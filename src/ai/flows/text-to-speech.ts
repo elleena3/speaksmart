@@ -32,7 +32,7 @@ const conversationalPrompt = ai.definePrompt({
   input: {
     schema: z.object({
       history: z.array(ConversationTurnSchema.extend({ isUser: z.boolean() })),
-      studentTranscript: z.string(), // Transcript is now required
+      studentTranscript: z.string().optional(),
     }),
   },
   output: { schema: z.string() },
@@ -40,22 +40,21 @@ const conversationalPrompt = ai.definePrompt({
 - Keep your responses relatively short and natural.
 - Ask questions to keep the conversation going.
 - If the student makes a grammatical error, don't correct them directly unless it significantly hinders understanding. The goal is conversation, not a grammar test.
-- The student's latest message is a transcript from their speech. Respond to it.
+
+{{#if studentTranscript}}
+The student's latest message is a transcript from their speech. Respond to it.
 
 Conversation History:
 {{#each history}}
 {{#if isUser}}Student{{else}}You{{/if}}: {{{text}}}
 {{/each}}
 Student: {{{studentTranscript}}}
-You:`,
-});
-
-// Prompt for the initial greeting
-const greetingPrompt = ai.definePrompt({
-    name: 'greetingPrompt',
-    input: { schema: z.string() },
-    output: { schema: z.string() },
-    prompt: `You are an AI English conversation partner named "Alex". Start the conversation. Greet the student and ask them how they are or what they'd like to talk about. For example: "Hi there! I'm Alex. How are you doing today?" or "Hello! I'm ready to chat when you are. What's on your mind?". Keep it short and friendly.`
+You:
+{{else}}
+You are starting the conversation. Greet the student and ask them how they are or what they'd like to talk about. For example: "Hi there! I'm Alex. How are you doing today?" or "Hello! I'm ready to chat when you are. What's on your mind?". Keep it short and friendly.
+You:
+{{/if}}
+`,
 });
 
 
@@ -124,15 +123,9 @@ const converseWithStudentFlow = ai.defineFlow(
   },
   async ({ studentRecordingDataUri, conversationHistory }) => {
     let studentTranscript = "";
-    let aiResponseText = "";
 
-    // Handle the initial greeting case when no audio is provided
-    if (!studentRecordingDataUri) {
-      const { output } = await greetingPrompt(""); // Pass an empty string
-      aiResponseText = output!;
-    } else {
-      // Handle subsequent conversation turns
-      // Step 1: Transcribe student's audio to text (STT)
+    // Step 1: Transcribe student's audio if it exists.
+    if (studentRecordingDataUri) {
       const sttResponse = await ai.generate({
         model: googleAI.model('gemini-2.0-flash'),
         prompt: [
@@ -147,21 +140,25 @@ const converseWithStudentFlow = ai.defineFlow(
           console.warn("Transcription result was empty.");
           studentTranscript = "(The user did not say anything)"; 
       }
-
-      // Step 2: Generate AI's text response based on transcript and history
-      const historyForPrompt = conversationHistory.map(turn => ({
-        ...turn,
-        isUser: turn.role === 'user',
-      }));
-
-      const { output } = await conversationalPrompt({
-        history: historyForPrompt,
-        studentTranscript,
-      });
-      aiResponseText = output!;
     }
 
-    // Step 3: Convert AI's text response to speech (TTS) for all cases
+    // Step 2: Generate AI's text response based on transcript and history
+    const historyForPrompt = conversationHistory.map(turn => ({
+      ...turn,
+      isUser: turn.role === 'user',
+    }));
+
+    const { output: aiResponseText } = await conversationalPrompt({
+      history: historyForPrompt,
+      // Pass studentTranscript only if it's not an empty string
+      studentTranscript: studentTranscript || undefined, 
+    });
+
+    if (!aiResponseText) {
+        throw new Error("AI did not generate a text response.");
+    }
+
+    // Step 3: Convert AI's text response to speech (TTS)
     const aiResponseAudioDataUri = await textToSpeech(aiResponseText);
 
     // Step 4: Return all the generated data
