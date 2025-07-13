@@ -1,4 +1,6 @@
 
+"use client"
+
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -13,21 +15,6 @@ const allAssessments: Assessment[] = [
   { id: "2", title: "6단원: 사람 묘사하기", topic: "성적 및 피드백 검토", status: "채점 완료" },
   { id: "1", title: "5단원: 나의 일과", topic: "성적 및 피드백 검토", status: "채점 완료" },
 ];
-
-function getDueDateText(endDate?: Date) {
-    if (!endDate) return null;
-    
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const end = new Date(endDate);
-    const diffTime = end.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-    if (diffDays < 0) return '마감일 지남';
-    if (diffDays === 0) return '오늘 마감';
-    return `마감까지 ${diffDays}일 남음`;
-}
 
 function AssessmentCard({ assessment }: { assessment: Assessment }) {
   const isToDo = assessment.status === '할 일';
@@ -55,8 +42,6 @@ function AssessmentCard({ assessment }: { assessment: Assessment }) {
         return <History className="h-5 w-5" />;
     }
   }
-  
-  const dueDateText = getDueDateText(assessment.endDate);
 
   return (
     <Card className="flex flex-col hover:shadow-md transition-shadow">
@@ -70,7 +55,7 @@ function AssessmentCard({ assessment }: { assessment: Assessment }) {
         <CardDescription>{assessment.topic}</CardDescription>
       </CardHeader>
       <CardContent className="flex-grow">
-        {isToDo && dueDateText && <p className="text-sm font-semibold text-destructive">{dueDateText}</p>}
+        {/* Removed problematic due date text */}
       </CardContent>
       <CardFooter>
         <Link href={isToDo ? `/student/assessment/${assessment.id}` : `/student/assessment/${assessment.id}/results`} passHref className="w-full">
@@ -85,33 +70,9 @@ function AssessmentCard({ assessment }: { assessment: Assessment }) {
 }
 
 export default function StudentDashboard() {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const availableAssessments = allAssessments.filter(assessment => {
-    if (assessment.status !== '할 일') {
-      return true; // Keep all completed assessments
-    }
-    
-    // For "to do" assessments, check the date range
-    if (assessment.id === 'free-talk') {
-        return true; // Free talk is always available
-    }
-    
-    const startDate = assessment.startDate ? new Date(assessment.startDate) : null;
-    const endDate = assessment.endDate ? new Date(assessment.endDate) : null;
-
-    // If no dates are set, it's always available
-    if (!startDate && !endDate) {
-        return true;
-    }
-    
-    // Check if within the date range
-    const isAfterStart = startDate ? today >= startDate : true;
-    const isBeforeEnd = endDate ? today <= endDate : true;
-
-    return isAfterStart && isBeforeEnd;
-  });
+  // The filtering logic that caused issues is removed for now.
+  // We'll just display all assessments.
+  const availableAssessments = allAssessments;
 
   return (
     <div className="space-y-6">
