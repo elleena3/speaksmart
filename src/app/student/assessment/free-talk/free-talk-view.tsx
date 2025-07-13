@@ -4,7 +4,7 @@
 import { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Mic, StopCircle, Loader2, Bot, User, CornerDownLeft, BrainCircuit, Play } from "lucide-react"
+import { Mic, StopCircle, Loader2, Bot, User, CornerDownLeft, BrainCircuit, Play, Volume2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { converseWithStudent } from "@/ai/flows/text-to-speech"
@@ -14,7 +14,7 @@ import { type Scenario } from "@/lib/types";
 const SESSION_STORAGE_KEY = 'freeTalkConversationHistory';
 
 export function FreeTalkView({ scenario, scenarioPrompt }: { scenario: Scenario, scenarioPrompt?: string }) {
-  const [sessionState, setSessionState] = useState<"idle" | "initializing" | "recording" | "processing" | "speaking">("idle");
+  const [sessionState, setSessionState] = useState<"idle" | "initializing" | "recording" | "processing" | "speaking" | "waiting_for_user">("idle");
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
   const [interimTranscript, setInterimTranscript] = useState<string | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -72,6 +72,7 @@ export function FreeTalkView({ scenario, scenarioPrompt }: { scenario: Scenario,
 
 
   const handleStartRecording = async () => {
+    if (sessionState !== 'waiting_for_user') return;
     setSessionState("recording");
     setInterimTranscript("듣고 있어요...");
     audioChunksRef.current = [];
@@ -89,7 +90,7 @@ export function FreeTalkView({ scenario, scenarioPrompt }: { scenario: Scenario,
         description: "마이크 접근을 허용해주세요.",
         variant: "destructive",
       });
-      setSessionState("idle");
+      setSessionState("waiting_for_user");
       setInterimTranscript(null);
     }
   };
@@ -142,7 +143,7 @@ export function FreeTalkView({ scenario, scenarioPrompt }: { scenario: Scenario,
         variant: "destructive",
       });
       setInterimTranscript(null);
-      setSessionState("speaking"); // Let user try again
+      setSessionState("waiting_for_user"); // Let user try again
     }
   };
 
@@ -187,6 +188,13 @@ export function FreeTalkView({ scenario, scenarioPrompt }: { scenario: Scenario,
         );
        case "speaking":
         return (
+            <Button size="lg" disabled className="w-full">
+                <Volume2 className="mr-2 h-5 w-5 animate-pulse" />
+                AI 응답 중...
+            </Button>
+        );
+       case "waiting_for_user":
+        return (
           <Button size="lg" onClick={handleStartRecording} className="w-full">
             <Mic className="mr-2 h-5 w-5" />
             응답하기
@@ -196,6 +204,7 @@ export function FreeTalkView({ scenario, scenarioPrompt }: { scenario: Scenario,
   };
 
   const getFooterButtonState = () => {
+    const isBusy = ["recording", "processing", "initializing", "speaking"].includes(sessionState);
     switch(sessionState) {
         case "idle":
             return (
@@ -206,7 +215,7 @@ export function FreeTalkView({ scenario, scenarioPrompt }: { scenario: Scenario,
             );
         default:
             return (
-                <Button onClick={handleFinishSession} variant="secondary" disabled={conversation.length === 0 || sessionState === 'recording' || sessionState === 'processing' || sessionState === 'initializing'}>
+                <Button onClick={handleFinishSession} variant="secondary" disabled={isBusy || conversation.length === 0}>
                     <CornerDownLeft className="mr-2 h-5 w-5"/>
                     대화 종료
                 </Button>
@@ -276,7 +285,7 @@ export function FreeTalkView({ scenario, scenarioPrompt }: { scenario: Scenario,
         )}
       </div>
 
-      <audio ref={audioPlayerRef} onEnded={() => setSessionState("speaking")} className="hidden" />
+      <audio ref={audioPlayerRef} onEnded={() => setSessionState("waiting_for_user")} className="hidden" />
     </div>
   );
 }
