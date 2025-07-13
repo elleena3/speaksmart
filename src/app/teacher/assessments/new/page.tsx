@@ -29,22 +29,35 @@ export default function NewAssessmentPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const formSchema = useMemo(() => z.object({
-    title: z.string().min(1, t.teacherAssessmentForm.errors.titleRequired),
-    topic: z.string().min(1, t.teacherAssessmentForm.errors.topicRequired),
-    prompt: z.string().min(1, t.teacherAssessmentForm.errors.promptRequired),
-    expectedFormat: z.string().min(1, t.teacherAssessmentForm.errors.expectedFormatRequired),
+    title: z.string(),
+    topic: z.string(),
+    prompt: z.string(),
+    expectedFormat: z.string(),
     startDate: z.date().optional(),
     endDate: z.date().optional(),
     assessmentType: z.enum(["monologue", "dialogue"]),
     scenario: z.enum(scenarios).optional(),
-  }).refine((data) => {
-      if (data.startDate && data.endDate) {
-          return data.endDate >= data.startDate;
+  }).superRefine((data, ctx) => {
+    const isFreeTalk = data.assessmentType === 'dialogue' && data.scenario === 'free-talk';
+
+    if (!isFreeTalk) {
+      if (!data.title) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: t.teacherAssessmentForm.errors.titleRequired, path: ['title'] });
       }
-      return true;
-  }, {
-      message: t.teacherAssessmentForm.errors.endDate,
-      path: ["endDate"],
+      if (!data.topic) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: t.teacherAssessmentForm.errors.topicRequired, path: ['topic'] });
+      }
+      if (!data.prompt) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: t.teacherAssessmentForm.errors.promptRequired, path: ['prompt'] });
+      }
+      if (!data.expectedFormat) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: t.teacherAssessmentForm.errors.expectedFormatRequired, path: ['expectedFormat'] });
+      }
+    }
+    
+    if (data.startDate && data.endDate && data.endDate < data.startDate) {
+      ctx.addIssue({ message: t.teacherAssessmentForm.errors.endDate, path: ["endDate"] });
+    }
   }), [t]);
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -60,39 +73,45 @@ export default function NewAssessmentPage() {
   });
 
   const assessmentType = form.watch("assessmentType");
+  const scenario = form.watch("scenario");
+  const isFreeTalkDialogue = assessmentType === 'dialogue' && scenario === 'free-talk';
 
   useEffect(() => {
-    // Re-validate form on language change
     form.trigger();
   }, [language, form]);
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsSubmitting(true);
     
-    // Simulate API call to create assessment
+    let submissionValues = { ...values };
+    if (isFreeTalkDialogue) {
+        submissionValues.title = values.title || t.teacherAssessmentForm.scenarios.freeTalk;
+        submissionValues.topic = values.topic || t.teacherAssessmentForm.freeTalkDefaults.topic;
+        submissionValues.prompt = values.prompt || t.teacherAssessmentForm.freeTalkDefaults.prompt;
+        submissionValues.expectedFormat = values.expectedFormat || t.teacherAssessmentForm.freeTalkDefaults.expectedFormat;
+    }
+    
     await new Promise(resolve => setTimeout(resolve, 1500));
     
-    // In a real app, this would come from the server response.
     const newAssessment: TeacherAssessment = {
       id: new Date().getTime().toString(),
-      title: values.title,
+      title: submissionValues.title,
       studentsCompleted: 0,
-      totalStudents: 20, // Assuming a default value
+      totalStudents: 20, 
       averageScore: 0,
       dateCreated: new Date().toISOString().split('T')[0],
-      startDate: values.startDate,
-      endDate: values.endDate,
-      assessmentType: values.assessmentType,
-      scenario: values.scenario,
+      startDate: submissionValues.startDate,
+      endDate: submissionValues.endDate,
+      assessmentType: submissionValues.assessmentType,
+      scenario: submissionValues.scenario,
     };
 
-    // Save to localStorage to persist across page navigation for this demo
     const existingAssessments: TeacherAssessment[] = JSON.parse(localStorage.getItem('assessments') || '[]');
     localStorage.setItem('assessments', JSON.stringify([...existingAssessments, newAssessment]));
 
     toast({
       title: t.teacherAssessmentForm.createSuccessToast.title,
-      description: t.teacherAssessmentForm.createSuccessToast.description.replace('{title}', values.title),
+      description: t.teacherAssessmentForm.createSuccessToast.description.replace('{title}', submissionValues.title),
     });
 
     setIsSubmitting(false);
@@ -175,9 +194,9 @@ export default function NewAssessmentPage() {
               name="title"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>{t.teacherAssessmentForm.titleLabel}</FormLabel>
+                  <FormLabel>{t.teacherAssessmentForm.titleLabel} {!isFreeTalkDialogue ? null : `(${t.teacherAssessmentForm.optional})`}</FormLabel>
                   <FormControl>
-                    <Input placeholder={t.teacherAssessmentForm.titlePlaceholder} {...field} />
+                    <Input placeholder={isFreeTalkDialogue ? t.teacherAssessmentForm.scenarios.freeTalk : t.teacherAssessmentForm.titlePlaceholder} {...field} />
                   </FormControl>
                   <FormDescription>{t.teacherAssessmentForm.titleDescription}</FormDescription>
                   <FormMessage />
@@ -189,9 +208,9 @@ export default function NewAssessmentPage() {
               name="topic"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>{t.teacherAssessmentForm.topicLabel}</FormLabel>
+                  <FormLabel>{t.teacherAssessmentForm.topicLabel} {!isFreeTalkDialogue ? null : `(${t.teacherAssessmentForm.optional})`}</FormLabel>
                   <FormControl>
-                    <Input placeholder={t.teacherAssessmentForm.topicPlaceholder} {...field} />
+                    <Input placeholder={isFreeTalkDialogue ? t.teacherAssessmentForm.freeTalkDefaults.topic : t.teacherAssessmentForm.topicPlaceholder} {...field} />
                   </FormControl>
                   <FormDescription>{t.teacherAssessmentForm.topicDescription}</FormDescription>
                   <FormMessage />
@@ -203,10 +222,16 @@ export default function NewAssessmentPage() {
               name="prompt"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>{assessmentType === 'monologue' ? t.teacherAssessmentForm.promptLabel : t.teacherAssessmentForm.scenarioPromptLabel}</FormLabel>
+                  <FormLabel>{assessmentType === 'monologue' ? t.teacherAssessmentForm.promptLabel : t.teacherAssessmentForm.scenarioPromptLabel} {!isFreeTalkDialogue ? null : `(${t.teacherAssessmentForm.optional})`}</FormLabel>
                   <FormControl>
                     <Textarea
-                      placeholder={assessmentType === 'monologue' ? t.teacherAssessmentForm.promptPlaceholder : t.teacherAssessmentForm.scenarioPromptPlaceholder}
+                      placeholder={
+                        isFreeTalkDialogue 
+                          ? t.teacherAssessmentForm.freeTalkDefaults.prompt 
+                          : assessmentType === 'monologue' 
+                            ? t.teacherAssessmentForm.promptPlaceholder 
+                            : t.teacherAssessmentForm.scenarioPromptPlaceholder
+                      }
                       rows={4}
                       {...field}
                     />
@@ -221,10 +246,10 @@ export default function NewAssessmentPage() {
               name="expectedFormat"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>{t.teacherAssessmentForm.expectedFormatLabel}</FormLabel>
+                  <FormLabel>{t.teacherAssessmentForm.expectedFormatLabel} {!isFreeTalkDialogue ? null : `(${t.teacherAssessmentForm.optional})`}</FormLabel>
                   <FormControl>
                     <Textarea
-                      placeholder={t.teacherAssessmentForm.expectedFormatPlaceholder}
+                      placeholder={isFreeTalkDialogue ? t.teacherAssessmentForm.freeTalkDefaults.expectedFormat : t.teacherAssessmentForm.expectedFormatPlaceholder}
                       rows={4}
                       {...field}
                     />
@@ -336,3 +361,5 @@ export default function NewAssessmentPage() {
     </Card>
   );
 }
+
+    

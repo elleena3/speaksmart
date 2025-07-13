@@ -103,6 +103,12 @@ export const translations = {
       createDescription: "새로운 말하기 평가를 생성하려면 아래 양식을 작성해주세요.",
       editTitle: "평가 수정",
       editDescription: "평가 정보를 수정하려면 아래 양식을 업데이트해주세요.",
+      optional: "선택",
+      freeTalkDefaults: {
+          topic: "AI와 자유롭게 대화하세요.",
+          prompt: "AI와 자유롭게 영어로 대화해 보세요. 준비가 되면 '대화 시작' 버튼을 누르세요.",
+          expectedFormat: "학생은 자연스러운 대화에 참여해야 합니다. AI는 유창성, 발음, 어휘, 문법을 전반적으로 평가합니다."
+      },
       typeLabel: "평가 유형",
       typeMonologue: "혼자 말하기 (Monologue)",
       typeDialogue: "AI와 대화하기 (Dialogue)",
@@ -277,6 +283,12 @@ export const translations = {
       createDescription: "Fill out the form below to create a new speaking assessment.",
       editTitle: "Edit Assessment",
       editDescription: "Update the form below to edit the assessment details.",
+      optional: "Optional",
+      freeTalkDefaults: {
+          topic: "Have a free conversation with the AI.",
+          prompt: "Have a free conversation in English with the AI. Click 'Start Conversation' when you're ready.",
+          expectedFormat: "The student should engage in a natural conversation. The AI will evaluate overall fluency, pronunciation, vocabulary, and grammar."
+      },
       typeLabel: "Assessment Type",
       typeMonologue: "Monologue",
       typeDialogue: "Dialogue with AI",
@@ -351,3 +363,5 @@ export const translations = {
 };
 
 export type Translation = typeof translations.ko;
+
+    

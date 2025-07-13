@@ -41,22 +41,35 @@ export default function EditAssessmentPage() {
   const assessmentId = Array.isArray(params.id) ? params.id[0] : params.id;
   
   const formSchema = useMemo(() => z.object({
-    title: z.string().min(1, t.teacherAssessmentForm.errors.titleRequired),
-    topic: z.string().min(1, t.teacherAssessmentForm.errors.topicRequired),
-    prompt: z.string().min(1, t.teacherAssessmentForm.errors.promptRequired),
-    expectedFormat: z.string().min(1, t.teacherAssessmentForm.errors.expectedFormatRequired),
+    title: z.string(),
+    topic: z.string(),
+    prompt: z.string(),
+    expectedFormat: z.string(),
     startDate: z.date().optional(),
     endDate: z.date().optional(),
     assessmentType: z.enum(["monologue", "dialogue"]),
     scenario: z.enum(scenarios).optional(),
-  }).refine((data) => {
-      if (data.startDate && data.endDate) {
-          return data.endDate >= data.startDate;
+  }).superRefine((data, ctx) => {
+    const isFreeTalk = data.assessmentType === 'dialogue' && data.scenario === 'free-talk';
+
+    if (!isFreeTalk) {
+      if (!data.title) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: t.teacherAssessmentForm.errors.titleRequired, path: ['title'] });
       }
-      return true;
-  }, {
-      message: t.teacherAssessmentForm.errors.endDate,
-      path: ["endDate"],
+      if (!data.topic) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: t.teacherAssessmentForm.errors.topicRequired, path: ['topic'] });
+      }
+      if (!data.prompt) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: t.teacherAssessmentForm.errors.promptRequired, path: ['prompt'] });
+      }
+      if (!data.expectedFormat) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: t.teacherAssessmentForm.errors.expectedFormatRequired, path: ['expectedFormat'] });
+      }
+    }
+    
+    if (data.startDate && data.endDate && data.endDate < data.startDate) {
+      ctx.addIssue({ message: t.teacherAssessmentForm.errors.endDate, path: ["endDate"] });
+    }
   }), [t]);
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -72,11 +85,15 @@ export default function EditAssessmentPage() {
   });
 
   const assessmentType = form.watch("assessmentType");
+  const scenario = form.watch("scenario");
+  const isFreeTalkDialogue = assessmentType === 'dialogue' && scenario === 'free-talk';
 
   useEffect(() => {
     if (assessmentId) {
-      // Simulate fetching data
-      const assessmentData = mockAssessments[assessmentId as keyof typeof mockAssessments];
+      const storedAssessments = localStorage.getItem('assessments');
+      const allAssessments = storedAssessments ? [...mockAssessments, ...JSON.parse(storedAssessments)] : mockAssessments;
+      const assessmentData = allAssessments.find(a => a.id === assessmentId);
+
       if (assessmentData) {
         form.reset(assessmentData);
       } else {
@@ -92,19 +109,45 @@ export default function EditAssessmentPage() {
   }, [assessmentId, form, router, toast]);
 
   useEffect(() => {
-    // Re-validate form on language change
     form.trigger();
   }, [language, form]);
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsSubmitting(true);
-    // Simulate API call to update assessment
-    console.log(`Updating assessment ${assessmentId} with values:`, values);
+    
+    let submissionValues = { ...values };
+    if (isFreeTalkDialogue) {
+        submissionValues.title = values.title || t.teacherAssessmentForm.scenarios.freeTalk;
+        submissionValues.topic = values.topic || t.teacherAssessmentForm.freeTalkDefaults.topic;
+        submissionValues.prompt = values.prompt || t.teacherAssessmentForm.freeTalkDefaults.prompt;
+        submissionValues.expectedFormat = values.expectedFormat || t.teacherAssessmentForm.freeTalkDefaults.expectedFormat;
+    }
+
+    console.log(`Updating assessment ${assessmentId} with values:`, submissionValues);
     await new Promise(resolve => setTimeout(resolve, 1500));
+
+    const storedAssessments = localStorage.getItem('assessments');
+    let assessments: any[] = storedAssessments ? JSON.parse(storedAssessments) : [];
+    const assessmentIndex = assessments.findIndex(a => a.id === assessmentId);
+
+    if (assessmentIndex > -1) {
+      assessments[assessmentIndex] = { ...assessments[assessmentIndex], ...submissionValues };
+    } else {
+        const mockIndex = mockAssessments[assessmentId as keyof typeof mockAssessments] ? assessmentId : null;
+        if (mockIndex) {
+            console.warn("Editing a mock assessment. This will not persist if not in localStorage.");
+        } else {
+             toast({ title: "Error", description: "Could not find assessment to update.", variant: "destructive" });
+             setIsSubmitting(false);
+             return;
+        }
+    }
+
+    localStorage.setItem('assessments', JSON.stringify(assessments));
 
     toast({
       title: t.teacherAssessmentForm.editSuccessToast.title,
-      description: t.teacherAssessmentForm.editSuccessToast.description.replace('{title}', values.title),
+      description: t.teacherAssessmentForm.editSuccessToast.description.replace('{title}', submissionValues.title),
     });
 
     setIsSubmitting(false);
@@ -195,9 +238,9 @@ export default function EditAssessmentPage() {
               name="title"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>{t.teacherAssessmentForm.titleLabel}</FormLabel>
+                  <FormLabel>{t.teacherAssessmentForm.titleLabel} {!isFreeTalkDialogue ? null : `(${t.teacherAssessmentForm.optional})`}</FormLabel>
                   <FormControl>
-                    <Input placeholder={t.teacherAssessmentForm.titlePlaceholder} {...field} />
+                    <Input placeholder={isFreeTalkDialogue ? t.teacherAssessmentForm.scenarios.freeTalk : t.teacherAssessmentForm.titlePlaceholder} {...field} />
                   </FormControl>
                   <FormDescription>{t.teacherAssessmentForm.titleDescription}</FormDescription>
                   <FormMessage />
@@ -209,9 +252,9 @@ export default function EditAssessmentPage() {
               name="topic"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>{t.teacherAssessmentForm.topicLabel}</FormLabel>
+                  <FormLabel>{t.teacherAssessmentForm.topicLabel} {!isFreeTalkDialogue ? null : `(${t.teacherAssessmentForm.optional})`}</FormLabel>
                   <FormControl>
-                    <Input placeholder={t.teacherAssessmentForm.topicPlaceholder} {...field} />
+                    <Input placeholder={isFreeTalkDialogue ? t.teacherAssessmentForm.freeTalkDefaults.topic : t.teacherAssessmentForm.topicPlaceholder} {...field} />
                   </FormControl>
                   <FormDescription>{t.teacherAssessmentForm.topicDescription}</FormDescription>
                   <FormMessage />
@@ -223,10 +266,16 @@ export default function EditAssessmentPage() {
               name="prompt"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>{assessmentType === 'monologue' ? t.teacherAssessmentForm.promptLabel : t.teacherAssessmentForm.scenarioPromptLabel}</FormLabel>
+                  <FormLabel>{assessmentType === 'monologue' ? t.teacherAssessmentForm.promptLabel : t.teacherAssessmentForm.scenarioPromptLabel} {!isFreeTalkDialogue ? null : `(${t.teacherAssessmentForm.optional})`}</FormLabel>
                   <FormControl>
                     <Textarea
-                      placeholder={assessmentType === 'monologue' ? t.teacherAssessmentForm.promptPlaceholder : t.teacherAssessmentForm.scenarioPromptPlaceholder}
+                      placeholder={
+                        isFreeTalkDialogue 
+                          ? t.teacherAssessmentForm.freeTalkDefaults.prompt 
+                          : assessmentType === 'monologue' 
+                            ? t.teacherAssessmentForm.promptPlaceholder 
+                            : t.teacherAssessmentForm.scenarioPromptPlaceholder
+                      }
                       rows={4}
                       {...field}
                     />
@@ -241,10 +290,10 @@ export default function EditAssessmentPage() {
               name="expectedFormat"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>{t.teacherAssessmentForm.expectedFormatLabel}</FormLabel>
+                  <FormLabel>{t.teacherAssessmentForm.expectedFormatLabel} {!isFreeTalkDialogue ? null : `(${t.teacherAssessmentForm.optional})`}</FormLabel>
                   <FormControl>
                     <Textarea
-                      placeholder={t.teacherAssessmentForm.expectedFormatPlaceholder}
+                      placeholder={isFreeTalkDialogue ? t.teacherAssessmentForm.freeTalkDefaults.expectedFormat : t.teacherAssessmentForm.expectedFormatPlaceholder}
                       rows={4}
                       {...field}
                     />
@@ -354,3 +403,5 @@ export default function EditAssessmentPage() {
     </Card>
   );
 }
+
+    
