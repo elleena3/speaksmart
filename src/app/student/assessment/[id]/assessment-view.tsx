@@ -23,8 +23,8 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Asses
   const handleStartRecording = () => {
     setIsRecording(true)
     toast({
-      title: "Recording Started",
-      description: "You have 1 minute to speak.",
+      title: "녹음 시작됨",
+      description: "1분 동안 말씀하실 수 있습니다.",
     })
   }
 
@@ -32,8 +32,8 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Asses
     setIsRecording(false)
     setIsProcessing(true)
     toast({
-      title: "Recording Stopped",
-      description: "Processing your audio...",
+      title: "녹음 중지됨",
+      description: "오디오를 처리 중입니다...",
     })
 
     try {
@@ -55,8 +55,8 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Asses
       await new Promise(resolve => setTimeout(resolve, 3000));
 
       toast({
-        title: "Processing Complete!",
-        description: "Your feedback is ready to view.",
+        title: "처리 완료!",
+        description: "피드백을 확인할 준비가 되었습니다.",
       })
 
       router.push(`/student/assessment/${assessmentDetails.id}/results`)
@@ -64,8 +64,8 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Asses
     } catch (error) {
       console.error("Error processing assessment:", error)
       toast({
-        title: "Error",
-        description: "There was a problem processing your recording. Please try again.",
+        title: "오류",
+        description: "녹음을 처리하는 중에 문제가 발생했습니다. 다시 시도해 주세요.",
         variant: "destructive",
       })
       setIsProcessing(false)
@@ -77,7 +77,7 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Asses
       return (
         <Button size="lg" disabled className="w-full">
           <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-          Processing...
+          처리 중...
         </Button>
       )
     }
@@ -85,14 +85,14 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Asses
       return (
         <Button size="lg" onClick={handleStopRecording} className="w-full" variant="destructive">
           <StopCircle className="mr-2 h-5 w-5" />
-          Stop Recording
+          녹음 중지
         </Button>
       )
     }
     return (
       <Button size="lg" onClick={handleStartRecording} className="w-full">
         <Mic className="mr-2 h-5 w-5" />
-        Start Recording
+        녹음 시작
       </Button>
     )
   }
@@ -106,7 +106,7 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Asses
       <div className="w-full max-w-xs">
         {getButtonState()}
       </div>
-      <p className="text-sm text-muted-foreground">Click "Start Recording" when you are ready.</p>
+      <p className="text-sm text-muted-foreground">준비가 되면 "녹음 시작"을 클릭하세요.</p>
     </div>
   )
 }

@@ -9,26 +9,26 @@ import { OverviewChart } from "./overview-chart"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 
 const assessments: TeacherAssessment[] = [
-  { id: "1", title: "Unit 5: My Daily Routine", studentsCompleted: 18, totalStudents: 20, averageScore: 85, dateCreated: "2024-05-10" },
-  { id: "2", title: "Unit 6: Describing People", studentsCompleted: 15, totalStudents: 20, averageScore: 78, dateCreated: "2024-05-17" },
-  { id: "3", title: "Mid-term Speaking Test", studentsCompleted: 20, totalStudents: 20, averageScore: 91, dateCreated: "2024-05-24" },
-  { id: "4", title: "Unit 7: Hobbies and Interests", studentsCompleted: 0, totalStudents: 20, averageScore: 0, dateCreated: "2024-05-31" },
+  { id: "1", title: "5단원: 나의 일과", studentsCompleted: 18, totalStudents: 20, averageScore: 85, dateCreated: "2024-05-10" },
+  { id: "2", title: "6단원: 사람 묘사하기", studentsCompleted: 15, totalStudents: 20, averageScore: 78, dateCreated: "2024-05-17" },
+  { id: "3", title: "중간 말하기 시험", studentsCompleted: 20, totalStudents: 20, averageScore: 91, dateCreated: "2024-05-24" },
+  { id: "4", title: "7단원: 취미와 관심사", studentsCompleted: 0, totalStudents: 20, averageScore: 0, dateCreated: "2024-05-31" },
 ];
 
 export default function TeacherDashboard() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
+        <h2 className="text-3xl font-bold tracking-tight">대시보드</h2>
         <Button>
-          <PlusCircle className="mr-2 h-4 w-4" /> Create Assessment
+          <PlusCircle className="mr-2 h-4 w-4" /> 평가 만들기
         </Button>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Class Performance Overview</CardTitle>
-          <CardDescription>Average scores across recent assessments.</CardDescription>
+          <CardTitle>수업 성과 개요</CardTitle>
+          <CardDescription>최근 평가의 평균 점수입니다.</CardDescription>
         </CardHeader>
         <CardContent>
           <OverviewChart />
@@ -37,18 +37,18 @@ export default function TeacherDashboard() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Assessments</CardTitle>
-          <CardDescription>Manage your speaking assessments.</CardDescription>
+          <CardTitle>평가</CardTitle>
+          <CardDescription>말하기 평가를 관리합니다.</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Title</TableHead>
-                <TableHead className="text-center">Completions</TableHead>
-                <TableHead className="text-center">Avg. Score</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead><span className="sr-only">Actions</span></TableHead>
+                <TableHead>제목</TableHead>
+                <TableHead className="text-center">완료</TableHead>
+                <TableHead className="text-center">평균 점수</TableHead>
+                <TableHead>생성일</TableHead>
+                <TableHead><span className="sr-only">작업</span></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -66,7 +66,7 @@ export default function TeacherDashboard() {
                   </TableCell>
                   <TableCell className="text-center">
                     <Badge variant="outline" className="font-mono">
-                      {assessment.averageScore > 0 ? `${assessment.averageScore}%` : 'N/A'}
+                      {assessment.averageScore > 0 ? `${assessment.averageScore}%` : '해당 없음'}
                     </Badge>
                   </TableCell>
                   <TableCell>{assessment.dateCreated}</TableCell>
@@ -74,14 +74,14 @@ export default function TeacherDashboard() {
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" className="h-8 w-8 p-0">
-                          <span className="sr-only">Open menu</span>
+                          <span className="sr-only">메뉴 열기</span>
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem asChild><Link href={`/teacher/assessment/${assessment.id}`}>View Results</Link></DropdownMenuItem>
-                        <DropdownMenuItem>Edit</DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive focus:bg-destructive/10 focus:text-destructive">Delete</DropdownMenuItem>
+                        <DropdownMenuItem asChild><Link href={`/teacher/assessment/${assessment.id}`}>결과 보기</Link></DropdownMenuItem>
+                        <DropdownMenuItem>편집</DropdownMenuItem>
+                        <DropdownMenuItem className="text-destructive focus:bg-destructive/10 focus:text-destructive">삭제</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>

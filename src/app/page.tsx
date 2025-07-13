@@ -10,10 +10,10 @@ export default function Home() {
       <div className="text-center mb-12">
         <div className="flex justify-center items-center mb-4">
           <Logo className="w-16 h-16 text-primary" />
-          <h1 className="text-5xl font-bold font-headline ml-4">SpeakSmart Evaluator</h1>
+          <h1 className="text-5xl font-bold font-headline ml-4">SpeakSmart 평가도구</h1>
         </div>
         <p className="text-xl text-muted-foreground">
-          AI-powered English speaking assessment platform
+          AI 기반 영어 말하기 평가 플랫폼
         </p>
       </div>
 
@@ -24,16 +24,16 @@ export default function Home() {
               <div className="p-3 bg-primary/10 rounded-full">
                 <GraduationCap className="w-8 h-8 text-primary" />
               </div>
-              <CardTitle className="text-2xl font-headline">For Students</CardTitle>
+              <CardTitle className="text-2xl font-headline">학생용</CardTitle>
             </div>
           </CardHeader>
           <CardContent>
             <p className="text-muted-foreground mb-6">
-              Take assessments, practice your speaking skills, and receive instant AI feedback to help you improve.
+              평가를 받고, 말하기 능력을 연습하고, 실력 향상에 도움이 되는 즉각적인 AI 피드백을 받아보세요.
             </p>
             <Link href="/student/dashboard" passHref>
               <Button className="w-full" size="lg">
-                Go to Student Dashboard
+                학생 대시보드로 가기
               </Button>
             </Link>
           </CardContent>
@@ -45,23 +45,23 @@ export default function Home() {
               <div className="p-3 bg-primary/10 rounded-full">
                 <User className="w-8 h-8 text-primary" />
               </div>
-              <CardTitle className="text-2xl font-headline">For Teachers</CardTitle>
+              <CardTitle className="text-2xl font-headline">교사용</CardTitle>
             </div>
           </CardHeader>
           <CardContent>
             <p className="text-muted-foreground mb-6">
-              Manage assessments, view student performance, and gain insights to enhance your teaching methods.
+              평가를 관리하고, 학생 성과를 확인하며, 교수법을 개선하기 위한 통찰력을 얻으세요.
             </p>
             <Link href="/teacher/dashboard" passHref>
               <Button className="w-full" size="lg">
-                Go to Teacher Dashboard
+                교사 대시보드로 가기
               </Button>
             </Link>
           </CardContent>
         </Card>
       </div>
       <footer className="mt-16 text-center text-muted-foreground text-sm">
-        <p>&copy; {new Date().getFullYear()} SpeakSmart Evaluator. All rights reserved.</p>
+        <p>&copy; {new Date().getFullYear()} SpeakSmart 평가도구. 모든 권리 보유.</p>
       </footer>
     </main>
   );

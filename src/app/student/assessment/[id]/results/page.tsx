@@ -8,7 +8,7 @@ export default function AssessmentResultsPage({ params }: { params: { id: string
   return (
     <FeedbackView
       assessmentId={params.id}
-      assessmentTitle="Unit 7: Hobbies and Interests"
+      assessmentTitle="7단원: 취미와 관심사"
       aiFeedback={aiFeedback.feedback}
     />
   )

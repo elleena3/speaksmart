@@ -5,26 +5,26 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 
 const pastAssessments = [
-    { id: "3", title: "Mid-term Speaking Test", score: 91, date: "2024-05-24" },
-    { id: "2", title: "Unit 6: Describing People", score: 78, date: "2024-05-17" },
-    { id: "1", title: "Unit 5: My Daily Routine", score: 85, date: "2024-05-10" },
+    { id: "3", title: "중간 말하기 시험", score: 91, date: "2024-05-24" },
+    { id: "2", title: "6단원: 사람 묘사하기", score: 78, date: "2024-05-17" },
+    { id: "1", title: "5단원: 나의 일과", score: 85, date: "2024-05-10" },
 ];
 
 export default function HistoryPage() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>My Results</CardTitle>
-        <CardDescription>A history of all your completed assessments.</CardDescription>
+        <CardTitle>내 결과</CardTitle>
+        <CardDescription>완료된 모든 평가 기록입니다.</CardDescription>
       </CardHeader>
       <CardContent>
         <Table>
             <TableHeader>
                 <TableRow>
-                    <TableHead>Assessment</TableHead>
-                    <TableHead>Date Completed</TableHead>
-                    <TableHead>Score</TableHead>
-                    <TableHead>Action</TableHead>
+                    <TableHead>평가</TableHead>
+                    <TableHead>완료 날짜</TableHead>
+                    <TableHead>점수</TableHead>
+                    <TableHead>작업</TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody>
@@ -37,7 +37,7 @@ export default function HistoryPage() {
                         </TableCell>
                         <TableCell>
                             <Link href={`/student/assessment/${assessment.id}/results`}>
-                                <Button variant="secondary" size="sm">View Feedback</Button>
+                                <Button variant="secondary" size="sm">피드백 보기</Button>
                             </Link>
                         </TableCell>
                     </TableRow>

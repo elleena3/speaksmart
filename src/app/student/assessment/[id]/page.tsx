@@ -4,9 +4,9 @@ import { AssessmentView } from "./assessment-view"
 export default function AssessmentPage({ params }: { params: { id: string } }) {
   const assessmentDetails = {
     id: params.id,
-    title: "Unit 7: Hobbies and Interests",
-    prompt: "Please talk about your favorite hobby. You should mention what it is, why you like it, and how often you do it. You will have 1 minute to speak.",
-    expectedFormat: "Student should introduce a hobby, provide reasons for liking it, and state the frequency. Use of present simple tense and relevant vocabulary is expected."
+    title: "7단원: 취미와 관심사",
+    prompt: "가장 좋아하는 취미에 대해 이야기해주세요. 무엇인지, 왜 좋아하는지, 얼마나 자주 하는지 언급해야 합니다. 1분 동안 말할 시간이 주어집니다.",
+    expectedFormat: "학생은 취미를 소개하고, 좋아하는 이유를 제시하며, 빈도를 언급해야 합니다. 현재 시제와 관련 어휘 사용이 예상됩니다."
   }
 
   return (

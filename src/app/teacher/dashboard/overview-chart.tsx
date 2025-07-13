@@ -4,18 +4,18 @@ import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis } from "recharts"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 
 const data = [
-  { name: "Unit 1", avgScore: 82 },
-  { name: "Unit 2", avgScore: 76 },
-  { name: "Unit 3", avgScore: 88 },
-  { name: "Unit 4", avgScore: 91 },
-  { name: "Unit 5", avgScore: 85 },
-  { name: "Unit 6", avgScore: 78 },
-  { name: "Mid-term", avgScore: 91 },
+  { name: "1단원", avgScore: 82 },
+  { name: "2단원", avgScore: 76 },
+  { name: "3단원", avgScore: 88 },
+  { name: "4단원", avgScore: 91 },
+  { name: "5단원", avgScore: 85 },
+  { name: "6단원", avgScore: 78 },
+  { name: "중간", avgScore: 91 },
 ]
 
 const chartConfig = {
   avgScore: {
-    label: "Average Score",
+    label: "평균 점수",
     color: "hsl(var(--primary))",
   },
 }

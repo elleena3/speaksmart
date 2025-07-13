@@ -8,8 +8,8 @@ export default function ProfilePage() {
   return (
     <Card className="max-w-2xl mx-auto">
       <CardHeader>
-        <CardTitle>My Profile</CardTitle>
-        <CardDescription>Manage your profile settings and personal information.</CardDescription>
+        <CardTitle>내 프로필</CardTitle>
+        <CardDescription>프로필 설정 및 개인 정보를 관리하세요.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="flex items-center gap-4">
@@ -24,14 +24,14 @@ export default function ProfilePage() {
         </div>
         <div className="space-y-4">
             <div className="grid gap-2">
-                <Label htmlFor="name">Full Name</Label>
+                <Label htmlFor="name">전체 이름</Label>
                 <Input id="name" defaultValue="Alex Doe" />
             </div>
             <div className="grid gap-2">
-                <Label htmlFor="email">Email Address</Label>
+                <Label htmlFor="email">이메일 주소</Label>
                 <Input id="email" type="email" defaultValue="alex.doe@example.com" />
             </div>
-            <Button>Save Changes</Button>
+            <Button>변경사항 저장</Button>
         </div>
       </CardContent>
     </Card>

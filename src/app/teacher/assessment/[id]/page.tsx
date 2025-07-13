@@ -7,14 +7,14 @@ import { Textarea } from "@/components/ui/textarea"
 import { Paperclip, Download } from "lucide-react"
 
 const studentResults = [
-  { studentId: "s1", name: "Alice Johnson", score: 92, status: "Graded", date: "2024-05-12" },
-  { studentId: "s2", name: "Bob Williams", score: 88, status: "Graded", date: "2024-05-12" },
-  { studentId: "s3", name: "Charlie Brown", score: 76, status: "Graded", date: "2024-05-13" },
-  { studentId: "s4", name: "Diana Prince", status: "Submitted", date: "2024-05-14" },
-  { studentId: "s5", name: "Ethan Hunt", score: 95, status: "Graded", date: "2024-05-12" },
+  { studentId: "s1", name: "Alice Johnson", score: 92, status: "채점 완료", date: "2024-05-12" },
+  { studentId: "s2", name: "Bob Williams", score: 88, status: "채점 완료", date: "2024-05-12" },
+  { studentId: "s3", name: "Charlie Brown", score: 76, status: "채점 완료", date: "2024-05-13" },
+  { studentId: "s4", name: "Diana Prince", status: "제출", date: "2024-05-14" },
+  { studentId: "s5", name: "Ethan Hunt", score: 95, status: "채점 완료", date: "2024-05-12" },
 ]
 
-const curricularRemarks = "Students demonstrated strong comprehension of daily routine vocabulary. Many excelled at using present simple tense correctly. Common areas for improvement include pronunciation of 'th' sounds and using a wider range of adverbs of frequency. Overall, performance was very good, with most students meeting or exceeding expectations for this unit."
+const curricularRemarks = "학생들은 일상생활 어휘에 대한 높은 이해도를 보였습니다. 많은 학생들이 현재 시제를 정확하게 사용하는 데 뛰어났습니다. 공통적인 개선 영역에는 'th' 발음과 다양한 빈도 부사 사용이 포함됩니다. 전반적으로, 대부분의 학생들이 이 단원에 대한 기대치를 충족하거나 초과하는 등 매우 우수한 성과를 보였습니다."
 
 export default function AssessmentResultsPage({ params }: { params: { id: string } }) {
   return (
@@ -22,18 +22,18 @@ export default function AssessmentResultsPage({ params }: { params: { id: string
       <div className="md:col-span-2 space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle>Unit 5: My Daily Routine - Results</CardTitle>
-            <CardDescription>Showing results for assessment ID: {params.id}</CardDescription>
+            <CardTitle>5단원: 나의 일과 - 결과</CardTitle>
+            <CardDescription>평가 ID 결과 보기: {params.id}</CardDescription>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Student</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Score</TableHead>
-                  <TableHead>Submission Date</TableHead>
-                  <TableHead>Action</TableHead>
+                  <TableHead>학생</TableHead>
+                  <TableHead>상태</TableHead>
+                  <TableHead>점수</TableHead>
+                  <TableHead>제출일</TableHead>
+                  <TableHead>작업</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -49,14 +49,14 @@ export default function AssessmentResultsPage({ params }: { params: { id: string
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={result.status === "Graded" ? "default" : "secondary"}>
+                      <Badge variant={result.status === "채점 완료" ? "default" : "secondary"}>
                         {result.status}
                       </Badge>
                     </TableCell>
-                    <TableCell>{result.score ? `${result.score}%` : "N/A"}</TableCell>
+                    <TableCell>{result.score ? `${result.score}%` : "해당 없음"}</TableCell>
                     <TableCell>{result.date}</TableCell>
                     <TableCell>
-                      <Button variant="outline" size="sm">View</Button>
+                      <Button variant="outline" size="sm">보기</Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -69,27 +69,27 @@ export default function AssessmentResultsPage({ params }: { params: { id: string
       <div className="space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle>Draft Curricular Remarks</CardTitle>
-            <CardDescription>AI-generated draft based on class performance.</CardDescription>
+            <CardTitle>교과과정 비고 초안</CardTitle>
+            <CardDescription>수업 성과에 기반한 AI 생성 초안입니다.</CardDescription>
           </CardHeader>
           <CardContent>
             <Textarea readOnly value={curricularRemarks} className="h-48 bg-muted/50" />
             <Button className="w-full mt-4">
-              <Paperclip className="mr-2 h-4 w-4" /> Save to Records
+              <Paperclip className="mr-2 h-4 w-4" /> 기록에 저장
             </Button>
           </CardContent>
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>Student Feedback Summary</CardTitle>
-             <CardDescription>AI-summarized feedback from students about this assessment.</CardDescription>
+            <CardTitle>학생 피드백 요약</CardTitle>
+             <CardDescription>이 평가에 대한 학생들의 AI 요약 피드백입니다.</CardDescription>
           </CardHeader>
           <CardContent>
              <div className="text-sm text-muted-foreground p-4 bg-muted/50 rounded-lg italic">
-              "The prompts were clear, but some found the time limit a bit stressful. A few students suggested adding a practice mode before the real assessment."
+              "지시문은 명확했지만, 일부 학생들은 시간제한이 약간 부담스럽다고 느꼈습니다. 몇몇 학생들은 실제 평가 전에 연습 모드를 추가할 것을 제안했습니다."
              </div>
             <Button variant="outline" className="w-full mt-4">
-              <Download className="mr-2 h-4 w-4" /> Download Full Feedback
+              <Download className="mr-2 h-4 w-4" /> 전체 피드백 다운로드
             </Button>
           </CardContent>
         </Card>

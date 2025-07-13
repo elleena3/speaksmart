@@ -2,7 +2,7 @@ export type Assessment = {
   id: string;
   title: string;
   topic: string;
-  status: 'To Do' | 'Completed' | 'Graded';
+  status: '할 일' | '완료' | '채점 완료';
   dueDate?: string;
 };
 
@@ -16,7 +16,7 @@ export type Submission = {
   studentId: string;
   assessmentId: string;
   score?: number;
-  status: 'Submitted' | 'Graded';
+  status: '제출' | '채점 완료';
   date: string;
 };
 

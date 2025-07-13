@@ -6,20 +6,20 @@ import { type Assessment } from "@/lib/types"
 import { ArrowRight, CheckCircle2, History } from "lucide-react"
 
 const assessments: Assessment[] = [
-  { id: "4", title: "Unit 7: Hobbies and Interests", topic: "Talk about your favorite hobbies for 1 minute.", status: "To Do", dueDate: "2024-06-07" },
-  { id: "3", title: "Mid-term Speaking Test", topic: "Review your performance and feedback.", status: "Graded" },
-  { id: "2", title: "Unit 6: Describing People", topic: "Review your performance and feedback.", status: "Graded" },
-  { id: "1", title: "Unit 5: My Daily Routine", topic: "Review your performance and feedback.", status: "Graded" },
+  { id: "4", title: "7단원: 취미와 관심사", topic: "가장 좋아하는 취미에 대해 1분간 이야기하세요.", status: "할 일", dueDate: "2024-06-07" },
+  { id: "3", title: "중간 말하기 시험", topic: "성적 및 피드백 검토", status: "채점 완료" },
+  { id: "2", title: "6단원: 사람 묘사하기", topic: "성적 및 피드백 검토", status: "채점 완료" },
+  { id: "1", title: "5단원: 나의 일과", topic: "성적 및 피드백 검토", status: "채점 완료" },
 ];
 
 function AssessmentCard({ assessment }: { assessment: Assessment }) {
-  const isToDo = assessment.status === 'To Do';
+  const isToDo = assessment.status === '할 일';
   
   const getBadgeVariant = (status: Assessment['status']) => {
     switch (status) {
-      case 'To Do':
+      case '할 일':
         return 'destructive';
-      case 'Graded':
+      case '채점 완료':
         return 'default';
       default:
         return 'secondary';
@@ -28,9 +28,9 @@ function AssessmentCard({ assessment }: { assessment: Assessment }) {
 
   const getIcon = (status: Assessment['status']) => {
     switch (status) {
-      case 'To Do':
+      case '할 일':
         return <ArrowRight className="h-5 w-5" />;
-      case 'Graded':
+      case '채점 완료':
         return <CheckCircle2 className="h-5 w-5" />;
       default:
         return <History className="h-5 w-5" />;
@@ -47,13 +47,13 @@ function AssessmentCard({ assessment }: { assessment: Assessment }) {
         <CardDescription>{assessment.topic}</CardDescription>
       </CardHeader>
       <CardContent className="flex-grow">
-        {assessment.dueDate && <p className="text-sm text-muted-foreground">Due: {assessment.dueDate}</p>}
+        {assessment.dueDate && <p className="text-sm text-muted-foreground">마감일: {assessment.dueDate}</p>}
       </CardContent>
       <CardFooter>
         <Link href={isToDo ? `/student/assessment/${assessment.id}` : `/student/assessment/${assessment.id}/results`} passHref className="w-full">
           <Button className="w-full">
             {getIcon(assessment.status)}
-            <span className="ml-2">{isToDo ? 'Start Assessment' : 'View Results'}</span>
+            <span className="ml-2">{isToDo ? '평가 시작' : '결과 보기'}</span>
           </Button>
         </Link>
       </CardFooter>
@@ -65,8 +65,8 @@ export default function StudentDashboard() {
   return (
     <div className="space-y-6">
       <div className="space-y-1">
-        <h2 className="text-3xl font-bold tracking-tight">Welcome back!</h2>
-        <p className="text-muted-foreground">Here are your pending and completed assessments.</p>
+        <h2 className="text-3xl font-bold tracking-tight">다시 오신 것을 환영합니다!</h2>
+        <p className="text-muted-foreground">대기 중이거나 완료된 평가입니다.</p>
       </div>
 
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">

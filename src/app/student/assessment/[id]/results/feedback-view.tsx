@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
-import { Send, ThumbsUp, ThumbsDown, MessageSquareQuote } from "lucide-react"
+import { Send, ThumbsUp, ThumbsDown, MessageSquareQuote, Loader2 } from "lucide-react"
 
 type FeedbackViewProps = {
   assessmentId: string;
@@ -22,14 +22,14 @@ export function FeedbackView({ assessmentId, assessmentTitle, aiFeedback }: Feed
   const handleSubmitFeedback = async () => {
     if (!teacherFeedback.trim()) {
       toast({
-        title: "Feedback is empty",
-        description: "Please write some feedback before submitting.",
+        title: "피드백이 비어있습니다",
+        description: "제출하기 전에 피드백을 작성해주세요.",
         variant: "destructive"
       })
       return
     }
     setIsSubmitting(true)
-    toast({ title: "Submitting your feedback..." })
+    toast({ title: "피드백을 제출하는 중..." })
     
     // Simulate API call to summarizeStudentFeedback
     await new Promise(resolve => setTimeout(resolve, 1500));
@@ -37,8 +37,8 @@ export function FeedbackView({ assessmentId, assessmentTitle, aiFeedback }: Feed
     setIsSubmitting(false)
     setTeacherFeedback("")
     toast({
-      title: "Feedback submitted!",
-      description: "Thank you for helping us improve."
+      title: "피드백이 제출되었습니다!",
+      description: "개선에 도움을 주셔서 감사합니다."
     })
   }
 
@@ -49,8 +49,8 @@ export function FeedbackView({ assessmentId, assessmentTitle, aiFeedback }: Feed
           <div className="flex items-center gap-3">
             <MessageSquareQuote className="w-8 h-8 text-primary shrink-0" />
             <div>
-              <CardTitle className="text-2xl">Your Feedback for "{assessmentTitle}"</CardTitle>
-              <CardDescription>AI-generated analysis of your performance.</CardDescription>
+              <CardTitle className="text-2xl">"{assessmentTitle}"에 대한 피드백</CardTitle>
+              <CardDescription>AI가 생성한 성과 분석입니다.</CardDescription>
             </div>
           </div>
         </CardHeader>
@@ -60,13 +60,13 @@ export function FeedbackView({ assessmentId, assessmentTitle, aiFeedback }: Feed
           </div>
         </CardContent>
         <CardFooter className="flex-col items-start gap-4">
-            <p className="text-sm font-medium">Was this feedback helpful?</p>
+            <p className="text-sm font-medium">이 피드백이 도움이 되었나요?</p>
             <div className="flex gap-2">
                 <Button variant={satisfaction === 'good' ? 'default' : 'outline'} onClick={() => setSatisfaction('good')}>
-                    <ThumbsUp className="mr-2 h-4 w-4" /> Helpful
+                    <ThumbsUp className="mr-2 h-4 w-4" /> 유용함
                 </Button>
                 <Button variant={satisfaction === 'bad' ? 'destructive' : 'outline'} onClick={() => setSatisfaction('bad')}>
-                    <ThumbsDown className="mr-2 h-4 w-4" /> Not Helpful
+                    <ThumbsDown className="mr-2 h-4 w-4" /> 유용하지 않음
                 </Button>
             </div>
         </CardFooter>
@@ -74,12 +74,12 @@ export function FeedbackView({ assessmentId, assessmentTitle, aiFeedback }: Feed
       
       <Card>
         <CardHeader>
-          <CardTitle>Feedback for your Teacher</CardTitle>
-          <CardDescription>Let your teacher know how you found this assessment activity.</CardDescription>
+          <CardTitle>교사에게 보내는 피드백</CardTitle>
+          <CardDescription>이 평가 활동에 대해 어떻게 생각하는지 교사에게 알려주세요.</CardDescription>
         </CardHeader>
         <CardContent>
           <Textarea 
-            placeholder="e.g., The topic was interesting, but the time was a bit short."
+            placeholder="예: 주제는 흥미로웠지만 시간이 좀 짧았습니다."
             value={teacherFeedback}
             onChange={(e) => setTeacherFeedback(e.target.value)}
             rows={6}
@@ -88,7 +88,7 @@ export function FeedbackView({ assessmentId, assessmentTitle, aiFeedback }: Feed
         <CardFooter>
           <Button className="w-full" onClick={handleSubmitFeedback} disabled={isSubmitting}>
             {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-            {isSubmitting ? "Submitting..." : "Send Feedback"}
+            {isSubmitting ? "제출 중..." : "피드백 보내기"}
           </Button>
         </CardFooter>
       </Card>
