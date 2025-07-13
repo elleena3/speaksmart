@@ -157,7 +157,7 @@ export default function AssessmentResultsPage() {
                     : "학생 피드백이 제출되면 AI가 요약을 생성합니다."
                 }
              </div>
-            <Button variant="outline" className="w-full mt-4" disabled={!hasSubributions}>
+            <Button variant="outline" className="w-full mt-4" disabled={!hasSubmissions}>
               <Download className="mr-2 h-4 w-4" /> 전체 피드백 다운로드
             </Button>
           </CardContent>
@@ -166,5 +166,3 @@ export default function AssessmentResultsPage() {
     </div>
   )
 }
-
-    
