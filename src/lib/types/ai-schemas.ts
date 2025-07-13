@@ -13,7 +13,7 @@ export const ConverseWithStudentInputSchema = z.object({
     .string()
     .describe(
       "The student's voice recording as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'"
-    ),
+    ).nullable(), // Allow null for initial greeting
   conversationHistory: z
     .array(ConversationTurnSchema)
     .describe('The history of the conversation so far.'),
