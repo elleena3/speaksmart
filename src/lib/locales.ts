@@ -33,6 +33,55 @@ export const translations = {
       delete: "삭제",
       openMenu: "메뉴 열기",
       noScore: "해당 없음"
+    },
+    teacherAssessments: {
+      title: "평가 관리",
+      description: "모든 평가를 생성, 편집 및 관리합니다.",
+      newAssessmentButton: "새 평가 만들기",
+      listTitle: "평가 목록",
+      listDescription: "생성된 모든 평가 목록입니다.",
+      tableHeaderTitle: "제목",
+      tableHeaderPeriod: "평가 기간",
+      tableHeaderCompleted: "완료",
+      tableHeaderAvgScore: "평균 점수",
+      tableHeaderActions: "작업",
+      periodAlways: "상시",
+      periodFrom: "{date}부터",
+      periodTo: "~ {date}까지",
+      scoreNotApplicable: "해당 없음",
+      menuOpen: "메뉴 열기",
+      menuViewResults: "결과 보기",
+      menuEdit: "편집",
+      menuDelete: "삭제",
+      deleteDialogTitle: "정말로 삭제하시겠습니까?",
+      deleteDialogDescription: "이 작업은 되돌릴 수 없습니다. 이 평가와 관련된 모든 데이터가 영구적으로 삭제됩니다.",
+      deleteDialogCancel: "취소",
+      deleteDialogConfirm: "삭제",
+      deleteToast: {
+        title: "평가 삭제됨",
+        description: "평가가 성공적으로 삭제되었습니다."
+      },
+      noAssessments: {
+          title: "아직 생성된 평가가 없습니다.",
+          description: "첫 번째 평가를 만들려면 위 버튼을 클릭하세요!"
+      }
+    },
+    teacherSettings: {
+        title: "설정",
+        description: "계정 및 알림 설정을 관리합니다.",
+        account: {
+            title: "계정 정보",
+            nameLabel: "전체 이름",
+            emailLabel: "이메일",
+            updateButton: "프로필 업데이트"
+        },
+        notifications: {
+            title: "알림 설정",
+            newSubmissionLabel: "새로운 제출",
+            newSubmissionDescription: "학생이 평가를 제출하면 알림을 받습니다.",
+            feedbackReceivedLabel: "피드백 수신",
+            feedbackReceivedDescription: "학생이 평가에 대한 피드백을 제공하면 알림을 받습니다."
+        }
     }
   },
   en: {
@@ -68,6 +117,55 @@ export const translations = {
         delete: "Delete",
         openMenu: "Open menu",
         noScore: "N/A"
+    },
+    teacherAssessments: {
+      title: "Assessment Management",
+      description: "Create, edit, and manage all your assessments.",
+      newAssessmentButton: "Create New Assessment",
+      listTitle: "Assessment List",
+      listDescription: "A list of all created assessments.",
+      tableHeaderTitle: "Title",
+      tableHeaderPeriod: "Assessment Period",
+      tableHeaderCompleted: "Completed",
+      tableHeaderAvgScore: "Avg. Score",
+      tableHeaderActions: "Actions",
+      periodAlways: "Always available",
+      periodFrom: "From {date}",
+      periodTo: "Until {date}",
+      scoreNotApplicable: "N/A",
+      menuOpen: "Open menu",
+      menuViewResults: "View Results",
+      menuEdit: "Edit",
+      menuDelete: "Delete",
+      deleteDialogTitle: "Are you absolutely sure?",
+      deleteDialogDescription: "This action cannot be undone. This will permanently delete the assessment and all related data.",
+      deleteDialogCancel: "Cancel",
+      deleteDialogConfirm: "Delete",
+      deleteToast: {
+        title: "Assessment Deleted",
+        description: "The assessment has been successfully deleted."
+      },
+      noAssessments: {
+          title: "No assessments created yet.",
+          description: "Click the button above to create your first assessment!"
+      }
+    },
+    teacherSettings: {
+        title: "Settings",
+        description: "Manage your account and notification settings.",
+        account: {
+            title: "Account Information",
+            nameLabel: "Full Name",
+            emailLabel: "Email",
+            updateButton: "Update Profile"
+        },
+        notifications: {
+            title: "Notification Settings",
+            newSubmissionLabel: "New Submissions",
+            newSubmissionDescription: "Get notified when a student submits an assessment.",
+            feedbackReceivedLabel: "Feedback Received",
+            feedbackReceivedDescription: "Get notified when a student provides feedback on an assessment."
+        }
     }
   },
 };

@@ -2,7 +2,7 @@
 "use client"
 
 import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { PlusCircle, MoreHorizontal } from 'lucide-react';
 import Link from 'next/link';
@@ -13,6 +13,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
 import { format } from "date-fns";
+import { useLanguage } from '@/context/language-context';
 
 const initialAssessments: TeacherAssessment[] = [
   { id: "1", title: "5단원: 나의 일과", studentsCompleted: 18, totalStudents: 20, averageScore: 85, dateCreated: "2024-05-10" },
@@ -24,56 +25,58 @@ const initialAssessments: TeacherAssessment[] = [
 export default function AssessmentsPage() {
   const [assessments, setAssessments] = useState(initialAssessments);
   const { toast } = useToast();
+  const { t } = useLanguage();
 
   const handleDelete = (assessmentId: string) => {
     setAssessments(assessments.filter(a => a.id !== assessmentId));
     toast({
-      title: "평가 삭제됨",
-      description: "평가가 성공적으로 삭제되었습니다."
+      title: t.teacherAssessments.deleteToast.title,
+      description: t.teacherAssessments.deleteToast.description
     });
   }
   
   const formatDateRange = (startDate?: Date, endDate?: Date) => {
+    const { periodAlways, periodFrom, periodTo } = t.teacherAssessments;
     if (startDate && endDate) {
       return `${format(startDate, "yy/MM/dd")} - ${format(endDate, "yy/MM/dd")}`;
     }
     if (startDate) {
-      return `${format(startDate, "yy/MM/dd")}부터`;
+      return periodFrom.replace('{date}', format(startDate, "yy/MM/dd"));
     }
     if (endDate) {
-      return `~ ${format(endDate, "yy/MM/dd")}까지`;
+      return periodTo.replace('{date}', format(endDate, "yy/MM/dd"));
     }
-    return "상시";
+    return periodAlways;
   };
   
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div className="space-y-1">
-          <h2 className="text-2xl font-bold tracking-tight">평가 관리</h2>
-          <p className="text-muted-foreground">모든 평가를 생성, 편집 및 관리합니다.</p>
+          <h2 className="text-2xl font-bold tracking-tight">{t.teacherAssessments.title}</h2>
+          <p className="text-muted-foreground">{t.teacherAssessments.description}</p>
         </div>
         <Link href="/teacher/assessments/new" passHref>
           <Button>
-            <PlusCircle className="mr-2 h-4 w-4" /> 새 평가 만들기
+            <PlusCircle className="mr-2 h-4 w-4" /> {t.teacherAssessments.newAssessmentButton}
           </Button>
         </Link>
       </div>
       <Card>
         <CardHeader>
-          <CardTitle>평가 목록</CardTitle>
-          <CardDescription>생성된 모든 평가 목록입니다.</CardDescription>
+          <CardTitle>{t.teacherAssessments.listTitle}</CardTitle>
+          <CardDescription>{t.teacherAssessments.listDescription}</CardDescription>
         </CardHeader>
         <CardContent>
           {assessments.length > 0 ? (
              <Table>
              <TableHeader>
                <TableRow>
-                 <TableHead>제목</TableHead>
-                 <TableHead>평가 기간</TableHead>
-                 <TableHead className="text-center">완료</TableHead>
-                 <TableHead className="text-center">평균 점수</TableHead>
-                 <TableHead><span className="sr-only">작업</span></TableHead>
+                 <TableHead>{t.teacherAssessments.tableHeaderTitle}</TableHead>
+                 <TableHead>{t.teacherAssessments.tableHeaderPeriod}</TableHead>
+                 <TableHead className="text-center">{t.teacherAssessments.tableHeaderCompleted}</TableHead>
+                 <TableHead className="text-center">{t.teacherAssessments.tableHeaderAvgScore}</TableHead>
+                 <TableHead><span className="sr-only">{t.teacherAssessments.tableHeaderActions}</span></TableHead>
                </TableRow>
              </TableHeader>
              <TableBody>
@@ -94,7 +97,7 @@ export default function AssessmentsPage() {
                    </TableCell>
                    <TableCell className="text-center">
                      <Badge variant="outline" className="font-mono">
-                       {assessment.averageScore > 0 ? `${assessment.averageScore}%` : '해당 없음'}
+                       {assessment.averageScore > 0 ? `${assessment.averageScore}%` : t.teacherAssessments.scoreNotApplicable}
                      </Badge>
                    </TableCell>
                    <TableCell>
@@ -102,34 +105,34 @@ export default function AssessmentsPage() {
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" className="h-8 w-8 p-0">
-                            <span className="sr-only">메뉴 열기</span>
+                            <span className="sr-only">{t.teacherAssessments.menuOpen}</span>
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem asChild>
-                            <Link href={`/teacher/assessment/${assessment.id}`}>결과 보기</Link>
+                            <Link href={`/teacher/assessment/${assessment.id}`}>{t.teacherAssessments.menuViewResults}</Link>
                           </DropdownMenuItem>
                            <DropdownMenuItem asChild>
-                             <Link href={`/teacher/assessments/${assessment.id}/edit`}>편집</Link>
+                             <Link href={`/teacher/assessments/${assessment.id}/edit`}>{t.teacherAssessments.menuEdit}</Link>
                            </DropdownMenuItem>
                            <AlertDialogTrigger asChild>
                             <DropdownMenuItem className="text-destructive focus:bg-destructive/10 focus:text-destructive" onSelect={(e) => e.preventDefault()}>
-                                삭제
+                                {t.teacherAssessments.menuDelete}
                             </DropdownMenuItem>
                           </AlertDialogTrigger>
                         </DropdownMenuContent>
                       </DropdownMenu>
                       <AlertDialogContent>
                           <AlertDialogHeader>
-                              <AlertDialogTitle>정말로 삭제하시겠습니까?</AlertDialogTitle>
+                              <AlertDialogTitle>{t.teacherAssessments.deleteDialogTitle}</AlertDialogTitle>
                               <AlertDialogDescription>
-                                  이 작업은 되돌릴 수 없습니다. 이 평가와 관련된 모든 데이터가 영구적으로 삭제됩니다.
+                                  {t.teacherAssessments.deleteDialogDescription}
                               </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
-                              <AlertDialogCancel>취소</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => handleDelete(assessment.id)} className="bg-destructive hover:bg-destructive/90">삭제</AlertDialogAction>
+                              <AlertDialogCancel>{t.teacherAssessments.deleteDialogCancel}</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleDelete(assessment.id)} className="bg-destructive hover:bg-destructive/90">{t.teacherAssessments.deleteDialogConfirm}</AlertDialogAction>
                           </AlertDialogFooter>
                       </AlertDialogContent>
                     </AlertDialog>
@@ -140,8 +143,8 @@ export default function AssessmentsPage() {
            </Table>
           ) : (
             <div className="text-center py-12 border-2 border-dashed rounded-lg">
-                <h3 className="text-lg font-medium text-muted-foreground">아직 생성된 평가가 없습니다.</h3>
-                <p className="text-sm text-muted-foreground mt-1">첫 번째 평가를 만들려면 위 버튼을 클릭하세요!</p>
+                <h3 className="text-lg font-medium text-muted-foreground">{t.teacherAssessments.noAssessments.title}</h3>
+                <p className="text-sm text-muted-foreground mt-1">{t.teacherAssessments.noAssessments.description}</p>
             </div>
           )}
         </CardContent>
