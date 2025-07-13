@@ -12,30 +12,12 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, CalendarIcon } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { useLanguage } from "@/context/language-context";
-
-const formSchema = z.object({
-  title: z.string().min(1, "Title is required."),
-  topic: z.string().min(1, "Topic is required."),
-  prompt: z.string().min(1, "Prompt is required."),
-  expectedFormat: z.string().min(1, "Expected format is required."),
-  startDate: z.date().optional(),
-  endDate: z.date().optional(),
-}).refine((data) => {
-    if (data.startDate && data.endDate) {
-        return data.endDate >= data.startDate;
-    }
-    return true;
-}, {
-    message: "End date cannot be earlier than start date.",
-    path: ["endDate"],
-});
-
 
 export default function NewAssessmentPage() {
   const router = useRouter();
@@ -43,18 +25,25 @@ export default function NewAssessmentPage() {
   const { t, language } = useLanguage();
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  const currentFormSchema = formSchema.refine((data) => {
-    if (data.startDate && data.endDate) {
-        return data.endDate >= data.startDate;
-    }
-    return true;
-    }, {
-    message: t.teacherAssessmentForm.errorEndDate,
-    path: ["endDate"],
-  });
+  const formSchema = useMemo(() => z.object({
+    title: z.string().min(1, t.teacherAssessmentForm.errors.titleRequired),
+    topic: z.string().min(1, t.teacherAssessmentForm.errors.topicRequired),
+    prompt: z.string().min(1, t.teacherAssessmentForm.errors.promptRequired),
+    expectedFormat: z.string().min(1, t.teacherAssessmentForm.errors.expectedFormatRequired),
+    startDate: z.date().optional(),
+    endDate: z.date().optional(),
+  }).refine((data) => {
+      if (data.startDate && data.endDate) {
+          return data.endDate >= data.startDate;
+      }
+      return true;
+  }, {
+      message: t.teacherAssessmentForm.errors.endDate,
+      path: ["endDate"],
+  }), [t]);
 
-  const form = useForm<z.infer<typeof currentFormSchema>>({
-    resolver: zodResolver(currentFormSchema),
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
     defaultValues: {
       title: "",
       topic: "",
@@ -64,18 +53,9 @@ export default function NewAssessmentPage() {
   });
 
   useEffect(() => {
-    const zodSchema = formSchema.refine((data) => {
-      if (data.startDate && data.endDate) {
-          return data.endDate >= data.startDate;
-      }
-      return true;
-      }, {
-      message: t.teacherAssessmentForm.errorEndDate,
-      path: ["endDate"],
-    });
-
-    form.trigger(); // Re-validate form on language change
-  }, [language, t, form]);
+    // Re-validate form on language change
+    form.trigger();
+  }, [language, form]);
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsSubmitting(true);

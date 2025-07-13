@@ -128,7 +128,13 @@ export const translations = {
         title: "성공!",
         description: "'{title}' 평가가 성공적으로 수정되었습니다.",
       },
-      errorEndDate: "종료일은 시작일보다 빠를 수 없습니다.",
+      errors: {
+        titleRequired: "제목을 입력해주세요.",
+        topicRequired: "주제를 입력해주세요.",
+        promptRequired: "안내 내용을 입력해주세요.",
+        expectedFormatRequired: "예상 답변 형식을 입력해주세요.",
+        endDate: "종료일은 시작일보다 빠를 수 없습니다.",
+      }
     },
     teacherSettings: {
         title: "설정",
@@ -276,7 +282,13 @@ export const translations = {
         title: "Success!",
         description: "The '{title}' assessment has been successfully updated.",
       },
-      errorEndDate: "End date cannot be earlier than start date.",
+      errors: {
+        titleRequired: "Title is required.",
+        topicRequired: "Topic is required.",
+        promptRequired: "Prompt is required.",
+        expectedFormatRequired: "Expected format is required.",
+        endDate: "End date cannot be earlier than start date.",
+      }
     },
     teacherSettings: {
         title: "Settings",
