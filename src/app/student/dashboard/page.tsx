@@ -1,3 +1,4 @@
+"use client"
 
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -5,8 +6,9 @@ import { Badge } from "@/components/ui/badge"
 import Link from "next/link"
 import { type Assessment } from "@/lib/types"
 import { ArrowRight, CheckCircle2, History, MessageCircle } from "lucide-react"
+import { useEffect, useState } from "react"
 
-const assessments: Assessment[] = [
+const allAssessments: Assessment[] = [
   { id: "free-talk", title: "자유 대화", topic: "AI와 3분간 자유롭게 대화하세요.", status: "할 일", special: true },
   { id: "4", title: "7단원: 취미와 관심사", topic: "가장 좋아하는 취미에 대해 1분간 이야기하세요.", status: "할 일", startDate: new Date("2024-06-01"), endDate: new Date("2024-06-07") },
   { id: "3", title: "중간 말하기 시험", topic: "성적 및 피드백 검토", status: "채점 완료" },
@@ -42,6 +44,7 @@ function AssessmentCard({ assessment }: { assessment: Assessment }) {
   }
 
   const getDueDateText = () => {
+    // This logic needs to run on the client, which is fine in a "use client" component.
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -86,24 +89,35 @@ function AssessmentCard({ assessment }: { assessment: Assessment }) {
 }
 
 export default function StudentDashboard() {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const [availableAssessments, setAvailableAssessments] = useState<Assessment[]>([]);
 
-  const availableAssessments = assessments.filter(assessment => {
-    if (assessment.status !== '할 일') {
-      return true; // Show completed assessments
-    }
-    const startDate = assessment.startDate ? new Date(assessment.startDate) : null;
-    const endDate = assessment.endDate ? new Date(assessment.endDate) : null;
+  useEffect(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
-    if (startDate && today < startDate) {
-      return false;
-    }
-    if (endDate && today > endDate) {
-      return false;
-    }
-    return true;
-  });
+    const filtered = allAssessments.filter(assessment => {
+      if (assessment.status !== '할 일') {
+        return true; // Show completed assessments
+      }
+      
+      // Free talk is always available
+      if (assessment.id === 'free-talk') {
+        return true;
+      }
+      
+      const startDate = assessment.startDate ? new Date(assessment.startDate) : null;
+      const endDate = assessment.endDate ? new Date(assessment.endDate) : null;
+
+      if (startDate && today < startDate) {
+        return false;
+      }
+      if (endDate && today < endDate) {
+        return false;
+      }
+      return true;
+    });
+    setAvailableAssessments(filtered);
+  }, []);
 
   return (
     <div className="space-y-6">
