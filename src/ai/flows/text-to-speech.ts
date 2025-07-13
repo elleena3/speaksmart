@@ -90,7 +90,7 @@ const converseWithStudentFlow = ai.defineFlow(
     outputSchema: ConverseWithStudentOutputSchema,
   },
   async ({ studentRecordingDataUri, conversationHistory }) => {
-    let studentTranscript = '';
+    let studentTranscript: string | undefined = undefined;
 
     // Step 1: Transcribe student's audio to text (STT), if provided
     if (studentRecordingDataUri) {
@@ -105,7 +105,10 @@ const converseWithStudentFlow = ai.defineFlow(
         });
         studentTranscript = sttResponse.text;
         if (!studentTranscript) {
-            throw new Error("Could not transcribe student audio.");
+            // It's possible for transcription to yield an empty string, which is not an error.
+            // Only throw if the response was completely empty.
+            console.warn("Transcription result was empty.");
+            studentTranscript = ""; 
         }
     }
 
@@ -119,7 +122,7 @@ const converseWithStudentFlow = ai.defineFlow(
 
     const textResponse = await conversationalPrompt({
       history: historyForPrompt,
-      studentTranscript: studentTranscript || undefined,
+      studentTranscript: studentTranscript,
     });
     const aiResponseText = textResponse;
 
@@ -151,7 +154,7 @@ const converseWithStudentFlow = ai.defineFlow(
 
     // Step 4: Return all the generated data
     return {
-      studentTranscript,
+      studentTranscript: studentTranscript || "", // Ensure we always return a string
       aiResponseText,
       aiResponseAudioDataUri: 'data:audio/wav;base64,' + wavBase64,
     };
