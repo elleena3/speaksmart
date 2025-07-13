@@ -8,12 +8,12 @@ export const metadata: Metadata = {
 };
 
 const navItems = [
-  { href: '/student/dashboard', label: '대시보드', icon: <LayoutDashboard /> },
-  { href: '/student/history', label: '내 결과', icon: <BookMarked /> },
-  { href: '/student/profile', label: '프로필', icon: <UserCircle /> },
+  { href: '/student/dashboard', labelKey: 'dashboard' as const, icon: <LayoutDashboard /> },
+  { href: '/student/history', labelKey: 'myResults' as const, icon: <BookMarked /> },
+  { href: '/student/profile', labelKey: 'profile' as const, icon: <UserCircle /> },
 ];
 
 export default function StudentLayout({ children }: { children: React.ReactNode }) {
-  const title = "학생 포털";
-  return <AppLayout navItems={navItems} title={title}>{children}</AppLayout>;
+  const titleKey = "studentPortal";
+  return <AppLayout navItems={navItems} titleKey={titleKey}>{children}</AppLayout>;
 }

@@ -8,12 +8,12 @@ export const metadata: Metadata = {
 };
 
 const navItems = [
-  { href: '/teacher/dashboard', label: '대시보드', icon: <LayoutDashboard /> },
-  { href: '/teacher/assessments', label: '평가', icon: <BookOpenCheck /> },
-  { href: '/teacher/settings', label: '설정', icon: <Settings /> },
+  { href: '/teacher/dashboard', labelKey: 'dashboard' as const, icon: <LayoutDashboard /> },
+  { href: '/teacher/assessments', labelKey: 'assessments' as const, icon: <BookOpenCheck /> },
+  { href: '/teacher/settings', labelKey: 'settings' as const, icon: <Settings /> },
 ];
 
 export default function TeacherLayout({ children }: { children: React.ReactNode }) {
-  const title = "교사 포털";
-  return <AppLayout navItems={navItems} title={title}>{children}</AppLayout>;
+  const titleKey = "teacherPortal";
+  return <AppLayout navItems={navItems} titleKey={titleKey}>{children}</AppLayout>;
 }

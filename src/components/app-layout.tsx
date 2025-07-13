@@ -14,24 +14,28 @@ import {
   SidebarTrigger,
   SidebarFooter
 } from "@/components/ui/sidebar"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Logo } from "@/components/icons"
 import { Button } from "./ui/button"
-import { LogOut } from "lucide-react"
+import { LogOut, Globe } from "lucide-react"
+import { useLanguage } from "@/context/language-context"
+import { translations } from "@/lib/locales"
 
 type NavItem = {
   href: string
-  label: string
+  labelKey: keyof (typeof translations.ko.nav);
   icon: React.ReactNode
 }
 
 type AppLayoutProps = {
   children: React.ReactNode
   navItems: NavItem[]
-  title: string
+  titleKey: keyof typeof translations.ko.titles;
 }
 
-export function AppLayout({ children, navItems, title }: AppLayoutProps) {
+export function AppLayout({ children, navItems, titleKey }: AppLayoutProps) {
   const pathname = usePathname()
+  const { language, setLanguage, t } = useLanguage()
 
   return (
     <SidebarProvider>
@@ -49,10 +53,10 @@ export function AppLayout({ children, navItems, title }: AppLayoutProps) {
                 <Link href={item.href} passHref>
                   <SidebarMenuButton
                     isActive={pathname.startsWith(item.href)}
-                    tooltip={{ children: item.label, side: "right" }}
+                    tooltip={{ children: t.nav[item.labelKey], side: "right" }}
                   >
                     {item.icon}
-                    <span>{item.label}</span>
+                    <span>{t.nav[item.labelKey]}</span>
                   </SidebarMenuButton>
                 </Link>
               </SidebarMenuItem>
@@ -60,10 +64,27 @@ export function AppLayout({ children, navItems, title }: AppLayoutProps) {
           </SidebarMenu>
         </SidebarContent>
         <SidebarFooter>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <SidebarMenuButton>
+                  <Globe/>
+                  <span>{t.language.title}</span>
+                </SidebarMenuButton>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent side="top" align="start">
+                <DropdownMenuItem onClick={() => setLanguage('ko')} disabled={language === 'ko'}>
+                  한국어
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setLanguage('en')} disabled={language === 'en'}>
+                  English
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
           <Link href="/" passHref>
              <SidebarMenuButton>
                 <LogOut/>
-                <span>로그아웃</span>
+                <span>{t.nav.logout}</span>
              </SidebarMenuButton>
           </Link>
         </SidebarFooter>
@@ -73,7 +94,7 @@ export function AppLayout({ children, navItems, title }: AppLayoutProps) {
           <div className="md:hidden">
              <SidebarTrigger />
           </div>
-          <h2 className="text-xl font-semibold font-headline ml-4 md:ml-0">{title}</h2>
+          <h2 className="text-xl font-semibold font-headline ml-4 md:ml-0">{t.titles[titleKey]}</h2>
           <div className="hidden md:block">
             <SidebarTrigger />
           </div>
