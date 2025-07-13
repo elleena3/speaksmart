@@ -1,5 +1,4 @@
 
-
 "use client"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -47,16 +46,19 @@ export default function FreeTalkPage() {
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
+    // This effect runs only on the client, after the component has mounted.
     setIsClient(true);
   }, []);
 
   useEffect(() => {
+    // This effect depends on isClient, so it will also only run on the client.
     if (!isClient) return;
 
     const scenario = (searchParams.get('scenario') as Scenario) || 'free-talk';
     const assessmentId = searchParams.get('id');
 
     if (assessmentId) {
+        // localStorage is safe to access here.
         const storedAssessments = JSON.parse(localStorage.getItem('assessments') || '[]');
         const found = storedAssessments.find((a: any) => a.id === assessmentId);
         if (found) {
@@ -73,7 +75,8 @@ export default function FreeTalkPage() {
 
 
   if (!isClient || !details) {
-    return <div>Loading...</div>; // Or a loading spinner
+    // Render a loading state on the server and during initial client render.
+    return <div>Loading...</div>; 
   }
 
   return (
