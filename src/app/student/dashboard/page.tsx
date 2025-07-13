@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import Link from "next/link"
 import { type Assessment } from "@/lib/types"
 import { ArrowRight, CheckCircle2, History, MessageCircle } from "lucide-react"
+import { useLanguage } from "@/context/language-context"
 
 const allAssessments: Assessment[] = [
   { id: "free-talk", title: "자유 대화", topic: "AI와 3분간 자유롭게 대화하세요.", status: "할 일", special: true },
@@ -17,7 +18,20 @@ const allAssessments: Assessment[] = [
 ];
 
 function AssessmentCard({ assessment }: { assessment: Assessment }) {
+  const { t } = useLanguage();
   const isToDo = assessment.status === '할 일';
+
+  const getStatusText = (status: Assessment['status'], special?: boolean) => {
+    if (special) return t.studentDashboard.status.practice;
+    switch (status) {
+      case '할 일':
+        return t.studentDashboard.status.todo;
+      case '채점 완료':
+        return t.studentDashboard.status.graded;
+      default:
+        return status;
+    }
+  }
   
   const getBadgeVariant = (status: Assessment['status']) => {
     if (assessment.special) return 'default';
@@ -49,7 +63,7 @@ function AssessmentCard({ assessment }: { assessment: Assessment }) {
         <div className="flex justify-between items-start">
           <CardTitle className="text-xl">{assessment.title}</CardTitle>
           <Badge variant={getBadgeVariant(assessment.status)} className={assessment.special ? "bg-accent text-accent-foreground" : ""}>
-            {assessment.special ? "연습" : assessment.status}
+            {getStatusText(assessment.status, assessment.special)}
           </Badge>
         </div>
         <CardDescription>{assessment.topic}</CardDescription>
@@ -59,7 +73,7 @@ function AssessmentCard({ assessment }: { assessment: Assessment }) {
         <Link href={isToDo ? `/student/assessment/${assessment.id}` : `/student/assessment/${assessment.id}/results`} passHref className="w-full">
           <Button className="w-full">
             {getIcon(assessment.status)}
-            <span className="ml-2">{isToDo ? '평가 시작' : '결과 보기'}</span>
+            <span className="ml-2">{isToDo ? t.studentDashboard.startAssessment : t.studentDashboard.viewResults}</span>
           </Button>
         </Link>
       </CardFooter>
@@ -68,11 +82,12 @@ function AssessmentCard({ assessment }: { assessment: Assessment }) {
 }
 
 export default function StudentDashboard() {
+  const { t } = useLanguage();
   return (
     <div className="space-y-6">
       <div className="space-y-1">
-        <h2 className="text-3xl font-bold tracking-tight">다시 오신 것을 환영합니다!</h2>
-        <p className="text-muted-foreground">대기 중이거나 완료된 평가입니다.</p>
+        <h2 className="text-3xl font-bold tracking-tight">{t.studentDashboard.welcome}</h2>
+        <p className="text-muted-foreground">{t.studentDashboard.description}</p>
       </div>
 
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">

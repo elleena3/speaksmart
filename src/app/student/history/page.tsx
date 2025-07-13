@@ -1,8 +1,12 @@
+
+"use client"
+
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
+import { useLanguage } from '@/context/language-context';
 
 const pastAssessments = [
     { id: "3", title: "중간 말하기 시험", score: 91, date: "2024-05-24" },
@@ -11,20 +15,21 @@ const pastAssessments = [
 ];
 
 export default function HistoryPage() {
+  const { t } = useLanguage();
   return (
     <Card>
       <CardHeader>
-        <CardTitle>내 결과</CardTitle>
-        <CardDescription>완료된 모든 평가 기록입니다.</CardDescription>
+        <CardTitle>{t.studentHistory.title}</CardTitle>
+        <CardDescription>{t.studentHistory.description}</CardDescription>
       </CardHeader>
       <CardContent>
         <Table>
             <TableHeader>
                 <TableRow>
-                    <TableHead>평가</TableHead>
-                    <TableHead>완료 날짜</TableHead>
-                    <TableHead>점수</TableHead>
-                    <TableHead>작업</TableHead>
+                    <TableHead>{t.studentHistory.assessment}</TableHead>
+                    <TableHead>{t.studentHistory.completionDate}</TableHead>
+                    <TableHead>{t.studentHistory.score}</TableHead>
+                    <TableHead>{t.studentHistory.action}</TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody>
@@ -37,7 +42,7 @@ export default function HistoryPage() {
                         </TableCell>
                         <TableCell>
                             <Link href={`/student/assessment/${assessment.id}/results`}>
-                                <Button variant="secondary" size="sm">피드백 보기</Button>
+                                <Button variant="secondary" size="sm">{t.studentHistory.viewFeedback}</Button>
                             </Link>
                         </TableCell>
                     </TableRow>

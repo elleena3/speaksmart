@@ -1,15 +1,20 @@
+
+"use client"
+
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useLanguage } from '@/context/language-context';
 
 export default function ProfilePage() {
+  const { t } = useLanguage();
   return (
     <Card className="max-w-2xl mx-auto">
       <CardHeader>
-        <CardTitle>내 프로필</CardTitle>
-        <CardDescription>프로필 설정 및 개인 정보를 관리하세요.</CardDescription>
+        <CardTitle>{t.studentProfile.title}</CardTitle>
+        <CardDescription>{t.studentProfile.description}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="flex items-center gap-4">
@@ -24,14 +29,14 @@ export default function ProfilePage() {
         </div>
         <div className="space-y-4">
             <div className="grid gap-2">
-                <Label htmlFor="name">전체 이름</Label>
+                <Label htmlFor="name">{t.studentProfile.fullName}</Label>
                 <Input id="name" defaultValue="Alex Doe" />
             </div>
             <div className="grid gap-2">
-                <Label htmlFor="email">이메일 주소</Label>
+                <Label htmlFor="email">{t.studentProfile.emailAddress}</Label>
                 <Input id="email" type="email" defaultValue="alex.doe@example.com" />
             </div>
-            <Button>변경사항 저장</Button>
+            <Button>{t.studentProfile.saveChanges}</Button>
         </div>
       </CardContent>
     </Card>

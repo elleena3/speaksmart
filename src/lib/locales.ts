@@ -16,6 +16,33 @@ export const translations = {
         studentPortal: "학생 포털",
         teacherPortal: "교사 포털",
     },
+    studentDashboard: {
+        welcome: "다시 오신 것을 환영합니다!",
+        description: "대기 중이거나 완료된 평가입니다.",
+        startAssessment: "평가 시작",
+        viewResults: "결과 보기",
+        status: {
+            todo: "할 일",
+            graded: "채점 완료",
+            practice: "연습",
+        }
+    },
+    studentHistory: {
+        title: "내 결과",
+        description: "완료된 모든 평가 기록입니다.",
+        assessment: "평가",
+        completionDate: "완료 날짜",
+        score: "점수",
+        action: "작업",
+        viewFeedback: "피드백 보기",
+    },
+    studentProfile: {
+        title: "내 프로필",
+        description: "프로필 설정 및 개인 정보를 관리하세요.",
+        fullName: "전체 이름",
+        emailAddress: "이메일 주소",
+        saveChanges: "변경사항 저장",
+    },
     teacherDashboard: {
       dashboard: "대시보드",
       createAssessment: "평가 만들기",
@@ -99,6 +126,33 @@ export const translations = {
     titles: {
         studentPortal: "Student Portal",
         teacherPortal: "Teacher Portal",
+    },
+    studentDashboard: {
+        welcome: "Welcome back!",
+        description: "Here are your pending and completed assessments.",
+        startAssessment: "Start Assessment",
+        viewResults: "View Results",
+        status: {
+            todo: "To Do",
+            graded: "Graded",
+            practice: "Practice",
+        }
+    },
+    studentHistory: {
+        title: "My Results",
+        description: "This is a record of all your completed assessments.",
+        assessment: "Assessment",
+        completionDate: "Completion Date",
+        score: "Score",
+        action: "Action",
+        viewFeedback: "View Feedback",
+    },
+    studentProfile: {
+        title: "My Profile",
+        description: "Manage your profile settings and personal information.",
+        fullName: "Full Name",
+        emailAddress: "Email Address",
+        saveChanges: "Save Changes",
     },
     teacherDashboard: {
         dashboard: "Dashboard",
