@@ -16,9 +16,11 @@ const SESSION_STORAGE_KEY = 'freeTalkConversationHistory';
 export function FreeTalkView({ scenario, scenarioPrompt }: { scenario: Scenario, scenarioPrompt?: string }) {
   const [sessionState, setSessionState] = useState<"idle" | "initializing" | "recording" | "processing" | "speaking">("idle");
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
+  const [interimTranscript, setInterimTranscript] = useState<string | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const { toast } = useToast();
 
@@ -26,6 +28,17 @@ export function FreeTalkView({ scenario, scenarioPrompt }: { scenario: Scenario,
     // Clear history when component mounts
     sessionStorage.removeItem(SESSION_STORAGE_KEY);
   }, []);
+
+  useEffect(() => {
+    // Scroll to the bottom of the conversation
+    if (scrollAreaRef.current) {
+        const scrollableView = scrollAreaRef.current.querySelector('div');
+        if (scrollableView) {
+            scrollableView.scrollTop = scrollableView.scrollHeight;
+        }
+    }
+  }, [conversation, interimTranscript]);
+
 
   const startConversation = async () => {
     setSessionState("initializing");
@@ -60,6 +73,7 @@ export function FreeTalkView({ scenario, scenarioPrompt }: { scenario: Scenario,
 
   const handleStartRecording = async () => {
     setSessionState("recording");
+    setInterimTranscript("듣고 있어요...");
     audioChunksRef.current = [];
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -76,6 +90,7 @@ export function FreeTalkView({ scenario, scenarioPrompt }: { scenario: Scenario,
         variant: "destructive",
       });
       setSessionState("idle");
+      setInterimTranscript(null);
     }
   };
 
@@ -92,6 +107,7 @@ export function FreeTalkView({ scenario, scenarioPrompt }: { scenario: Scenario,
       };
       mediaRecorderRef.current.stop();
       setSessionState("processing");
+      setInterimTranscript("처리 중...");
     }
   };
 
@@ -103,6 +119,8 @@ export function FreeTalkView({ scenario, scenarioPrompt }: { scenario: Scenario,
         scenario: scenario,
         scenarioPrompt: scenarioPrompt,
       });
+      
+      setInterimTranscript(null);
 
       const newConversation: ConversationTurn[] = [
         ...conversation,
@@ -123,7 +141,8 @@ export function FreeTalkView({ scenario, scenarioPrompt }: { scenario: Scenario,
         description: "오디오 처리 중 오류가 발생했습니다. 다시 시도해주세요.",
         variant: "destructive",
       });
-      setSessionState("idle");
+      setInterimTranscript(null);
+      setSessionState("speaking"); // Let user try again
     }
   };
 
@@ -197,45 +216,64 @@ export function FreeTalkView({ scenario, scenarioPrompt }: { scenario: Scenario,
 
   return (
     <div className="flex flex-col gap-4">
-      <ScrollArea className="h-80 w-full rounded-md border p-4 space-y-4">
-        {sessionState === "idle" && (
-          <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground">
-              <BrainCircuit className="h-12 w-12 mb-4 text-primary"/>
-              <p className="font-semibold">AI와 자유롭게 대화하며 영어 실력을 향상시키세요.</p>
-              <p className="text-sm">준비가 되면 아래 '대화 시작' 버튼을 눌러주세요.</p>
-          </div>
-        )}
-        {sessionState === "initializing" && (
-          <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground">
-              <Loader2 className="h-12 w-12 mb-4 animate-spin"/>
-              <p className="font-semibold">AI 대화 파트너 "Alex"를 연결하는 중입니다...</p>
-              <p className="text-sm">잠시만 기다려주세요.</p>
-          </div>
-        )}
-        {conversation.map((turn, index) => (
-          <div key={index} className={`flex items-start gap-3 ${turn.role === 'user' ? 'justify-start' : 'justify-end'}`}>
-             {turn.role === 'user' && (
-                <div className="p-2 rounded-full bg-muted">
-                    <User className="h-5 w-5" />
+      <ScrollArea className="h-80 w-full rounded-md border p-4" ref={scrollAreaRef}>
+        <div className="space-y-4">
+            {sessionState === "idle" && (
+              <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground pt-12">
+                  <BrainCircuit className="h-12 w-12 mb-4 text-primary"/>
+                  <p className="font-semibold">AI와 자유롭게 대화하며 영어 실력을 향상시키세요.</p>
+                  <p className="text-sm">준비가 되면 아래 '대화 시작' 버튼을 눌러주세요.</p>
+              </div>
+            )}
+            {sessionState === "initializing" && (
+              <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground pt-12">
+                  <Loader2 className="h-12 w-12 mb-4 animate-spin"/>
+                  <p className="font-semibold">AI 대화 파트너 "Alex"를 연결하는 중입니다...</p>
+                  <p className="text-sm">잠시만 기다려주세요.</p>
+              </div>
+            )}
+            {conversation.map((turn, index) => (
+              <div key={index} className={`flex items-start gap-3 ${turn.role === 'user' ? 'justify-start' : 'justify-end'}`}>
+                 {turn.role === 'user' && (
+                    <div className="p-2 rounded-full bg-muted">
+                        <User className="h-5 w-5" />
+                    </div>
+                )}
+                <div className={`p-3 rounded-lg max-w-[80%] ${turn.role === 'user' ? 'bg-muted' : 'bg-primary text-primary-foreground'}`}>
+                  <p className="text-sm">{turn.text}</p>
+                </div>
+                 {turn.role === 'model' && (
+                    <div className="p-2 rounded-full bg-primary text-primary-foreground">
+                        <Bot className="h-5 w-5" />
+                    </div>
+                )}
+              </div>
+            ))}
+            {interimTranscript && (
+                <div className="flex items-start gap-3 justify-start">
+                    <div className="p-2 rounded-full bg-muted">
+                        <User className="h-5 w-5" />
+                    </div>
+                    <div className="p-3 rounded-lg max-w-[80%] bg-muted">
+                        <p className="text-sm text-muted-foreground italic">{interimTranscript}</p>
+                    </div>
                 </div>
             )}
-            <div className={`p-3 rounded-lg max-w-[80%] ${turn.role === 'user' ? 'bg-muted' : 'bg-primary text-primary-foreground'}`}>
-              <p className="text-sm">{turn.text}</p>
-            </div>
-             {turn.role === 'model' && (
-                <div className="p-2 rounded-full bg-primary text-primary-foreground">
-                    <Bot className="h-5 w-5" />
-                </div>
-            )}
-          </div>
-        ))}
+        </div>
       </ScrollArea>
       
-      <div className="flex gap-2">
-        <div className="flex-grow">
-          {getButtonState()}
+      <div className="flex flex-col gap-2">
+        <div className="flex gap-2">
+            <div className="flex-grow">
+              {getButtonState()}
+            </div>
+            {getFooterButtonState()}
         </div>
-        {getFooterButtonState()}
+        {sessionState !== 'idle' && sessionState !== 'initializing' && (
+            <p className="text-xs text-center text-muted-foreground">
+                AI의 응답이 끝나면 <strong className="text-foreground">[응답하기]</strong> 버튼을 누르고 말씀하세요. 발언이 끝나면 <strong className="text-foreground">[말하기 중지]</strong> 버튼을 누릅니다.
+            </p>
+        )}
       </div>
 
       <audio ref={audioPlayerRef} onEnded={() => setSessionState("speaking")} className="hidden" />
