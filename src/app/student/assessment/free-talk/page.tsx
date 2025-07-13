@@ -8,6 +8,7 @@ import { type Scenario } from "@/lib/types"
 import { useEffect, useState } from "react"
 
 type Details = { 
+  id?: string;
   title: string; 
   prompt: string; 
   scenario: Scenario;
@@ -77,7 +78,7 @@ export default function FreeTalkPage() {
           <CardDescription>{details.prompt}</CardDescription>
         </CardHeader>
         <CardContent>
-          <FreeTalkView scenario={details.scenario} scenarioPrompt={details.prompt} />
+          <FreeTalkView scenario={details.scenario} scenarioPrompt={details.prompt} assessmentId={details.id} />
         </CardContent>
       </Card>
     </div>

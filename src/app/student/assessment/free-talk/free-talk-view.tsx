@@ -13,7 +13,7 @@ import { type Scenario } from "@/lib/types";
 
 const SESSION_STORAGE_KEY = 'freeTalkConversationHistory';
 
-export function FreeTalkView({ scenario, scenarioPrompt }: { scenario: Scenario, scenarioPrompt?: string }) {
+export function FreeTalkView({ scenario, scenarioPrompt, assessmentId }: { scenario: Scenario, scenarioPrompt?: string, assessmentId?: string | null }) {
   const [sessionState, setSessionState] = useState<"idle" | "initializing" | "recording" | "processing" | "speaking" | "waiting_for_user">("idle");
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
   const [interimTranscript, setInterimTranscript] = useState<string | null>(null);
@@ -153,7 +153,8 @@ export function FreeTalkView({ scenario, scenarioPrompt }: { scenario: Scenario,
     // Store the final transcript in session storage to be picked up by the results page
     sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({ history: conversation }));
     
-    router.push('/student/assessment/free-talk/results');
+    const url = assessmentId ? `/student/assessment/free-talk/results?id=${assessmentId}` : '/student/assessment/free-talk/results';
+    router.push(url);
   }
 
   const getButtonState = () => {
