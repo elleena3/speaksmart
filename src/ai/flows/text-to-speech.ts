@@ -35,7 +35,7 @@ const conversationalPrompt = ai.definePrompt({
       studentTranscript: z.string().optional(),
     }),
   },
-  output: { schema: z.string() },
+  output: { schema: z.object({ response: z.string().describe("The AI's response text.") }) },
   prompt: `You are an AI English conversation partner. Your name is "Alex". You are friendly, patient, and encouraging. Your goal is to have a natural, engaging conversation with a student learning English.
 - Keep your responses relatively short and natural.
 - Ask questions to keep the conversation going.
@@ -123,6 +123,7 @@ const converseWithStudentFlow = ai.defineFlow(
   },
   async ({ studentRecordingDataUri, conversationHistory }) => {
     let studentTranscript = "";
+    let aiResponseText = "";
 
     // Step 1: Transcribe student's audio if it exists.
     if (studentRecordingDataUri) {
@@ -148,14 +149,17 @@ const converseWithStudentFlow = ai.defineFlow(
       isUser: turn.role === 'user',
     }));
 
-    const { output: aiResponseText } = await conversationalPrompt({
+    const { output } = await conversationalPrompt({
       history: historyForPrompt,
       // Pass studentTranscript only if it's not an empty string
       studentTranscript: studentTranscript || undefined, 
     });
 
+    aiResponseText = output?.response || "";
+
     if (!aiResponseText) {
-        throw new Error("AI did not generate a text response.");
+        console.error("AI did not generate a text response. Received:", output);
+        throw new Error("AI did not generate a valid text response.");
     }
 
     // Step 3: Convert AI's text response to speech (TTS)
