@@ -94,7 +94,7 @@ async function textToSpeech(text: string): Promise<string> {
             responseModalities: ['AUDIO'],
             speechConfig: {
                 voiceConfig: {
-                    prebuiltVoiceConfig: { voiceName: 'Alloy' }, // A friendly, natural voice
+                    prebuiltVoiceConfig: { voiceName: 'Algenib' }, // A friendly, natural voice
                 },
             },
         },
@@ -159,7 +159,12 @@ const converseWithStudentFlow = ai.defineFlow(
 
     if (!aiResponseText) {
         console.error("AI did not generate a text response. Received:", output);
-        throw new Error("AI did not generate a valid text response.");
+        // Return an empty response instead of throwing an error to avoid crashing the flow
+        return {
+          studentTranscript,
+          aiResponseText: "",
+          aiResponseAudioDataUri: "",
+        }
     }
 
     // Step 3: Convert AI's text response to speech (TTS)
