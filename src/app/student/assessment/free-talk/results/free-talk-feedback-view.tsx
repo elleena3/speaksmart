@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState, useEffect } from "react";
@@ -83,7 +84,7 @@ export function FreeTalkFeedbackView() {
         return <div className="text-center p-8">피드백을 불러오지 못했습니다.</div>;
     }
 
-    const { studentFeedback, teacherGuidance } = feedback;
+    const { studentFeedback } = feedback;
 
     return (
         <div className="space-y-6">
@@ -107,12 +108,6 @@ export function FreeTalkFeedbackView() {
                                 <RubricItem title="어휘 (Vocabulary)" {...studentFeedback.rubric.vocabulary} />
                                 <RubricItem title="문법 (Grammar)" {...studentFeedback.rubric.grammar} />
                             </AccordionContent>
-                        </AccordionItem>
-                        <AccordionItem value="item-2">
-                             <AccordionTrigger className="text-lg font-semibold">선생님을 위한 조언</AccordionTrigger>
-                             <AccordionContent className="pt-4">
-                                <p className="text-sm text-muted-foreground">{teacherGuidance}</p>
-                             </AccordionContent>
                         </AccordionItem>
                     </Accordion>
                 </CardContent>
