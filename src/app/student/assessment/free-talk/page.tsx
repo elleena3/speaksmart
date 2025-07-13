@@ -1,4 +1,5 @@
 
+
 "use client"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -43,8 +44,15 @@ export default function FreeTalkPage() {
   const searchParams = useSearchParams();
   const { t } = useLanguage();
   const [details, setDetails] = useState<Details>(null);
+  const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isClient) return;
+
     const scenario = (searchParams.get('scenario') as Scenario) || 'free-talk';
     const assessmentId = searchParams.get('id');
 
@@ -61,10 +69,10 @@ export default function FreeTalkPage() {
     const mockData = Object.values(mockAssessmentDetails).find(d => d.scenario === scenario);
     setDetails(mockData || mockAssessmentDetails['free-talk']);
 
-  }, [searchParams]);
+  }, [searchParams, isClient]);
 
 
-  if (!details) {
+  if (!isClient || !details) {
     return <div>Loading...</div>; // Or a loading spinner
   }
 
