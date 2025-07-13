@@ -1,12 +1,38 @@
+
+"use client"
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { User, GraduationCap } from "lucide-react";
+import { User, GraduationCap, Globe } from "lucide-react";
 import { Logo } from "@/components/icons";
+import { useLanguage } from "@/context/language-context";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 export default function Home() {
+  const { language, setLanguage, t } = useLanguage();
+
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-background p-8">
+    <main className="flex min-h-screen flex-col items-center justify-center bg-background p-8 relative">
+      <div className="absolute top-4 right-4">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm">
+              <Globe className="mr-2 h-4 w-4" />
+              <span>{t.language.title}</span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => setLanguage('ko')} disabled={language === 'ko'}>
+              한국어
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setLanguage('en')} disabled={language === 'en'}>
+              English
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
       <div className="text-center mb-12">
         <div className="flex justify-center items-center mb-4">
           <Logo className="w-16 h-16 text-primary" />
