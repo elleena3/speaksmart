@@ -19,6 +19,7 @@ export const ConverseWithStudentInputSchema = z.object({
     .array(ConversationTurnSchema)
     .describe('The history of the conversation so far.'),
   scenario: z.enum(scenarios).optional().describe('The role-playing scenario for the conversation.'),
+  scenarioPrompt: z.string().optional().describe('The teacher-provided prompt for the role-playing scenario.'),
 });
 export type ConverseWithStudentInput = z.infer<typeof ConverseWithStudentInputSchema>;
 

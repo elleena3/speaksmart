@@ -7,6 +7,7 @@ export type Assessment = {
   id: string;
   title: string;
   topic: string;
+  prompt: string;
   status: '할 일' | '완료' | '채점 완료';
   assessmentType: 'monologue' | 'dialogue';
   scenario?: Scenario;
@@ -29,6 +30,8 @@ export type Submission = {
 export type TeacherAssessment = {
   id: string;
   title: string;
+  topic: string; // Added topic
+  prompt: string; // Added prompt for consistency
   studentsCompleted: number;
   totalStudents: number;
   averageScore: number;

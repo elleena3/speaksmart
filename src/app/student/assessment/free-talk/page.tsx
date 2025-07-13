@@ -6,10 +6,18 @@ import { FreeTalkView } from "./free-talk-view"
 import { useSearchParams } from "next/navigation"
 import { type Scenario } from "@/lib/types"
 import { useLanguage } from "@/context/language-context"
+import { useEffect, useState } from "react"
 
-// Mock data, in a real app this would come from the assessment linked to this page
-const mockAssessmentDetails: { [key: string]: { title: string, prompt: string, scenario: Scenario } } = {
+type Details = { 
+  title: string; 
+  prompt: string; 
+  scenario: Scenario;
+} | null;
+
+
+const mockAssessmentDetails: { [key: string]: { title: string; prompt: string; scenario: Scenario, id?: string } } = {
   "free-talk": {
+    id: "free-talk-default",
     title: "자유 대화",
     prompt: "AI와 자유롭게 영어로 대화해 보세요. 준비가 되면 '대화 시작' 버튼을 누르세요.",
     scenario: "free-talk"
@@ -32,11 +40,33 @@ const mockAssessmentDetails: { [key: string]: { title: string, prompt: string, s
 }
 
 export default function FreeTalkPage() {
-  const searchParams = useSearchParams()
+  const searchParams = useSearchParams();
   const { t } = useLanguage();
-  const scenario = (searchParams.get('scenario') as Scenario) || 'free-talk';
+  const [details, setDetails] = useState<Details>(null);
 
-  const details = mockAssessmentDetails[scenario] || mockAssessmentDetails['free-talk'];
+  useEffect(() => {
+    const scenario = (searchParams.get('scenario') as Scenario) || 'free-talk';
+    const assessmentId = searchParams.get('id');
+
+    if (assessmentId) {
+        const storedAssessments = JSON.parse(localStorage.getItem('assessments') || '[]');
+        const found = storedAssessments.find((a: any) => a.id === assessmentId);
+        if (found) {
+            setDetails(found);
+            return;
+        }
+    }
+    
+    // Fallback to mock data if not found in local storage or no ID
+    const mockData = Object.values(mockAssessmentDetails).find(d => d.scenario === scenario);
+    setDetails(mockData || mockAssessmentDetails['free-talk']);
+
+  }, [searchParams]);
+
+
+  if (!details) {
+    return <div>Loading...</div>; // Or a loading spinner
+  }
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -46,7 +76,7 @@ export default function FreeTalkPage() {
           <CardDescription>{details.prompt}</CardDescription>
         </CardHeader>
         <CardContent>
-          <FreeTalkView scenario={details.scenario} />
+          <FreeTalkView scenario={details.scenario} scenarioPrompt={details.prompt} />
         </CardContent>
       </Card>
     </div>

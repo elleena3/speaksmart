@@ -14,10 +14,8 @@ import {
   ConverseWithStudentInputSchema,
   ConverseWithStudentOutput,
   ConverseWithStudentOutputSchema,
-  ConversationTurnSchema,
 } from '@/lib/types/ai-schemas';
 import wav from 'wav';
-import { z } from 'zod';
 
 export async function converseWithStudent(
   input: ConverseWithStudentInput
@@ -30,82 +28,45 @@ export async function converseWithStudent(
 const conversationalPrompt = ai.definePrompt({
   name: 'conversationalPrompt',
   input: {
-    schema: z.object({
-      history: z.array(ConversationTurnSchema.extend({ isUser: z.boolean() })),
-      studentTranscript: z.string().optional(),
-      scenario: z.string().optional().describe("The role-playing scenario for the conversation. Examples: 'ordering-food', 'airport-check-in', 'shopping', or 'free-talk'."),
-    }),
+    schema: ConverseWithStudentInputSchema.pick({
+      conversationHistory: true,
+      studentTranscript: true,
+      scenario: true,
+      scenarioPrompt: true, // Use the prompt from the schema
+    }).extend({
+        history: ConverseWithStudentInputSchema.shape.conversationHistory, // for handlebars
+    })
   },
-  output: { schema: z.object({ response: z.string().describe("The AI's response text.") }) },
+  output: { schema: ConverseWithStudentOutputSchema.pick({ aiResponseText: true }) },
   prompt: `You are an AI English conversation partner. Your name is "Alex". You are friendly, patient, and encouraging. Your goal is to have a natural, engaging conversation with a student learning English.
 
 {{#if scenario}}
 You are in a role-playing scenario. Adapt your persona and responses accordingly.
 Scenario: {{{scenario}}}
+Situation: {{#if scenarioPrompt}} {{{scenarioPrompt}}} {{else}} You are just having a friendly conversation. {{/if}}
 
-{{#if (eq scenario "ordering-food")}}
-You are a restaurant employee. The student is a customer.
-- Start by greeting the customer and asking if they are ready to order.
-- Respond to their order, ask clarifying questions (e.g., "Anything else?"), and confirm the order.
-- Your goal is to simulate a realistic food ordering experience.
-{{else if (eq scenario "airport-check-in")}}
-You are an airline check-in agent. The student is a passenger.
-- Start by greeting the passenger and asking for their passport and ticket.
-- Ask standard check-in questions (e.g., "How many bags are you checking in?", "Do you have a seat preference?").
-- Your goal is to simulate a realistic airport check-in experience.
-{{else if (eq scenario "shopping")}}
-You are a shop assistant in a clothing store. The student is a customer.
-- Start by greeting the customer and asking if they need any help.
-- Respond to their questions about items, sizes, and prices.
-- Your goal is to simulate a realistic shopping experience.
-{{else}}
-This is a free-talk session. Have a natural, friendly conversation.
-- Ask questions to keep the conversation going.
-- If the student makes a grammatical error, don't correct them directly unless it significantly hinders understanding. The goal is conversation, not a grammar test.
-{{/if}}
-
-{{#if studentTranscript}}
-The student's latest message is a transcript from their speech. Respond to it based on your role.
-
-Conversation History:
-{{#each history}}
-{{#if isUser}}Student{{else}}You{{/if}}: {{{text}}}
-{{/each}}
-Student: {{{studentTranscript}}}
-You:
-{{else}}
-You are starting the conversation. Greet the student according to your role and the scenario.
-{{#if (eq scenario "ordering-food")}}
-For example: "Hi, welcome! Are you ready to order?"
-{{else if (eq scenario "airport-check-in")}}
-For example: "Hello there. I can help the next person in line. Can I see your passport and ticket, please?"
-{{else if (eq scenario "shopping")}}
-For example: "Hi, welcome to our store. Let me know if you need any help finding something."
-{{else}}
-For example: "Hi there! I'm Alex. How are you doing today?" or "Hello! I'm ready to chat when you are. What's on your mind?". Keep it short and friendly.
-{{/if}}
-You:
-{{/if}}
-
+Based on the situation, start the conversation or respond to the student.
 {{else}}
 This is a free-talk session. Have a natural, friendly conversation.
 - Keep your responses relatively short and natural.
 - Ask questions to keep the conversation going.
 - If the student makes a grammatical error, don't correct them directly unless it significantly hinders understanding. The goal is conversation, not a grammar test.
+{{/if}}
+
+Conversation History (if any):
+{{#each history}}
+{{#if (eq role "user")}}Student{{else}}You{{/if}}: {{{text}}}
+{{/each}}
 
 {{#if studentTranscript}}
 The student's latest message is a transcript from their speech. Respond to it.
-
-Conversation History:
-{{#each history}}
-{{#if isUser}}Student{{else}}You{{/if}}: {{{text}}}
-{{/each}}
 Student: {{{studentTranscript}}}
 You:
 {{else}}
-You are starting the conversation. Greet the student and ask them how they are or what they'd like to talk about. For example: "Hi there! I'm Alex. How are you doing today?" or "Hello! I'm ready to chat when you are. What's on your mind?". Keep it short and friendly.
+You are starting the conversation. Greet the student according to your role and the situation. Keep it short and friendly.
+For example, if you are a shop assistant: "Hi, welcome to our store. Let me know if you need any help finding something."
+For a free talk, you could say: "Hi there! I'm Alex. How are you doing today?"
 You:
-{{/if}}
 {{/if}}
 `,
 });
@@ -174,7 +135,7 @@ const converseWithStudentFlow = ai.defineFlow(
     inputSchema: ConverseWithStudentInputSchema,
     outputSchema: ConverseWithStudentOutputSchema,
   },
-  async ({ studentRecordingDataUri, conversationHistory, scenario }) => {
+  async ({ studentRecordingDataUri, conversationHistory, scenario, scenarioPrompt }) => {
     let studentTranscript = "";
     let aiResponseText = "";
 
@@ -197,19 +158,15 @@ const converseWithStudentFlow = ai.defineFlow(
     }
 
     // Step 2: Generate AI's text response based on transcript and history
-    const historyForPrompt = conversationHistory.map(turn => ({
-      ...turn,
-      isUser: turn.role === 'user',
-    }));
-
     const { output } = await conversationalPrompt({
-      history: historyForPrompt,
-      // Pass studentTranscript only if it's not an empty string
+      history: conversationHistory,
       studentTranscript: studentTranscript || undefined, 
-      scenario: scenario || 'free-talk'
+      scenario: scenario || 'free-talk',
+      scenarioPrompt: scenarioPrompt,
+      conversationHistory: conversationHistory,
     });
 
-    aiResponseText = output?.response || "";
+    aiResponseText = output?.aiResponseText || "";
 
     if (!aiResponseText) {
         console.error("AI did not generate a text response. Received:", output);

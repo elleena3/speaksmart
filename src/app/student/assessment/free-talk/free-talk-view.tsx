@@ -13,7 +13,7 @@ import { type Scenario } from "@/lib/types";
 
 const SESSION_STORAGE_KEY = 'freeTalkConversationHistory';
 
-export function FreeTalkView({ scenario }: { scenario: Scenario }) {
+export function FreeTalkView({ scenario, scenarioPrompt }: { scenario: Scenario, scenarioPrompt?: string }) {
   const [sessionState, setSessionState] = useState<"idle" | "initializing" | "recording" | "processing" | "speaking">("idle");
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -35,6 +35,7 @@ export function FreeTalkView({ scenario }: { scenario: Scenario }) {
         studentRecordingDataUri: null,
         conversationHistory: [],
         scenario: scenario,
+        scenarioPrompt: scenarioPrompt,
       });
 
       const initialTurn: ConversationTurn = { role: 'model', text: aiResponseText };
@@ -100,6 +101,7 @@ export function FreeTalkView({ scenario }: { scenario: Scenario }) {
         studentRecordingDataUri,
         conversationHistory: conversation,
         scenario: scenario,
+        scenarioPrompt: scenarioPrompt,
       });
 
       const newConversation: ConversationTurn[] = [

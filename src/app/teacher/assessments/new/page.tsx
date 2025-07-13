@@ -96,6 +96,8 @@ export default function NewAssessmentPage() {
     const newAssessment: TeacherAssessment = {
       id: new Date().getTime().toString(),
       title: submissionValues.title,
+      topic: submissionValues.topic,
+      prompt: submissionValues.prompt,
       studentsCompleted: 0,
       totalStudents: 20, 
       averageScore: 0,
@@ -194,7 +196,7 @@ export default function NewAssessmentPage() {
               name="title"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>{t.teacherAssessmentForm.titleLabel} {!isFreeTalkDialogue ? null : `(${t.teacherAssessmentForm.optional})`}</FormLabel>
+                  <FormLabel>{t.teacherAssessmentForm.titleLabel} {isFreeTalkDialogue && `(${t.teacherAssessmentForm.optional})`}</FormLabel>
                   <FormControl>
                     <Input placeholder={isFreeTalkDialogue ? t.teacherAssessmentForm.scenarios.freeTalk : t.teacherAssessmentForm.titlePlaceholder} {...field} />
                   </FormControl>
@@ -208,7 +210,7 @@ export default function NewAssessmentPage() {
               name="topic"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>{t.teacherAssessmentForm.topicLabel} {!isFreeTalkDialogue ? null : `(${t.teacherAssessmentForm.optional})`}</FormLabel>
+                  <FormLabel>{t.teacherAssessmentForm.topicLabel} {isFreeTalkDialogue && `(${t.teacherAssessmentForm.optional})`}</FormLabel>
                   <FormControl>
                     <Input placeholder={isFreeTalkDialogue ? t.teacherAssessmentForm.freeTalkDefaults.topic : t.teacherAssessmentForm.topicPlaceholder} {...field} />
                   </FormControl>
@@ -222,7 +224,7 @@ export default function NewAssessmentPage() {
               name="prompt"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>{assessmentType === 'monologue' ? t.teacherAssessmentForm.promptLabel : t.teacherAssessmentForm.scenarioPromptLabel} {!isFreeTalkDialogue ? null : `(${t.teacherAssessmentForm.optional})`}</FormLabel>
+                  <FormLabel>{assessmentType === 'monologue' ? t.teacherAssessmentForm.promptLabel : t.teacherAssessmentForm.scenarioPromptLabel} {isFreeTalkDialogue && `(${t.teacherAssessmentForm.optional})`}</FormLabel>
                   <FormControl>
                     <Textarea
                       placeholder={
@@ -246,7 +248,7 @@ export default function NewAssessmentPage() {
               name="expectedFormat"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>{t.teacherAssessmentForm.expectedFormatLabel} {!isFreeTalkDialogue ? null : `(${t.teacherAssessmentForm.optional})`}</FormLabel>
+                  <FormLabel>{t.teacherAssessmentForm.expectedFormatLabel} {isFreeTalkDialogue && `(${t.teacherAssessmentForm.optional})`}</FormLabel>
                   <FormControl>
                     <Textarea
                       placeholder={isFreeTalkDialogue ? t.teacherAssessmentForm.freeTalkDefaults.expectedFormat : t.teacherAssessmentForm.expectedFormatPlaceholder}

@@ -10,11 +10,11 @@ import { ArrowRight, CheckCircle2, History, MessageCircle, Mic } from "lucide-re
 import { useLanguage } from "@/context/language-context"
 
 const allAssessments: Assessment[] = [
-  { id: "free-talk-default", title: "자유 대화", topic: "AI와 자유롭게 대화하세요.", status: "할 일", assessmentType: "dialogue", scenario: "free-talk" },
-  { id: "4", title: "7단원: 취미와 관심사", topic: "가장 좋아하는 취미에 대해 1분간 이야기하세요.", status: "할 일", assessmentType: "monologue" },
-  { id: "3", title: "중간 말하기 시험", topic: "성적 및 피드백 검토", status: "채점 완료", assessmentType: "monologue" },
-  { id: "2", title: "6단원: 사람 묘사하기", topic: "성적 및 피드백 검토", status: "채점 완료", assessmentType: "monologue" },
-  { id: "1", title: "5단원: 나의 일과", topic: "성적 및 피드백 검토", status: "채점 완료", assessmentType: "monologue" },
+  { id: "free-talk-default", title: "자유 대화", topic: "AI와 자유롭게 대화하세요.", status: "할 일", assessmentType: "dialogue", scenario: "free-talk", prompt: "AI와 자유롭게 영어로 대화해 보세요. 준비가 되면 '대화 시작' 버튼을 누르세요." },
+  { id: "4", title: "7단원: 취미와 관심사", topic: "가장 좋아하는 취미에 대해 1분간 이야기하세요.", status: "할 일", assessmentType: "monologue", prompt: "가장 좋아하는 취미에 대해 이야기해주세요. 무엇인지, 왜 좋아하는지, 얼마나 자주 하는지 언급해야 합니다. 1분 동안 말할 시간이 주어집니다." },
+  { id: "3", title: "중간 말하기 시험", topic: "성적 및 피드백 검토", status: "채점 완료", assessmentType: "monologue", prompt: "" },
+  { id: "2", title: "6단원: 사람 묘사하기", topic: "성적 및 피드백 검토", status: "채점 완료", assessmentType: "monologue", prompt: "" },
+  { id: "1", title: "5단원: 나의 일과", topic: "성적 및 피드백 검토", status: "채점 완료", assessmentType: "monologue", prompt: "" },
 ];
 
 function AssessmentCard({ assessment }: { assessment: Assessment }) {
@@ -51,7 +51,8 @@ function AssessmentCard({ assessment }: { assessment: Assessment }) {
   const getLink = () => {
     if (!isToDo) return `/student/assessment/${assessment.id}/results`;
     if (assessment.assessmentType === 'dialogue') {
-      return `/student/assessment/free-talk?scenario=${assessment.scenario || 'free-talk'}`;
+      // Pass both scenario and a unique ID to find the details on the next page
+      return `/student/assessment/free-talk?scenario=${assessment.scenario || 'free-talk'}&id=${assessment.id}`;
     }
     return `/student/assessment/${assessment.id}`;
   }
