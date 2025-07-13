@@ -30,3 +30,35 @@ export const ConverseWithStudentOutputSchema = z.object({
   studentTranscript: z.string().describe("The transcript of the student's speech."),
 });
 export type ConverseWithStudentOutput = z.infer<typeof ConverseWithStudentOutputSchema>;
+
+
+// Schemas for Free Talk Feedback Flow
+export const GenerateFreeTalkFeedbackInputSchema = z.object({
+  conversationTranscript: z
+    .string()
+    .describe('The full transcript of the conversation between the AI and the student.'),
+});
+export type GenerateFreeTalkFeedbackInput = z.infer<typeof GenerateFreeTalkFeedbackInputSchema>;
+
+const RubricItemSchema = z.object({
+  score: z.number().describe('The score for this category, from 1 to 5.'),
+  feedback: z.string().describe('Specific feedback for this category.'),
+});
+
+export const GenerateFreeTalkFeedbackOutputSchema = z.object({
+  studentFeedback: z.object({
+    overall: z.string().describe('Overall feedback for the student in Korean.'),
+    rubric: z.object({
+      fluency: RubricItemSchema.describe('Assessment of the flow and smoothness of speech.'),
+      pronunciation: RubricItemSchema.describe('Assessment of the clarity of speech and sounds.'),
+      vocabulary: RubricItemSchema.describe('Assessment of the range and appropriateness of word choice.'),
+      grammar: RubricItemSchema.describe('Assessment of the accuracy of sentence structure.'),
+    }),
+  }),
+  teacherGuidance: z
+    .string()
+    .describe(
+      'Actionable guidance for the teacher on how to help this student improve, in Korean.'
+    ),
+});
+export type GenerateFreeTalkFeedbackOutput = z.infer<typeof GenerateFreeTalkFeedbackOutputSchema>;

@@ -4,42 +4,15 @@
  * @fileOverview Analyzes a free-form English conversation and provides feedback.
  *
  * - generateFreeTalkFeedback - A function that generates rubric-based feedback for a student and guidance for a teacher.
- * - GenerateFreeTalkFeedbackInput - The input type for the function.
- * - GenerateFreeTalkFeedbackOutput - The return type for the function.
  */
 
 import { ai } from '@/ai/genkit';
-import { z } from 'genkit';
-
-export const GenerateFreeTalkFeedbackInputSchema = z.object({
-  conversationTranscript: z
-    .string()
-    .describe('The full transcript of the conversation between the AI and the student.'),
-});
-export type GenerateFreeTalkFeedbackInput = z.infer<typeof GenerateFreeTalkFeedbackInputSchema>;
-
-const RubricItemSchema = z.object({
-  score: z.number().describe('The score for this category, from 1 to 5.'),
-  feedback: z.string().describe('Specific feedback for this category.'),
-});
-
-export const GenerateFreeTalkFeedbackOutputSchema = z.object({
-  studentFeedback: z.object({
-    overall: z.string().describe('Overall feedback for the student in Korean.'),
-    rubric: z.object({
-      fluency: RubricItemSchema.describe('Assessment of the flow and smoothness of speech.'),
-      pronunciation: RubricItemSchema.describe('Assessment of the clarity of speech and sounds.'),
-      vocabulary: RubricItemSchema.describe('Assessment of the range and appropriateness of word choice.'),
-      grammar: RubricItemSchema.describe('Assessment of the accuracy of sentence structure.'),
-    }),
-  }),
-  teacherGuidance: z
-    .string()
-    .describe(
-      'Actionable guidance for the teacher on how to help this student improve, in Korean.'
-    ),
-});
-export type GenerateFreeTalkFeedbackOutput = z.infer<typeof GenerateFreeTalkFeedbackOutputSchema>;
+import {
+  GenerateFreeTalkFeedbackInput,
+  GenerateFreeTalkFeedbackInputSchema,
+  GenerateFreeTalkFeedbackOutput,
+  GenerateFreeTalkFeedbackOutputSchema,
+} from '@/lib/types/ai-schemas';
 
 export async function generateFreeTalkFeedback(
   input: GenerateFreeTalkFeedbackInput
