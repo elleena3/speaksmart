@@ -21,20 +21,21 @@ function DueDate({ endDate }: { endDate?: Date }) {
     const [text, setText] = useState<string | null>(null);
 
     useEffect(() => {
+        if (!endDate) {
+            setText(null);
+            return;
+        }
+
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
-        if (endDate) {
-            const end = new Date(endDate);
-            const diffTime = end.getTime() - today.getTime();
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        const end = new Date(endDate);
+        const diffTime = end.getTime() - today.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-            if (diffDays < 0) setText('마감일 지남');
-            else if (diffDays === 0) setText('오늘 마감');
-            else setText(`마감까지 ${diffDays}일 남음`);
-        } else {
-            setText(null);
-        }
+        if (diffDays < 0) setText('마감일 지남');
+        else if (diffDays === 0) setText('오늘 마감');
+        else setText(`마감까지 ${diffDays}일 남음`);
     }, [endDate]);
 
     if (!text) return null;
