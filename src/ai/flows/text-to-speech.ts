@@ -14,6 +14,7 @@ import {
   ConverseWithStudentInputSchema,
   ConverseWithStudentOutput,
   ConverseWithStudentOutputSchema,
+  ConversationTurn,
 } from '@/lib/types/ai-schemas';
 import wav from 'wav';
 
@@ -23,18 +24,16 @@ export async function converseWithStudent(
   return converseWithStudentFlow(input);
 }
 
-
 // 1. Define the prompt for generating the conversational text response
 const conversationalPrompt = ai.definePrompt({
   name: 'conversationalPrompt',
   input: {
     schema: ConverseWithStudentInputSchema.pick({
-      conversationHistory: true,
       studentTranscript: true,
       scenario: true,
-      scenarioPrompt: true, // Use the prompt from the schema
+      scenarioPrompt: true, 
     }).extend({
-        history: ConverseWithStudentInputSchema.shape.conversationHistory, // for handlebars
+        history: z.array(ConversationTurnSchema.extend({ isUser: z.boolean() })),
     })
   },
   output: { schema: ConverseWithStudentOutputSchema.pick({ aiResponseText: true }) },
@@ -55,7 +54,7 @@ This is a free-talk session. Have a natural, friendly conversation.
 
 Conversation History (if any):
 {{#each history}}
-{{#if (eq role "user")}}Student{{else}}You{{/if}}: {{{text}}}
+{{#if isUser}}Student{{else}}You{{/if}}: {{{text}}}
 {{/each}}
 
 {{#if studentTranscript}}
@@ -157,13 +156,18 @@ const converseWithStudentFlow = ai.defineFlow(
       }
     }
 
+    // Pre-process history for the template helper
+    const historyForPrompt = conversationHistory.map(turn => ({
+      ...turn,
+      isUser: turn.role === 'user',
+    }));
+
     // Step 2: Generate AI's text response based on transcript and history
     const { output } = await conversationalPrompt({
-      history: conversationHistory,
+      history: historyForPrompt,
       studentTranscript: studentTranscript || undefined, 
       scenario: scenario || 'free-talk',
       scenarioPrompt: scenarioPrompt,
-      conversationHistory: conversationHistory,
     });
 
     aiResponseText = output?.aiResponseText || "";
