@@ -17,12 +17,13 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
+import { useLanguage } from "@/context/language-context";
 
 const formSchema = z.object({
-  title: z.string().min(1, "제목을 입력해주세요."),
-  topic: z.string().min(1, "주제를 입력해주세요."),
-  prompt: z.string().min(1, "안내 내용을 입력해주세요."),
-  expectedFormat: z.string().min(1, "예상 답변 형식을 입력해주세요."),
+  title: z.string().min(1, "Title is required."),
+  topic: z.string().min(1, "Topic is required."),
+  prompt: z.string().min(1, "Prompt is required."),
+  expectedFormat: z.string().min(1, "Expected format is required."),
   startDate: z.date().optional(),
   endDate: z.date().optional(),
 }).refine((data) => {
@@ -31,7 +32,7 @@ const formSchema = z.object({
     }
     return true;
 }, {
-    message: "종료일은 시작일보다 빠를 수 없습니다.",
+    message: "End date cannot be earlier than start date.",
     path: ["endDate"],
 });
 
@@ -47,13 +48,24 @@ export default function EditAssessmentPage() {
   const router = useRouter();
   const params = useParams();
   const { toast } = useToast();
+  const { t, language } = useLanguage();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   const assessmentId = Array.isArray(params.id) ? params.id[0] : params.id;
   
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
+  const currentFormSchema = formSchema.refine((data) => {
+    if (data.startDate && data.endDate) {
+        return data.endDate >= data.startDate;
+    }
+    return true;
+    }, {
+    message: t.teacherAssessmentForm.errorEndDate,
+    path: ["endDate"],
+  });
+
+  const form = useForm<z.infer<typeof currentFormSchema>>({
+    resolver: zodResolver(currentFormSchema),
     defaultValues: {
       title: "",
       topic: "",
@@ -70,8 +82,8 @@ export default function EditAssessmentPage() {
         form.reset(assessmentData);
       } else {
         toast({
-          title: "오류",
-          description: "평가 정보를 찾을 수 없습니다.",
+          title: "Error",
+          description: "Assessment data not found.",
           variant: "destructive"
         })
         router.push("/teacher/assessments");
@@ -80,6 +92,20 @@ export default function EditAssessmentPage() {
     }
   }, [assessmentId, form, router, toast]);
 
+  useEffect(() => {
+    const zodSchema = formSchema.refine((data) => {
+      if (data.startDate && data.endDate) {
+          return data.endDate >= data.startDate;
+      }
+      return true;
+      }, {
+      message: t.teacherAssessmentForm.errorEndDate,
+      path: ["endDate"],
+    });
+
+    form.trigger(); // Re-validate form on language change
+  }, [language, t, form]);
+
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsSubmitting(true);
     // Simulate API call to update assessment
@@ -87,8 +113,8 @@ export default function EditAssessmentPage() {
     await new Promise(resolve => setTimeout(resolve, 1500));
 
     toast({
-      title: "성공!",
-      description: `"${values.title}" 평가가 성공적으로 수정되었습니다.`,
+      title: t.teacherAssessmentForm.editSuccessToast.title,
+      description: t.teacherAssessmentForm.editSuccessToast.description.replace('{title}', values.title),
     });
 
     setIsSubmitting(false);
@@ -106,8 +132,8 @@ export default function EditAssessmentPage() {
   return (
     <Card className="max-w-3xl mx-auto">
       <CardHeader>
-        <CardTitle>평가 수정</CardTitle>
-        <CardDescription>평가 정보를 수정하려면 아래 양식을 업데이트해주세요.</CardDescription>
+        <CardTitle>{t.teacherAssessmentForm.editTitle}</CardTitle>
+        <CardDescription>{t.teacherAssessmentForm.editDescription}</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -117,11 +143,11 @@ export default function EditAssessmentPage() {
               name="title"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>평가 제목</FormLabel>
+                  <FormLabel>{t.teacherAssessmentForm.titleLabel}</FormLabel>
                   <FormControl>
-                    <Input placeholder="예: 7단원: 취미와 관심사" {...field} />
+                    <Input placeholder={t.teacherAssessmentForm.titlePlaceholder} {...field} />
                   </FormControl>
-                  <FormDescription>학생에게 보여질 평가의 이름입니다.</FormDescription>
+                  <FormDescription>{t.teacherAssessmentForm.titleDescription}</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -131,11 +157,11 @@ export default function EditAssessmentPage() {
               name="topic"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>평가 주제</FormLabel>
+                  <FormLabel>{t.teacherAssessmentForm.topicLabel}</FormLabel>
                   <FormControl>
-                    <Input placeholder="예: 가장 좋아하는 취미에 대해 1분간 이야기하세요." {...field} />
+                    <Input placeholder={t.teacherAssessmentForm.topicPlaceholder} {...field} />
                   </FormControl>
-                  <FormDescription>평가 목록에 표시될 간략한 주제입니다.</FormDescription>
+                  <FormDescription>{t.teacherAssessmentForm.topicDescription}</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -145,15 +171,15 @@ export default function EditAssessmentPage() {
               name="prompt"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>학생 안내 내용</FormLabel>
+                  <FormLabel>{t.teacherAssessmentForm.promptLabel}</FormLabel>
                   <FormControl>
                     <Textarea
-                      placeholder="학생에게 보여줄 자세한 안내 내용을 입력하세요."
+                      placeholder={t.teacherAssessmentForm.promptPlaceholder}
                       rows={4}
                       {...field}
                     />
                   </FormControl>
-                  <FormDescription>학생이 평가를 시작할 때 보게 될 상세한 지시사항입니다.</FormDescription>
+                  <FormDescription>{t.teacherAssessmentForm.promptDescription}</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -163,15 +189,15 @@ export default function EditAssessmentPage() {
               name="expectedFormat"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>AI 평가를 위한 예상 답변 형식</FormLabel>
+                  <FormLabel>{t.teacherAssessmentForm.expectedFormatLabel}</FormLabel>
                   <FormControl>
                     <Textarea
-                      placeholder="AI가 평가할 때 참고할 학생의 예상 답변 형식이나 핵심 요소를 설명해주세요."
+                      placeholder={t.teacherAssessmentForm.expectedFormatPlaceholder}
                       rows={4}
                       {...field}
                     />
                   </FormControl>
-                   <FormDescription>이 내용은 AI 피드백의 정확도를 높이는 데 사용됩니다.</FormDescription>
+                   <FormDescription>{t.teacherAssessmentForm.expectedFormatDescription}</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -182,7 +208,7 @@ export default function EditAssessmentPage() {
                     name="startDate"
                     render={({ field }) => (
                         <FormItem className="flex flex-col">
-                        <FormLabel>평가 시작일 (선택)</FormLabel>
+                        <FormLabel>{t.teacherAssessmentForm.startDateLabel}</FormLabel>
                         <Popover>
                             <PopoverTrigger asChild>
                             <FormControl>
@@ -196,7 +222,7 @@ export default function EditAssessmentPage() {
                                 {field.value ? (
                                     format(field.value, "PPP")
                                 ) : (
-                                    <span>날짜 선택</span>
+                                    <span>{t.teacherAssessmentForm.datePlaceholder}</span>
                                 )}
                                 <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                                 </Button>
@@ -212,7 +238,7 @@ export default function EditAssessmentPage() {
                             </PopoverContent>
                         </Popover>
                         <FormDescription>
-                            평가를 시작할 날짜를 지정합니다.
+                            {t.teacherAssessmentForm.startDateDescription}
                         </FormDescription>
                         <FormMessage />
                         </FormItem>
@@ -223,7 +249,7 @@ export default function EditAssessmentPage() {
                     name="endDate"
                     render={({ field }) => (
                         <FormItem className="flex flex-col">
-                        <FormLabel>평가 종료일 (선택)</FormLabel>
+                        <FormLabel>{t.teacherAssessmentForm.endDateLabel}</FormLabel>
                         <Popover>
                             <PopoverTrigger asChild>
                             <FormControl>
@@ -237,7 +263,7 @@ export default function EditAssessmentPage() {
                                 {field.value ? (
                                     format(field.value, "PPP")
                                 ) : (
-                                    <span>날짜 선택</span>
+                                    <span>{t.teacherAssessmentForm.datePlaceholder}</span>
                                 )}
                                 <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                                 </Button>
@@ -256,7 +282,7 @@ export default function EditAssessmentPage() {
                             </PopoverContent>
                         </Popover>
                         <FormDescription>
-                            평가를 마감할 날짜를 지정합니다.
+                           {t.teacherAssessmentForm.endDateDescription}
                         </FormDescription>
                         <FormMessage />
                         </FormItem>
@@ -264,10 +290,10 @@ export default function EditAssessmentPage() {
                 />
             </div>
             <div className="flex justify-end gap-2">
-               <Button type="button" variant="outline" onClick={() => router.back()}>취소</Button>
+               <Button type="button" variant="outline" onClick={() => router.back()}>{t.teacherAssessmentForm.cancelButton}</Button>
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {isSubmitting ? "저장 중..." : "변경사항 저장"}
+                {isSubmitting ? t.teacherAssessmentForm.savingButton : t.teacherAssessmentForm.saveButton}
               </Button>
             </div>
           </form>
