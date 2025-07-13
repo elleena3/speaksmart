@@ -46,27 +46,26 @@ export function AppLayout({ children, navItems, title }: AppLayoutProps) {
           <SidebarMenu>
             {navItems.map((item) => (
               <SidebarMenuItem key={item.href}>
-                <SidebarMenuButton
-                  asChild
-                  isActive={pathname.startsWith(item.href)}
-                  tooltip={{ children: item.label, side: "right" }}
-                >
-                  <Link href={item.href}>
+                <Link href={item.href} passHref>
+                  <SidebarMenuButton
+                    isActive={pathname.startsWith(item.href)}
+                    tooltip={{ children: item.label, side: "right" }}
+                  >
                     {item.icon}
                     <span>{item.label}</span>
-                  </Link>
-                </SidebarMenuButton>
+                  </SidebarMenuButton>
+                </Link>
               </SidebarMenuItem>
             ))}
           </SidebarMenu>
         </SidebarContent>
         <SidebarFooter>
-          <SidebarMenuButton asChild>
-            <Link href="/">
-              <LogOut/>
-              <span>Logout</span>
-            </Link>
-          </SidebarMenuButton>
+          <Link href="/" passHref>
+             <SidebarMenuButton>
+                <LogOut/>
+                <span>로그아웃</span>
+             </SidebarMenuButton>
+          </Link>
         </SidebarFooter>
       </Sidebar>
       <SidebarInset>
