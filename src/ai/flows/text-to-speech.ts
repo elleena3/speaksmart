@@ -9,12 +9,14 @@
 
 import { ai } from '@/ai/genkit';
 import { googleAI } from '@genkit-ai/googleai';
+import { z } from 'genkit';
 import {
   ConverseWithStudentInput,
   ConverseWithStudentInputSchema,
   ConverseWithStudentOutput,
   ConverseWithStudentOutputSchema,
   ConversationTurn,
+  ConversationTurnSchema,
 } from '@/lib/types/ai-schemas';
 import wav from 'wav';
 
