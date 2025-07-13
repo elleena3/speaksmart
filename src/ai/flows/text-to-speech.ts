@@ -53,7 +53,7 @@ You:`,
 // Prompt for the initial greeting
 const greetingPrompt = ai.definePrompt({
     name: 'greetingPrompt',
-    input: { schema: z.string() }, // Allow string input
+    input: { schema: z.string() },
     output: { schema: z.string() },
     prompt: `You are an AI English conversation partner named "Alex". Start the conversation. Greet the student and ask them how they are or what they'd like to talk about. For example: "Hi there! I'm Alex. How are you doing today?" or "Hello! I'm ready to chat when you are. What's on your mind?". Keep it short and friendly.`
 });
@@ -128,7 +128,8 @@ const converseWithStudentFlow = ai.defineFlow(
 
     // Handle the initial greeting case when no audio is provided
     if (!studentRecordingDataUri) {
-      aiResponseText = await greetingPrompt(""); // Pass an empty string
+      const { output } = await greetingPrompt(""); // Pass an empty string
+      aiResponseText = output!;
     } else {
       // Handle subsequent conversation turns
       // Step 1: Transcribe student's audio to text (STT)
@@ -153,10 +154,11 @@ const converseWithStudentFlow = ai.defineFlow(
         isUser: turn.role === 'user',
       }));
 
-      aiResponseText = await conversationalPrompt({
+      const { output } = await conversationalPrompt({
         history: historyForPrompt,
         studentTranscript,
       });
+      aiResponseText = output!;
     }
 
     // Step 3: Convert AI's text response to speech (TTS) for all cases
