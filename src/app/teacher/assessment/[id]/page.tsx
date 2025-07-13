@@ -14,7 +14,7 @@ const studentResults = [
   { studentId: "s5", name: "Ethan Hunt", score: 95, status: "채점 완료", date: "2024-05-12" },
 ]
 
-const curricularRemarks = "학생들은 일상생활 어휘에 대한 높은 이해도를 보였습니다. 많은 학생들이 현재 시제를 정확하게 사용하는 데 뛰어났습니다. 공통적인 개선 영역에는 'th' 발음과 다양한 빈도 부사 사용이 포함됩니다. 전반적으로, 대부분의 학생들이 이 단원에 대한 기대치를 충족하거나 초과하는 등 매우 우수한 성과를 보였습니다."
+const curricularRemarks = "학생들은 일상생활 어휘에 대한 높은 이해도를 보였음. 많은 학생들이 현재 시제를 정확하게 사용하는 데 뛰어난 모습을 보임. 공통적인 개선 영역에는 'th' 발음과 다양한 빈도 부사 사용이 포함됨. 전반적으로, 대부분의 학생들이 이 단원에 대한 기대치를 충족하거나 초과하는 등 매우 우수한 성과를 보였음."
 
 export default function AssessmentResultsPage({ params }: { params: { id: string } }) {
   return (
