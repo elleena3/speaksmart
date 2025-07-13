@@ -1,3 +1,4 @@
+import { type ConversationTurn } from "@/ai/flows/text-to-speech";
 
 export type Assessment = {
   id: string;
@@ -31,3 +32,8 @@ export type TeacherAssessment = {
   startDate?: Date;
   endDate?: Date;
 };
+
+// Add conversation history type to be stored in localStorage
+export type ConversationHistory = {
+  history: ConversationTurn[];
+}
