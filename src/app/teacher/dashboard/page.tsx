@@ -39,8 +39,8 @@ export default function TeacherDashboard() {
 
       <Card>
         <CardHeader>
-          <CardTitle>평가</CardTitle>
-          <CardDescription>말하기 평가를 관리합니다.</CardDescription>
+          <CardTitle>최근 평가</CardTitle>
+          <CardDescription>가장 최근에 생성된 말하기 평가입니다.</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
@@ -54,7 +54,7 @@ export default function TeacherDashboard() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {assessments.map((assessment) => (
+              {assessments.slice(0, 5).map((assessment) => (
                 <TableRow key={assessment.id}>
                   <TableCell className="font-medium">
                     <Link href={`/teacher/assessment/${assessment.id}`} className="hover:underline text-primary">
@@ -81,8 +81,12 @@ export default function TeacherDashboard() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem asChild><Link href={`/teacher/assessment/${assessment.id}`}>결과 보기</Link></DropdownMenuItem>
-                        <DropdownMenuItem>편집</DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                          <Link href={`/teacher/assessment/${assessment.id}`}>결과 보기</Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                           <Link href={`/teacher/assessments/${assessment.id}/edit`}>편집</Link>
+                        </DropdownMenuItem>
                         <DropdownMenuItem className="text-destructive focus:bg-destructive/10 focus:text-destructive">삭제</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
