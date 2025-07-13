@@ -1,11 +1,15 @@
 import { type ConversationTurn } from "@/lib/types/ai-schemas";
 
+export const scenarios = ["free-talk", "ordering-food", "airport-check-in", "shopping"] as const;
+export type Scenario = (typeof scenarios)[number];
+
 export type Assessment = {
   id: string;
   title: string;
   topic: string;
   status: '할 일' | '완료' | '채점 완료';
-  special?: boolean;
+  assessmentType: 'monologue' | 'dialogue';
+  scenario?: Scenario;
 };
 
 export type Student = {

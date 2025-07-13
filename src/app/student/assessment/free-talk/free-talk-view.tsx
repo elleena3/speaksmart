@@ -9,10 +9,11 @@ import { useToast } from "@/hooks/use-toast"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { converseWithStudent } from "@/ai/flows/text-to-speech"
 import { type ConversationTurn } from "@/lib/types/ai-schemas";
+import { type Scenario } from "@/lib/types";
 
 const SESSION_STORAGE_KEY = 'freeTalkConversationHistory';
 
-export function FreeTalkView() {
+export function FreeTalkView({ scenario }: { scenario: Scenario }) {
   const [sessionState, setSessionState] = useState<"idle" | "initializing" | "recording" | "processing" | "speaking">("idle");
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -33,6 +34,7 @@ export function FreeTalkView() {
       const { aiResponseText, aiResponseAudioDataUri } = await converseWithStudent({
         studentRecordingDataUri: null,
         conversationHistory: [],
+        scenario: scenario,
       });
 
       const initialTurn: ConversationTurn = { role: 'model', text: aiResponseText };
@@ -97,6 +99,7 @@ export function FreeTalkView() {
       const { studentTranscript, aiResponseText, aiResponseAudioDataUri } = await converseWithStudent({
         studentRecordingDataUri,
         conversationHistory: conversation,
+        scenario: scenario,
       });
 
       const newConversation: ConversationTurn[] = [

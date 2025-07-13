@@ -18,13 +18,16 @@ import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { useLanguage } from "@/context/language-context";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { scenarios, type Scenario } from "@/lib/types";
 
 // Mock data for demonstration. In a real app, you'd fetch this from your database.
-const mockAssessments: { [key: string]: { title: string; topic: string; prompt: string; expectedFormat: string; startDate?: Date; endDate?: Date } } = {
-  "1": { title: "5단원: 나의 일과", topic: "당신의 일반적인 하루에 대해 이야기하세요.", prompt: "아침에 일어나서 밤에 잠자리에 들 때까지 당신의 일과를 설명해주세요.", expectedFormat: "현재 시제를 사용하고 시간 표현을 포함해야 합니다." },
-  "2": { title: "6단원: 사람 묘사하기", topic: "가족 구성원을 묘사하세요.", prompt: "가족 중 한 명을 선택하여 외모와 성격을 묘사해주세요.", expectedFormat: "형용사를 사용하여 외모와 성격을 자세히 묘사해야 합니다." },
-  "3": { title: "중간 말하기 시험", topic: "지난 주말에 한 일에 대해 이야기하세요.", prompt: "지난 주말에 있었던 일에 대해 구체적으로 설명해주세요.", expectedFormat: "과거 시제를 정확하게 사용해야 합니다." },
-  "4": { title: "7단원: 취미와 관심사", topic: "가장 좋아하는 취미에 대해 1분간 이야기하세요.", prompt: "가장 좋아하는 취미에 대해 이야기해주세요. 무엇인지, 왜 좋아하는지, 얼마나 자주 하는지 언급해야 합니다.", expectedFormat: "학생은 취미를 소개하고, 좋아하는 이유를 제시하며, 빈도를 언급해야 합니다.", startDate: new Date("2024-06-01"), endDate: new Date("2024-06-07") },
+const mockAssessments: { [key: string]: { title: string; topic: string; prompt: string; expectedFormat: string; startDate?: Date; endDate?: Date, assessmentType: "monologue" | "dialogue", scenario?: Scenario } } = {
+  "1": { title: "5단원: 나의 일과", topic: "당신의 일반적인 하루에 대해 이야기하세요.", prompt: "아침에 일어나서 밤에 잠자리에 들 때까지 당신의 일과를 설명해주세요.", expectedFormat: "현재 시제를 사용하고 시간 표현을 포함해야 합니다.", assessmentType: "monologue" },
+  "2": { title: "6단원: 사람 묘사하기", topic: "가족 구성원을 묘사하세요.", prompt: "가족 중 한 명을 선택하여 외모와 성격을 묘사해주세요.", expectedFormat: "형용사를 사용하여 외모와 성격을 자세히 묘사해야 합니다.", assessmentType: "monologue" },
+  "3": { title: "중간 말하기 시험", topic: "지난 주말에 한 일에 대해 이야기하세요.", prompt: "지난 주말에 있었던 일에 대해 구체적으로 설명해주세요.", expectedFormat: "과거 시제를 정확하게 사용해야 합니다.", assessmentType: "monologue" },
+  "4": { title: "7단원: 취미와 관심사", topic: "가장 좋아하는 취미에 대해 1분간 이야기하세요.", prompt: "가장 좋아하는 취미에 대해 이야기해주세요. 무엇인지, 왜 좋아하는지, 얼마나 자주 하는지 언급해야 합니다.", expectedFormat: "학생은 취미를 소개하고, 좋아하는 이유를 제시하며, 빈도를 언급해야 합니다.", startDate: new Date("2024-06-01"), endDate: new Date("2024-06-07"), assessmentType: "monologue" },
 };
 
 export default function EditAssessmentPage() {
@@ -44,6 +47,8 @@ export default function EditAssessmentPage() {
     expectedFormat: z.string().min(1, t.teacherAssessmentForm.errors.expectedFormatRequired),
     startDate: z.date().optional(),
     endDate: z.date().optional(),
+    assessmentType: z.enum(["monologue", "dialogue"]),
+    scenario: z.enum(scenarios).optional(),
   }).refine((data) => {
       if (data.startDate && data.endDate) {
           return data.endDate >= data.startDate;
@@ -61,8 +66,12 @@ export default function EditAssessmentPage() {
       topic: "",
       prompt: "",
       expectedFormat: "",
+      assessmentType: "monologue",
+      scenario: "free-talk"
     },
   });
+
+  const assessmentType = form.watch("assessmentType");
 
   useEffect(() => {
     if (assessmentId) {
@@ -121,6 +130,68 @@ export default function EditAssessmentPage() {
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <FormField
               control={form.control}
+              name="assessmentType"
+              render={({ field }) => (
+                <FormItem className="space-y-3">
+                  <FormLabel>{t.teacherAssessmentForm.typeLabel}</FormLabel>
+                  <FormControl>
+                    <RadioGroup
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                      className="flex flex-col space-y-1"
+                    >
+                      <FormItem className="flex items-center space-x-3 space-y-0">
+                        <FormControl>
+                          <RadioGroupItem value="monologue" />
+                        </FormControl>
+                        <FormLabel className="font-normal">
+                          {t.teacherAssessmentForm.typeMonologue}
+                        </FormLabel>
+                      </FormItem>
+                      <FormItem className="flex items-center space-x-3 space-y-0">
+                        <FormControl>
+                          <RadioGroupItem value="dialogue" />
+                        </FormControl>
+                        <FormLabel className="font-normal">
+                          {t.teacherAssessmentForm.typeDialogue}
+                        </FormLabel>
+                      </FormItem>
+                    </RadioGroup>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {assessmentType === 'dialogue' && (
+               <FormField
+                  control={form.control}
+                  name="scenario"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t.teacherAssessmentForm.scenarioLabel}</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder={t.teacherAssessmentForm.scenarioPlaceholder} />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="free-talk">{t.teacherAssessmentForm.scenarios.freeTalk}</SelectItem>
+                          <SelectItem value="ordering-food">{t.teacherAssessmentForm.scenarios.orderingFood}</SelectItem>
+                          <SelectItem value="airport-check-in">{t.teacherAssessmentForm.scenarios.airportCheckIn}</SelectItem>
+                          <SelectItem value="shopping">{t.teacherAssessmentForm.scenarios.shopping}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>{t.teacherAssessmentForm.scenarioDescription}</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+            )}
+
+            <FormField
+              control={form.control}
               name="title"
               render={({ field }) => (
                 <FormItem>
@@ -152,15 +223,15 @@ export default function EditAssessmentPage() {
               name="prompt"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>{t.teacherAssessmentForm.promptLabel}</FormLabel>
+                  <FormLabel>{assessmentType === 'monologue' ? t.teacherAssessmentForm.promptLabel : t.teacherAssessmentForm.scenarioPromptLabel}</FormLabel>
                   <FormControl>
                     <Textarea
-                      placeholder={t.teacherAssessmentForm.promptPlaceholder}
+                      placeholder={assessmentType === 'monologue' ? t.teacherAssessmentForm.promptPlaceholder : t.teacherAssessmentForm.scenarioPromptPlaceholder}
                       rows={4}
                       {...field}
                     />
                   </FormControl>
-                  <FormDescription>{t.teacherAssessmentForm.promptDescription}</FormDescription>
+                  <FormDescription>{assessmentType === 'monologue' ? t.teacherAssessmentForm.promptDescription : t.teacherAssessmentForm.scenarioPromptDescription}</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}

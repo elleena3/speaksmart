@@ -1,4 +1,5 @@
 import { z } from 'genkit';
+import { scenarios } from '@/lib/types';
 
 // Define the structure for a single message in the conversation history
 export const ConversationTurnSchema = z.object({
@@ -17,6 +18,7 @@ export const ConverseWithStudentInputSchema = z.object({
   conversationHistory: z
     .array(ConversationTurnSchema)
     .describe('The history of the conversation so far.'),
+  scenario: z.enum(scenarios).optional().describe('The role-playing scenario for the conversation.'),
 });
 export type ConverseWithStudentInput = z.infer<typeof ConverseWithStudentInputSchema>;
 

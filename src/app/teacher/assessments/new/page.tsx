@@ -18,6 +18,9 @@ import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { useLanguage } from "@/context/language-context";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { scenarios } from "@/lib/types";
 
 export default function NewAssessmentPage() {
   const router = useRouter();
@@ -32,6 +35,8 @@ export default function NewAssessmentPage() {
     expectedFormat: z.string().min(1, t.teacherAssessmentForm.errors.expectedFormatRequired),
     startDate: z.date().optional(),
     endDate: z.date().optional(),
+    assessmentType: z.enum(["monologue", "dialogue"]),
+    scenario: z.enum(scenarios).optional(),
   }).refine((data) => {
       if (data.startDate && data.endDate) {
           return data.endDate >= data.startDate;
@@ -49,8 +54,12 @@ export default function NewAssessmentPage() {
       topic: "",
       prompt: "",
       expectedFormat: "",
+      assessmentType: "monologue",
+      scenario: "free-talk"
     },
   });
+
+  const assessmentType = form.watch("assessmentType");
 
   useEffect(() => {
     // Re-validate form on language change
@@ -81,6 +90,68 @@ export default function NewAssessmentPage() {
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <FormField
+              control={form.control}
+              name="assessmentType"
+              render={({ field }) => (
+                <FormItem className="space-y-3">
+                  <FormLabel>{t.teacherAssessmentForm.typeLabel}</FormLabel>
+                  <FormControl>
+                    <RadioGroup
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                      className="flex flex-col space-y-1"
+                    >
+                      <FormItem className="flex items-center space-x-3 space-y-0">
+                        <FormControl>
+                          <RadioGroupItem value="monologue" />
+                        </FormControl>
+                        <FormLabel className="font-normal">
+                          {t.teacherAssessmentForm.typeMonologue}
+                        </FormLabel>
+                      </FormItem>
+                      <FormItem className="flex items-center space-x-3 space-y-0">
+                        <FormControl>
+                          <RadioGroupItem value="dialogue" />
+                        </FormControl>
+                        <FormLabel className="font-normal">
+                          {t.teacherAssessmentForm.typeDialogue}
+                        </FormLabel>
+                      </FormItem>
+                    </RadioGroup>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {assessmentType === 'dialogue' && (
+               <FormField
+                  control={form.control}
+                  name="scenario"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t.teacherAssessmentForm.scenarioLabel}</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder={t.teacherAssessmentForm.scenarioPlaceholder} />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="free-talk">{t.teacherAssessmentForm.scenarios.freeTalk}</SelectItem>
+                          <SelectItem value="ordering-food">{t.teacherAssessmentForm.scenarios.orderingFood}</SelectItem>
+                          <SelectItem value="airport-check-in">{t.teacherAssessmentForm.scenarios.airportCheckIn}</SelectItem>
+                          <SelectItem value="shopping">{t.teacherAssessmentForm.scenarios.shopping}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>{t.teacherAssessmentForm.scenarioDescription}</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+            )}
+
             <FormField
               control={form.control}
               name="title"
@@ -114,15 +185,15 @@ export default function NewAssessmentPage() {
               name="prompt"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>{t.teacherAssessmentForm.promptLabel}</FormLabel>
+                  <FormLabel>{assessmentType === 'monologue' ? t.teacherAssessmentForm.promptLabel : t.teacherAssessmentForm.scenarioPromptLabel}</FormLabel>
                   <FormControl>
                     <Textarea
-                      placeholder={t.teacherAssessmentForm.promptPlaceholder}
+                      placeholder={assessmentType === 'monologue' ? t.teacherAssessmentForm.promptPlaceholder : t.teacherAssessmentForm.scenarioPromptPlaceholder}
                       rows={4}
                       {...field}
                     />
                   </FormControl>
-                  <FormDescription>{t.teacherAssessmentForm.promptDescription}</FormDescription>
+                  <FormDescription>{assessmentType === 'monologue' ? t.teacherAssessmentForm.promptDescription : t.teacherAssessmentForm.scenarioPromptDescription}</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
