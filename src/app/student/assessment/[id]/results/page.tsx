@@ -1,7 +1,7 @@
 import { FeedbackView } from "./feedback-view"
 
 const aiFeedback = {
-  feedback: "Great job on describing your hobby! You spoke clearly and at a good pace. Your vocabulary was appropriate for the topic. \n\n**Areas for improvement:**\n\n*   **Pronunciation:** Be mindful of the 'th' sound in words like 'three' and 'with'. Try practicing tongue twisters to improve this.\n*   **Fluency:** You had a few pauses. Try to connect your ideas more smoothly. You could use connecting words like 'also', 'in addition', or 'because'.\n\nKeep up the great work!",
+  feedback: "취미에 대해 훌륭하게 설명해주셨어요! 명확하고 좋은 속도로 말씀하셨습니다. 주제에 맞는 어휘를 사용하셨네요. \n\n**개선할 점:**\n\n*   **발음:** 'three'나 'with' 같은 단어에서 'th' 발음에 유의해주세요. 텅 트위스터를 연습하면 도움이 될 거예요.\n*   **유창성:** 몇 번의 멈춤이 있었어요. 아이디어를 더 부드럽게 연결해보세요. 'also', 'in addition', 'because' 같은 연결어를 사용하면 좋습니다.\n\n계속해서 좋은 모습 보여주세요!",
 }
 
 export default function AssessmentResultsPage({ params }: { params: { id: string } }) {

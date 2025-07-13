@@ -48,7 +48,7 @@ const generateSpeakingFeedbackPrompt = ai.definePrompt({
   name: 'generateSpeakingFeedbackPrompt',
   input: {schema: GenerateSpeakingFeedbackInputSchema},
   output: {schema: GenerateSpeakingFeedbackOutputSchema},
-  prompt: `You are an AI assistant that provides feedback on student spoken English practice.
+  prompt: `You are an AI assistant that provides feedback on student spoken English practice. Your response must be in Korean.
 
 You will use information about the activity prompt, expected format, and the student's recording to provide feedback to the student.
 
@@ -58,7 +58,7 @@ Student Recording: {{media url=studentRecordingDataUri}}
 
 Instructions for generating feedback for the student: {{{studentFeedbackInstructions}}}
 
-Provide constructive criticism and specific areas for improvement.
+Provide constructive criticism and specific areas for improvement in Korean.
 `,
 });
 
