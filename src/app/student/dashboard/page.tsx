@@ -86,35 +86,39 @@ function AssessmentCard({ assessment }: { assessment: Assessment }) {
 
 export default function StudentDashboard() {
   const { t } = useLanguage();
-  const [allAssessments, setAllAssessments] = useState<Assessment[]>(initialAssessments);
+  const [allAssessments, setAllAssessments] = useState<Assessment[]>([]);
 
   useEffect(() => {
     try {
       const storedAssessments = localStorage.getItem(LOCAL_STORAGE_KEY);
-      if (storedAssessments) {
-        const localData: TeacherAssessment[] = JSON.parse(storedAssessments);
-        
-        const studentViewAssessments: Assessment[] = localData.map(teacherAssessment => ({
-          ...teacherAssessment,
-          // Assuming all assessments are 'To Do' for a student unless there's a specific status logic
-          status: '할 일'
-        }));
+      const localData: TeacherAssessment[] = storedAssessments ? JSON.parse(storedAssessments) : [];
+      
+      const studentViewAssessments: Assessment[] = localData.map(teacherAssessment => ({
+        ...teacherAssessment,
+        status: '할 일' // All teacher-created assessments are "To Do" for the student by default
+      }));
 
-        const combined = [...initialAssessments];
-        studentViewAssessments.forEach(localItem => {
-            const index = combined.findIndex(initialItem => initialItem.id === localItem.id);
-            if (index > -1) {
-              // Update if it's a new assessment that overwrites a mock one (by id)
-              combined[index] = { ...combined[index], ...localItem, status: '할 일' };
-            } else {
-              combined.push(localItem);
-            }
-        });
+      // Create a map of the initial assessments for easy lookup
+      const combinedMap = new Map<string, Assessment>();
+      
+      // Add initial assessments first
+      initialAssessments.forEach(item => combinedMap.set(item.id, item));
+      
+      // Add or overwrite with assessments from localStorage
+      studentViewAssessments.forEach(item => combinedMap.set(item.id, item));
 
-        setAllAssessments(combined);
+      // Add the default free-talk if it was overwritten by a custom one
+      if (!combinedMap.has("free-talk-default")) {
+         const freeTalkDefault = initialAssessments.find(a => a.id === 'free-talk-default');
+         if (freeTalkDefault) combinedMap.set(freeTalkDefault.id, freeTalkDefault);
       }
+
+      const combined = Array.from(combinedMap.values());
+      setAllAssessments(combined);
+      
     } catch (error) {
       console.error("Failed to load assessments from localStorage", error);
+      setAllAssessments(initialAssessments); // Fallback to initial data on error
     }
   }, []);
 

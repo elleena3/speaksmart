@@ -10,6 +10,10 @@ export default function AssessmentResultsPage({ params }: { params: { id: string
     redirect('/student/assessment/free-talk/results');
   }
 
+  // This page is for monologue results. Since we don't have dynamic results for monologues yet,
+  // we can show a sample. A real implementation would fetch results based on the ID.
+  // We prevent redirection for any ID that is not 'free-talk'.
+
   return (
     <FeedbackView
       assessmentId={params.id}
