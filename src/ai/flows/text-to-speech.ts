@@ -32,7 +32,7 @@ const conversationalPrompt = ai.definePrompt({
   input: {
     schema: z.object({
       history: z.array(ConversationTurnSchema.extend({ isUser: z.boolean() })),
-      studentTranscript: z.string().optional(), // Make student transcript optional
+      studentTranscript: z.string(), // Transcript is now required
     }),
   },
   output: { schema: z.string() },
@@ -42,18 +42,21 @@ const conversationalPrompt = ai.definePrompt({
 - If the student makes a grammatical error, don't correct them directly unless it significantly hinders understanding. The goal is conversation, not a grammar test.
 - The student's latest message is a transcript from their speech. Respond to it.
 
-{{#if studentTranscript}}
 Conversation History:
 {{#each history}}
 {{#if isUser}}Student{{else}}You{{/if}}: {{{text}}}
 {{/each}}
 Student: {{{studentTranscript}}}
-You: 
-{{else}}
-You are starting the conversation. Greet the student and ask them how they are or what they'd like to talk about. For example: "Hi there! I'm Alex. How are you doing today?" or "Hello! I'm ready to chat when you are. What's on your mind?".
-You:
-{{/if}}`,
+You:`,
 });
+
+// Prompt for the initial greeting
+const greetingPrompt = ai.definePrompt({
+    name: 'greetingPrompt',
+    output: { schema: z.string() },
+    prompt: `You are an AI English conversation partner named "Alex". Start the conversation. Greet the student and ask them how they are or what they'd like to talk about. For example: "Hi there! I'm Alex. How are you doing today?" or "Hello! I'm ready to chat when you are. What's on your mind?". Keep it short and friendly.`
+});
+
 
 // Helper function to convert PCM audio buffer to WAV format
 async function toWav(
@@ -83,6 +86,34 @@ async function toWav(
   });
 }
 
+// Function to convert text to speech
+async function textToSpeech(text: string): Promise<string> {
+    const ttsResponse = await ai.generate({
+        model: googleAI.model('gemini-2.5-flash-preview-tts'),
+        config: {
+            responseModalities: ['AUDIO'],
+            speechConfig: {
+                voiceConfig: {
+                    prebuiltVoiceConfig: { voiceName: 'Alloy' }, // A friendly, natural voice
+                },
+            },
+        },
+        prompt: text,
+    });
+
+    const audioMedia = ttsResponse.media;
+    if (!audioMedia) {
+        throw new Error('TTS did not return any audio media.');
+    }
+
+    const pcmBuffer = Buffer.from(
+        audioMedia.url.substring(audioMedia.url.indexOf(',') + 1),
+        'base64'
+    );
+    
+    return 'data:audio/wav;base64,' + await toWav(pcmBuffer);
+}
+
 // 2. Define the main flow that orchestrates the entire process
 const converseWithStudentFlow = ai.defineFlow(
   {
@@ -91,73 +122,50 @@ const converseWithStudentFlow = ai.defineFlow(
     outputSchema: ConverseWithStudentOutputSchema,
   },
   async ({ studentRecordingDataUri, conversationHistory }) => {
-    let studentTranscript: string | undefined = undefined;
+    let studentTranscript = "";
+    let aiResponseText = "";
 
-    // Step 1: Transcribe student's audio to text (STT), if provided
-    if (studentRecordingDataUri) {
-        const sttResponse = await ai.generate({
-          model: googleAI.model('gemini-2.0-flash'), // Using a powerful model for transcription
-          prompt: [
-            {
-              text: 'Transcribe the following audio. The user is a non-native English speaker. Just provide the transcript, nothing else.',
-            },
-            { media: { url: studentRecordingDataUri } },
-          ],
-        });
-        studentTranscript = sttResponse.text;
-        if (!studentTranscript) {
-            // It's possible for transcription to yield an empty string, which is not an error.
-            // Only throw if the response was completely empty.
-            console.warn("Transcription result was empty.");
-            studentTranscript = ""; 
-        }
-    }
-
-
-    // Step 2: Generate AI's text response based on transcript and history
-    // Add the `isUser` flag to the history for the Handlebars template
-    const historyForPrompt = conversationHistory.map(turn => ({
-      ...turn,
-      isUser: turn.role === 'user',
-    }));
-
-    const textResponse = await conversationalPrompt({
-      history: historyForPrompt,
-      studentTranscript: studentTranscript,
-    });
-    const aiResponseText = textResponse;
-
-    // Step 3: Convert AI's text response to speech (TTS)
-    const ttsResponse = await ai.generate({
-      model: googleAI.model('gemini-2.5-flash-preview-tts'),
-      config: {
-        responseModalities: ['AUDIO'],
-        speechConfig: {
-          voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: 'Alloy' }, // A friendly, natural voice
+    // Handle the initial greeting case when no audio is provided
+    if (!studentRecordingDataUri) {
+      aiResponseText = await greetingPrompt();
+    } else {
+      // Handle subsequent conversation turns
+      // Step 1: Transcribe student's audio to text (STT)
+      const sttResponse = await ai.generate({
+        model: googleAI.model('gemini-2.0-flash'),
+        prompt: [
+          {
+            text: 'Transcribe the following audio. The user is a non-native English speaker. Just provide the transcript, nothing else.',
           },
-        },
-      },
-      prompt: aiResponseText,
-    });
+          { media: { url: studentRecordingDataUri } },
+        ],
+      });
+      studentTranscript = sttResponse.text;
+      if (!studentTranscript) {
+          console.warn("Transcription result was empty.");
+          studentTranscript = "(The user did not say anything)"; 
+      }
 
-    const audioMedia = ttsResponse.media;
-    if (!audioMedia) {
-      throw new Error('TTS did not return any audio media.');
+      // Step 2: Generate AI's text response based on transcript and history
+      const historyForPrompt = conversationHistory.map(turn => ({
+        ...turn,
+        isUser: turn.role === 'user',
+      }));
+
+      aiResponseText = await conversationalPrompt({
+        history: historyForPrompt,
+        studentTranscript,
+      });
     }
 
-    // The TTS model returns raw PCM data, which needs a WAV header to be playable in browsers.
-    const pcmBuffer = Buffer.from(
-      audioMedia.url.substring(audioMedia.url.indexOf(',') + 1),
-      'base64'
-    );
-    const wavBase64 = await toWav(pcmBuffer);
+    // Step 3: Convert AI's text response to speech (TTS) for all cases
+    const aiResponseAudioDataUri = await textToSpeech(aiResponseText);
 
     // Step 4: Return all the generated data
     return {
-      studentTranscript: studentTranscript || "", // Ensure we always return a string
+      studentTranscript,
       aiResponseText,
-      aiResponseAudioDataUri: 'data:audio/wav;base64,' + wavBase64,
+      aiResponseAudioDataUri,
     };
   }
 );
