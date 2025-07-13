@@ -30,8 +30,8 @@ export type Submission = {
 export type TeacherAssessment = {
   id: string;
   title: string;
-  topic: string; // Added topic
-  prompt: string; // Added prompt for consistency
+  topic: string;
+  prompt: string;
   studentsCompleted: number;
   totalStudents: number;
   averageScore: number;
