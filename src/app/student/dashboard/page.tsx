@@ -1,13 +1,10 @@
 
-"use client"
-
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import Link from "next/link"
 import { type Assessment } from "@/lib/types"
 import { ArrowRight, CheckCircle2, History, MessageCircle } from "lucide-react"
-import { useEffect, useState } from "react"
 
 const allAssessments: Assessment[] = [
   { id: "free-talk", title: "자유 대화", topic: "AI와 3분간 자유롭게 대화하세요.", status: "할 일", special: true },
@@ -17,32 +14,20 @@ const allAssessments: Assessment[] = [
   { id: "1", title: "5단원: 나의 일과", topic: "성적 및 피드백 검토", status: "채점 완료" },
 ];
 
-function DueDate({ endDate }: { endDate?: Date }) {
-    const [text, setText] = useState<string | null>(null);
+function getDueDateText(endDate?: Date) {
+    if (!endDate) return null;
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
-    useEffect(() => {
-        if (!endDate) {
-            setText(null);
-            return;
-        }
+    const end = new Date(endDate);
+    const diffTime = end.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
-        const end = new Date(endDate);
-        const diffTime = end.getTime() - today.getTime();
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-        if (diffDays < 0) setText('마감일 지남');
-        else if (diffDays === 0) setText('오늘 마감');
-        else setText(`마감까지 ${diffDays}일 남음`);
-    }, [endDate]);
-
-    if (!text) return null;
-
-    return <p className="text-sm font-semibold text-destructive">{text}</p>;
+    if (diffDays < 0) return '마감일 지남';
+    if (diffDays === 0) return '오늘 마감';
+    return `마감까지 ${diffDays}일 남음`;
 }
-
 
 function AssessmentCard({ assessment }: { assessment: Assessment }) {
   const isToDo = assessment.status === '할 일';
@@ -70,6 +55,8 @@ function AssessmentCard({ assessment }: { assessment: Assessment }) {
         return <History className="h-5 w-5" />;
     }
   }
+  
+  const dueDateText = getDueDateText(assessment.endDate);
 
   return (
     <Card className="flex flex-col hover:shadow-md transition-shadow">
@@ -83,7 +70,7 @@ function AssessmentCard({ assessment }: { assessment: Assessment }) {
         <CardDescription>{assessment.topic}</CardDescription>
       </CardHeader>
       <CardContent className="flex-grow">
-        {isToDo && <DueDate endDate={assessment.endDate} />}
+        {isToDo && dueDateText && <p className="text-sm font-semibold text-destructive">{dueDateText}</p>}
       </CardContent>
       <CardFooter>
         <Link href={isToDo ? `/student/assessment/${assessment.id}` : `/student/assessment/${assessment.id}/results`} passHref className="w-full">
@@ -98,46 +85,33 @@ function AssessmentCard({ assessment }: { assessment: Assessment }) {
 }
 
 export default function StudentDashboard() {
-  const [availableAssessments, setAvailableAssessments] = useState<Assessment[]>([]);
-  const [isMounted, setIsMounted] = useState(false);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
 
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (isMounted) {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      const filtered = allAssessments.filter(assessment => {
-        if (assessment.status !== '할 일') {
-          return true; 
-        }
-        
-        if (assessment.id === 'free-talk') {
-          return true;
-        }
-        
-        const startDate = assessment.startDate ? new Date(assessment.startDate) : null;
-        const endDate = assessment.endDate ? new Date(assessment.endDate) : null;
-
-        if (!startDate && !endDate) {
-          return true;
-        }
-        
-        const isAfterStart = startDate ? today >= startDate : true;
-        const isBeforeEnd = endDate ? today <= endDate : true;
-
-        return isAfterStart && isBeforeEnd;
-      });
-      setAvailableAssessments(filtered);
+  const availableAssessments = allAssessments.filter(assessment => {
+    if (assessment.status !== '할 일') {
+      return true; // Keep all completed assessments
     }
-  }, [isMounted]);
+    
+    // For "to do" assessments, check the date range
+    if (assessment.id === 'free-talk') {
+        return true; // Free talk is always available
+    }
+    
+    const startDate = assessment.startDate ? new Date(assessment.startDate) : null;
+    const endDate = assessment.endDate ? new Date(assessment.endDate) : null;
 
-  if (!isMounted) {
-    return null; // or a loading spinner
-  }
+    // If no dates are set, it's always available
+    if (!startDate && !endDate) {
+        return true;
+    }
+    
+    // Check if within the date range
+    const isAfterStart = startDate ? today >= startDate : true;
+    const isBeforeEnd = endDate ? today <= endDate : true;
+
+    return isAfterStart && isBeforeEnd;
+  });
 
   return (
     <div className="space-y-6">
