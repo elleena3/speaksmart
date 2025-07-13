@@ -35,6 +35,8 @@ export type TeacherAssessment = {
   dateCreated: string;
   startDate?: Date;
   endDate?: Date;
+  assessmentType: 'monologue' | 'dialogue';
+  scenario?: Scenario;
 };
 
 // Add conversation history type to be stored in localStorage

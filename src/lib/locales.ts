@@ -68,10 +68,15 @@ export const translations = {
       listTitle: "평가 목록",
       listDescription: "생성된 모든 평가 목록입니다.",
       tableHeaderTitle: "제목",
+      tableHeaderType: "유형",
       tableHeaderPeriod: "평가 기간",
       tableHeaderCompleted: "완료",
       tableHeaderAvgScore: "평균 점수",
       tableHeaderActions: "작업",
+      assessmentTypes: {
+        monologue: "혼자 말하기",
+        dialogue: "AI와 대화하기"
+      },
       periodAlways: "상시",
       periodFrom: "{date}부터",
       periodTo: "~ {date}까지",
@@ -137,7 +142,7 @@ export const translations = {
       savingButton: "저장 중...",
       createSuccessToast: {
         title: "성공!",
-        description: "'{title}' 평가가 성공적으로 생성되었습니다. (참고: 이 데이터는 새로고침 시 사라집니다.)",
+        description: "'{title}' 평가가 성공적으로 생성되었습니다.",
       },
       editSuccessToast: {
         title: "성공!",
@@ -237,10 +242,15 @@ export const translations = {
       listTitle: "Assessment List",
       listDescription: "A list of all created assessments.",
       tableHeaderTitle: "Title",
+      tableHeaderType: "Type",
       tableHeaderPeriod: "Assessment Period",
       tableHeaderCompleted: "Completed",
       tableHeaderAvgScore: "Avg. Score",
       tableHeaderActions: "Actions",
+      assessmentTypes: {
+        monologue: "Monologue",
+        dialogue: "Dialogue with AI"
+      },
       periodAlways: "Always available",
       periodFrom: "From {date}",
       periodTo: "Until {date}",
@@ -306,7 +316,7 @@ export const translations = {
       savingButton: "Saving...",
       createSuccessToast: {
         title: "Success!",
-        description: "The '{title}' assessment has been successfully created. (Note: this data will be lost on refresh)",
+        description: "The '{title}' assessment has been successfully created.",
       },
       editSuccessToast: {
         title: "Success!",

@@ -20,7 +20,7 @@ import { format } from "date-fns";
 import { useLanguage } from "@/context/language-context";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { scenarios } from "@/lib/types";
+import { scenarios, type TeacherAssessment } from "@/lib/types";
 
 export default function NewAssessmentPage() {
   const router = useRouter();
@@ -68,9 +68,27 @@ export default function NewAssessmentPage() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsSubmitting(true);
+    
     // Simulate API call to create assessment
-    console.log("Creating assessment with values:", values);
     await new Promise(resolve => setTimeout(resolve, 1500));
+    
+    // In a real app, this would come from the server response.
+    const newAssessment: TeacherAssessment = {
+      id: new Date().getTime().toString(),
+      title: values.title,
+      studentsCompleted: 0,
+      totalStudents: 20, // Assuming a default value
+      averageScore: 0,
+      dateCreated: new Date().toISOString().split('T')[0],
+      startDate: values.startDate,
+      endDate: values.endDate,
+      assessmentType: values.assessmentType,
+      scenario: values.scenario,
+    };
+
+    // Save to localStorage to persist across page navigation for this demo
+    const existingAssessments: TeacherAssessment[] = JSON.parse(localStorage.getItem('assessments') || '[]');
+    localStorage.setItem('assessments', JSON.stringify([...existingAssessments, newAssessment]));
 
     toast({
       title: t.teacherAssessmentForm.createSuccessToast.title,

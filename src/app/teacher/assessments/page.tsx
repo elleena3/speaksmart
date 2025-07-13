@@ -1,7 +1,7 @@
 
 "use client"
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { PlusCircle, MoreHorizontal } from 'lucide-react';
@@ -16,27 +16,57 @@ import { format } from "date-fns";
 import { useLanguage } from '@/context/language-context';
 
 const initialAssessments: TeacherAssessment[] = [
-  { id: "1", title: "5단원: 나의 일과", studentsCompleted: 18, totalStudents: 20, averageScore: 85, dateCreated: "2024-05-10" },
-  { id: "2", title: "6단원: 사람 묘사하기", studentsCompleted: 15, totalStudents: 20, averageScore: 78, dateCreated: "2024-05-17" },
-  { id: "3", title: "중간 말하기 시험", studentsCompleted: 20, totalStudents: 20, averageScore: 91, dateCreated: "2024-05-24" },
-  { id: "4", title: "7단원: 취미와 관심사", studentsCompleted: 0, totalStudents: 20, averageScore: 0, dateCreated: "2024-05-31", startDate: new Date("2024-06-01"), endDate: new Date("2024-06-07") },
+  { id: "1", title: "5단원: 나의 일과", studentsCompleted: 18, totalStudents: 20, averageScore: 85, dateCreated: "2024-05-10", assessmentType: "monologue" },
+  { id: "2", title: "6단원: 사람 묘사하기", studentsCompleted: 15, totalStudents: 20, averageScore: 78, dateCreated: "2024-05-17", assessmentType: "monologue" },
+  { id: "3", title: "중간 말하기 시험", studentsCompleted: 20, totalStudents: 20, averageScore: 91, dateCreated: "2024-05-24", assessmentType: "monologue" },
+  { id: "4", title: "7단원: 취미와 관심사", studentsCompleted: 0, totalStudents: 20, averageScore: 0, dateCreated: "2024-05-31", startDate: new Date("2024-06-01"), endDate: new Date("2024-06-07"), assessmentType: "monologue" },
 ];
 
+const LOCAL_STORAGE_KEY = 'assessments';
+
 export default function AssessmentsPage() {
-  const [assessments, setAssessments] = useState(initialAssessments);
+  const [assessments, setAssessments] = useState<TeacherAssessment[]>([]);
   const { toast } = useToast();
   const { t } = useLanguage();
 
+  useEffect(() => {
+    // Load assessments from localStorage on component mount
+    const storedAssessments = localStorage.getItem(LOCAL_STORAGE_KEY);
+    const localData: TeacherAssessment[] = storedAssessments ? JSON.parse(storedAssessments) : [];
+    
+    // Combine initial mock data with data from localStorage, preventing duplicates
+    const combined = [...initialAssessments];
+    localData.forEach(localItem => {
+        if (!combined.some(initialItem => initialItem.id === localItem.id)) {
+            combined.push(localItem);
+        }
+    });
+
+    setAssessments(combined);
+  }, []);
+
   const handleDelete = (assessmentId: string) => {
-    setAssessments(assessments.filter(a => a.id !== assessmentId));
+    const updatedAssessments = assessments.filter(a => a.id !== assessmentId);
+    setAssessments(updatedAssessments);
+    
+    // Also update localStorage
+    const storedAssessments = localStorage.getItem(LOCAL_STORAGE_KEY);
+    const localData: TeacherAssessment[] = storedAssessments ? JSON.parse(storedAssessments) : [];
+    const updatedLocalData = localData.filter(a => a.id !== assessmentId);
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updatedLocalData));
+
     toast({
       title: t.teacherAssessments.deleteToast.title,
       description: t.teacherAssessments.deleteToast.description
     });
   }
   
-  const formatDateRange = (startDate?: Date, endDate?: Date) => {
+  const formatDateRange = (startDateStr?: Date, endDateStr?: Date) => {
     const { periodAlways, periodFrom, periodTo } = t.teacherAssessments;
+    // Dates from localStorage might be strings, so convert them
+    const startDate = startDateStr ? new Date(startDateStr) : undefined;
+    const endDate = endDateStr ? new Date(endDateStr) : undefined;
+
     if (startDate && endDate) {
       return `${format(startDate, "yy/MM/dd")} - ${format(endDate, "yy/MM/dd")}`;
     }
@@ -48,6 +78,13 @@ export default function AssessmentsPage() {
     }
     return periodAlways;
   };
+
+  const getAssessmentTypeText = (assessment: TeacherAssessment) => {
+    if (assessment.assessmentType === 'dialogue') {
+      return t.teacherAssessments.assessmentTypes.dialogue;
+    }
+    return t.teacherAssessments.assessmentTypes.monologue;
+  }
   
   return (
     <div className="space-y-6">
@@ -73,6 +110,7 @@ export default function AssessmentsPage() {
              <TableHeader>
                <TableRow>
                  <TableHead>{t.teacherAssessments.tableHeaderTitle}</TableHead>
+                 <TableHead>{t.teacherAssessments.tableHeaderType}</TableHead>
                  <TableHead>{t.teacherAssessments.tableHeaderPeriod}</TableHead>
                  <TableHead className="text-center">{t.teacherAssessments.tableHeaderCompleted}</TableHead>
                  <TableHead className="text-center">{t.teacherAssessments.tableHeaderAvgScore}</TableHead>
@@ -86,6 +124,9 @@ export default function AssessmentsPage() {
                      <Link href={`/teacher/assessment/${assessment.id}`} className="hover:underline text-primary">
                        {assessment.title}
                      </Link>
+                   </TableCell>
+                   <TableCell>
+                      <Badge variant="outline">{getAssessmentTypeText(assessment)}</Badge>
                    </TableCell>
                    <TableCell className="text-sm text-muted-foreground">
                       {formatDateRange(assessment.startDate, assessment.endDate)}
