@@ -17,6 +17,32 @@ const allAssessments: Assessment[] = [
   { id: "1", title: "5단원: 나의 일과", topic: "성적 및 피드백 검토", status: "채점 완료" },
 ];
 
+function DueDate({ endDate }: { endDate?: Date }) {
+    const [text, setText] = useState<string | null>(null);
+
+    useEffect(() => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        if (endDate) {
+            const end = new Date(endDate);
+            const diffTime = end.getTime() - today.getTime();
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+            if (diffDays < 0) setText('마감일 지남');
+            else if (diffDays === 0) setText('오늘 마감');
+            else setText(`마감까지 ${diffDays}일 남음`);
+        } else {
+            setText(null);
+        }
+    }, [endDate]);
+
+    if (!text) return null;
+
+    return <p className="text-sm font-semibold text-destructive">{text}</p>;
+}
+
+
 function AssessmentCard({ assessment }: { assessment: Assessment }) {
   const isToDo = assessment.status === '할 일';
   
@@ -44,25 +70,6 @@ function AssessmentCard({ assessment }: { assessment: Assessment }) {
     }
   }
 
-  const getDueDateText = () => {
-    // This logic needs to run on the client, which is fine in a "use client" component.
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    if (assessment.endDate) {
-      const endDate = new Date(assessment.endDate);
-      const diffTime = endDate.getTime() - today.getTime();
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-      if (diffDays < 0) return '마감일 지남';
-      if (diffDays === 0) return '오늘 마감';
-      return `마감까지 ${diffDays}일 남음`;
-    }
-    return null;
-  }
-
-  const dueDateText = getDueDateText();
-
   return (
     <Card className="flex flex-col hover:shadow-md transition-shadow">
       <CardHeader>
@@ -75,7 +82,7 @@ function AssessmentCard({ assessment }: { assessment: Assessment }) {
         <CardDescription>{assessment.topic}</CardDescription>
       </CardHeader>
       <CardContent className="flex-grow">
-        {dueDateText && <p className="text-sm font-semibold text-destructive">{dueDateText}</p>}
+        <DueDate endDate={assessment.endDate} />
       </CardContent>
       <CardFooter>
         <Link href={isToDo ? `/student/assessment/${assessment.id}` : `/student/assessment/${assessment.id}/results`} passHref className="w-full">

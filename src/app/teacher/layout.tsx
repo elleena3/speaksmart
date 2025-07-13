@@ -1,3 +1,4 @@
+
 import type { Metadata } from 'next';
 import { AppLayout } from '@/components/app-layout';
 import { LayoutDashboard, BookOpenCheck, Settings } from 'lucide-react';
