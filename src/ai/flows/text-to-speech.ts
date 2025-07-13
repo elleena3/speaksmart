@@ -30,7 +30,7 @@ const conversationalPrompt = ai.definePrompt({
   name: 'conversationalPrompt',
   input: {
     schema: z.object({
-      history: z.array(ConversationTurnSchema),
+      history: z.array(ConversationTurnSchema.extend({ isUser: z.boolean() })),
       studentTranscript: z.string(),
     }),
   },
@@ -43,7 +43,7 @@ const conversationalPrompt = ai.definePrompt({
 
 Conversation History:
 {{#each history}}
-{{#if (eq role 'user')}}Student{{else}}You{{/if}}: {{{text}}}
+{{#if isUser}}Student{{else}}You{{/if}}: {{{text}}}
 {{/each}}
 Student: {{{studentTranscript}}}
 You: `,
@@ -101,8 +101,14 @@ const converseWithStudentFlow = ai.defineFlow(
     }
 
     // Step 2: Generate AI's text response based on transcript and history
+    // Add the `isUser` flag to the history for the Handlebars template
+    const historyForPrompt = conversationHistory.map(turn => ({
+      ...turn,
+      isUser: turn.role === 'user',
+    }));
+
     const textResponse = await conversationalPrompt({
-      history: conversationHistory,
+      history: historyForPrompt,
       studentTranscript,
     });
     const aiResponseText = textResponse;
