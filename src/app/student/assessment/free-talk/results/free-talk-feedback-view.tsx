@@ -2,12 +2,12 @@
 "use client"
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Loader2, ThumbsUp, ThumbsDown } from "lucide-react";
 import { generateFreeTalkFeedback, GenerateFreeTalkFeedbackOutput } from "@/ai/flows/generate-free-talk-feedback";
-import { type ConversationHistory } from "@/lib/types";
+import { type ConversationHistory, type StudentResult } from "@/lib/types";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
@@ -32,7 +32,10 @@ export function FreeTalkFeedbackView() {
     const [isLoading, setIsLoading] = useState(true);
     const [satisfaction, setSatisfaction] = useState<"good" | "bad" | null>(null);
     const router = useRouter();
+    const searchParams = useSearchParams();
     const { toast } = useToast();
+
+    const assessmentId = searchParams.get('id');
 
     useEffect(() => {
         const storedData = sessionStorage.getItem(SESSION_STORAGE_KEY);
@@ -58,6 +61,32 @@ export function FreeTalkFeedbackView() {
         try {
             const result = await generateFreeTalkFeedback({ conversationTranscript });
             setFeedback(result);
+
+            if (assessmentId) {
+                 // Calculate a score based on rubric
+                const rubric = result.studentFeedback.rubric;
+                const totalScore = rubric.fluency.score + rubric.pronunciation.score + rubric.vocabulary.score + rubric.grammar.score;
+                const averageScore = Math.round((totalScore / 20) * 100);
+
+                const studentResult: StudentResult = {
+                    studentId: "student-alex-doe",
+                    assessmentId: assessmentId,
+                    name: "Alex Doe",
+                    avatarUrl: "https://placehold.co/40x40.png",
+                    status: "채점 완료",
+                    score: averageScore,
+                    date: new Date().toISOString().split('T')[0],
+                    aiFeedback: result.studentFeedback.overall,
+                    curricularRemarks: `AI와의 자유 대화에서 유창성과 어휘 사용 능력이 돋보였습니다. ${result.studentFeedback.rubric.fluency.feedback} ${result.studentFeedback.rubric.vocabulary.feedback}`,
+                    studentFeedbackSummary: "학생이 평가에 대해 남긴 피드백이 없습니다.", // This would be a separate flow/feature
+                    teacherGuidance: result.teacherGuidance,
+                }
+                
+                const existingResults: StudentResult[] = JSON.parse(localStorage.getItem('student_results') || '[]');
+                const updatedResults = [...existingResults.filter(r => r.assessmentId !== assessmentId), studentResult];
+                localStorage.setItem('student_results', JSON.stringify(updatedResults));
+            }
+
         } catch (error) {
             console.error("Error generating feedback:", error);
             toast({

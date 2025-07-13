@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState } from "react"
@@ -5,7 +6,8 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Mic, StopCircle, Loader2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-// import { generateSpeakingFeedback } from "@/ai/flows/generate-speaking-feedback"
+import { generateSpeakingFeedback } from "@/ai/flows/generate-speaking-feedback"
+import { type StudentResult } from "@/lib/types"
 
 type AssessmentDetails = {
   id: string,
@@ -37,22 +39,39 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Asses
     })
 
     try {
-      // Here you would typically get the recorded audio data.
-      // For this demo, we'll simulate the process.
+      // In a real app, this would come from a microphone recording.
+      // For this demo, we'll use a placeholder short, silent audio data URI.
       const studentRecordingDataUri = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA="
 
-      // This is commented out because we are not actually calling the AI in the scaffold.
-      /*
-      await generateSpeakingFeedback({
+      const feedbackResult = await generateSpeakingFeedback({
         activityPrompt: assessmentDetails.prompt,
         expectedFormat: assessmentDetails.expectedFormat,
         studentRecordingDataUri,
         studentFeedbackInstructions: "Provide feedback on fluency, pronunciation, and vocabulary usage. Be encouraging."
       });
-      */
-     
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 3000));
+
+      // In a real app, this would be more sophisticated.
+      const score = Math.floor(Math.random() * (98 - 80 + 1)) + 80;
+
+      const studentResult: StudentResult = {
+        studentId: "student-alex-doe",
+        assessmentId: assessmentDetails.id,
+        name: "Alex Doe",
+        avatarUrl: "https://placehold.co/40x40.png",
+        status: "채점 완료",
+        score,
+        date: new Date().toISOString().split('T')[0],
+        aiFeedback: feedbackResult.feedback,
+        // Mocking these for now as they require more complex flows
+        curricularRemarks: "학생은 주어진 주제에 대해 논리적으로 자신의 경험을 잘 설명함. 특히, 과거 시제를 적절히 사용하여 문장을 구성하는 능력이 돋보임. 어휘 사용 범위가 다소 제한적이었으나, 핵심 내용은 명확하게 전달함. 발음은 대체로 양호하나, 일부 단어에서 강세 위치를 개선할 필요가 있음. 전반적으로 성실하게 과제에 임하는 태도가 긍정적임.",
+        studentFeedbackSummary: "학생은 평가 주제가 흥미로웠다고 응답했으나, 답변 준비 시간이 조금 더 길었으면 좋겠다는 의견을 제시함. AI의 피드백이 전반적으로 도움이 되었다고 평가함.",
+        teacherGuidance: "이 학생은 문법 구조에 대한 이해도가 높습니다. 다양한 어휘를 사용할 수 있도록 유의어 및 관련 표현 학습을 독려해주세요. 역할극이나 짧은 발표 활동을 통해 자신감을 키워주는 것이 도움이 될 것입니다."
+      }
+      
+      const existingResults: StudentResult[] = JSON.parse(localStorage.getItem('student_results') || '[]');
+      const updatedResults = [...existingResults.filter(r => r.assessmentId !== assessmentDetails.id), studentResult];
+      localStorage.setItem('student_results', JSON.stringify(updatedResults));
+      localStorage.setItem(`assessment_feedback_${assessmentDetails.id}`, feedbackResult.feedback);
 
       toast({
         title: "처리 완료!",

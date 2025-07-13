@@ -46,3 +46,17 @@ export type TeacherAssessment = {
 export type ConversationHistory = {
   history: ConversationTurn[];
 }
+
+export type StudentResult = {
+  studentId: string;
+  assessmentId: string;
+  name: string;
+  avatarUrl: string;
+  status: "채점 완료";
+  score: number;
+  date: string;
+  aiFeedback: string;
+  curricularRemarks: string;
+  studentFeedbackSummary: string;
+  teacherGuidance: string;
+}

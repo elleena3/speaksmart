@@ -2,30 +2,22 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter, useParams, notFound } from "next/navigation";
+import { useParams, notFound, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
-import { Loader2, Info, User, ArrowRight } from "lucide-react"
-import { type TeacherAssessment } from "@/lib/types";
+import { Loader2, User, ArrowRight } from "lucide-react"
+import { type TeacherAssessment, type StudentResult } from "@/lib/types";
 import { useLanguage } from "@/context/language-context";
 
-// Mock data: A single student result for a specific, existing assessment.
-// In a real app, this would be fetched dynamically from a database.
-const mockStudentResults = [
-  {
-    studentId: "student-alex-doe",
-    assessmentId: "3", // This result is only for the "중간 말하기 시험"
-    name: "Alex Doe",
-    avatarUrl: "https://placehold.co/40x40.png",
-    status: "채점 완료",
-    score: 91,
-    date: "2024-05-24",
-    progress: 100
-  }
+const initialAssessments: TeacherAssessment[] = [
+  { id: "1", title: "5단원: 나의 일과", studentsCompleted: 18, totalStudents: 20, averageScore: 85, dateCreated: "2024-05-10", assessmentType: "monologue", prompt: "" },
+  { id: "2", title: "6단원: 사람 묘사하기", studentsCompleted: 15, totalStudents: 20, averageScore: 78, dateCreated: "2024-05-17", assessmentType: "monologue", prompt: "" },
+  { id: "3", title: "중간 말하기 시험", studentsCompleted: 20, totalStudents: 20, averageScore: 91, dateCreated: "2024-05-24", assessmentType: "monologue", prompt: "" },
+  { id: "4", title: "7단원: 취미와 관심사", studentsCompleted: 0, totalStudents: 20, averageScore: 0, dateCreated: "2024-05-31", assessmentType: "monologue", prompt: "" },
 ];
 
 export default function AssessmentSubmissionsPage() {
@@ -33,23 +25,17 @@ export default function AssessmentSubmissionsPage() {
   const router = useRouter();
   const { t } = useLanguage();
   const [assessment, setAssessment] = useState<TeacherAssessment | null>(null);
-  const [studentResults, setStudentResults] = useState<typeof mockStudentResults>([]);
+  const [studentResults, setStudentResults] = useState<StudentResult[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const assessmentId = Array.isArray(params.id) ? params.id[0] : params.id;
 
   useEffect(() => {
     if (assessmentId) {
-      const storedAssessments: TeacherAssessment[] = JSON.parse(localStorage.getItem('assessments') || '[]');
-      const initialAssessments: TeacherAssessment[] = [
-        { id: "1", title: "5단원: 나의 일과", studentsCompleted: 18, totalStudents: 20, averageScore: 85, dateCreated: "2024-05-10", assessmentType: "monologue", prompt: "" },
-        { id: "2", title: "6단원: 사람 묘사하기", studentsCompleted: 15, totalStudents: 20, averageScore: 78, dateCreated: "2024-05-17", assessmentType: "monologue", prompt: "" },
-        { id: "3", title: "중간 말하기 시험", studentsCompleted: 20, totalStudents: 20, averageScore: 91, dateCreated: "2024-05-24", assessmentType: "monologue", prompt: "" },
-        { id: "4", title: "7단원: 취미와 관심사", studentsCompleted: 0, totalStudents: 20, averageScore: 0, dateCreated: "2024-05-31", assessmentType: "monologue", prompt: "" },
-      ];
-
+      const storedTeacherAssessments: TeacherAssessment[] = JSON.parse(localStorage.getItem('assessments') || '[]');
+      
       const allAssessments = [...initialAssessments];
-      storedAssessments.forEach(localItem => {
+      storedTeacherAssessments.forEach(localItem => {
           const index = allAssessments.findIndex(initialItem => initialItem.id === localItem.id);
           if (index > -1) {
             allAssessments[index] = localItem;
@@ -62,14 +48,12 @@ export default function AssessmentSubmissionsPage() {
       
       if (foundAssessment) {
         setAssessment(foundAssessment);
-        // Only show mock results for the assessment with ID "3"
-        if (assessmentId === "3") {
-            setStudentResults(mockStudentResults);
-        } else {
-            setStudentResults([]); // No results for other assessments
-        }
-
+        const allStudentResults: StudentResult[] = JSON.parse(localStorage.getItem('student_results') || '[]');
+        const resultsForThisAssessment = allStudentResults.filter(r => r.assessmentId === assessmentId);
+        setStudentResults(resultsForThisAssessment);
       } else {
+        // If assessment not found, maybe redirect or show a 'not found' message
+        // For now, using Next's notFound utility
         notFound();
       }
       setIsLoading(false);

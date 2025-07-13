@@ -8,10 +8,10 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Loader2, Paperclip, Download, User, Activity, BookText } from "lucide-react"
-import { type TeacherAssessment } from "@/lib/types";
+import { type TeacherAssessment, type StudentResult } from "@/lib/types";
 import { useLanguage } from "@/context/language-context";
 
-// This is all mock data for a single student ("Alex Doe") on assessment "3"
+// This is just to define the type for mock data structure
 const mockStudentData = {
   studentId: "student-alex-doe",
   name: "Alex Doe",
@@ -22,32 +22,39 @@ const mockStudentData = {
   teacherGuidance: "이 학생은 문법 구조에 대한 이해도가 높습니다. 다양한 어휘를 사용할 수 있도록 유의어 및 관련 표현 학습을 독려해주세요. 역할극이나 짧은 발표 활동을 통해 자신감을 키워주는 것이 도움이 될 것입니다."
 };
 
-const mockAssessments: TeacherAssessment[] = [
+const initialAssessments: TeacherAssessment[] = [
+    { id: "1", title: "5단원: 나의 일과", studentsCompleted: 18, totalStudents: 20, averageScore: 85, dateCreated: "2024-05-10", assessmentType: "monologue", prompt: "" },
+    { id: "2", title: "6단원: 사람 묘사하기", studentsCompleted: 15, totalStudents: 20, averageScore: 78, dateCreated: "2024-05-17", assessmentType: "monologue", prompt: "" },
     { id: "3", title: "중간 말하기 시험", studentsCompleted: 20, totalStudents: 20, averageScore: 91, dateCreated: "2024-05-24", assessmentType: "monologue", prompt: "" },
+    { id: "4", title: "7단원: 취미와 관심사", studentsCompleted: 0, totalStudents: 20, averageScore: 0, dateCreated: "2024-05-31", assessmentType: "monologue", prompt: "" },
 ];
+
 
 export default function StudentResultPage() {
   const params = useParams();
   const { t } = useLanguage();
   const [assessment, setAssessment] = useState<TeacherAssessment | null>(null);
-  const [student, setStudent] = useState<typeof mockStudentData | null>(null);
+  const [student, setStudent] = useState<StudentResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const assessmentId = Array.isArray(params.id) ? params.id[0] : params.id;
   const studentId = Array.isArray(params.studentId) ? params.studentId[0] : params.studentId;
 
   useEffect(() => {
-    // This is all mocked because we don't have a real backend.
-    // In a real app, you would fetch the assessment and the specific student result.
     if (assessmentId && studentId) {
-        const foundAssessment = mockAssessments.find(a => a.id === assessmentId);
-        
-        // We only have mock data for one student on one assessment
-        if (foundAssessment && studentId === mockStudentData.studentId && assessmentId === mockStudentData.assessmentId) {
+        // Fetch assessment details
+        const storedTeacherAssessments: TeacherAssessment[] = JSON.parse(localStorage.getItem('assessments') || '[]');
+        const allAssessments = [...initialAssessments, ...storedTeacherAssessments];
+        const foundAssessment = allAssessments.find(a => a.id === assessmentId);
+
+        // Fetch student result details
+        const allStudentResults: StudentResult[] = JSON.parse(localStorage.getItem('student_results') || '[]');
+        const foundStudentResult = allStudentResults.find(r => r.assessmentId === assessmentId && r.studentId === studentId);
+
+        if (foundAssessment && foundStudentResult) {
             setAssessment(foundAssessment);
-            setStudent(mockStudentData);
+            setStudent(foundStudentResult);
         } else {
-            // If the URL is for any other student/assessment, show not found.
             notFound();
         }
         setIsLoading(false);
