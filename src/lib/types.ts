@@ -4,8 +4,6 @@ export type Assessment = {
   title: string;
   topic: string;
   status: '할 일' | '완료' | '채점 완료';
-  startDate?: Date;
-  endDate?: Date;
   special?: boolean;
 };
 

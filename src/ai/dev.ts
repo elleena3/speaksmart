@@ -5,4 +5,3 @@ import '@/ai/flows/generate-speaking-feedback.ts';
 import '@/ai/flows/draft-curricular-remarks.ts';
 import '@/ai/flows/summarize-student-feedback.ts';
 import '@/ai/flows/generate-free-talk-feedback.ts';
-import '@/ai/flows/text-to-speech.ts';
