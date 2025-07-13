@@ -38,7 +38,7 @@ export default function AssessmentSubmissionsPage() {
       storedTeacherAssessments.forEach(localItem => {
           const index = allAssessments.findIndex(initialItem => initialItem.id === localItem.id);
           if (index > -1) {
-            allAssessments[index] = localItem;
+            allAssessments[index] = { ...allAssessments[index], ...localItem };
           } else {
             allAssessments.push(localItem);
           }

@@ -18,7 +18,8 @@ const initialAssessments: Assessment[] = [
   { id: "1", title: "5단원: 나의 일과", topic: "성적 및 피드백 검토", status: "채점 완료", assessmentType: "monologue", prompt: "" },
 ];
 
-const LOCAL_STORAGE_KEY = 'assessments';
+const LOCAL_STORAGE_KEY_ASSESSMENTS = 'assessments';
+const LOCAL_STORAGE_KEY_RESULTS = 'student_results';
 
 function AssessmentCard({ assessment }: { assessment: Assessment }) {
   const { t } = useLanguage();
@@ -90,28 +91,28 @@ export default function StudentDashboard() {
 
   useEffect(() => {
     try {
-      const storedAssessments = localStorage.getItem(LOCAL_STORAGE_KEY);
-      const localData: TeacherAssessment[] = storedAssessments ? JSON.parse(storedAssessments) : [];
+      const storedAssessments = localStorage.getItem(LOCAL_STORAGE_KEY_ASSESSMENTS);
+      const teacherCreatedAssessments: TeacherAssessment[] = storedAssessments ? JSON.parse(storedAssessments) : [];
       
-      const studentViewAssessments: Assessment[] = localData.map(teacherAssessment => ({
-        ...teacherAssessment,
-        status: '할 일' // All teacher-created assessments are "To Do" for the student by default
-      }));
+      const studentResults = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY_RESULTS) || '[]');
+      const completedAssessmentIds = new Set(studentResults.map((r: any) => r.assessmentId));
 
-      // Create a map of the initial assessments for easy lookup
       const combinedMap = new Map<string, Assessment>();
       
       // Add initial assessments first
-      initialAssessments.forEach(item => combinedMap.set(item.id, item));
+      initialAssessments.forEach(item => {
+        if (completedAssessmentIds.has(item.id)) {
+          combinedMap.set(item.id, { ...item, status: '채점 완료' });
+        } else {
+          combinedMap.set(item.id, item);
+        }
+      });
       
-      // Add or overwrite with assessments from localStorage
-      studentViewAssessments.forEach(item => combinedMap.set(item.id, item));
-
-      // Add the default free-talk if it was overwritten by a custom one
-      if (!combinedMap.has("free-talk-default")) {
-         const freeTalkDefault = initialAssessments.find(a => a.id === 'free-talk-default');
-         if (freeTalkDefault) combinedMap.set(freeTalkDefault.id, freeTalkDefault);
-      }
+      // Add or overwrite with assessments from localStorage (teacher-created)
+      teacherCreatedAssessments.forEach(item => {
+        const status = completedAssessmentIds.has(item.id) ? '채점 완료' : '할 일';
+        combinedMap.set(item.id, { ...item, status });
+      });
 
       const combined = Array.from(combinedMap.values());
       setAllAssessments(combined);
