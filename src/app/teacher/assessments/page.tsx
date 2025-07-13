@@ -16,10 +16,12 @@ import { format } from "date-fns";
 import { useLanguage } from '@/context/language-context';
 
 const initialAssessments: TeacherAssessment[] = [
-  { id: "1", title: "5단원: 나의 일과", studentsCompleted: 18, totalStudents: 20, averageScore: 85, dateCreated: "2024-05-10", assessmentType: "monologue" },
-  { id: "2", title: "6단원: 사람 묘사하기", studentsCompleted: 15, totalStudents: 20, averageScore: 78, dateCreated: "2024-05-17", assessmentType: "monologue" },
-  { id: "3", title: "중간 말하기 시험", studentsCompleted: 20, totalStudents: 20, averageScore: 91, dateCreated: "2024-05-24", assessmentType: "monologue" },
-  { id: "4", title: "7단원: 취미와 관심사", studentsCompleted: 0, totalStudents: 20, averageScore: 0, dateCreated: "2024-05-31", startDate: new Date("2024-06-01"), endDate: new Date("2024-06-07"), assessmentType: "monologue" },
+  { id: "free-talk-default", title: "자유 대화", topic: "AI와 자유롭게 대화하세요.", studentsCompleted: 0, totalStudents: 20, averageScore: 0, dateCreated: "2024-06-01", assessmentType: "dialogue", scenario: "free-talk", prompt: "AI와 자유롭게 영어로 대화해 보세요. 준비가 되면 '대화 시작' 버튼을 누르세요." },
+  { id: "4", title: "7단원: 취미와 관심사", topic: "가장 좋아하는 취미에 대해 1분간 이야기하세요.", studentsCompleted: 0, totalStudents: 20, averageScore: 0, dateCreated: "2024-05-31", assessmentType: "monologue", prompt: "가장 좋아하는 취미에 대해 이야기해주세요. 무엇인지, 왜 좋아하는지, 얼마나 자주 하는지 언급해야 합니다. 1분 동안 말할 시간이 주어집니다." },
+  { id: "3", title: "중간 말하기 시험", topic: "성적 및 피드백 검토", studentsCompleted: 20, totalStudents: 20, averageScore: 91, dateCreated: "2024-05-24", assessmentType: "monologue", prompt: "" },
+  { id: "2", title: "6단원: 사람 묘사하기", topic: "성적 및 피드백 검토", studentsCompleted: 15, totalStudents: 20, averageScore: 78, dateCreated: "2024-05-17", assessmentType: "monologue", prompt: "" },
+  { id: "1", title: "5단원: 나의 일과", topic: "성적 및 피드백 검토", studentsCompleted: 18, totalStudents: 20, averageScore: 85, dateCreated: "2024-05-10", assessmentType: "monologue", prompt: "" },
+  { id: "free-talk-test", title: "자유 대화 테스트", topic: "1", studentsCompleted: 0, totalStudents: 20, averageScore: 0, dateCreated: "2024-06-02", assessmentType: "dialogue", scenario: "free-talk", prompt: "자유 대화 테스트입니다. AI와 대화하세요." },
 ];
 
 const LOCAL_STORAGE_KEY = 'assessments';
@@ -35,13 +37,12 @@ export default function AssessmentsPage() {
     const localData: TeacherAssessment[] = storedAssessments ? JSON.parse(storedAssessments) : [];
     
     // Combine initial mock data with data from localStorage, preventing duplicates
-    const combined = [...initialAssessments];
-    localData.forEach(localItem => {
-        if (!combined.some(initialItem => initialItem.id === localItem.id)) {
-            combined.push(localItem);
-        }
-    });
+    const combinedMap = new Map<string, TeacherAssessment>();
+      
+    initialAssessments.forEach(item => combinedMap.set(item.id, item));
+    localData.forEach(item => combinedMap.set(item.id, item));
 
+    const combined = Array.from(combinedMap.values());
     setAssessments(combined);
   }, []);
 

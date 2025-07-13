@@ -16,6 +16,7 @@ const initialAssessments: Assessment[] = [
   { id: "3", title: "중간 말하기 시험", topic: "성적 및 피드백 검토", status: "채점 완료", assessmentType: "monologue", prompt: "" },
   { id: "2", title: "6단원: 사람 묘사하기", topic: "성적 및 피드백 검토", status: "채점 완료", assessmentType: "monologue", prompt: "" },
   { id: "1", title: "5단원: 나의 일과", topic: "성적 및 피드백 검토", status: "채점 완료", assessmentType: "monologue", prompt: "" },
+  { id: "free-talk-test", title: "자유 대화 테스트", topic: "1", status: "할 일", assessmentType: "dialogue", scenario: "free-talk", prompt: "자유 대화 테스트입니다. AI와 대화하세요." },
 ];
 
 const LOCAL_STORAGE_KEY_ASSESSMENTS = 'assessments';
