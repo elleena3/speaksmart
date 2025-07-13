@@ -5,17 +5,20 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import Link from "next/link"
-import { type Assessment } from "@/lib/types"
-import { ArrowRight, CheckCircle2, History, MessageCircle, Mic } from "lucide-react"
+import { type Assessment, type TeacherAssessment } from "@/lib/types"
+import { CheckCircle2, MessageCircle, Mic } from "lucide-react"
 import { useLanguage } from "@/context/language-context"
+import { useEffect, useState } from "react"
 
-const allAssessments: Assessment[] = [
+const initialAssessments: Assessment[] = [
   { id: "free-talk-default", title: "자유 대화", topic: "AI와 자유롭게 대화하세요.", status: "할 일", assessmentType: "dialogue", scenario: "free-talk", prompt: "AI와 자유롭게 영어로 대화해 보세요. 준비가 되면 '대화 시작' 버튼을 누르세요." },
   { id: "4", title: "7단원: 취미와 관심사", topic: "가장 좋아하는 취미에 대해 1분간 이야기하세요.", status: "할 일", assessmentType: "monologue", prompt: "가장 좋아하는 취미에 대해 이야기해주세요. 무엇인지, 왜 좋아하는지, 얼마나 자주 하는지 언급해야 합니다. 1분 동안 말할 시간이 주어집니다." },
   { id: "3", title: "중간 말하기 시험", topic: "성적 및 피드백 검토", status: "채점 완료", assessmentType: "monologue", prompt: "" },
   { id: "2", title: "6단원: 사람 묘사하기", topic: "성적 및 피드백 검토", status: "채점 완료", assessmentType: "monologue", prompt: "" },
   { id: "1", title: "5단원: 나의 일과", topic: "성적 및 피드백 검토", status: "채점 완료", assessmentType: "monologue", prompt: "" },
 ];
+
+const LOCAL_STORAGE_KEY = 'assessments';
 
 function AssessmentCard({ assessment }: { assessment: Assessment }) {
   const { t } = useLanguage();
@@ -51,7 +54,6 @@ function AssessmentCard({ assessment }: { assessment: Assessment }) {
   const getLink = () => {
     if (!isToDo) return `/student/assessment/${assessment.id}/results`;
     if (assessment.assessmentType === 'dialogue') {
-      // Pass both scenario and a unique ID to find the details on the next page
       return `/student/assessment/free-talk?scenario=${assessment.scenario || 'free-talk'}&id=${assessment.id}`;
     }
     return `/student/assessment/${assessment.id}`;
@@ -84,6 +86,38 @@ function AssessmentCard({ assessment }: { assessment: Assessment }) {
 
 export default function StudentDashboard() {
   const { t } = useLanguage();
+  const [allAssessments, setAllAssessments] = useState<Assessment[]>(initialAssessments);
+
+  useEffect(() => {
+    try {
+      const storedAssessments = localStorage.getItem(LOCAL_STORAGE_KEY);
+      if (storedAssessments) {
+        const localData: TeacherAssessment[] = JSON.parse(storedAssessments);
+        
+        const studentViewAssessments: Assessment[] = localData.map(teacherAssessment => ({
+          ...teacherAssessment,
+          // Assuming all assessments are 'To Do' for a student unless there's a specific status logic
+          status: '할 일'
+        }));
+
+        const combined = [...initialAssessments];
+        studentViewAssessments.forEach(localItem => {
+            const index = combined.findIndex(initialItem => initialItem.id === localItem.id);
+            if (index > -1) {
+              // Update if it's a new assessment that overwrites a mock one (by id)
+              combined[index] = { ...combined[index], ...localItem, status: '할 일' };
+            } else {
+              combined.push(localItem);
+            }
+        });
+
+        setAllAssessments(combined);
+      }
+    } catch (error) {
+      console.error("Failed to load assessments from localStorage", error);
+    }
+  }, []);
+
   return (
     <div className="space-y-6">
       <div className="space-y-1">

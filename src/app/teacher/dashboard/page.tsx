@@ -1,6 +1,7 @@
 
 "use client"
 
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -12,54 +13,44 @@ import { OverviewChart } from "./overview-chart"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { useLanguage } from "@/context/language-context"
 
-const assessments: TeacherAssessment[] = [
-  { id: "1", title: "5단원: 나의 일과", studentsCompleted: 18, totalStudents: 20, averageScore: 85, dateCreated: "2024-05-10" },
-  { id: "2", title: "6단원: 사람 묘사하기", studentsCompleted: 15, totalStudents: 20, averageScore: 78, dateCreated: "2024-05-17" },
-  { id: "3", title: "중간 말하기 시험", studentsCompleted: 20, totalStudents: 20, averageScore: 91, dateCreated: "2024-05-24" },
-  { id: "4", title: "7단원: 취미와 관심사", studentsCompleted: 0, totalStudents: 20, averageScore: 0, dateCreated: "2024-05-31" },
+const initialAssessments: TeacherAssessment[] = [
+  { id: "1", title: "5단원: 나의 일과", studentsCompleted: 18, totalStudents: 20, averageScore: 85, dateCreated: "2024-05-10", assessmentType: "monologue" },
+  { id: "2", title: "6단원: 사람 묘사하기", studentsCompleted: 15, totalStudents: 20, averageScore: 78, dateCreated: "2024-05-17", assessmentType: "monologue" },
+  { id: "3", title: "중간 말하기 시험", studentsCompleted: 20, totalStudents: 20, averageScore: 91, dateCreated: "2024-05-24", assessmentType: "monologue" },
+  { id: "4", title: "7단원: 취미와 관심사", studentsCompleted: 0, totalStudents: 20, averageScore: 0, dateCreated: "2024-05-31", assessmentType: "monologue" },
 ];
+
+const LOCAL_STORAGE_KEY = 'assessments';
 
 export default function TeacherDashboard() {
   const { t } = useLanguage();
+  const [assessments, setAssessments] = useState<TeacherAssessment[]>(initialAssessments);
 
-  const content = {
-      ko: {
-          dashboard: "대시보드",
-          createAssessment: "평가 만들기",
-          performanceOverview: "수업 성과 개요",
-          avgScoreDescription: "최근 평가의 평균 점수입니다.",
-          recentAssessments: "최근 평가",
-          recentAssessmentsDescription: "가장 최근에 생성된 말하기 평가입니다.",
-          title: "제목",
-          completed: "완료",
-          avgScore: "평균 점수",
-          dateCreated: "생성일",
-          actions: "작업",
-          viewResults: "결과 보기",
-          edit: "편집",
-          delete: "삭제",
-          openMenu: "메뉴 열기",
-          noScore: "해당 없음"
-      },
-      en: {
-          dashboard: "Dashboard",
-          createAssessment: "Create Assessment",
-          performanceOverview: "Class Performance Overview",
-          avgScoreDescription: "Average scores from recent assessments.",
-          recentAssessments: "Recent Assessments",
-          recentAssessmentsDescription: "Your most recently created speaking assessments.",
-          title: "Title",
-          completed: "Completed",
-          avgScore: "Avg. Score",
-          dateCreated: "Date Created",
-          actions: "Actions",
-          viewResults: "View Results",
-          edit: "Edit",
-          delete: "Delete",
-          openMenu: "Open menu",
-          noScore: "N/A"
+  useEffect(() => {
+    try {
+      const storedAssessments = localStorage.getItem(LOCAL_STORAGE_KEY);
+      if (storedAssessments) {
+        const localData: TeacherAssessment[] = JSON.parse(storedAssessments);
+        
+        // Combine initial mock data with data from localStorage, preventing duplicates
+        const combined = [...initialAssessments];
+        localData.forEach(localItem => {
+            const index = combined.findIndex(initialItem => initialItem.id === localItem.id);
+            if (index > -1) {
+              combined[index] = localItem; // Update existing
+            } else {
+              combined.push(localItem); // Add new
+            }
+        });
+
+        // Sort by creation date descending to show recent ones first
+        combined.sort((a, b) => new Date(b.dateCreated).getTime() - new Date(a.dateCreated).getTime());
+        setAssessments(combined);
       }
-  }
+    } catch (error) {
+      console.error("Failed to load assessments from localStorage", error);
+    }
+  }, []);
 
   return (
     <div className="space-y-6">
