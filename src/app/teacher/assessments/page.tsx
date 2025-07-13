@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState } from 'react';
@@ -11,12 +12,13 @@ import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
+import { format } from "date-fns";
 
 const initialAssessments: TeacherAssessment[] = [
   { id: "1", title: "5단원: 나의 일과", studentsCompleted: 18, totalStudents: 20, averageScore: 85, dateCreated: "2024-05-10" },
   { id: "2", title: "6단원: 사람 묘사하기", studentsCompleted: 15, totalStudents: 20, averageScore: 78, dateCreated: "2024-05-17" },
   { id: "3", title: "중간 말하기 시험", studentsCompleted: 20, totalStudents: 20, averageScore: 91, dateCreated: "2024-05-24" },
-  { id: "4", title: "7단원: 취미와 관심사", studentsCompleted: 0, totalStudents: 20, averageScore: 0, dateCreated: "2024-05-31" },
+  { id: "4", title: "7단원: 취미와 관심사", studentsCompleted: 0, totalStudents: 20, averageScore: 0, dateCreated: "2024-05-31", startDate: new Date("2024-06-01"), endDate: new Date("2024-06-07") },
 ];
 
 export default function AssessmentsPage() {
@@ -30,6 +32,19 @@ export default function AssessmentsPage() {
       description: "평가가 성공적으로 삭제되었습니다."
     });
   }
+  
+  const formatDateRange = (startDate?: Date, endDate?: Date) => {
+    if (startDate && endDate) {
+      return `${format(startDate, "yy/MM/dd")} - ${format(endDate, "yy/MM/dd")}`;
+    }
+    if (startDate) {
+      return `${format(startDate, "yy/MM/dd")}부터`;
+    }
+    if (endDate) {
+      return `~ ${format(endDate, "yy/MM/dd")}까지`;
+    }
+    return "상시";
+  };
   
   return (
     <div className="space-y-6">
@@ -55,9 +70,9 @@ export default function AssessmentsPage() {
              <TableHeader>
                <TableRow>
                  <TableHead>제목</TableHead>
+                 <TableHead>평가 기간</TableHead>
                  <TableHead className="text-center">완료</TableHead>
                  <TableHead className="text-center">평균 점수</TableHead>
-                 <TableHead>생성일</TableHead>
                  <TableHead><span className="sr-only">작업</span></TableHead>
                </TableRow>
              </TableHeader>
@@ -69,6 +84,9 @@ export default function AssessmentsPage() {
                        {assessment.title}
                      </Link>
                    </TableCell>
+                   <TableCell className="text-sm text-muted-foreground">
+                      {formatDateRange(assessment.startDate, assessment.endDate)}
+                   </TableCell>
                    <TableCell className="text-center">
                      <Badge variant={assessment.studentsCompleted === assessment.totalStudents ? "default" : "secondary"}>
                        {assessment.studentsCompleted} / {assessment.totalStudents}
@@ -79,7 +97,6 @@ export default function AssessmentsPage() {
                        {assessment.averageScore > 0 ? `${assessment.averageScore}%` : '해당 없음'}
                      </Badge>
                    </TableCell>
-                   <TableCell>{assessment.dateCreated}</TableCell>
                    <TableCell>
                      <AlertDialog>
                       <DropdownMenu>
