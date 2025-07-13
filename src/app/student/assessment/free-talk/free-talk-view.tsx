@@ -3,14 +3,16 @@
 import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Mic, StopCircle, Loader2, Bot, User } from "lucide-react"
+import { Mic, StopCircle, Loader2, Bot, User, Volume2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
 import { Progress } from "@/components/ui/progress"
+import { textToSpeech } from "@/ai/flows/text-to-speech"
 
 type Message = {
   speaker: "ai" | "user";
   text: string;
+  audioDataUri?: string;
 };
 
 const TOTAL_TIME = 180; // 3 minutes in seconds
@@ -22,11 +24,16 @@ export function FreeTalkView() {
   const [conversation, setConversation] = useState<Message[]>([]);
   const [timeLeft, setTimeLeft] = useState(TOTAL_TIME);
   const [isSessionActive, setIsSessionActive] = useState(false);
+  const [isAiSpeaking, setIsAiSpeaking] = useState(false);
+
   const router = useRouter()
   const { toast } = useToast()
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
 
   useEffect(() => {
+    audioRef.current = new Audio();
     const getPermissions = async () => {
       try {
         await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
@@ -56,13 +63,39 @@ export function FreeTalkView() {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSessionActive, timeLeft]);
 
-  const handleStartSession = () => {
+  const speak = (audioDataUri: string) => {
+    if (audioRef.current) {
+        audioRef.current.src = audioDataUri;
+        audioRef.current.play();
+        setIsAiSpeaking(true);
+        audioRef.current.onended = () => {
+            setIsAiSpeaking(false);
+        };
+    }
+  }
+
+  const handleStartSession = async () => {
     setIsSessionActive(true);
-    setConversation([{ speaker: "ai", text: "Hello! My name is Alex. What's your name?" }]);
-    // Here, you would call TTS for the AI's first line and play it.
-    // For now, we just display the text.
+    setIsProcessing(true);
+    const initialText = "Hello! My name is Alex. What's your name?";
+    try {
+        const { audioDataUri } = await textToSpeech({ text: initialText });
+        setConversation([{ speaker: "ai", text: initialText, audioDataUri }]);
+        speak(audioDataUri);
+    } catch(e) {
+        console.error("Error generating initial speech", e);
+        setConversation([{ speaker: "ai", text: initialText }]);
+         toast({
+          variant: 'destructive',
+          title: '음성 생성 오류',
+          description: 'AI 음성을 생성하는데 실패했습니다.',
+        });
+    } finally {
+        setIsProcessing(false);
+    }
   };
 
   const handleEndSession = () => {
@@ -73,33 +106,32 @@ export function FreeTalkView() {
       title: "대화 종료됨",
       description: "대화 내용을 분석 중입니다...",
     });
-
-    const conversationText = conversation.map(m => `${m.speaker}: ${m.text}`).join('\n');
     
     // Store conversation in local storage to pass to the results page
     localStorage.setItem('freeTalkConversation', JSON.stringify(conversation));
     
     // Simulate analysis and redirect
     setTimeout(() => {
-      // In a real app, you might pass a session ID
       router.push(`/student/assessment/free-talk/results`); 
     }, 2000);
   };
   
   const handleStartRecording = () => {
-    // In a real app, you would start recording audio here.
+    if (isAiSpeaking) {
+        toast({ title: "AI가 말하는 중입니다.", description: "AI의 말이 끝난 후 시도해주세요."});
+        return;
+    }
     setIsRecording(true);
   };
 
   const handleStopRecording = async () => {
     setIsRecording(false);
-    // In a real app, you would stop recording, process the audio to text,
-    // and then send it to the AI to get a response.
-    // Here, we simulate this process.
-    setConversation(prev => [...prev, { speaker: "user", text: "My name is... (simulated user speech)" }]);
+    setIsProcessing(true);
+    const simulatedUserText = "My name is... (simulated user speech)";
+    setConversation(prev => [...prev, { speaker: "user", text: simulatedUserText }]);
     
     // Simulate AI thinking and responding
-    setTimeout(() => {
+    setTimeout(async () => {
         const aiResponses = [
             "That's a nice name! How are you today?",
             "Interesting. What are your hobbies?",
@@ -107,8 +139,23 @@ export function FreeTalkView() {
             "That sounds fun! What did you do yesterday?"
         ];
         const randomResponse = aiResponses[Math.floor(Math.random() * aiResponses.length)];
-        setConversation(prev => [...prev, { speaker: "ai", text: randomResponse }]);
-    }, 1500);
+        
+        try {
+            const { audioDataUri } = await textToSpeech({ text: randomResponse });
+            setConversation(prev => [...prev, { speaker: "ai", text: randomResponse, audioDataUri }]);
+            speak(audioDataUri);
+        } catch (e) {
+            console.error("Error generating response speech", e);
+            setConversation(prev => [...prev, { speaker: "ai", text: randomResponse }]);
+            toast({
+                variant: 'destructive',
+                title: '음성 생성 오류',
+                description: 'AI 응답 음성을 생성하는데 실패했습니다.',
+            });
+        } finally {
+            setIsProcessing(false);
+        }
+    }, 500);
   };
 
   if (!hasPermission) {
@@ -125,8 +172,9 @@ export function FreeTalkView() {
   return (
     <div className="flex flex-col items-center gap-6 p-4 border rounded-lg bg-muted/50">
       {!isSessionActive ? (
-        <Button size="lg" onClick={handleStartSession}>
-          대화 시작하기
+        <Button size="lg" onClick={handleStartSession} disabled={isProcessing}>
+          {isProcessing ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
+          {isProcessing ? '준비 중...' : '대화 시작하기'}
         </Button>
       ) : (
         <>
@@ -142,12 +190,23 @@ export function FreeTalkView() {
             {conversation.map((msg, index) => (
               <div key={index} className={`flex items-start gap-3 ${msg.speaker === 'ai' ? '' : 'justify-end'}`}>
                 {msg.speaker === 'ai' && <Bot className="w-6 h-6 text-primary shrink-0" />}
-                <div className={`rounded-lg px-3 py-2 max-w-xs ${msg.speaker === 'ai' ? 'bg-primary/10' : 'bg-secondary'}`}>
+                <div className={`rounded-lg px-3 py-2 max-w-xs flex items-center gap-2 ${msg.speaker === 'ai' ? 'bg-primary/10' : 'bg-secondary'}`}>
                   <p className="text-sm">{msg.text}</p>
+                   {msg.speaker === 'ai' && msg.audioDataUri && (
+                     <button onClick={() => speak(msg.audioDataUri!)} disabled={isAiSpeaking}>
+                        <Volume2 className="w-4 h-4 text-primary/70 hover:text-primary" />
+                     </button>
+                   )}
                 </div>
                 {msg.speaker === 'user' && <User className="w-6 h-6 text-foreground shrink-0" />}
               </div>
             ))}
+             { isAiSpeaking && (
+                <div className="flex items-center gap-2 justify-center text-sm text-muted-foreground">
+                    <Volume2 className="w-4 h-4 animate-pulse" />
+                    <span>AI가 말하는 중...</span>
+                </div>
+            )}
           </div>
 
           <div className="flex flex-col items-center gap-4">
@@ -157,7 +216,7 @@ export function FreeTalkView() {
                 말하기 중지
               </Button>
             ) : (
-              <Button size="lg" onClick={handleStartRecording} disabled={isProcessing}>
+              <Button size="lg" onClick={handleStartRecording} disabled={isProcessing || isAiSpeaking}>
                  {isProcessing ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Mic className="mr-2 h-5 w-5" />}
                  {isProcessing ? '처리중...' : '누르고 말하기'}
               </Button>
