@@ -18,24 +18,22 @@ const TOTAL_TIME = 180; // 3 minutes in seconds
 export function FreeTalkView() {
   const [isRecording, setIsRecording] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
-  const [hasCameraPermission, setHasCameraPermission] = useState(true);
+  const [hasPermission, setHasPermission] = useState(true);
   const [conversation, setConversation] = useState<Message[]>([]);
   const [timeLeft, setTimeLeft] = useState(TOTAL_TIME);
   const [isSessionActive, setIsSessionActive] = useState(false);
   const router = useRouter()
   const { toast } = useToast()
   const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const audioRef = useRef<HTMLAudioElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
-    const getCameraPermission = async () => {
+    const getPermissions = async () => {
       try {
         await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
-        setHasCameraPermission(true);
+        setHasPermission(true);
       } catch (error) {
         console.error('Error accessing media devices:', error);
-        setHasCameraPermission(false);
+        setHasPermission(false);
         toast({
           variant: 'destructive',
           title: '마이크 접근 거부됨',
@@ -44,7 +42,7 @@ export function FreeTalkView() {
       }
     };
 
-    getCameraPermission();
+    getPermissions();
   }, [toast]);
   
   useEffect(() => {
@@ -76,21 +74,31 @@ export function FreeTalkView() {
       description: "대화 내용을 분석 중입니다...",
     });
 
+    const conversationText = conversation.map(m => `${m.speaker}: ${m.text}`).join('\n');
+    
+    // Store conversation in local storage to pass to the results page
+    localStorage.setItem('freeTalkConversation', JSON.stringify(conversation));
+    
     // Simulate analysis and redirect
     setTimeout(() => {
-      router.push(`/student/assessment/4/results`); // Redirect to a sample result page
+      // In a real app, you might pass a session ID
+      router.push(`/student/assessment/free-talk/results`); 
     }, 2000);
   };
   
   const handleStartRecording = () => {
+    // In a real app, you would start recording audio here.
     setIsRecording(true);
   };
 
   const handleStopRecording = async () => {
     setIsRecording(false);
-    // Simulate user speaking and AI response
-    setConversation(prev => [...prev, { speaker: "user", text: "My name is... (simulated)" }]);
+    // In a real app, you would stop recording, process the audio to text,
+    // and then send it to the AI to get a response.
+    // Here, we simulate this process.
+    setConversation(prev => [...prev, { speaker: "user", text: "My name is... (simulated user speech)" }]);
     
+    // Simulate AI thinking and responding
     setTimeout(() => {
         const aiResponses = [
             "That's a nice name! How are you today?",
@@ -103,7 +111,7 @@ export function FreeTalkView() {
     }, 1500);
   };
 
-  if (!hasCameraPermission) {
+  if (!hasPermission) {
     return (
       <Alert variant="destructive">
         <AlertTitle>마이크 접근 필요</AlertTitle>
@@ -160,7 +168,6 @@ export function FreeTalkView() {
           </div>
         </>
       )}
-      <audio ref={audioRef} hidden />
     </div>
   );
 }
