@@ -5,7 +5,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { FreeTalkView } from "./free-talk-view"
 import { useSearchParams } from "next/navigation"
 import { type Scenario } from "@/lib/types"
-import { useLanguage } from "@/context/language-context"
 import { useEffect, useState } from "react"
 
 type Details = { 
@@ -41,19 +40,10 @@ const mockAssessmentDetails: { [key: string]: { title: string; prompt: string; s
 
 export default function FreeTalkPage() {
   const searchParams = useSearchParams();
-  const { t } = useLanguage();
   const [details, setDetails] = useState<Details>(null);
-  const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
     // This effect runs only on the client, after the component has mounted.
-    setIsClient(true);
-  }, []);
-
-  useEffect(() => {
-    // This effect depends on isClient, so it will also only run on the client.
-    if (!isClient) return;
-
     const scenario = (searchParams.get('scenario') as Scenario) || 'free-talk';
     const assessmentId = searchParams.get('id');
 
@@ -71,10 +61,10 @@ export default function FreeTalkPage() {
     const mockData = Object.values(mockAssessmentDetails).find(d => d.scenario === scenario);
     setDetails(mockData || mockAssessmentDetails['free-talk']);
 
-  }, [searchParams, isClient]);
+  }, [searchParams]);
 
 
-  if (!isClient || !details) {
+  if (!details) {
     // Render a loading state on the server and during initial client render.
     return <div>Loading...</div>; 
   }
