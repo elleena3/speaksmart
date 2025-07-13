@@ -1,4 +1,4 @@
-import { type ConversationTurn } from "@/ai/flows/text-to-speech";
+import { type ConversationTurn } from "@/lib/types/ai-schemas";
 
 export type Assessment = {
   id: string;

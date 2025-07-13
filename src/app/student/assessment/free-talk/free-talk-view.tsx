@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/button"
 import { Mic, StopCircle, Loader2, Bot, User, CornerDownLeft, BrainCircuit } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { type ConversationTurn, converseWithStudent } from "@/ai/flows/text-to-speech"
+import { converseWithStudent } from "@/ai/flows/text-to-speech"
 import { type ConversationHistory } from "@/lib/types"
+import { type ConversationTurn } from "@/lib/types/ai-schemas";
 
 const SESSION_STORAGE_KEY = 'freeTalkConversationHistory';
 
