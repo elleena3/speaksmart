@@ -1,6 +1,8 @@
+
 "use client"
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Loader2, Lightbulb, BookUser, Star } from "lucide-react";
@@ -38,6 +40,7 @@ export function FreeTalkFeedbackView({ assessmentTitle, mockFeedback }: Feedback
   const [feedback, setFeedback] = useState<GenerateFreeTalkFeedbackOutput | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
+  const router = useRouter();
 
   useEffect(() => {
     const getFeedback = async () => {

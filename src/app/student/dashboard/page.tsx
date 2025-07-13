@@ -10,7 +10,7 @@ import { ArrowRight, CheckCircle2, History, MessageCircle } from "lucide-react"
 
 const allAssessments: Assessment[] = [
   { id: "free-talk", title: "자유 대화", topic: "AI와 3분간 자유롭게 대화하세요.", status: "할 일", special: true },
-  { id: "4", title: "7단원: 취미와 관심사", topic: "가장 좋아하는 취미에 대해 1분간 이야기하세요.", status: "할 일", startDate: new Date("2024-06-01"), endDate: new Date("2024-06-07") },
+  { id: "4", title: "7단원: 취미와 관심사", topic: "가장 좋아하는 취미에 대해 1분간 이야기하세요.", status: "할 일" },
   { id: "3", title: "중간 말하기 시험", topic: "성적 및 피드백 검토", status: "채점 완료" },
   { id: "2", title: "6단원: 사람 묘사하기", topic: "성적 및 피드백 검토", status: "채점 완료" },
   { id: "1", title: "5단원: 나의 일과", topic: "성적 및 피드백 검토", status: "채점 완료" },
@@ -54,9 +54,7 @@ function AssessmentCard({ assessment }: { assessment: Assessment }) {
         </div>
         <CardDescription>{assessment.topic}</CardDescription>
       </CardHeader>
-      <CardContent className="flex-grow">
-        {/* Removed problematic due date text */}
-      </CardContent>
+      <CardContent className="flex-grow" />
       <CardFooter>
         <Link href={isToDo ? `/student/assessment/${assessment.id}` : `/student/assessment/${assessment.id}/results`} passHref className="w-full">
           <Button className="w-full">
@@ -70,10 +68,6 @@ function AssessmentCard({ assessment }: { assessment: Assessment }) {
 }
 
 export default function StudentDashboard() {
-  // The filtering logic that caused issues is removed for now.
-  // We'll just display all assessments.
-  const availableAssessments = allAssessments;
-
   return (
     <div className="space-y-6">
       <div className="space-y-1">
@@ -82,7 +76,7 @@ export default function StudentDashboard() {
       </div>
 
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {availableAssessments.map((assessment) => (
+        {allAssessments.map((assessment) => (
           <AssessmentCard key={assessment.id} assessment={assessment} />
         ))}
       </div>
