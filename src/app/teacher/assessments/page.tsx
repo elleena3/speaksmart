@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { PlusCircle } from 'lucide-react';
+import Link from 'next/link';
 
 export default function AssessmentsPage() {
   return (
@@ -10,9 +11,11 @@ export default function AssessmentsPage() {
           <h2 className="text-2xl font-bold tracking-tight">평가</h2>
           <p className="text-muted-foreground">모든 평가를 생성, 편집 및 관리합니다.</p>
         </div>
-        <Button>
-          <PlusCircle className="mr-2 h-4 w-4" /> 새 평가 만들기
-        </Button>
+        <Link href="/teacher/assessments/new" passHref>
+          <Button>
+            <PlusCircle className="mr-2 h-4 w-4" /> 새 평가 만들기
+          </Button>
+        </Link>
       </div>
       <Card>
         <CardHeader>

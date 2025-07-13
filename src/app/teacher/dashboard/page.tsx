@@ -20,9 +20,11 @@ export default function TeacherDashboard() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-3xl font-bold tracking-tight">대시보드</h2>
-        <Button>
-          <PlusCircle className="mr-2 h-4 w-4" /> 평가 만들기
-        </Button>
+        <Link href="/teacher/assessments/new" passHref>
+          <Button>
+            <PlusCircle className="mr-2 h-4 w-4" /> 평가 만들기
+          </Button>
+        </Link>
       </div>
 
       <Card>
