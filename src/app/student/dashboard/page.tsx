@@ -3,9 +3,10 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import Link from "next/link"
 import { type Assessment } from "@/lib/types"
-import { ArrowRight, CheckCircle2, History } from "lucide-react"
+import { ArrowRight, CheckCircle2, History, MessageCircle } from "lucide-react"
 
 const assessments: Assessment[] = [
+  { id: "free-talk", title: "자유 대화", topic: "AI와 3분간 자유롭게 대화하세요.", status: "할 일", special: true },
   { id: "4", title: "7단원: 취미와 관심사", topic: "가장 좋아하는 취미에 대해 1분간 이야기하세요.", status: "할 일", dueDate: "2024-06-07" },
   { id: "3", title: "중간 말하기 시험", topic: "성적 및 피드백 검토", status: "채점 완료" },
   { id: "2", title: "6단원: 사람 묘사하기", topic: "성적 및 피드백 검토", status: "채점 완료" },
@@ -16,6 +17,7 @@ function AssessmentCard({ assessment }: { assessment: Assessment }) {
   const isToDo = assessment.status === '할 일';
   
   const getBadgeVariant = (status: Assessment['status']) => {
+    if (assessment.special) return 'default';
     switch (status) {
       case '할 일':
         return 'destructive';
@@ -27,6 +29,7 @@ function AssessmentCard({ assessment }: { assessment: Assessment }) {
   }
 
   const getIcon = (status: Assessment['status']) => {
+    if (assessment.special) return <MessageCircle className="h-5 w-5" />;
     switch (status) {
       case '할 일':
         return <ArrowRight className="h-5 w-5" />;
@@ -42,7 +45,9 @@ function AssessmentCard({ assessment }: { assessment: Assessment }) {
       <CardHeader>
         <div className="flex justify-between items-start">
           <CardTitle className="text-xl">{assessment.title}</CardTitle>
-          <Badge variant={getBadgeVariant(assessment.status)}>{assessment.status}</Badge>
+          <Badge variant={getBadgeVariant(assessment.status)} className={assessment.special ? "bg-accent text-accent-foreground" : ""}>
+            {assessment.special ? "연습" : assessment.status}
+          </Badge>
         </div>
         <CardDescription>{assessment.topic}</CardDescription>
       </CardHeader>
