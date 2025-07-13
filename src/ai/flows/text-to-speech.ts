@@ -147,14 +147,12 @@ const converseWithStudentFlow = ai.defineFlow(
       const sttResponse = await ai.generate({
         model: googleAI.model('gemini-2.0-flash'),
         prompt: [
-          {
-            text: 'Transcribe the following audio. The user is a non-native English speaker. Just provide the transcript, nothing else.',
-          },
+          { text: 'Transcribe this audio.' },
           { media: { url: studentRecordingDataUri } },
         ],
       });
       studentTranscript = sttResponse.text;
-      if (!studentTranscript) {
+      if (!studentTranscript?.trim()) {
           console.warn("Transcription result was empty.");
           studentTranscript = "(The user did not say anything)"; 
       }
