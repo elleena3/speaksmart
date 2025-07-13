@@ -97,12 +97,10 @@ export default function StudentDashboard() {
     today.setHours(0, 0, 0, 0);
 
     const filtered = allAssessments.filter(assessment => {
-      // Always show completed assessments
       if (assessment.status !== '할 일') {
         return true; 
       }
       
-      // Free talk is always available
       if (assessment.id === 'free-talk') {
         return true;
       }
@@ -110,12 +108,10 @@ export default function StudentDashboard() {
       const startDate = assessment.startDate ? new Date(assessment.startDate) : null;
       const endDate = assessment.endDate ? new Date(assessment.endDate) : null;
 
-      // If there are no dates, it's always available
       if (!startDate && !endDate) {
         return true;
       }
       
-      // Check if today is within the date range
       const isAfterStart = startDate ? today >= startDate : true;
       const isBeforeEnd = endDate ? today <= endDate : true;
 
