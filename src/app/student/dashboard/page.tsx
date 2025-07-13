@@ -83,7 +83,7 @@ function AssessmentCard({ assessment }: { assessment: Assessment }) {
         <CardDescription>{assessment.topic}</CardDescription>
       </CardHeader>
       <CardContent className="flex-grow">
-        <DueDate endDate={assessment.endDate} />
+        {isToDo && <DueDate endDate={assessment.endDate} />}
       </CardContent>
       <CardFooter>
         <Link href={isToDo ? `/student/assessment/${assessment.id}` : `/student/assessment/${assessment.id}/results`} passHref className="w-full">
@@ -99,34 +99,45 @@ function AssessmentCard({ assessment }: { assessment: Assessment }) {
 
 export default function StudentDashboard() {
   const [availableAssessments, setAvailableAssessments] = useState<Assessment[]>([]);
+  const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const filtered = allAssessments.filter(assessment => {
-      if (assessment.status !== '할 일') {
-        return true; 
-      }
-      
-      if (assessment.id === 'free-talk') {
-        return true;
-      }
-      
-      const startDate = assessment.startDate ? new Date(assessment.startDate) : null;
-      const endDate = assessment.endDate ? new Date(assessment.endDate) : null;
-
-      if (!startDate && !endDate) {
-        return true;
-      }
-      
-      const isAfterStart = startDate ? today >= startDate : true;
-      const isBeforeEnd = endDate ? today <= endDate : true;
-
-      return isAfterStart && isBeforeEnd;
-    });
-    setAvailableAssessments(filtered);
+    setIsMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (isMounted) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const filtered = allAssessments.filter(assessment => {
+        if (assessment.status !== '할 일') {
+          return true; 
+        }
+        
+        if (assessment.id === 'free-talk') {
+          return true;
+        }
+        
+        const startDate = assessment.startDate ? new Date(assessment.startDate) : null;
+        const endDate = assessment.endDate ? new Date(assessment.endDate) : null;
+
+        if (!startDate && !endDate) {
+          return true;
+        }
+        
+        const isAfterStart = startDate ? today >= startDate : true;
+        const isBeforeEnd = endDate ? today <= endDate : true;
+
+        return isAfterStart && isBeforeEnd;
+      });
+      setAvailableAssessments(filtered);
+    }
+  }, [isMounted]);
+
+  if (!isMounted) {
+    return null; // or a loading spinner
+  }
 
   return (
     <div className="space-y-6">
