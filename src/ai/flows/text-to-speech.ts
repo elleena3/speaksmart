@@ -41,6 +41,8 @@ const conversationalPrompt = ai.definePrompt({
   output: { schema: ConverseWithStudentOutputSchema.pick({ aiResponseText: true }) },
   prompt: `You are an AI English conversation partner. Your name is "Alex". You are friendly, patient, and encouraging. Your goal is to have a natural, engaging conversation with a student learning English.
 
+IMPORTANT RULE: If the student's transcript is "(The user did not say anything)", you MUST respond by asking them to speak again, for example: "Sorry, I didn't catch that. Could you please say that again?" or "I couldn't hear you, can you repeat that?". Do not say "Okay, I see" or try to continue the conversation.
+
 {{#if scenario}}
 You are in a role-playing scenario. Adapt your persona and responses accordingly.
 Scenario: {{{scenario}}}
@@ -176,12 +178,8 @@ const converseWithStudentFlow = ai.defineFlow(
 
     if (!aiResponseText) {
         console.error("AI did not generate a text response. Received:", output);
-        // Return an empty response instead of throwing an error to avoid crashing the flow
-        return {
-          studentTranscript,
-          aiResponseText: "",
-          aiResponseAudioDataUri: "",
-        }
+        // If AI fails to respond, generate a safe fallback response.
+        aiResponseText = "Sorry, I'm having a little trouble right now. Could you say that again?";
     }
 
     // Step 3: Convert AI's text response to speech (TTS)
@@ -189,7 +187,7 @@ const converseWithStudentFlow = ai.defineFlow(
 
     // Step 4: Return all the generated data
     return {
-      studentTranscript,
+      studentTranscript: studentTranscript === "(The user did not say anything)" ? "" : studentTranscript,
       aiResponseText,
       aiResponseAudioDataUri,
     };
