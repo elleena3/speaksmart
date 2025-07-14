@@ -30,6 +30,12 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
     ? assessmentDetails.recordingTimeLimit * 60 
     : null;
 
+  const handleStopRecording = useCallback(() => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+      mediaRecorderRef.current.stop(); // This will trigger the onstop event
+    }
+  }, []);
+
   const cleanup = useCallback(() => {
     if (audioStreamRef.current) {
       audioStreamRef.current.getTracks().forEach(track => track.stop());
@@ -45,22 +51,14 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
       clearInterval(timerIntervalRef.current);
       timerIntervalRef.current = null;
     }
-    setRemainingTime(timeLimit);
     audioChunksRef.current = [];
-  }, [timeLimit]);
+  }, []);
 
-  const handleStopRecording = useCallback(() => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
-      setIsRecording(false);
-      setIsProcessing(true);
-      mediaRecorderRef.current.stop(); // This will trigger the onstop event
-      if(timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-      toast({
-        title: "녹음 중지됨",
-        description: "오디오를 처리하고 AI 피드백을 생성 중입니다...",
-      });
+  useEffect(() => {
+    if (remainingTime === 0) {
+      handleStopRecording();
     }
-  }, [toast]);
+  }, [remainingTime, handleStopRecording]);
   
   const startTimer = () => {
     if (timeLimit) {
@@ -68,7 +66,7 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
       timerIntervalRef.current = setInterval(() => {
         setRemainingTime(prevTime => {
           if (prevTime === null || prevTime <= 1) {
-            handleStopRecording();
+            if(timerIntervalRef.current) clearInterval(timerIntervalRef.current);
             return 0;
           }
           return prevTime - 1;
@@ -80,6 +78,7 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
   const handleStartRecording = async () => {
     cleanup();
     setIsRecording(true);
+    if(timeLimit) setRemainingTime(timeLimit);
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -96,6 +95,15 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
       };
 
       mediaRecorderRef.current.onstop = async () => {
+        setIsRecording(false);
+        setIsProcessing(true);
+        if(timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+        
+        toast({
+            title: "녹음 중지됨",
+            description: "오디오를 처리하고 AI 피드백을 생성 중입니다...",
+        });
+
         if (audioChunksRef.current.length === 0) {
             console.warn("No audio data recorded.");
             toast({
@@ -105,6 +113,7 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
             });
             setIsProcessing(false);
             cleanup();
+            if (timeLimit) setRemainingTime(timeLimit);
             return;
         }
 
@@ -161,8 +170,8 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
       const storageRef = ref(storage, audioFileName);
       await uploadBytes(storageRef, audioBlob);
       const downloadURL = await getDownloadURL(storageRef);
-
-      const contentResult = await generateContentFeedback({
+      
+      const contentPromise = generateContentFeedback({
         activityPrompt: assessmentDetails.prompt,
         expectedFormat: assessmentDetails.expectedFormat || "학생의 답변을 평가합니다.",
         studentRecordingDataUri,
@@ -170,11 +179,15 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
         assessmentTitle: assessmentDetails.title.replace(/ - 복사본(\s\d+)?$/, ''),
       });
 
-      const pronunciationResult = await generatePronunciationFeedback({
+      const [contentResult] = await Promise.all([contentPromise]);
+
+      const pronunciationPromise = generatePronunciationFeedback({
         studentRecordingDataUri,
         studentTranscript: contentResult.studentTranscript,
       });
-      
+
+      const [pronunciationResult] = await Promise.all([pronunciationPromise]);
+
       const resultData = {
         studentId: user.uid,
         assessmentId: assessmentDetails.id,
@@ -272,7 +285,7 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
       {timeLimit && (
         <div className="flex items-center gap-2 text-lg font-semibold text-muted-foreground">
           <Timer className="h-6 w-6" />
-          <span>{isRecording ? timerDisplay : formatTime(timeLimit)}</span>
+          <span>{isRecording || isProcessing ? timerDisplay : formatTime(timeLimit)}</span>
         </div>
       )}
       <div className="relative flex items-center justify-center w-32 h-32 rounded-full bg-background">

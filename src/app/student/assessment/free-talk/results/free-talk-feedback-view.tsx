@@ -72,8 +72,8 @@ export function FreeTalkFeedbackView() {
             await uploadBytes(storageRef, audioBlob);
             const downloadURL = await getDownloadURL(storageRef);
 
-            // 2. Generate content feedback
-            const contentResult = await generateContentFeedback({
+            // 2. Generate content and pronunciation feedback in parallel
+            const contentPromise = generateContentFeedback({
                 activityPrompt: `${assessment.prompt}\n\n--- 대화 기록 ---\n${fullTranscript}`,
                 expectedFormat: assessment.expectedFormat || "AI와의 자연스러운 대화 능력을 평가합니다.",
                 studentRecordingDataUri: studentRecordingDataUri, 
@@ -81,11 +81,12 @@ export function FreeTalkFeedbackView() {
                 assessmentTitle: assessment.title.replace(/ - 복사본(\s\d+)?$/, ''),
             });
 
-            // 3. Generate pronunciation feedback
-            const pronunciationResult = await generatePronunciationFeedback({
+            const pronunciationPromise = generatePronunciationFeedback({
                 studentRecordingDataUri,
                 studentTranscript: fullTranscript, // Use the full conversation transcript for context
             });
+
+            const [contentResult, pronunciationResult] = await Promise.all([contentPromise, pronunciationPromise]);
 
             const resultData: Omit<StudentResult, 'id'> = {
                 studentId: user.uid,
