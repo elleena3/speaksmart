@@ -67,7 +67,7 @@ export function FreeTalkFeedbackView() {
             
             const generatedResult = await generateComprehensiveFeedback({
                 activityPrompt: `${assessment.prompt}\n\n--- 대화 기록 ---\n${fullTranscript}`,
-                expectedFormat: "AI와의 자연스러운 대화 능력을 평가합니다. 유창성, 발음, 어휘, 문법을 종합적으로 고려하여 피드백을 제공해주세요.",
+                expectedFormat: assessment.expectedFormat || "AI와의 자연스러운 대화 능력을 평가합니다. 유창성, 발음, 어휘, 문법을 종합적으로 고려하여 피드백을 제공해주세요.",
                 studentRecordingDataUri: studentRecordingDataUri,
                 studentName: "Alex Doe", 
                 assessmentTitle: assessment.title,
