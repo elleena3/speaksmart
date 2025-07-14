@@ -80,14 +80,8 @@ export default function AssessmentResultsPage() {
         }
       } else {
         // This case can happen if the doc is not created yet, or if it has been cancelled.
-        // If we are already cancelling, don't show an error.
-        if (!isCancelling) {
-          // If still loading, it might just be a delay. Otherwise, maybe it was cancelled.
-          if (!isLoading) {
-            toast({ title: "평가가 취소되었거나 결과를 찾을 수 없습니다." });
-            router.push('/student/dashboard');
-          }
-        }
+        // It's safe to just stop loading and let the page render the "not found" state.
+        setIsLoading(false);
       }
     }, (err) => {
       console.error("Error fetching result with onSnapshot: ", err);
@@ -97,7 +91,7 @@ export default function AssessmentResultsPage() {
 
     return () => unsubscribe(); // Cleanup subscription on unmount
 
-  }, [id, user, authLoading, router, isCancelling, isLoading, toast]);
+  }, [id, user, authLoading, router]);
   
   const handleCancelAnalysis = async () => {
     if (!resultId) {
@@ -110,7 +104,8 @@ export default function AssessmentResultsPage() {
     try {
       await deleteDoc(doc(db, "results", resultId));
       toast({ title: "성공", description: "분석이 취소되었습니다." });
-      // The onSnapshot listener will handle the redirect.
+      // Immediately redirect to the dashboard.
+      router.push('/student/dashboard');
     } catch (error) {
       console.error("Error cancelling analysis: ", error);
       toast({ title: "오류", description: "분석 취소에 실패했습니다.", variant: "destructive" });
@@ -157,7 +152,7 @@ export default function AssessmentResultsPage() {
      return (
         <div className="text-center p-8">
             <p>평가 결과를 찾을 수 없습니다.</p>
-            <p className="text-sm text-muted-foreground">평가를 먼저 완료해주세요.</p>
+            <p className="text-sm text-muted-foreground">평가를 먼저 완료했거나, 분석이 취소되었을 수 있습니다.</p>
         </div>
      );
   }
