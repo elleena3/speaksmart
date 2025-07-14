@@ -1,67 +1,41 @@
 
-"use client"
-
-import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { PlusCircle, MoreHorizontal, Loader2 } from "lucide-react"
+import { PlusCircle, MoreHorizontal } from "lucide-react"
 import Link from "next/link"
 import { type TeacherAssessment } from "@/lib/types"
 import { OverviewChart } from "./overview-chart"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { useLanguage } from "@/context/language-context"
-import { useAuth } from "@/context/auth-context"
-import { useRouter } from "next/navigation"
+import { getLanguage } from "@/lib/get-language"
 import { db } from "@/lib/firebase"
 import { collection, query, where, getDocs, orderBy } from "firebase/firestore"
 
-export default function TeacherDashboard() {
-  const { t } = useLanguage();
-  const { user, loading: authLoading } = useAuth();
-  const router = useRouter();
-  const [assessments, setAssessments] = useState<TeacherAssessment[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    if (!authLoading) {
-      if (!user) {
-        router.push('/');
-        return;
-      }
-      
-      const fetchAssessments = async () => {
-        try {
-          const q = query(
-            collection(db, "assessments"), 
-            where("uid", "==", user.uid),
-            orderBy("createdAt", "desc")
-          );
-          const querySnapshot = await getDocs(q);
-          const assessmentsData = querySnapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-          } as TeacherAssessment));
-          setAssessments(assessmentsData);
-        } catch (error) {
-          console.error("Error fetching assessments: ", error);
-        } finally {
-          setIsLoading(false);
-        }
-      };
-
-      fetchAssessments();
+async function getAssessments(teacherId: string): Promise<TeacherAssessment[]> {
+    try {
+      const q = query(
+        collection(db, "assessments"), 
+        where("uid", "==", teacherId),
+        orderBy("createdAt", "desc")
+      );
+      const querySnapshot = await getDocs(q);
+      return querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as TeacherAssessment));
+    } catch (error) {
+      console.error("Error fetching assessments: ", error);
+      return [];
     }
-  }, [user, authLoading, router]);
+}
 
-  if (authLoading || isLoading) {
-    return (
-        <div className="flex justify-center items-center h-64">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
-    );
-  }
+
+export default async function TeacherDashboard() {
+  const t = getLanguage();
+  // We'll use a mock user ID since login is disabled
+  const mockTeacherId = "test-user-id";
+  const assessments = await getAssessments(mockTeacherId);
 
   return (
     <div className="space-y-6">

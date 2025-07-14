@@ -1,58 +1,35 @@
 
-"use client"
-
-import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { useLanguage } from '@/context/language-context';
 import { type StudentResult } from '@/lib/types';
-import { useAuth } from '@/context/auth-context';
-import { useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
-import { Loader2 } from 'lucide-react';
+import { getLanguage } from '@/lib/get-language';
 
-export default function HistoryPage() {
-  const { t } = useLanguage();
-  const { user, loading: authLoading } = useAuth();
-  const router = useRouter();
-  const [completedAssessments, setCompletedAssessments] = useState<StudentResult[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    if (authLoading) return;
-    if (!user) {
-        router.push('/');
-        return;
+async function getHistory(studentId: string): Promise<StudentResult[]> {
+    try {
+        const q = query(
+            collection(db, "results"), 
+            where("studentId", "==", studentId),
+            orderBy("createdAt", "desc")
+        );
+        const querySnapshot = await getDocs(q);
+        const results = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as StudentResult));
+        return results;
+    } catch (error) {
+        console.error("Error fetching student history: ", error);
+        return [];
     }
+}
 
-    const fetchHistory = async () => {
-        setIsLoading(true);
-        try {
-            const q = query(
-                collection(db, "results"), 
-                where("studentId", "==", user.uid),
-                orderBy("createdAt", "desc")
-            );
-            const querySnapshot = await getDocs(q);
-            const results = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as StudentResult));
-            setCompletedAssessments(results);
-        } catch (error) {
-            console.error("Error fetching student history: ", error);
-        } finally {
-            setIsLoading(false);
-        }
-    }
-
-    fetchHistory();
-  }, [user, authLoading, router]);
-
-  if (isLoading || authLoading) {
-    return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin"/></div>;
-  }
+export default async function HistoryPage() {
+  const t = getLanguage();
+  // We'll use a mock user ID since login is disabled
+  const mockStudentId = "test-user-id";
+  const completedAssessments = await getHistory(mockStudentId);
 
   return (
     <Card>

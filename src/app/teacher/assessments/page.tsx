@@ -2,11 +2,11 @@
 "use client"
 
 import { useState, useEffect, useCallback } from 'react';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, MoreHorizontal, Copy, Loader2 } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Copy } from 'lucide-react';
 import Link from 'next/link';
-import { type TeacherAssessment, type StudentResult } from "@/lib/types";
+import { type TeacherAssessment } from "@/lib/types";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
@@ -140,14 +140,6 @@ export default function AssessmentsPage() {
     }
     return t.teacherAssessments.assessmentTypes.monologue;
   }
-  
-  if(isLoading || authLoading) {
-    return (
-        <div className="flex justify-center items-center h-64">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
@@ -163,12 +155,12 @@ export default function AssessmentsPage() {
         </Link>
       </div>
       <Card>
-        <CardHeader>
-          <CardTitle>{t.teacherAssessments.listTitle}</CardTitle>
-          <CardDescription>{t.teacherAssessments.listDescription}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {assessments.length > 0 ? (
+        <CardContent className="p-0">
+          {isLoading ? (
+            <div className="text-center py-24">
+              <p className="text-muted-foreground">평가 목록을 불러오는 중...</p>
+            </div>
+          ) : assessments.length > 0 ? (
              <Table>
              <TableHeader>
                <TableRow>
@@ -251,7 +243,7 @@ export default function AssessmentsPage() {
              </TableBody>
            </Table>
           ) : (
-            <div className="text-center py-12 border-2 border-dashed rounded-lg">
+            <div className="text-center py-12 border-2 border-dashed rounded-lg m-4">
                 <h3 className="text-lg font-medium text-muted-foreground">{t.teacherAssessments.noAssessments.title}</h3>
                 <p className="text-sm text-muted-foreground mt-1">{t.teacherAssessments.noAssessments.description}</p>
             </div>
