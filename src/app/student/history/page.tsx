@@ -8,30 +8,31 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { useLanguage } from '@/context/language-context';
-import { type StudentResult } from '@/lib/types';
-
-// This is a mapping from assessment ID to a more friendly title if needed.
-const assessmentTitles: { [key: string]: string } = {
-  "1": "5단원: 나의 일과",
-  "2": "6단원: 사람 묘사하기",
-  "3": "중간 말하기 시험",
-  "4": "7단원: 취미와 관심사",
-  // Add other known IDs here if they don't have a title in the result object
-};
+import { type StudentResult, type TeacherAssessment } from '@/lib/types';
 
 export default function HistoryPage() {
   const { t } = useLanguage();
   const [completedAssessments, setCompletedAssessments] = useState<StudentResult[]>([]);
+  const [assessmentTitles, setAssessmentTitles] = useState<{ [key: string]: string }>({});
 
   useEffect(() => {
     // This code runs only on the client, where localStorage is available.
-    const results: StudentResult[] = JSON.parse(localStorage.getItem('student_results') || '[]');
-    setCompletedAssessments(results);
+    const studentResults: StudentResult[] = JSON.parse(localStorage.getItem('student_results') || '[]');
+    const teacherAssessments: TeacherAssessment[] = JSON.parse(localStorage.getItem('assessments') || '[]');
+
+    const validAssessmentIds = new Set(teacherAssessments.map(a => a.id));
+    const titleMap = teacherAssessments.reduce((acc, assessment) => {
+        acc[assessment.id] = assessment.title;
+        return acc;
+    }, {} as { [key: string]: string });
+
+    const filteredResults = studentResults.filter(result => validAssessmentIds.has(result.assessmentId));
+    
+    setCompletedAssessments(filteredResults);
+    setAssessmentTitles(titleMap);
   }, []);
 
   const getAssessmentTitle = (assessment: StudentResult) => {
-    // In a real app, the result object would likely contain the title.
-    // Here we fall back to a mapping.
     return assessmentTitles[assessment.assessmentId] || `평가 ID: ${assessment.assessmentId}`;
   }
 
