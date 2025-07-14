@@ -1,0 +1,22 @@
+
+[
+  {
+    "origin": [
+      "http://localhost:3000",
+      "http://localhost:9002",
+      "https://speaksmart-evaluator.web.app",
+      "https://speaksmart-evaluator.firebaseapp.com"
+    ],
+    "method": [
+      "GET",
+      "POST",
+      "PUT",
+      "HEAD"
+    ],
+    "responseHeader": [
+      "Content-Type",
+      "Access-Control-Allow-Origin"
+    ],
+    "maxAgeSeconds": 3600
+  }
+]
