@@ -72,6 +72,19 @@ const generateComprehensiveFeedbackFlow = ai.defineFlow(
     outputSchema: GenerateComprehensiveFeedbackOutputSchema,
   },
   async ({ studentRecordingDataUri, activityPrompt, expectedFormat, studentName, assessmentTitle }) => {
+    
+    // Handle cases with no audio data to prevent API errors.
+    const audioData = studentRecordingDataUri.split(',')[1];
+    if (!audioData) {
+      return {
+        studentTranscript: '(학생 답변이 기록되지 않았습니다.)',
+        aiFeedback: '죄송합니다, 답변을 제대로 듣지 못했습니다. 마이크를 확인하고 다시 시도해주세요.',
+        teacherGuidance: '학생 답변이 없어 조언 불가',
+        curricularRemarks: '학생 답변이 없어 판별 불가',
+        score: 0,
+      };
+    }
+
     // Step 1: Transcribe the student's audio recording, specifying English.
     const sttResponse = await ai.generate({
       model: googleAI.model('gemini-2.0-flash'),
