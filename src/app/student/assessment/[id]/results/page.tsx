@@ -10,6 +10,7 @@ import { db } from "@/lib/firebase";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { Loader2, UploadCloud, FileText, BrainCircuit, BookCheck } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 
 const statusDetails: Record<ResultStatus, { icon: React.ElementType, text: string }> = {
     "업로드 중": { icon: UploadCloud, text: "오디오 파일 업로드 중..." },
@@ -29,6 +30,7 @@ export default function AssessmentResultsPage() {
   const [result, setResult] = useState<StudentResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [currentStatus, setCurrentStatus] = useState<ResultStatus>("채점 중");
+  const [currentProgress, setCurrentProgress] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -55,6 +57,7 @@ export default function AssessmentResultsPage() {
         const resultData = { id: doc.id, ...doc.data() } as StudentResult;
         setResult(resultData);
         setCurrentStatus(resultData.status);
+        setCurrentProgress(resultData.progress || 0);
 
         if (resultData.status === '오류') {
           setError(resultData.aiFeedback || "분석 중 오류가 발생했습니다.");
@@ -70,6 +73,7 @@ export default function AssessmentResultsPage() {
         // It's better to show that it's still grading.
         setIsLoading(true);
         setCurrentStatus("채점 중");
+        setCurrentProgress(0);
       }
     }, (err) => {
       console.error("Error fetching result with onSnapshot: ", err);
@@ -90,8 +94,10 @@ export default function AssessmentResultsPage() {
           <CardTitle>AI 분석 진행 중</CardTitle>
           <CardDescription>{text}</CardDescription>
         </CardHeader>
-        <CardContent>
-            <p className="text-sm text-muted-foreground">분석이 완료되면 이 페이지가 자동으로 새로고침됩니다.</p>
+        <CardContent className="w-full max-w-sm">
+            <Progress value={currentProgress} className="mb-2" />
+            <p className="text-sm text-muted-foreground">{currentProgress}% 완료</p>
+            <p className="text-sm text-muted-foreground mt-4">분석이 완료되면 이 페이지가 자동으로 새로고침됩니다.</p>
         </CardContent>
       </Card>
     );

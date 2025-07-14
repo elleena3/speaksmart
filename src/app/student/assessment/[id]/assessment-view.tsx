@@ -177,13 +177,11 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
 
      const newResultRef = doc(collection(db, "results"));
 
-     const updateStatus = async (status: ResultStatus, data: Partial<StudentResult> = {}) => {
-        // This function is called from the AI flow to update the document in Firestore
-        await updateDoc(newResultRef, { status, ...data });
+     const updateStatus = async (status: ResultStatus, progress: number, data: Partial<StudentResult> = {}) => {
+        await updateDoc(newResultRef, { status, progress, ...data });
      };
 
      try {
-        setProcessingStatus("업로드 중");
         const initialResultData: Partial<StudentResult> = {
             id: newResultRef.id,
             studentId: user.uid,
@@ -192,6 +190,7 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
             name: user.displayName || "Student",
             avatarUrl: user.photoURL || `https://placehold.co/40x40.png?text=${user.displayName?.charAt(0)}`,
             status: "업로드 중",
+            progress: 10,
             date: new Date().toISOString().split('T')[0],
             createdAt: Date.now(),
             teacherUid: assessmentDetails.uid,
@@ -203,17 +202,15 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
         await uploadBytes(storageRef, audioBlob);
         const downloadURL = await getDownloadURL(storageRef);
         
-        // This will now call the updated flow which internally calls updateStatus
         const analysisResult = await generateSpeakingAnalysis({
             studentRecordingDataUri,
             activityPrompt: assessmentDetails.prompt,
             expectedFormat: assessmentDetails.expectedFormat || "학생의 답변을 평가합니다.",
             studentName: user.displayName || "Student",
             assessmentTitle: assessmentDetails.title.replace(/ - 복사본(\s\d+)?$/, ''),
-        }, (status) => updateStatus(status as ResultStatus));
+        }, (status, progress) => updateStatus(status as ResultStatus, progress));
 
-        // The final update to "채점 완료"
-        const finalResultData: Omit<StudentResult, 'id' | 'status'> = {
+        const finalResultData: Omit<StudentResult, 'id' | 'status' | 'progress'> = {
             studentId: user.uid,
             assessmentId: assessmentDetails.id,
             assessmentTitle: assessmentDetails.title,
@@ -233,12 +230,17 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
             teacherUid: assessmentDetails.uid,
         };
         
-        await updateStatus("채점 완료", finalResultData as Partial<StudentResult>);
+        await updateDoc(newResultRef, { 
+            status: "채점 완료",
+            progress: 100,
+            ...finalResultData 
+        });
         
     } catch (error) {
         console.error("Error processing assessment in background:", error);
         await updateDoc(newResultRef, { 
             status: "오류", 
+            progress: 100,
             aiFeedback: "결과를 분석하는 중 오류가 발생했습니다. 잠시 후 다시 시도하거나 관리자에게 문의하세요."
         });
     }
@@ -261,8 +263,6 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
   };
 
   const getButtonState = () => {
-    // This component no longer needs to show processing steps, as the user is redirected.
-    // It only manages the recording state.
     if (isRecording) {
       return (
         <Button size="lg" onClick={handleStopRecording} className="w-full" variant="destructive">

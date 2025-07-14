@@ -65,6 +65,7 @@ export type StudentResult = {
   name: string; // Student's display name
   avatarUrl: string;
   status: ResultStatus;
+  progress?: number; // Progress percentage (0-100)
   score: number;
   date: string;
   aiFeedback: string;
