@@ -15,6 +15,7 @@ import { db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import jsPDF from "jspdf";
 import autoTable from 'jspdf-autotable';
+import { NotoSansKRFont } from '@/lib/fonts/noto-sans-kr';
 
 export default function StudentResultPage() {
   const params = useParams();
@@ -71,69 +72,59 @@ export default function StudentResultPage() {
 
     const docPDF = new jsPDF();
     const margin = 15;
-    let finalY = 20;
+    
+    // Add Korean font
+    docPDF.addFileToVFS("NotoSansKR-Regular.ttf", NotoSansKRFont);
+    docPDF.addFont("NotoSansKR-Regular.ttf", "NotoSansKR", "normal");
+    docPDF.setFont("NotoSansKR");
 
-    // Use a basic font that supports English characters.
-    docPDF.setFont("Helvetica");
 
     docPDF.setFontSize(22);
-    docPDF.text('Student Report', margin, finalY);
-    finalY += 10;
-    
-    docPDF.setDrawColor(200, 200, 200);
-    docPDF.line(margin, finalY, 210 - margin, finalY);
-    finalY += 10;
-    
+    docPDF.text('학생 리포트', margin, 20);
     docPDF.setFontSize(12);
-    
+    docPDF.setTextColor(100);
+    docPDF.text(`${studentResult.name} 학생 - ${assessment.title}`, margin, 30);
+
     const isDialogue = assessment.assessmentType === 'dialogue';
 
-    const bodyData = [
-      ['Student Name', studentResult.name],
-      ['Assessment', assessment.title],
-      ['Type', isDialogue ? 'Dialogue with AI' : 'Monologue'],
-      ['Date', studentResult.date],
-      ['Content Score', `${studentResult.score}%`],
-      ['Pronunciation Score', `${studentResult.pronunciationScore ?? 0}%`],
-      { content: 'AI Feedback (for Student)', styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } },
-      [studentResult.aiFeedback],
-      { content: 'Pronunciation Analysis', styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } },
-      [studentResult.pronunciationFeedback || 'N/A'],
-      { content: `Full ${isDialogue ? 'Conversation' : 'Response'} Transcript`, styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } },
-      [studentResult.studentTranscript || 'No transcript available'],
-      { content: 'Draft Curricular Remarks', styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } },
-      [studentResult.curricularRemarks],
-      { content: 'Guidance for Teacher', styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } },
-      [studentResult.teacherGuidance],
-      { content: 'Student Feedback Summary', styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } },
-      [studentResult.studentFeedbackSummary],
-    ];
-
     autoTable(docPDF, {
-      startY: finalY,
-      head: [['Item', 'Details']],
-      body: bodyData,
+      startY: 40,
+      head: [['항목', '세부 내용']],
+      body: [
+        ['학생 이름', studentResult.name],
+        ['평가명', assessment.title],
+        ['유형', isDialogue ? 'AI와 대화하기' : '혼자 말하기'],
+        ['제출일', studentResult.date],
+        ['내용 점수', `${studentResult.score}%`],
+        ['발음 점수', `${studentResult.pronunciationScore ?? 0}%`],
+      ],
       theme: 'grid',
-      styles: {
-        cellPadding: 3,
-        fontSize: 10,
-      },
-      headStyles: {
-        fontStyle: 'bold',
-        fillColor: [52, 152, 219],
-        textColor: 255,
-      },
-      didParseCell: function(data) {
-        if (typeof data.cell.raw === 'object' && !Array.isArray(data.cell.raw)) {
-          data.cell.styles.halign = 'center';
-          data.cell.text = (data.cell.raw as any).content;
-          data.cell.colSpan = 2;
-        }
-        if (Array.isArray(data.cell.raw) && data.cell.raw.length === 1) {
-            data.cell.colSpan = 2;
-        }
-      }
+      styles: { font: "NotoSansKR", fontSize: 10 },
+      headStyles: { fontStyle: 'bold', fillColor: [41, 128, 185], textColor: 255 }
     });
+
+    const finalY = (docPDF as any).lastAutoTable.finalY || 100;
+
+    const addSection = (title: string, content: string, startY: number) => {
+      docPDF.setFontSize(14);
+      docPDF.setTextColor(0);
+      docPDF.text(title, margin, startY);
+      docPDF.setFontSize(10);
+      docPDF.setTextColor(100);
+      const splitContent = docPDF.splitTextToSize(content || "내용 없음", 180);
+      docPDF.text(splitContent, margin, startY + 8);
+      const contentHeight = docPDF.getTextDimensions(splitContent).h;
+      return startY + contentHeight + 15;
+    };
+
+    let currentY = finalY + 10;
+    currentY = addSection('AI 피드백 (학생용)', studentResult.aiFeedback, currentY);
+    currentY = addSection('발음 분석', studentResult.pronunciationFeedback || 'N/A', currentY);
+    currentY = addSection(isDialogue ? '전체 대화 기록' : '답변 내용', studentResult.studentTranscript || '기록 없음', currentY);
+    currentY = addSection('교과과정 비고 초안', studentResult.curricularRemarks, currentY);
+    currentY = addSection('선생님을 위한 조언', studentResult.teacherGuidance, currentY);
+    addSection('학생 피드백 요약', studentResult.studentFeedbackSummary, currentY);
+
 
     docPDF.save(`${studentResult.name}_${assessment.title}_Report.pdf`);
   };
