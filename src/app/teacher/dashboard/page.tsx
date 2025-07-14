@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { PlusCircle, MoreHorizontal, ArrowRight } from "lucide-react"
+import { PlusCircle, MoreHorizontal, ArrowRight, Users } from "lucide-react"
 import Link from "next/link"
 import { type TeacherAssessment } from "@/lib/types"
 import { OverviewChart } from "./overview-chart"
@@ -84,9 +84,10 @@ export default async function TeacherDashboard() {
                     </Link>
                   </TableCell>
                   <TableCell className="text-center">
-                    <Badge variant={assessment.studentsCompleted === assessment.totalStudents ? "default" : "secondary"}>
-                      {assessment.studentsCompleted} / {assessment.totalStudents}
-                    </Badge>
+                    <div className="flex items-center justify-center gap-1.5">
+                      <Users className="h-4 w-4 text-muted-foreground" />
+                      <Badge variant="secondary">{assessment.studentsCompleted}</Badge>
+                    </div>
                   </TableCell>
                   <TableCell className="text-center">
                     <Badge variant="outline" className="font-mono">

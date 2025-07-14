@@ -10,7 +10,7 @@ import { generateComprehensiveFeedback } from "@/ai/flows/generate-comprehensive
 import { type StudentResult, type TeacherAssessment } from "@/lib/types"
 import { useAuth } from "@/context/auth-context"
 import { db } from "@/lib/firebase"
-import { collection, addDoc, doc, writeBatch, query, where, getDocs } from "firebase/firestore"
+import { collection, addDoc, doc, writeBatch, query, where, getDocs, runTransaction, increment } from "firebase/firestore"
 
 export function AssessmentView({ assessmentDetails }: { assessmentDetails: TeacherAssessment }) {
   const { user } = useAuth();
@@ -164,6 +164,22 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
       const resultsRef = collection(db, "results");
       const q = query(resultsRef, where("assessmentId", "==", assessmentDetails.id), where("studentId", "==", user.uid));
       const existingDocs = await getDocs(q);
+
+      if (existingDocs.empty) {
+        // This is a new submission, so increment the counter
+        const assessmentRef = doc(db, "assessments", assessmentDetails.id);
+        try {
+            await runTransaction(db, async (transaction) => {
+                const assessmentDoc = await transaction.get(assessmentRef);
+                if (!assessmentDoc.exists()) {
+                    throw "Assessment document does not exist!";
+                }
+                transaction.update(assessmentRef, { studentsCompleted: increment(1) });
+            });
+        } catch (e) {
+            console.error("Transaction failed: ", e);
+        }
+      }
 
       const batch = writeBatch(db);
       existingDocs.forEach(doc => batch.delete(doc.ref));

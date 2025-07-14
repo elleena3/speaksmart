@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, MoreHorizontal, Copy } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Copy, Users } from 'lucide-react';
 import Link from 'next/link';
 import { type TeacherAssessment } from "@/lib/types";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -72,7 +72,7 @@ export default function AssessmentsPage() {
         const { id, ...assessmentDataToCopy } = assessmentToCopy;
         
         const copySuffix = t.teacherAssessments.copySuffix; // " - 복사본"
-        const regex = new RegExp(`^(.+)${copySuffix}( \\d+)?$`);
+        const regex = new RegExp(`^(.*?)(${copySuffix}( \\d+)?)?$`);
         const match = assessmentToCopy.title.match(regex);
         const baseTitle = match ? match[1] : assessmentToCopy.title;
 
@@ -100,6 +100,9 @@ export default function AssessmentsPage() {
         }
         if (newAssessment.endDate === undefined) {
             delete (newAssessment as any).endDate;
+        }
+        if (newAssessment.totalStudents) {
+          delete (newAssessment as any).totalStudents;
         }
 
         await addDoc(collection(db, "assessments"), newAssessment);
@@ -210,9 +213,10 @@ export default function AssessmentsPage() {
                       {formatDateRange(assessment.startDate, assessment.endDate)}
                    </TableCell>
                    <TableCell className="text-center">
-                     <Badge variant={assessment.studentsCompleted === assessment.totalStudents ? "default" : "secondary"}>
-                       {assessment.studentsCompleted} / {assessment.totalStudents}
-                     </Badge>
+                      <div className="flex items-center justify-center gap-1.5">
+                        <Users className="h-4 w-4 text-muted-foreground" />
+                        <Badge variant="secondary">{assessment.studentsCompleted}</Badge>
+                      </div>
                    </TableCell>
                    <TableCell className="text-center">
                      <Badge variant="outline" className="font-mono">

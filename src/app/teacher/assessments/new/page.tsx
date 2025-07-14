@@ -115,7 +115,6 @@ export default function NewAssessmentPage() {
             ...submissionValues,
             uid: user.uid,
             studentsCompleted: 0,
-            totalStudents: 20, 
             averageScore: 0,
             dateCreated: new Date().toISOString().split('T')[0],
             createdAt: Date.now(),
