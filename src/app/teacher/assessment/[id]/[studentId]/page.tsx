@@ -271,7 +271,7 @@ export default function StudentResultPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2"><User className="h-5 w-5 text-primary"/> 학생 피드백 요약</CardTitle>
                  <CardDescription>이 평가 활동에 대한 학생의 AI 요약 피드백입니다.</CardDescription>
-              </CardHeader>
+              </Header>
               <CardContent>
                  <div className="text-sm text-muted-foreground p-4 bg-muted/50 rounded-lg italic">
                     {hasFeedback ? studentResult.studentFeedbackSummary : "피드백 없음"}
