@@ -2,86 +2,84 @@
 "use client"
 
 import { useState, useEffect } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
 import { generateComprehensiveFeedback } from "@/ai/flows/generate-comprehensive-feedback";
-import { type ConversationHistory, type StudentResult, type TeacherAssessment } from "@/lib/types";
+import { type StudentResult, type TeacherAssessment } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { FeedbackView } from "../../[id]/results/feedback-view";
+import { useAuth } from "@/context/auth-context";
+import { db } from "@/lib/firebase";
+import { collection, addDoc, query, where, getDocs, writeBatch } from "firebase/firestore";
 
 const SESSION_STORAGE_KEY = 'freeTalkConversationHistory';
 
+type StoredConversationData = {
+    history: any[];
+    studentRecordingDataUri: string;
+    assessment: TeacherAssessment;
+}
 
 export function FreeTalkFeedbackView() {
+    const { user, loading: authLoading } = useAuth();
     const [isLoading, setIsLoading] = useState(true);
     const [result, setResult] = useState<StudentResult | null>(null);
-    const [assessmentDetails, setAssessmentDetails] = useState<TeacherAssessment | null>(null);
 
     const router = useRouter();
-    const searchParams = useSearchParams();
     const { toast } = useToast();
 
-    const assessmentId = searchParams.get('id');
-
     useEffect(() => {
-        const storedData = sessionStorage.getItem(SESSION_STORAGE_KEY);
-        if (!assessmentId || !storedData) {
+        if(authLoading) return;
+        if(!user) {
+            router.push('/');
+            return;
+        }
+
+        const storedDataString = sessionStorage.getItem(SESSION_STORAGE_KEY);
+        if (!storedDataString) {
             toast({
                 title: "오류",
-                description: "분석할 대화 기록이나 평가 정보를 찾을 수 없습니다. 대시보드로 돌아갑니다.",
+                description: "분석할 대화 기록을 찾을 수 없습니다. 대시보드로 돌아갑니다.",
                 variant: "destructive"
             });
             router.push('/student/dashboard');
             return;
         }
 
-        const allAssessments: TeacherAssessment[] = JSON.parse(localStorage.getItem('assessments') || '[]');
-        const currentAssessment = allAssessments.find(a => a.id === assessmentId);
+        const storedData: StoredConversationData = JSON.parse(storedDataString);
+        generateFeedback(storedData);
         
-        if(!currentAssessment) {
-             toast({
-                title: "평가 정보 없음",
-                description: "평가 정보를 찾을 수 없습니다.",
-                variant: "destructive"
-            });
-            router.push('/student/dashboard');
-            return;
-        }
-        setAssessmentDetails(currentAssessment);
+    }, [user, authLoading, router, toast]);
 
-        const conversationData: ConversationHistory = JSON.parse(storedData);
-        generateFeedback(conversationData, currentAssessment);
-        
-    }, [assessmentId, router, toast]);
-
-    const generateFeedback = async (conversationData: ConversationHistory, assessment: TeacherAssessment) => {
+    const generateFeedback = async (conversationData: StoredConversationData) => {
+        if (!user) return;
         setIsLoading(true);
         try {
-            const studentRecordingDataUri = conversationData.studentRecordingDataUri || "data:audio/webm;base64,";
+            const { assessment, history, studentRecordingDataUri } = conversationData;
             
-            const fullTranscript = conversationData.history
+            const fullTranscript = history
                 .map(turn => `${turn.role === 'user' ? '학생' : 'AI'}: ${turn.text}`)
                 .join('\n');
             
             const generatedResult = await generateComprehensiveFeedback({
                 activityPrompt: `${assessment.prompt}\n\n--- 대화 기록 ---\n${fullTranscript}`,
-                expectedFormat: assessment.expectedFormat || "AI와의 자연스러운 대화 능력을 평가합니다. 유창성, 발음, 어휘, 문법을 종합적으로 고려하여 피드백을 제공해주세요.",
+                expectedFormat: assessment.expectedFormat || "AI와의 자연스러운 대화 능력을 평가합니다.",
                 studentRecordingDataUri: studentRecordingDataUri,
-                studentName: "Alex Doe", 
+                studentName: user.displayName || "Student", 
                 assessmentTitle: assessment.title.replace(' - 복사본', ''),
             });
 
-            const studentResult: StudentResult = {
-                studentId: "student-alex-doe",
+            const resultData: Omit<StudentResult, 'id'> = {
+                studentId: user.uid,
                 assessmentId: assessment.id,
                 assessmentTitle: assessment.title,
-                name: "Alex Doe",
-                avatarUrl: "https://placehold.co/40x40.png",
+                name: user.displayName || "Student",
+                avatarUrl: user.photoURL || `https://placehold.co/40x40.png?text=${user.displayName?.charAt(0)}`,
                 status: "채점 완료",
                 score: generatedResult.score,
                 date: new Date().toISOString().split('T')[0],
+                createdAt: Date.now(),
                 aiFeedback: generatedResult.aiFeedback,
                 curricularRemarks: generatedResult.curricularRemarks,
                 studentFeedbackSummary: "학생이 평가에 대해 남긴 피드백이 없습니다.",
@@ -90,13 +88,21 @@ export function FreeTalkFeedbackView() {
                 studentRecordingDataUri: studentRecordingDataUri,
                 pronunciationScore: generatedResult.pronunciationScore,
                 pronunciationFeedback: generatedResult.pronunciationFeedback,
-            }
+                teacherUid: assessment.uid,
+            };
+
+            // Atomically add the new result and delete any old one for this assessment
+            const resultsRef = collection(db, "results");
+            const q = query(resultsRef, where("assessmentId", "==", assessment.id), where("studentId", "==", user.uid));
+            const existingDocs = await getDocs(q);
+
+            const batch = writeBatch(db);
+            existingDocs.forEach(doc => batch.delete(doc.ref)); // Delete old results
+            const newResultRef = doc(collection(db, "results"));
+            batch.set(newResultRef, resultData); // Add new result
+            await batch.commit();
             
-            const existingResults: StudentResult[] = JSON.parse(localStorage.getItem('student_results') || '[]');
-            const updatedResults = [...existingResults.filter(r => r.assessmentId !== assessmentId), studentResult];
-            localStorage.setItem('student_results', JSON.stringify(updatedResults));
-            
-            setResult(studentResult);
+            setResult({ id: newResultRef.id, ...resultData });
 
         } catch (error) {
             console.error("Error generating feedback:", error);
@@ -107,10 +113,11 @@ export function FreeTalkFeedbackView() {
             });
         } finally {
             setIsLoading(false);
+            sessionStorage.removeItem(SESSION_STORAGE_KEY);
         }
     };
 
-    if (isLoading) {
+    if (isLoading || authLoading) {
         return (
             <div className="flex flex-col items-center justify-center text-center p-8 border rounded-lg bg-muted/50 h-96">
                 <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />

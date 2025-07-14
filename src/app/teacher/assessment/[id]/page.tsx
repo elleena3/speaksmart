@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, notFound, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -12,17 +12,15 @@ import { Button } from "@/components/ui/button"
 import { Loader2, User, ArrowRight } from "lucide-react"
 import { type TeacherAssessment, type StudentResult } from "@/lib/types";
 import { useLanguage } from "@/context/language-context";
+import { useAuth } from "@/context/auth-context";
+import { db } from "@/lib/firebase";
+import { collection, query, where, getDocs, doc, getDoc, orderBy } from "firebase/firestore";
 
-const initialAssessments: TeacherAssessment[] = [
-  { id: "1", title: "5단원: 나의 일과", studentsCompleted: 18, totalStudents: 20, averageScore: 85, dateCreated: "2024-05-10", assessmentType: "monologue", prompt: "" },
-  { id: "2", title: "6단원: 사람 묘사하기", studentsCompleted: 15, totalStudents: 20, averageScore: 78, dateCreated: "2024-05-17", assessmentType: "monologue", prompt: "" },
-  { id: "3", title: "중간 말하기 시험", studentsCompleted: 20, totalStudents: 20, averageScore: 91, dateCreated: "2024-05-24", assessmentType: "monologue", prompt: "" },
-  { id: "4", title: "7단원: 취미와 관심사", studentsCompleted: 0, totalStudents: 20, averageScore: 0, dateCreated: "2024-05-31", assessmentType: "monologue", prompt: "" },
-];
 
 export default function AssessmentSubmissionsPage() {
   const params = useParams();
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
   const { t } = useLanguage();
   const [assessment, setAssessment] = useState<TeacherAssessment | null>(null);
   const [studentResults, setStudentResults] = useState<StudentResult[]>([]);
@@ -30,37 +28,49 @@ export default function AssessmentSubmissionsPage() {
 
   const assessmentId = Array.isArray(params.id) ? params.id[0] : params.id;
 
-  useEffect(() => {
-    if (assessmentId) {
-      const storedTeacherAssessments: TeacherAssessment[] = JSON.parse(localStorage.getItem('assessments') || '[]');
-      
-      const allAssessments = [...initialAssessments];
-      storedTeacherAssessments.forEach(localItem => {
-          const index = allAssessments.findIndex(initialItem => initialItem.id === localItem.id);
-          if (index > -1) {
-            allAssessments[index] = { ...allAssessments[index], ...localItem };
-          } else {
-            allAssessments.push(localItem);
-          }
-      });
-      
-      const foundAssessment = allAssessments.find((a) => a.id === assessmentId);
-      
-      if (foundAssessment) {
-        setAssessment(foundAssessment);
-        const allStudentResults: StudentResult[] = JSON.parse(localStorage.getItem('student_results') || '[]');
-        const resultsForThisAssessment = allStudentResults.filter(r => r.assessmentId === assessmentId);
-        setStudentResults(resultsForThisAssessment);
-      } else {
-        // If assessment not found, maybe redirect or show a 'not found' message
-        // For now, using Next's notFound utility
-        notFound();
-      }
-      setIsLoading(false);
-    }
-  }, [assessmentId]);
+  const fetchSubmissions = useCallback(async () => {
+    if (!user || !assessmentId) return;
+    setIsLoading(true);
 
-  if (isLoading) {
+    try {
+        const assessmentRef = doc(db, "assessments", assessmentId);
+        const assessmentSnap = await getDoc(assessmentRef);
+
+        if (!assessmentSnap.exists() || assessmentSnap.data().uid !== user.uid) {
+            notFound();
+            return;
+        }
+        setAssessment({ id: assessmentSnap.id, ...assessmentSnap.data() } as TeacherAssessment);
+
+        const resultsQuery = query(
+            collection(db, "results"), 
+            where("assessmentId", "==", assessmentId),
+            orderBy("createdAt", "desc")
+        );
+        const resultsSnapshot = await getDocs(resultsQuery);
+        const resultsData = resultsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as StudentResult));
+        setStudentResults(resultsData);
+
+    } catch (error) {
+        console.error("Error fetching submissions:", error);
+        toast({ title: "오류", description: "제출 현황을 불러오는 데 실패했습니다.", variant: "destructive" });
+    } finally {
+        setIsLoading(false);
+    }
+  }, [assessmentId, user]);
+
+
+  useEffect(() => {
+    if (!authLoading) {
+      if (!user) {
+        router.push('/');
+      } else {
+        fetchSubmissions();
+      }
+    }
+  }, [user, authLoading, router, fetchSubmissions]);
+
+  if (isLoading || authLoading) {
     return (
       <div className="flex justify-center items-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -113,7 +123,7 @@ export default function AssessmentSubmissionsPage() {
                     <TableCell>{result.score ? `${result.score}%` : "N/A"}</TableCell>
                     <TableCell>{result.date}</TableCell>
                     <TableCell className="text-right">
-                       <Link href={`/teacher/assessment/${assessmentId}/${result.studentId}`}>
+                       <Link href={`/teacher/assessment/${assessmentId}/${result.id}`}>
                          <Button variant="outline" size="sm">
                            결과 보기 <ArrowRight className="ml-2 h-4 w-4" />
                          </Button>

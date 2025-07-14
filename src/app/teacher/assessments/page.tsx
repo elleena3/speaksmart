@@ -1,12 +1,12 @@
 
 "use client"
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, MoreHorizontal, Copy } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Copy, Loader2 } from 'lucide-react';
 import Link from 'next/link';
-import { type TeacherAssessment } from "@/lib/types";
+import { type TeacherAssessment, type StudentResult } from "@/lib/types";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
@@ -14,87 +14,114 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useToast } from '@/hooks/use-toast';
 import { format } from "date-fns";
 import { useLanguage } from '@/context/language-context';
-import { type StudentResult } from '@/lib/types';
-
-
-const initialAssessments: TeacherAssessment[] = [
-  { id: "free-talk-default", title: "자유 대화", topic: "AI와 자유롭게 대화하세요.", studentsCompleted: 0, totalStudents: 20, averageScore: 0, dateCreated: "2024-06-01", assessmentType: "dialogue", scenario: "free-talk", prompt: "AI와 자유롭게 영어로 대화해 보세요. 준비가 되면 '대화 시작' 버튼을 누르세요." },
-  { id: "4", title: "7단원: 취미와 관심사", topic: "가장 좋아하는 취미에 대해 1분간 이야기하세요.", studentsCompleted: 0, totalStudents: 20, averageScore: 0, dateCreated: "2024-05-31", assessmentType: "monologue", prompt: "가장 좋아하는 취미에 대해 이야기해주세요. 무엇인지, 왜 좋아하는지, 얼마나 자주 하는지 언급해야 합니다. 1분 동안 말할 시간이 주어집니다." },
-  { id: "3", title: "중간 말하기 시험", topic: "성적 및 피드백 검토", studentsCompleted: 20, totalStudents: 20, averageScore: 91, dateCreated: "2024-05-24", assessmentType: "monologue", prompt: "" },
-  { id: "2", title: "6단원: 사람 묘사하기", topic: "성적 및 피드백 검토", studentsCompleted: 15, totalStudents: 20, averageScore: 78, dateCreated: "2024-05-17", assessmentType: "monologue", prompt: "" },
-  { id: "1", title: "5단원: 나의 일과", topic: "성적 및 피드백 검토", studentsCompleted: 18, totalStudents: 20, averageScore: 85, dateCreated: "2024-05-10", assessmentType: "monologue", prompt: "" },
-  { id: "free-talk-test", title: "자유 대화 테스트", topic: "1", studentsCompleted: 0, totalStudents: 20, averageScore: 0, dateCreated: "2024-06-02", assessmentType: "dialogue", scenario: "free-talk", prompt: "자유 대화 테스트입니다. AI와 대화하세요." },
-];
-
-const LOCAL_STORAGE_KEY_ASSESSMENTS = 'assessments';
-const LOCAL_STORAGE_KEY_RESULTS = 'student_results';
+import { useAuth } from '@/context/auth-context';
+import { useRouter } from 'next/navigation';
+import { db } from '@/lib/firebase';
+import { collection, query, where, getDocs, orderBy, addDoc, deleteDoc, doc, writeBatch } from "firebase/firestore";
 
 export default function AssessmentsPage() {
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
   const [assessments, setAssessments] = useState<TeacherAssessment[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
-  const { t, language } = useLanguage();
+  const { t } = useLanguage();
+
+  const fetchAssessments = useCallback(async () => {
+    if (!user) return;
+    setIsLoading(true);
+    try {
+      const q = query(
+        collection(db, "assessments"),
+        where("uid", "==", user.uid),
+        orderBy("createdAt", "desc")
+      );
+      const querySnapshot = await getDocs(q);
+      const assessmentsData = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        // Convert Firestore Timestamps to JS Dates if they exist
+        startDate: doc.data().startDate?.toDate(),
+        endDate: doc.data().endDate?.toDate(),
+      } as TeacherAssessment));
+      setAssessments(assessmentsData);
+    } catch (error) {
+      console.error("Error fetching assessments: ", error);
+      toast({ title: "오류", description: "평가 목록을 불러오는 데 실패했습니다.", variant: "destructive" });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user, toast]);
 
   useEffect(() => {
-    // Load assessments from localStorage on component mount
-    const storedAssessments = localStorage.getItem(LOCAL_STORAGE_KEY_ASSESSMENTS);
-    let assessmentsData: TeacherAssessment[] = [];
-    
-    if (storedAssessments) {
-      assessmentsData = JSON.parse(storedAssessments);
-    } else {
-      assessmentsData = initialAssessments;
-      localStorage.setItem(LOCAL_STORAGE_KEY_ASSESSMENTS, JSON.stringify(initialAssessments));
+    if (!authLoading) {
+      if (!user) {
+        router.push('/');
+      } else {
+        fetchAssessments();
+      }
     }
-    
-    setAssessments(assessmentsData);
-  }, []);
+  }, [user, authLoading, router, fetchAssessments]);
 
-  const handleCopy = (assessmentId: string) => {
+
+  const handleCopy = async (assessmentId: string) => {
     const assessmentToCopy = assessments.find(a => a.id === assessmentId);
-    if (!assessmentToCopy) return;
+    if (!assessmentToCopy || !user) return;
 
-    const newAssessment: TeacherAssessment = {
-      ...assessmentToCopy,
-      id: new Date().getTime().toString(),
-      title: `${assessmentToCopy.title}${t.teacherAssessments.copySuffix}`,
-      dateCreated: new Date().toISOString().split('T')[0],
-      studentsCompleted: 0,
-      averageScore: 0,
-    };
+    try {
+      const { id, ...assessmentDataToCopy } = assessmentToCopy;
+      
+      const newAssessment: Omit<TeacherAssessment, 'id'> = {
+        ...assessmentDataToCopy,
+        title: `${assessmentToCopy.title}${t.teacherAssessments.copySuffix}`,
+        createdAt: Date.now(),
+        dateCreated: new Date().toISOString().split('T')[0],
+        studentsCompleted: 0,
+        averageScore: 0,
+      };
 
-    const updatedAssessments = [newAssessment, ...assessments];
-    setAssessments(updatedAssessments);
-    localStorage.setItem(LOCAL_STORAGE_KEY_ASSESSMENTS, JSON.stringify(updatedAssessments));
+      await addDoc(collection(db, "assessments"), newAssessment);
 
-    toast({
-      title: t.teacherAssessments.copyToast.title,
-      description: t.teacherAssessments.copyToast.description.replace('{title}', assessmentToCopy.title),
-    });
+      toast({
+        title: t.teacherAssessments.copyToast.title,
+        description: t.teacherAssessments.copyToast.description.replace('{title}', assessmentToCopy.title),
+      });
+      fetchAssessments(); // Refresh list
+    } catch (error) {
+      console.error("Error copying assessment: ", error);
+      toast({ title: "오류", description: "평가 복사에 실패했습니다.", variant: "destructive" });
+    }
   }
 
-  const handleDelete = (assessmentId: string) => {
-    // Delete the assessment itself
-    const updatedAssessments = assessments.filter(a => a.id !== assessmentId);
-    setAssessments(updatedAssessments);
-    localStorage.setItem(LOCAL_STORAGE_KEY_ASSESSMENTS, JSON.stringify(updatedAssessments));
+  const handleDelete = async (assessmentId: string) => {
+    try {
+      // Delete the assessment document
+      await deleteDoc(doc(db, "assessments", assessmentId));
 
-    // Also delete associated student results to maintain data consistency
-    const allResults: StudentResult[] = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY_RESULTS) || '[]');
-    const updatedResults = allResults.filter(r => r.assessmentId !== assessmentId);
-    localStorage.setItem(LOCAL_STORAGE_KEY_RESULTS, JSON.stringify(updatedResults));
+      // Also delete associated student results to maintain data consistency
+      const resultsQuery = query(collection(db, "results"), where("assessmentId", "==", assessmentId));
+      const resultsSnapshot = await getDocs(resultsQuery);
+      
+      const batch = writeBatch(db);
+      resultsSnapshot.forEach(doc => {
+        batch.delete(doc.ref);
+      });
+      await batch.commit();
 
-    toast({
-      title: t.teacherAssessments.deleteToast.title,
-      description: t.teacherAssessments.deleteToast.description
-    });
+      toast({
+        title: t.teacherAssessments.deleteToast.title,
+        description: t.teacherAssessments.deleteToast.description
+      });
+      fetchAssessments(); // Refresh list
+    } catch (error) {
+       console.error("Error deleting assessment: ", error);
+       toast({ title: "오류", description: "평가 삭제에 실패했습니다.", variant: "destructive" });
+    }
   }
   
-  const formatDateRange = (startDateStr?: Date, endDateStr?: Date) => {
+  const formatDateRange = (startDate?: Date, endDate?: Date) => {
     const { periodAlways, periodFrom, periodTo } = t.teacherAssessments;
-    // Dates from localStorage might be strings, so convert them
-    const startDate = startDateStr ? new Date(startDateStr) : undefined;
-    const endDate = endDateStr ? new Date(endDateStr) : undefined;
-
+    
     if (startDate && endDate) {
       return `${format(startDate, "yy/MM/dd")} - ${format(endDate, "yy/MM/dd")}`;
     }
@@ -114,6 +141,14 @@ export default function AssessmentsPage() {
     return t.teacherAssessments.assessmentTypes.monologue;
   }
   
+  if(isLoading || authLoading) {
+    return (
+        <div className="flex justify-center items-center h-64">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">

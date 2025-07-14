@@ -1,7 +1,8 @@
+
 "use client"
 
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import {
   SidebarProvider,
   Sidebar,
@@ -18,6 +19,10 @@ import { Logo } from "@/components/icons"
 import { LogOut } from "lucide-react"
 import { useLanguage } from "@/context/language-context"
 import { translations } from "@/lib/locales"
+import { useAuth } from "@/context/auth-context"
+import { auth } from "@/lib/firebase"
+import { useToast } from "@/hooks/use-toast"
+import { Avatar, AvatarImage, AvatarFallback } from "./ui/avatar"
 
 type NavItem = {
   href: string
@@ -33,7 +38,21 @@ type AppLayoutProps = {
 
 export function AppLayout({ children, navItems, titleKey }: AppLayoutProps) {
   const pathname = usePathname()
+  const router = useRouter()
+  const { user } = useAuth()
   const { t } = useLanguage()
+  const { toast } = useToast()
+
+  const handleLogout = async () => {
+    try {
+        await auth.signOut();
+        router.push('/');
+        toast({ title: "로그아웃", description: "성공적으로 로그아웃되었습니다." });
+    } catch (error) {
+        console.error("Logout error", error);
+        toast({ title: "오류", description: "로그아웃 중 문제가 발생했습니다.", variant: "destructive" });
+    }
+  }
 
   return (
     <SidebarProvider>
@@ -62,12 +81,20 @@ export function AppLayout({ children, navItems, titleKey }: AppLayoutProps) {
           </SidebarMenu>
         </SidebarContent>
         <SidebarFooter>
-          <Link href="/" passHref>
-             <SidebarMenuButton>
-                <LogOut/>
-                <span>{t.nav.logout}</span>
-             </SidebarMenuButton>
-          </Link>
+          <div className="flex items-center gap-3 p-2">
+             <Avatar className="h-8 w-8">
+                <AvatarImage src={user?.photoURL || ""} alt={user?.displayName || "User"}/>
+                <AvatarFallback>{user?.displayName?.charAt(0) || "U"}</AvatarFallback>
+            </Avatar>
+            <div className="flex flex-col overflow-hidden">
+                <span className="text-sm font-medium truncate">{user?.displayName}</span>
+                <span className="text-xs text-muted-foreground truncate">{user?.email}</span>
+            </div>
+          </div>
+          <SidebarMenuButton onClick={handleLogout}>
+            <LogOut/>
+            <span>{t.nav.logout}</span>
+          </SidebarMenuButton>
         </SidebarFooter>
       </Sidebar>
       <SidebarInset>

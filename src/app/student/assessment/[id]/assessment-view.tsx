@@ -8,8 +8,12 @@ import { Mic, StopCircle, Loader2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { generateComprehensiveFeedback } from "@/ai/flows/generate-comprehensive-feedback"
 import { type StudentResult, type TeacherAssessment } from "@/lib/types"
+import { useAuth } from "@/context/auth-context"
+import { db } from "@/lib/firebase"
+import { collection, addDoc } from "firebase/firestore"
 
 export function AssessmentView({ assessmentDetails }: { assessmentDetails: TeacherAssessment }) {
+  const { user } = useAuth();
   const [isRecording, setIsRecording] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
   const router = useRouter()
@@ -65,6 +69,12 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
   }
   
   const processAssessment = async (studentRecordingDataUri: string) => {
+     if (!user) {
+        toast({ title: "인증 오류", description: "사용자 정보를 찾을 수 없습니다.", variant: "destructive" });
+        setIsProcessing(false);
+        return;
+     }
+
      try {
       const { 
         aiFeedback, 
@@ -76,34 +86,34 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
         pronunciationFeedback
       } = await generateComprehensiveFeedback({
         activityPrompt: assessmentDetails.prompt,
-        expectedFormat: assessmentDetails.expectedFormat || "학생의 답변을 평가합니다.", // Fallback if expectedFormat is missing
+        expectedFormat: assessmentDetails.expectedFormat || "학생의 답변을 평가합니다.",
         studentRecordingDataUri,
-        studentName: "Alex Doe", // In a real app, this would be dynamic
+        studentName: user.displayName || "Student",
         assessmentTitle: assessmentDetails.title.replace(' - 복사본', ''),
       });
-
-      const studentResult: StudentResult = {
-        studentId: "student-alex-doe",
+      
+      const resultData = {
+        studentId: user.uid,
         assessmentId: assessmentDetails.id,
         assessmentTitle: assessmentDetails.title,
-        name: "Alex Doe",
-        avatarUrl: "https://placehold.co/40x40.png",
+        name: user.displayName || "Student",
+        avatarUrl: user.photoURL || `https://placehold.co/40x40.png?text=${user.displayName?.charAt(0)}`,
         status: "채점 완료",
         score,
         date: new Date().toISOString().split('T')[0],
+        createdAt: Date.now(),
         aiFeedback,
         curricularRemarks,
-        studentFeedbackSummary: "학생이 평가에 대해 남긴 피드백이 없습니다.", // This will be updated later if the student provides it
+        studentFeedbackSummary: "학생이 평가에 대해 남긴 피드백이 없습니다.",
         teacherGuidance,
         studentTranscript,
         studentRecordingDataUri,
         pronunciationScore,
         pronunciationFeedback,
-      }
-      
-      const existingResults: StudentResult[] = JSON.parse(localStorage.getItem('student_results') || '[]');
-      const updatedResults = [...existingResults.filter(r => r.assessmentId !== assessmentDetails.id), studentResult];
-      localStorage.setItem('student_results', JSON.stringify(updatedResults));
+        teacherUid: assessmentDetails.uid,
+      };
+
+      await addDoc(collection(db, "results"), resultData);
 
       toast({
         title: "처리 완료!",

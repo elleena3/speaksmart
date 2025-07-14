@@ -7,9 +7,29 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useLanguage } from '@/context/language-context';
+import { useAuth } from '@/context/auth-context';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
+import { Loader2 } from 'lucide-react';
 
 export default function SettingsPage() {
     const { t } = useLanguage();
+    const { user, loading } = useAuth();
+    const router = useRouter();
+
+    useEffect(() => {
+        if(!loading && !user) {
+            router.push('/');
+        }
+    }, [user, loading, router]);
+
+    if (loading || !user) {
+        return (
+            <div className="flex justify-center items-center h-64">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+        );
+    }
 
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
@@ -24,11 +44,11 @@ export default function SettingsPage() {
             <CardContent className="space-y-4">
                 <div className="grid gap-2">
                     <Label htmlFor="name">{t.teacherSettings.account.nameLabel}</Label>
-                    <Input id="name" defaultValue="Jane Doe" />
+                    <Input id="name" defaultValue={user.displayName || ''} />
                 </div>
                 <div className="grid gap-2">
                     <Label htmlFor="email">{t.teacherSettings.account.emailLabel}</Label>
-                    <Input id="email" type="email" defaultValue="jane.doe@example.com" />
+                    <Input id="email" type="email" defaultValue={user.email || ''} readOnly />
                 </div>
                  <Button>{t.teacherSettings.account.updateButton}</Button>
             </CardContent>

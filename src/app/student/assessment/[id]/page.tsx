@@ -4,34 +4,51 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { AssessmentView } from "./assessment-view"
 import { useEffect, useState } from "react";
-import { useParams, notFound } from "next/navigation";
+import { useParams, notFound, useRouter } from "next/navigation";
 import { type TeacherAssessment } from "@/lib/types";
+import { useAuth } from "@/context/auth-context";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { Loader2 } from "lucide-react";
 
 export default function AssessmentPage() {
   const params = useParams();
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
   const [assessmentDetails, setAssessmentDetails] = useState<TeacherAssessment | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
 
   useEffect(() => {
-    if (id) {
-        const storedAssessments: TeacherAssessment[] = JSON.parse(localStorage.getItem('assessments') || '[]');
-        const foundAssessment = storedAssessments.find(a => a.id === id);
-
-        if (foundAssessment) {
-            setAssessmentDetails(foundAssessment);
-        } else {
-            // In a real app, you might fetch from a DB here as a fallback.
-            // For this app, if it's not in localStorage, it's considered not found.
-            console.warn(`Assessment with ID ${id} not found in localStorage.`);
-        }
-        setIsLoading(false);
+    if (authLoading) return;
+    if (!user) {
+        router.push('/');
+        return;
     }
-  }, [id]);
+    if (id) {
+        const fetchAssessment = async () => {
+            const docRef = doc(db, "assessments", id);
+            const docSnap = await getDoc(docRef);
 
-  if (isLoading) {
-    return <div className="max-w-3xl mx-auto p-8 text-center">Loading assessment...</div>;
+            if (docSnap.exists()) {
+                setAssessmentDetails({ id: docSnap.id, ...docSnap.data() } as TeacherAssessment);
+            } else {
+                console.warn(`Assessment with ID ${id} not found in Firestore.`);
+                notFound();
+            }
+            setIsLoading(false);
+        }
+        fetchAssessment();
+    }
+  }, [id, user, authLoading, router]);
+
+  if (isLoading || authLoading) {
+    return (
+        <div className="flex justify-center items-center h-64">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+    );
   }
 
   if (!assessmentDetails) {

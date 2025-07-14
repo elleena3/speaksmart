@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, notFound } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -11,38 +11,62 @@ import { Loader2, Paperclip, Download, User, Activity, BookText, FileText, Targe
 import { type TeacherAssessment, type StudentResult } from "@/lib/types";
 import { useLanguage } from "@/context/language-context";
 import { Progress } from "@/components/ui/progress";
+import { useAuth } from "@/context/auth-context";
+import { db } from "@/lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
 
 export default function StudentResultPage() {
   const params = useParams();
   const router = useRouter();
-  const { t } = useLanguage();
+  const { user, loading: authLoading } = useAuth();
   const [assessment, setAssessment] = useState<TeacherAssessment | null>(null);
-  const [student, setStudent] = useState<StudentResult | null>(null);
+  const [studentResult, setStudentResult] = useState<StudentResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const assessmentId = Array.isArray(params.id) ? params.id[0] : params.id;
-  const studentId = Array.isArray(params.studentId) ? params.studentId[0] : params.id;
+  const resultId = Array.isArray(params.studentId) ? params.studentId[0] : params.studentId;
 
   useEffect(() => {
-    if (assessmentId && studentId) {
-        const storedTeacherAssessments: TeacherAssessment[] = JSON.parse(localStorage.getItem('assessments') || '[]');
-        const foundAssessment = storedTeacherAssessments.find(a => a.id === assessmentId);
-
-        const allStudentResults: StudentResult[] = JSON.parse(localStorage.getItem('student_results') || '[]');
-        const foundStudentResult = allStudentResults.find(r => r.assessmentId === assessmentId && r.studentId === studentId);
-
-        if (foundAssessment && foundStudentResult) {
-            setAssessment(foundAssessment);
-            setStudent(foundStudentResult);
-        } else {
-            console.warn("Assessment or student result not found in localStorage. Redirecting.");
-            router.push('/teacher/dashboard');
-        }
-        setIsLoading(false);
+    if (authLoading) return;
+    if (!user) {
+        router.push('/');
+        return;
     }
-  }, [assessmentId, studentId, router]);
 
-  if (isLoading) {
+    if (assessmentId && resultId) {
+        const fetchResultData = async () => {
+            try {
+                const resultRef = doc(db, "results", resultId);
+                const resultSnap = await getDoc(resultRef);
+
+                if (!resultSnap.exists() || resultSnap.data().teacherUid !== user.uid) {
+                    notFound();
+                    return;
+                }
+                const resultData = { id: resultSnap.id, ...resultSnap.data() } as StudentResult;
+                setStudentResult(resultData);
+
+                const assessmentRef = doc(db, "assessments", resultData.assessmentId);
+                const assessmentSnap = await getDoc(assessmentRef);
+                if (assessmentSnap.exists()) {
+                    setAssessment({ id: assessmentSnap.id, ...assessmentSnap.data() } as TeacherAssessment);
+                } else {
+                    // Handle case where assessment is deleted but result still exists
+                    setAssessment({ id: resultData.assessmentId, title: resultData.assessmentTitle } as any);
+                }
+            } catch (error) {
+                console.error("Error fetching result data:", error);
+                notFound();
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchResultData();
+    }
+  }, [assessmentId, resultId, user, authLoading, router]);
+
+  if (isLoading || authLoading) {
     return (
       <div className="flex justify-center items-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -50,12 +74,12 @@ export default function StudentResultPage() {
     );
   }
 
-  if (!assessment || !student) {
+  if (!assessment || !studentResult) {
     return null; 
   }
 
   const noFeedbackMessage = "학생이 평가에 대해 남긴 피드백이 없습니다.";
-  const hasFeedback = student.studentFeedbackSummary && student.studentFeedbackSummary !== noFeedbackMessage;
+  const hasFeedback = studentResult.studentFeedbackSummary && studentResult.studentFeedbackSummary !== noFeedbackMessage;
   const isDialogue = assessment.assessmentType === 'dialogue';
 
   return (
@@ -63,11 +87,11 @@ export default function StudentResultPage() {
        <Card>
           <CardHeader className="flex-row items-center gap-4 space-y-0">
              <Avatar className="h-16 w-16">
-                <AvatarImage src={student.avatarUrl} alt={student.name} data-ai-hint="person portrait" />
-                <AvatarFallback>{student.name.charAt(0)}</AvatarFallback>
+                <AvatarImage src={studentResult.avatarUrl} alt={studentResult.name} data-ai-hint="person portrait" />
+                <AvatarFallback>{studentResult.name.charAt(0)}</AvatarFallback>
             </Avatar>
             <div>
-              <CardTitle className="text-2xl">{student.name} 학생 결과</CardTitle>
+              <CardTitle className="text-2xl">{studentResult.name} 학생 결과</CardTitle>
               <CardDescription>평가: <span className="font-semibold">{assessment.title}</span></CardDescription>
             </div>
           </CardHeader>
@@ -88,15 +112,15 @@ export default function StudentResultPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {student.studentRecordingDataUri && (
+                {studentResult.studentRecordingDataUri && (
                   <div>
-                    <audio controls src={student.studentRecordingDataUri} className="w-full">
+                    <audio controls src={studentResult.studentRecordingDataUri} className="w-full">
                       Your browser does not support the audio element.
                     </audio>
                   </div>
                 )}
                 <div className="text-sm p-4 bg-muted/50 rounded-lg font-mono whitespace-pre-wrap max-h-96 overflow-y-auto">
-                    {student.studentTranscript || "학생 답변이 기록되지 않았습니다."}
+                    {studentResult.studentTranscript || "학생 답변이 기록되지 않았습니다."}
                 </div>
               </CardContent>
             </Card>
@@ -107,7 +131,7 @@ export default function StudentResultPage() {
                 <CardDescription>학생의 성과에 기반한 AI 생성 초안입니다.</CardDescription>
               </CardHeader>
               <CardContent>
-                <Textarea readOnly value={student.curricularRemarks} className="h-48 bg-muted/50 font-mono text-sm whitespace-pre-wrap" />
+                <Textarea readOnly value={studentResult.curricularRemarks} className="h-48 bg-muted/50 font-mono text-sm whitespace-pre-wrap" />
                 <Button className="w-full mt-4">
                   <Paperclip className="mr-2 h-4 w-4" /> 생활기록부에 저장
                 </Button>
@@ -116,7 +140,7 @@ export default function StudentResultPage() {
         </div>
         
         <div className="space-y-6">
-            {student.pronunciationScore !== undefined && student.pronunciationFeedback && (
+            {studentResult.pronunciationScore !== undefined && studentResult.pronunciationFeedback && (
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -130,13 +154,13 @@ export default function StudentResultPage() {
                         <div className="w-full">
                             <div className="flex justify-between mb-1">
                                 <span className="text-base font-medium text-primary">발음 점수</span>
-                                <span className="text-sm font-medium text-primary">{student.pronunciationScore}%</span>
+                                <span className="text-sm font-medium text-primary">{studentResult.pronunciationScore}%</span>
                             </div>
-                            <Progress value={student.pronunciationScore} className="h-2" />
+                            <Progress value={studentResult.pronunciationScore} className="h-2" />
                         </div>
                     </div>
                     <div className="text-sm text-muted-foreground p-4 bg-muted/50 rounded-lg whitespace-pre-wrap">
-                        {student.pronunciationFeedback}
+                        {studentResult.pronunciationFeedback}
                     </div>
                 </CardContent>
               </Card>
@@ -149,7 +173,7 @@ export default function StudentResultPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-sm text-muted-foreground p-4 bg-muted/50 rounded-lg whitespace-pre-wrap">
-                    {student.teacherGuidance}
+                    {studentResult.teacherGuidance}
                   </div>
                 </CardContent>
               </Card>
@@ -161,7 +185,7 @@ export default function StudentResultPage() {
               </CardHeader>
               <CardContent>
                  <div className="text-sm text-muted-foreground p-4 bg-muted/50 rounded-lg italic">
-                    {hasFeedback ? student.studentFeedbackSummary : "피드백 없음"}
+                    {hasFeedback ? studentResult.studentFeedbackSummary : "피드백 없음"}
                  </div>
                 <Button variant="outline" className="w-full mt-4" disabled={!hasFeedback}>
                   <Download className="mr-2 h-4 w-4" /> 전체 피드백 다운로드

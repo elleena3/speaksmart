@@ -8,32 +8,50 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { useLanguage } from '@/context/language-context';
-import { type StudentResult, type TeacherAssessment } from '@/lib/types';
+import { type StudentResult } from '@/lib/types';
+import { useAuth } from '@/context/auth-context';
+import { useRouter } from 'next/navigation';
+import { db } from '@/lib/firebase';
+import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { Loader2 } from 'lucide-react';
 
 export default function HistoryPage() {
   const { t } = useLanguage();
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
   const [completedAssessments, setCompletedAssessments] = useState<StudentResult[]>([]);
-  const [assessmentTitles, setAssessmentTitles] = useState<{ [key: string]: string }>({});
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // This code runs only on the client, where localStorage is available.
-    const studentResults: StudentResult[] = JSON.parse(localStorage.getItem('student_results') || '[]');
-    const teacherAssessments: TeacherAssessment[] = JSON.parse(localStorage.getItem('assessments') || '[]');
+    if (authLoading) return;
+    if (!user) {
+        router.push('/');
+        return;
+    }
 
-    const validAssessmentIds = new Set(teacherAssessments.map(a => a.id));
-    const titleMap = teacherAssessments.reduce((acc, assessment) => {
-        acc[assessment.id] = assessment.title;
-        return acc;
-    }, {} as { [key: string]: string });
+    const fetchHistory = async () => {
+        setIsLoading(true);
+        try {
+            const q = query(
+                collection(db, "results"), 
+                where("studentId", "==", user.uid),
+                orderBy("createdAt", "desc")
+            );
+            const querySnapshot = await getDocs(q);
+            const results = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as StudentResult));
+            setCompletedAssessments(results);
+        } catch (error) {
+            console.error("Error fetching student history: ", error);
+        } finally {
+            setIsLoading(false);
+        }
+    }
 
-    const filteredResults = studentResults.filter(result => validAssessmentIds.has(result.assessmentId));
-    
-    setCompletedAssessments(filteredResults);
-    setAssessmentTitles(titleMap);
-  }, []);
+    fetchHistory();
+  }, [user, authLoading, router]);
 
-  const getAssessmentTitle = (assessment: StudentResult) => {
-    return assessmentTitles[assessment.assessmentId] || `평가 ID: ${assessment.assessmentId}`;
+  if (isLoading || authLoading) {
+    return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin"/></div>;
   }
 
   return (
@@ -55,8 +73,8 @@ export default function HistoryPage() {
             <TableBody>
                 {completedAssessments.length > 0 ? (
                     completedAssessments.map((assessment) => (
-                        <TableRow key={assessment.assessmentId}>
-                            <TableCell className="font-medium">{getAssessmentTitle(assessment)}</TableCell>
+                        <TableRow key={assessment.id}>
+                            <TableCell className="font-medium">{assessment.assessmentTitle}</TableCell>
                             <TableCell>{assessment.date}</TableCell>
                             <TableCell>
                                 <Badge variant="outline">{assessment.score}%</Badge>

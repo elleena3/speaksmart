@@ -21,9 +21,13 @@ import { useLanguage } from "@/context/language-context";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { scenarios, type TeacherAssessment } from "@/lib/types";
+import { useAuth } from "@/context/auth-context";
+import { db } from "@/lib/firebase";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 
 export default function NewAssessmentPage() {
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const { t, language } = useLanguage();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -78,10 +82,21 @@ export default function NewAssessmentPage() {
   const isFreeTalkDialogue = assessmentType === 'dialogue' && scenario === 'free-talk';
 
   useEffect(() => {
+    if (!authLoading && !user) {
+        router.push('/');
+    }
+  }, [user, authLoading, router]);
+
+  useEffect(() => {
     form.trigger();
   }, [language, form]);
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
+    if (!user) {
+        toast({ title: "인증 오류", description: "로그인이 필요합니다.", variant: "destructive" });
+        return;
+    }
+
     setIsSubmitting(true);
     
     let submissionValues = { ...values };
@@ -91,39 +106,40 @@ export default function NewAssessmentPage() {
         submissionValues.prompt = values.prompt || t.teacherAssessmentForm.freeTalkDefaults.prompt;
     }
 
-    // Use default expectedFormat for dialogue if it's empty
     if (submissionValues.assessmentType === 'dialogue' && !submissionValues.expectedFormat) {
         submissionValues.expectedFormat = "발음, 문법, 단어, 문장 등을 평가 주제에 맞게 종합적으로 판단.";
     }
     
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    const newAssessment: TeacherAssessment = {
-      id: new Date().getTime().toString(),
-      title: submissionValues.title,
-      topic: submissionValues.topic,
-      prompt: submissionValues.prompt,
-      expectedFormat: submissionValues.expectedFormat,
-      studentsCompleted: 0,
-      totalStudents: 20, 
-      averageScore: 0,
-      dateCreated: new Date().toISOString().split('T')[0],
-      startDate: submissionValues.startDate,
-      endDate: submissionValues.endDate,
-      assessmentType: submissionValues.assessmentType,
-      scenario: submissionValues.scenario,
-    };
+    try {
+        const newAssessmentData = {
+            ...submissionValues,
+            uid: user.uid,
+            studentsCompleted: 0,
+            totalStudents: 20, 
+            averageScore: 0,
+            dateCreated: new Date().toISOString().split('T')[0],
+            createdAt: Date.now(),
+        };
 
-    const existingAssessments: TeacherAssessment[] = JSON.parse(localStorage.getItem('assessments') || '[]');
-    localStorage.setItem('assessments', JSON.stringify([...existingAssessments, newAssessment]));
+        await addDoc(collection(db, "assessments"), newAssessmentData);
 
-    toast({
-      title: t.teacherAssessmentForm.createSuccessToast.title,
-      description: t.teacherAssessmentForm.createSuccessToast.description.replace('{title}', submissionValues.title),
-    });
+        toast({
+        title: t.teacherAssessmentForm.createSuccessToast.title,
+        description: t.teacherAssessmentForm.createSuccessToast.description.replace('{title}', submissionValues.title),
+        });
 
-    setIsSubmitting(false);
-    router.push("/teacher/assessments");
+        router.push("/teacher/assessments");
+
+    } catch (error) {
+        console.error("Error creating assessment: ", error);
+        toast({ title: "오류", description: "평가 생성에 실패했습니다.", variant: "destructive" });
+    } finally {
+        setIsSubmitting(false);
+    }
+  }
+
+  if (authLoading) {
+    return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin"/></div>
   }
 
   return (

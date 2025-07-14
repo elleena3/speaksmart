@@ -10,6 +10,8 @@ import { Send, ThumbsUp, ThumbsDown, MessageSquareQuote, Loader2, FileText, Targ
 import { summarizeStudentFeedback } from "@/ai/flows/summarize-student-feedback"
 import { type StudentResult } from "@/lib/types"
 import { Progress } from "@/components/ui/progress"
+import { db } from "@/lib/firebase"
+import { doc, updateDoc } from "firebase/firestore"
 
 type FeedbackViewProps = {
   result: StudentResult
@@ -22,7 +24,7 @@ export function FeedbackView({ result }: FeedbackViewProps) {
   const { toast } = useToast()
 
   const {
-    assessmentId,
+    id: resultId,
     assessmentTitle,
     aiFeedback,
     studentTranscript,
@@ -46,21 +48,18 @@ export function FeedbackView({ result }: FeedbackViewProps) {
     try {
       const { summary } = await summarizeStudentFeedback({ feedbackText: teacherFeedback });
 
-      // Update the student result in localStorage with the summarized feedback
-      const existingResults: StudentResult[] = JSON.parse(localStorage.getItem('student_results') || '[]');
-      const resultIndex = existingResults.findIndex(r => r.assessmentId === assessmentId);
-
-      if (resultIndex > -1) {
-        existingResults[resultIndex].studentFeedbackSummary = summary;
-        localStorage.setItem('student_results', JSON.stringify(existingResults));
-      }
+      const resultRef = doc(db, "results", resultId);
+      await updateDoc(resultRef, {
+        studentFeedbackSummary: summary
+      });
       
-      setIsSubmitting(false)
-      setTeacherFeedback("")
       toast({
         title: "피드백이 제출되었습니다!",
         description: "개선에 도움을 주셔서 감사합니다."
       })
+      setTeacherFeedback("");
+      // Optimistically update local state if needed, though a re-fetch would be more robust
+      result.studentFeedbackSummary = summary;
     } catch(error) {
         console.error("Error submitting feedback:", error);
         toast({
@@ -68,7 +67,8 @@ export function FeedbackView({ result }: FeedbackViewProps) {
             description: "피드백을 제출하는 중 문제가 발생했습니다.",
             variant: "destructive"
         })
-        setIsSubmitting(false);
+    } finally {
+      setIsSubmitting(false);
     }
   }
 

@@ -5,28 +5,24 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import Link from "next/link"
-import { type Assessment, type TeacherAssessment, type StudentResult } from "@/lib/types"
-import { CheckCircle2, MessageCircle, Mic } from "lucide-react"
+import { type TeacherAssessment, type StudentResult } from "@/lib/types"
+import { CheckCircle2, MessageCircle, Mic, Loader2 } from "lucide-react"
 import { useLanguage } from "@/context/language-context"
 import { useEffect, useState } from "react"
+import { useAuth } from "@/context/auth-context"
+import { db } from "@/lib/firebase"
+import { collection, query, where, getDocs, orderBy } from "firebase/firestore"
+import { useRouter } from "next/navigation"
 
-const initialAssessments: Assessment[] = [
-  { id: "free-talk-default", title: "자유 대화", topic: "AI와 자유롭게 대화하세요.", status: "할 일", assessmentType: "dialogue", scenario: "free-talk", prompt: "AI와 자유롭게 영어로 대화해 보세요. 준비가 되면 '대화 시작' 버튼을 누르세요." },
-  { id: "4", title: "7단원: 취미와 관심사", topic: "가장 좋아하는 취미에 대해 1분간 이야기하세요.", status: "할 일", assessmentType: "monologue", prompt: "가장 좋아하는 취미에 대해 이야기해주세요. 무엇인지, 왜 좋아하는지, 얼마나 자주 하는지 언급해야 합니다. 1분 동안 말할 시간이 주어집니다." },
-  { id: "3", title: "중간 말하기 시험", topic: "성적 및 피드백 검토", status: "채점 완료", assessmentType: "monologue", prompt: "" },
-  { id: "2", title: "6단원: 사람 묘사하기", topic: "성적 및 피드백 검토", status: "채점 완료", assessmentType: "monologue", prompt: "" },
-  { id: "1", title: "5단원: 나의 일과", topic: "성적 및 피드백 검토", status: "채점 완료", assessmentType: "monologue", prompt: "" },
-  { id: "free-talk-test", title: "자유 대화 테스트", topic: "1", status: "할 일", assessmentType: "dialogue", scenario: "free-talk", prompt: "자유 대화 테스트입니다. AI와 대화하세요." },
-];
+type CombinedAssessment = TeacherAssessment & {
+    status: '할 일' | '채점 완료';
+};
 
-const LOCAL_STORAGE_KEY_ASSESSMENTS = 'assessments';
-const LOCAL_STORAGE_KEY_RESULTS = 'student_results';
-
-function AssessmentCard({ assessment }: { assessment: Assessment }) {
+function AssessmentCard({ assessment }: { assessment: CombinedAssessment }) {
   const { t } = useLanguage();
   const isToDo = assessment.status === '할 일';
 
-  const getStatusText = (status: Assessment['status']) => {
+  const getStatusText = (status: CombinedAssessment['status']) => {
     switch (status) {
       case '할 일':
         return t.studentDashboard.status.todo;
@@ -37,7 +33,7 @@ function AssessmentCard({ assessment }: { assessment: Assessment }) {
     }
   }
   
-  const getBadgeVariant = (status: Assessment['status']) => {
+  const getBadgeVariant = (status: CombinedAssessment['status']) => {
     switch (status) {
       case '할 일':
         return 'destructive';
@@ -56,7 +52,7 @@ function AssessmentCard({ assessment }: { assessment: Assessment }) {
   const getLink = () => {
     if (!isToDo) return `/student/assessment/${assessment.id}/results`;
     if (assessment.assessmentType === 'dialogue') {
-      return `/student/assessment/free-talk?scenario=${assessment.scenario || 'free-talk'}&id=${assessment.id}`;
+      return `/student/assessment/free-talk?id=${assessment.id}`;
     }
     return `/student/assessment/${assessment.id}`;
   }
@@ -88,36 +84,54 @@ function AssessmentCard({ assessment }: { assessment: Assessment }) {
 
 export default function StudentDashboard() {
   const { t } = useLanguage();
-  const [allAssessments, setAllAssessments] = useState<Assessment[]>([]);
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
+  const [allAssessments, setAllAssessments] = useState<CombinedAssessment[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    try {
-      let assessmentsForStudent: TeacherAssessment[] = [];
-      const storedAssessments = localStorage.getItem(LOCAL_STORAGE_KEY_ASSESSMENTS);
-      
-      if (storedAssessments) {
-        assessmentsForStudent = JSON.parse(storedAssessments);
-      } else {
-        // If no assessments in local storage, use the initial/mock data.
-        assessmentsForStudent = initialAssessments;
-      }
-      
-      const studentResults: StudentResult[] = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY_RESULTS) || '[]');
-      const completedAssessmentIds = new Set(studentResults.map((r: any) => r.assessmentId));
+    if (!authLoading) {
+        if (!user) {
+            router.push('/');
+            return;
+        }
 
-      const combined = assessmentsForStudent.map(assessment => ({
-        ...assessment,
-        status: completedAssessmentIds.has(assessment.id) ? '채점 완료' : '할 일',
-      }));
-      
-      setAllAssessments(combined as Assessment[]);
-      
-    } catch (error) {
-      console.error("Failed to load assessments from localStorage", error);
-      // Fallback to initial data on error
-      setAllAssessments(initialAssessments); 
+        const fetchAssessments = async () => {
+            try {
+                // Fetch all assessments (in a real app, you'd filter this for the student's class)
+                const assessmentsQuery = query(collection(db, "assessments"), orderBy("createdAt", "desc"));
+                const assessmentsSnapshot = await getDocs(assessmentsQuery);
+                const teacherAssessments = assessmentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TeacherAssessment));
+                
+                // Fetch this student's results
+                const resultsQuery = query(collection(db, "results"), where("studentId", "==", user.uid));
+                const resultsSnapshot = await getDocs(resultsQuery);
+                const completedAssessmentIds = new Set(resultsSnapshot.docs.map(doc => doc.data().assessmentId));
+
+                const combined = teacherAssessments.map(assessment => ({
+                    ...assessment,
+                    status: completedAssessmentIds.has(assessment.id) ? '채점 완료' : '할 일',
+                }));
+                
+                setAllAssessments(combined);
+            } catch (error) {
+                console.error("Failed to load assessments from Firestore", error);
+            } finally {
+                setIsLoading(false);
+            }
+        }
+        
+        fetchAssessments();
     }
-  }, []);
+  }, [user, authLoading, router]);
+
+  if (authLoading || isLoading) {
+    return (
+        <div className="flex justify-center items-center h-64">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -127,9 +141,14 @@ export default function StudentDashboard() {
       </div>
 
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {allAssessments.map((assessment) => (
+        {allAssessments.length > 0 ? allAssessments.map((assessment) => (
           <AssessmentCard key={assessment.id} assessment={assessment} />
-        ))}
+        )) : (
+            <div className="col-span-full text-center py-12 border-2 border-dashed rounded-lg">
+                <h3 className="text-lg font-medium text-muted-foreground">할당된 평가 없음</h3>
+                <p className="text-sm text-muted-foreground mt-1">현재 참여할 수 있는 평가가 없습니다.</p>
+            </div>
+        )}
       </div>
     </div>
   )

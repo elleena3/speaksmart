@@ -9,11 +9,11 @@ import { useToast } from "@/hooks/use-toast"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { converseWithStudent } from "@/ai/flows/text-to-speech"
 import { type ConversationTurn } from "@/lib/types/ai-schemas";
-import { type Scenario } from "@/lib/types";
+import { type Scenario, type TeacherAssessment } from "@/lib/types";
 
 const SESSION_STORAGE_KEY = 'freeTalkConversationHistory';
 
-export function FreeTalkView({ scenario, scenarioPrompt, assessmentId }: { scenario: Scenario, scenarioPrompt?: string, assessmentId?: string | null }) {
+export function FreeTalkView({ scenario, scenarioPrompt, assessment }: { scenario: Scenario, scenarioPrompt?: string, assessment: TeacherAssessment }) {
   const [sessionState, setSessionState] = useState<"idle" | "initializing" | "recording" | "processing" | "speaking" | "waiting_for_user">("idle");
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
   const [interimTranscript, setInterimTranscript] = useState<string | null>(null);
@@ -26,7 +26,7 @@ export function FreeTalkView({ scenario, scenarioPrompt, assessmentId }: { scena
   const { toast } = useToast();
 
   useEffect(() => {
-    // Clear history when component mounts
+    // Clear history when component mounts for a clean start
     sessionStorage.removeItem(SESSION_STORAGE_KEY);
   }, []);
 
@@ -157,14 +157,13 @@ export function FreeTalkView({ scenario, scenarioPrompt, assessmentId }: { scena
     reader.onloadend = () => {
         const studentRecordingDataUri = reader.result as string;
         
-        // Store the final transcript and the combined audio in session storage
         sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({ 
             history: conversation,
-            studentRecordingDataUri: studentRecordingDataUri
+            studentRecordingDataUri: studentRecordingDataUri,
+            assessment: assessment, // Pass the full assessment object
         }));
         
-        const url = assessmentId ? `/student/assessment/free-talk/results?id=${assessmentId}` : '/student/assessment/free-talk/results';
-        router.push(url);
+        router.push(`/student/assessment/free-talk/results`);
     };
   }
 
@@ -227,7 +226,7 @@ export function FreeTalkView({ scenario, scenarioPrompt, assessmentId }: { scena
             );
         default:
             return (
-                <Button onClick={handleFinishSession} variant="secondary" disabled={isBusy || conversation.length === 0}>
+                <Button onClick={handleFinishSession} variant="secondary" disabled={isBusy || conversation.length <= 1}>
                     <CornerDownLeft className="mr-2 h-5 w-5"/>
                     대화 종료
                 </Button>

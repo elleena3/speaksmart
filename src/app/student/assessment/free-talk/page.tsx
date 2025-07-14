@@ -3,71 +3,66 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { FreeTalkView } from "./free-talk-view"
-import { useSearchParams } from "next/navigation"
-import { type Scenario } from "@/lib/types"
+import { useSearchParams, useRouter, notFound } from "next/navigation"
+import { type Scenario, type TeacherAssessment } from "@/lib/types"
 import { useEffect, useState } from "react"
-
-type Details = { 
-  id?: string;
-  title: string; 
-  prompt: string; 
-  scenario: Scenario;
-} | null;
-
-
-const mockAssessmentDetails: { [key: string]: { title: string; prompt: string; scenario: Scenario, id?: string } } = {
-  "free-talk": {
-    id: "free-talk-default",
-    title: "자유 대화",
-    prompt: "AI와 자유롭게 영어로 대화해 보세요. 준비가 되면 '대화 시작' 버튼을 누르세요.",
-    scenario: "free-talk"
-  },
-  "ordering-food": {
-    title: "상황극: 음식 주문하기",
-    prompt: "당신은 손님입니다. AI 종업원에게 음식을 주문하세요.",
-    scenario: "ordering-food"
-  },
-  "airport-check-in": {
-    title: "상황극: 공항 체크인",
-    prompt: "당신은 승객입니다. AI 항공사 직원에게 체크인을 하세요.",
-    scenario: "airport-check-in"
-  },
-  "shopping": {
-    title: "상황극: 쇼핑하기",
-    prompt: "당신은 손님입니다. AI 상점 직원에게 원하는 물건에 대해 질문하고 구매하세요.",
-    scenario: "shopping"
-  },
-}
+import { useAuth } from "@/context/auth-context"
+import { doc, getDoc } from "firebase/firestore"
+import { db } from "@/lib/firebase"
+import { Loader2 } from "lucide-react"
 
 export default function FreeTalkPage() {
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
   const searchParams = useSearchParams();
-  const [details, setDetails] = useState<Details>(null);
+  const [details, setDetails] = useState<TeacherAssessment | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const assessmentId = searchParams.get('id');
 
   useEffect(() => {
-    // This effect runs only on the client, after the component has mounted.
-    const scenario = (searchParams.get('scenario') as Scenario) || 'free-talk';
-    const assessmentId = searchParams.get('id');
+    if (authLoading) return;
+    if (!user) {
+        router.push('/');
+        return;
+    }
 
-    if (assessmentId) {
-        // localStorage is safe to access here.
-        const storedAssessments = JSON.parse(localStorage.getItem('assessments') || '[]');
-        const found = storedAssessments.find((a: any) => a.id === assessmentId);
-        if (found) {
-            setDetails(found);
-            return;
+    const fetchDetails = async () => {
+        if (assessmentId) {
+            const docRef = doc(db, "assessments", assessmentId);
+            const docSnap = await getDoc(docRef);
+
+            if (docSnap.exists()) {
+                setDetails({ id: docSnap.id, ...docSnap.data() } as TeacherAssessment);
+            } else {
+                notFound();
+            }
+        } else {
+            // This is a generic free-talk practice, not tied to a specific assessment
+            setDetails({
+                id: "free-talk-practice",
+                uid: "system",
+                title: "자유 대화 연습",
+                prompt: "AI와 자유롭게 영어로 대화해 보세요. 이 대화는 저장되지 않습니다.",
+                assessmentType: "dialogue",
+                scenario: "free-talk"
+            } as any);
         }
+        setIsLoading(false);
     }
     
-    // Fallback to mock data if not found in local storage or no ID
-    const mockData = Object.values(mockAssessmentDetails).find(d => d.scenario === scenario);
-    setDetails(mockData || mockAssessmentDetails['free-talk']);
+    fetchDetails();
 
-  }, [searchParams]);
+  }, [searchParams, user, authLoading, router, assessmentId]);
 
+
+  if (isLoading || authLoading) {
+    return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin"/></div>; 
+  }
 
   if (!details) {
-    // Render a loading state on the server and during initial client render.
-    return <div>Loading...</div>; 
+    notFound();
+    return null;
   }
 
   return (
@@ -78,7 +73,11 @@ export default function FreeTalkPage() {
           <CardDescription>{details.prompt}</CardDescription>
         </CardHeader>
         <CardContent>
-          <FreeTalkView scenario={details.scenario} scenarioPrompt={details.prompt} assessmentId={details.id} />
+          <FreeTalkView 
+            scenario={details.scenario!} 
+            scenarioPrompt={details.prompt} 
+            assessment={details} 
+          />
         </CardContent>
       </Card>
     </div>

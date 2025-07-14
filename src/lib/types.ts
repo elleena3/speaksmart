@@ -11,24 +11,21 @@ export type Assessment = {
   status: '할 일' | '완료' | '채점 완료';
   assessmentType: 'monologue' | 'dialogue';
   scenario?: Scenario;
+  // Firestore fields
+  uid?: string; // Teacher's UID
+  createdAt?: number; 
 };
 
 export type Student = {
-  id: string;
+  id: string; // Corresponds to Firebase Auth UID
   name: string;
   avatar: string;
-};
-
-export type Submission = {
-  studentId: string;
-  assessmentId: string;
-  score?: number;
-  status: '제출' | '채점 완료';
-  date: string;
+  email: string;
 };
 
 export type TeacherAssessment = {
-  id: string;
+  id: string; // Firestore document ID
+  uid: string; // Teacher's UID
   title: string;
   topic: string;
   prompt: string;
@@ -41,19 +38,22 @@ export type TeacherAssessment = {
   assessmentType: 'monologue' | 'dialogue';
   scenario?: Scenario;
   expectedFormat?: string;
+  // For Firestore timestamp
+  createdAt: number;
 };
 
-// Add conversation history type to be stored in localStorage
+// Add conversation history type to be stored in localStorage/sessionStorage
 export type ConversationHistory = {
   history: ConversationTurn[];
   studentRecordingDataUri?: string;
 }
 
 export type StudentResult = {
-  studentId: string;
+  id: string; // Firestore document ID
+  studentId: string; // Student's UID
   assessmentId: string;
-  assessmentTitle: string; // Add assessment title
-  name: string;
+  assessmentTitle: string; 
+  name: string; // Student's display name
   avatarUrl: string;
   status: "채점 완료";
   score: number;
@@ -66,4 +66,6 @@ export type StudentResult = {
   studentRecordingDataUri?: string;
   pronunciationScore?: number;
   pronunciationFeedback?: string;
+  teacherUid: string; // To query results by teacher
+  createdAt: number;
 }

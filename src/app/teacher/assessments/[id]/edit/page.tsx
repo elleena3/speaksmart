@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useRouter, useParams } from "next/navigation";
+import { useRouter, useParams, notFound } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, CalendarIcon } from "lucide-react";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
@@ -21,18 +21,14 @@ import { useLanguage } from "@/context/language-context";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { scenarios, type TeacherAssessment } from "@/lib/types";
-
-// Mock data for demonstration. In a real app, you'd fetch this from your database.
-const mockAssessments: { [key: string]: { title: string; topic: string; prompt: string; expectedFormat?: string; startDate?: Date; endDate?: Date, assessmentType: "monologue" | "dialogue", scenario?: typeof scenarios[number] } } = {
-  "1": { title: "5단원: 나의 일과", topic: "당신의 일반적인 하루에 대해 이야기하세요.", prompt: "아침에 일어나서 밤에 잠자리에 들 때까지 당신의 일과를 설명해주세요.", expectedFormat: "현재 시제를 사용하고 시간 표현을 포함해야 합니다.", assessmentType: "monologue" },
-  "2": { title: "6단원: 사람 묘사하기", topic: "가족 구성원을 묘사하세요.", prompt: "가족 중 한 명을 선택하여 외모와 성격을 묘사해주세요.", expectedFormat: "형용사를 사용하여 외모와 성격을 자세히 묘사해야 합니다.", assessmentType: "monologue" },
-  "3": { title: "중간 말하기 시험", topic: "지난 주말에 한 일에 대해 이야기하세요.", prompt: "지난 주말에 있었던 일에 대해 구체적으로 설명해주세요.", expectedFormat: "과거 시제를 정확하게 사용해야 합니다.", assessmentType: "monologue" },
-  "4": { title: "7단원: 취미와 관심사", topic: "가장 좋아하는 취미에 대해 1분간 이야기하세요.", prompt: "가장 좋아하는 취미에 대해 이야기해주세요. 무엇인지, 왜 좋아하는지, 얼마나 자주 하는지 언급해야 합니다.", expectedFormat: "학생은 취미를 소개하고, 좋아하는 이유를 제시하며, 빈도를 언급해야 합니다.", startDate: new Date("2024-06-01"), endDate: new Date("2024-06-07"), assessmentType: "monologue" },
-};
+import { useAuth } from "@/context/auth-context";
+import { db } from "@/lib/firebase";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
 
 export default function EditAssessmentPage() {
   const router = useRouter();
   const params = useParams();
+  const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const { t, language } = useLanguage();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -89,38 +85,47 @@ export default function EditAssessmentPage() {
   const scenario = form.watch("scenario");
   const isFreeTalkDialogue = assessmentType === 'dialogue' && scenario === 'free-talk';
 
-  useEffect(() => {
-    if (assessmentId) {
-      const storedAssessments = JSON.parse(localStorage.getItem('assessments') || '[]');
-      let assessmentData = storedAssessments.find((a: any) => a.id === assessmentId);
+  const fetchAssessment = useCallback(async () => {
+    if (!user || !assessmentId) return;
+    try {
+      const assessmentRef = doc(db, "assessments", assessmentId);
+      const docSnap = await getDoc(assessmentRef);
 
-      if(!assessmentData){
-        assessmentData = mockAssessments[assessmentId as keyof typeof mockAssessments];
-      }
-
-      if (assessmentData) {
+      if (docSnap.exists() && docSnap.data().uid === user.uid) {
+        const data = docSnap.data();
         form.reset({
-            ...assessmentData,
-            startDate: assessmentData.startDate ? new Date(assessmentData.startDate) : undefined,
-            endDate: assessmentData.endDate ? new Date(assessmentData.endDate) : undefined,
+          ...data,
+          startDate: data.startDate?.toDate(),
+          endDate: data.endDate?.toDate(),
         });
       } else {
-        toast({
-          title: "Error",
-          description: "Assessment data not found.",
-          variant: "destructive"
-        })
+        toast({ title: "오류", description: "평가를 찾을 수 없거나 접근 권한이 없습니다.", variant: "destructive" });
         router.push("/teacher/assessments");
       }
-      setIsLoading(false);
+    } catch (error) {
+      console.error("Error fetching assessment:", error);
+      toast({ title: "오류", description: "평가 정보를 불러오는 데 실패했습니다.", variant: "destructive" });
+    } finally {
+        setIsLoading(false);
     }
-  }, [assessmentId, form, router, toast]);
+  }, [assessmentId, user, form, router, toast]);
+
+  useEffect(() => {
+    if (!authLoading) {
+      if (!user) {
+        router.push('/');
+      } else {
+        fetchAssessment();
+      }
+    }
+  }, [user, authLoading, router, fetchAssessment]);
 
   useEffect(() => {
     form.trigger();
   }, [language, form]);
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
+    if (!user || !assessmentId) return;
     setIsSubmitting(true);
     
     let submissionValues = { ...values };
@@ -135,47 +140,23 @@ export default function EditAssessmentPage() {
         submissionValues.expectedFormat = "발음, 문법, 단어, 문장 등을 평가 주제에 맞게 종합적으로 판단.";
     }
 
-    console.log(`Updating assessment ${assessmentId} with values:`, submissionValues);
-    await new Promise(resolve => setTimeout(resolve, 1500));
-
-    const storedAssessments = localStorage.getItem('assessments');
-    let assessments: any[] = storedAssessments ? JSON.parse(storedAssessments) : [];
-    const assessmentIndex = assessments.findIndex(a => a.id === assessmentId);
-
-    if (assessmentIndex > -1) {
-      assessments[assessmentIndex] = { ...assessments[assessmentIndex], ...submissionValues };
-    } else {
-        // This case handles editing mock assessments that are not yet in localStorage
-        const initialIndex = Object.keys(mockAssessments).indexOf(assessmentId);
-        if (initialIndex > -1) {
-            // It's a mock assessment, add it to our localStorage array to persist the edit.
-             assessments.push({
-                id: assessmentId,
-                studentsCompleted: 0,
-                totalStudents: 20,
-                averageScore: 0,
-                dateCreated: new Date().toISOString().split('T')[0],
-                ...submissionValues
-             });
-        } else {
-             toast({ title: "Error", description: "Could not find assessment to update.", variant: "destructive" });
-             setIsSubmitting(false);
-             return;
-        }
+    try {
+        const assessmentRef = doc(db, "assessments", assessmentId);
+        await updateDoc(assessmentRef, submissionValues as any);
+        toast({
+          title: t.teacherAssessmentForm.editSuccessToast.title,
+          description: t.teacherAssessmentForm.editSuccessToast.description.replace('{title}', submissionValues.title),
+        });
+        router.push("/teacher/assessments");
+    } catch (error) {
+        console.error("Error updating assessment:", error);
+        toast({ title: "오류", description: "평가 업데이트에 실패했습니다.", variant: "destructive" });
+    } finally {
+        setIsSubmitting(false);
     }
-
-    localStorage.setItem('assessments', JSON.stringify(assessments));
-
-    toast({
-      title: t.teacherAssessmentForm.editSuccessToast.title,
-      description: t.teacherAssessmentForm.editSuccessToast.description.replace('{title}', submissionValues.title),
-    });
-
-    setIsSubmitting(false);
-    router.push("/teacher/assessments");
   }
 
-  if (isLoading) {
+  if (isLoading || authLoading) {
     return (
         <div className="flex items-center justify-center h-64">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
