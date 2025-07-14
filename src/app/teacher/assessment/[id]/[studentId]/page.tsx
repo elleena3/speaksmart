@@ -21,7 +21,7 @@ export default function StudentResultPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   const assessmentId = Array.isArray(params.id) ? params.id[0] : params.id;
-  const studentId = Array.isArray(params.studentId) ? params.studentId[0] : params.studentId;
+  const studentId = Array.isArray(params.studentId) ? params.studentId[0] : params.id;
 
   useEffect(() => {
     if (assessmentId && studentId) {
@@ -83,12 +83,12 @@ export default function StudentResultPage() {
                 </CardTitle>
                 <CardDescription>
                   {isDialogue 
-                    ? "학생과 AI의 전체 대화 내용입니다." 
+                    ? "학생과 AI의 전체 대화 내용과 학생 발화 녹음입니다." 
                     : "학생의 실제 답변 텍스트와 녹음 파일입니다."}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {!isDialogue && student.studentRecordingDataUri && (
+                {student.studentRecordingDataUri && (
                   <div>
                     <audio controls src={student.studentRecordingDataUri} className="w-full">
                       Your browser does not support the audio element.
