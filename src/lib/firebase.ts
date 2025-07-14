@@ -6,17 +6,16 @@ import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 // ====================================================================
-// 중요: 여기에 Firebase 프로젝트의 실제 설정 값을 직접 입력해주세요.
-// Firebase 콘솔 -> 프로젝트 설정 -> 일반 탭에서 찾을 수 있습니다.
-// YOUR_..._HERE 부분을 실제 값으로 교체해야 합니다.
+// 중요: 새 Firebase 프로젝트의 설정 값으로 이 부분을 교체해야 합니다.
+// 아래 값들은 문제가 발생했던 이전 프로젝트의 설정입니다.
 // ====================================================================
 export const firebaseConfig = {
-  apiKey: "AIzaSyAX4QXJaFvRGm0pLLk8n6PdFW5bY_QkJNg",
-  authDomain: "speaksmart-evaluator.firebaseapp.com",
-  projectId: "speaksmart-evaluator",
-  storageBucket: "speaksmart-evaluator.appspot.com",
-  messagingSenderId: "467932902885",
-  appId: "1:467932902885:web:713b072c717516dea72b0c"
+  apiKey: "YOUR_NEW_API_KEY",
+  authDomain: "YOUR_NEW_PROJECT_ID.firebaseapp.com",
+  projectId: "YOUR_NEW_PROJECT_ID",
+  storageBucket: "YOUR_NEW_PROJECT_ID.appspot.com",
+  messagingSenderId: "YOUR_NEW_MESSAGING_SENDER_ID",
+  appId: "YOUR_NEW_APP_ID"
 };
 
 
@@ -28,7 +27,7 @@ if (!getApps().length) {
   if (!firebaseConfig.apiKey || firebaseConfig.apiKey.includes('YOUR_')) {
     // 유효하지 않은 설정일 경우, 초기화하지 않습니다.
     // 이 상태는 auth-context.tsx에서 감지하여 사용자에게 안내 메시지를 보여줍니다.
-    console.error("Firebase config is missing or incomplete in src/lib/firebase.ts");
+    console.error("Firebase config is missing or incomplete in src/lib/firebase.ts. Please add your new project's configuration.");
   } else {
     app = initializeApp(firebaseConfig);
   }
