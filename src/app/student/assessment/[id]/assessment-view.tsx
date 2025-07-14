@@ -196,11 +196,16 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
         };
         await setDoc(newResultRef, initialResultData);
         
+        // 1. Upload audio file to Storage first.
         const audioFileName = `recordings/${user.uid}_${assessmentDetails.id}_${Date.now()}.webm`;
         const storageRef = ref(storage, audioFileName);
         await uploadBytes(storageRef, audioBlob);
         const downloadURL = await getDownloadURL(storageRef);
-        
+
+        // Update status after upload and store the URL
+        await updateStatus("텍스트 변환 중", 25, { studentRecordingDataUri: downloadURL });
+
+        // 2. Run the analysis flow.
         const analysisResult = await generateSpeakingAnalysis({
             studentRecordingDataUri,
             activityPrompt: assessmentDetails.prompt,
@@ -208,8 +213,9 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
             studentName: user.displayName || "Student",
             assessmentTitle: assessmentDetails.title.replace(/ - 복사본(\s\d+)?$/, ''),
         }, (status, progress) => updateStatus(status as ResultStatus, progress));
-
-        const finalResultData: Omit<StudentResult, 'id' | 'status' | 'progress'> = {
+        
+        // 3. Store the final result.
+        const finalResultData: Omit<StudentResult, 'id' | 'status' | 'progress' | 'studentRecordingDataUri'> = {
             studentId: user.uid,
             assessmentId: assessmentDetails.id,
             assessmentTitle: assessmentDetails.title,
@@ -223,7 +229,6 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
             studentFeedbackSummary: "학생이 평가에 대해 남긴 피드백이 없습니다.",
             teacherGuidance: analysisResult.teacherGuidance,
             studentTranscript: analysisResult.studentTranscript,
-            studentRecordingDataUri: downloadURL,
             pronunciationScore: analysisResult.pronunciationScore,
             pronunciationFeedback: analysisResult.pronunciationFeedback,
             teacherUid: assessmentDetails.uid,
