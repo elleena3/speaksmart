@@ -80,14 +80,9 @@ export default function StudentResultPage() {
     try {
         const { default: jsPDF } = await import('jspdf');
         const { default: autoTable } = await import('jspdf-autotable');
-        const { NanumGothicFont } = await import('@/lib/fonts/nanum-gothic-for-jspdf');
         
         const docPDF = new jsPDF();
         
-        docPDF.addFileToVFS("NanumGothic.ttf", NanumGothicFont);
-        docPDF.addFont("NanumGothic.ttf", "NanumGothic", "normal");
-        docPDF.setFont("NanumGothic");
-
         const margin = 15;
         
         docPDF.setFontSize(22);
@@ -125,7 +120,8 @@ export default function StudentResultPage() {
         let finalY = (docPDF as any).lastAutoTable.finalY || 100;
 
         const addSection = (title: string, content: string, startY: number): number => {
-            if (startY > 260) { 
+            const pageHeight = docPDF.internal.pageSize.height;
+            if (startY > pageHeight - 40) { // check for space before adding content
                 docPDF.addPage();
                 startY = 20;
             }
@@ -137,12 +133,17 @@ export default function StudentResultPage() {
             
             const splitContent = docPDF.splitTextToSize(content || "내용 없음", 180);
             const lineHeight = docPDF.getLineHeight() / docPDF.getPointScale();
-            const numLines = splitContent.length;
-            const contentHeight = (lineHeight * numLines);
+            const contentHeight = splitContent.length * lineHeight;
 
-            if (startY + 8 + contentHeight > 280) { 
+            if (startY + 8 + contentHeight > pageHeight - 20) { // check for space including content
                 docPDF.addPage();
                 startY = 20;
+                // re-add title on new page
+                docPDF.setFontSize(14);
+                docPDF.setTextColor(0);
+                docPDF.text(title, margin, startY);
+                docPDF.setFontSize(10);
+                docPDF.setTextColor(100);
             }
 
             docPDF.text(splitContent, margin, startY + 8);
