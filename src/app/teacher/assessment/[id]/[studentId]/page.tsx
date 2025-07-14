@@ -13,9 +13,8 @@ import { Progress } from "@/components/ui/progress";
 import { useAuth } from "@/context/auth-context";
 import { db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
-import jsPDF from "jspdf";
-import autoTable from 'jspdf-autotable';
-import { NotoSansKRFont } from '@/lib/fonts/noto-sans-kr';
+import { useToast } from "@/hooks/use-toast";
+
 
 export default function StudentResultPage() {
   const params = useParams();
@@ -24,6 +23,8 @@ export default function StudentResultPage() {
   const [assessment, setAssessment] = useState<TeacherAssessment | null>(null);
   const [studentResult, setStudentResult] = useState<StudentResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const { toast } = useToast();
 
   const assessmentId = Array.isArray(params.id) ? params.id[0] : params.id;
   const resultId = Array.isArray(params.studentId) ? params.studentId[0] : params.studentId;
@@ -37,6 +38,7 @@ export default function StudentResultPage() {
 
     if (assessmentId && resultId) {
         const fetchResultData = async () => {
+            setIsLoading(true);
             try {
                 const resultRef = doc(db, "results", resultId);
                 const resultSnap = await getDoc(resultRef);
@@ -53,10 +55,12 @@ export default function StudentResultPage() {
                 if (assessmentSnap.exists()) {
                     setAssessment({ id: assessmentSnap.id, ...assessmentSnap.data() } as TeacherAssessment);
                 } else {
+                    // Fallback if assessment is deleted but result remains
                     setAssessment({ id: resultData.assessmentId, title: resultData.assessmentTitle } as any);
                 }
             } catch (error) {
                 console.error("Error fetching result data:", error);
+                toast({ title: "오류", description: "결과를 불러오는 중 오류가 발생했습니다.", variant: "destructive" });
                 notFound();
             } finally {
                 setIsLoading(false);
@@ -65,68 +69,96 @@ export default function StudentResultPage() {
 
         fetchResultData();
     }
-  }, [assessmentId, resultId, user, authLoading, router]);
+  }, [assessmentId, resultId, user, authLoading, router, toast]);
 
-  const handleDownloadReport = () => {
+  const handleDownloadReport = async () => {
     if (!studentResult || !assessment) return;
 
-    const docPDF = new jsPDF();
-    const margin = 15;
-    
-    // Add Korean font
-    docPDF.addFileToVFS("NotoSansKR-Regular.ttf", NotoSansKRFont);
-    docPDF.addFont("NotoSansKR-Regular.ttf", "NotoSansKR", "normal");
-    docPDF.setFont("NotoSansKR");
+    setIsDownloading(true);
+    toast({ title: "리포트 생성 중...", description: "PDF 파일을 준비하고 있습니다." });
 
+    try {
+        // Dynamically import libraries and font
+        const { default: jsPDF } = await import('jspdf');
+        const { default: autoTable } = await import('jspdf-autotable');
+        const { NotoSansKRFont } = await import('@/lib/fonts/noto-sans-kr');
 
-    docPDF.setFontSize(22);
-    docPDF.text('학생 리포트', margin, 20);
-    docPDF.setFontSize(12);
-    docPDF.setTextColor(100);
-    docPDF.text(`${studentResult.name} 학생 - ${assessment.title}`, margin, 30);
+        const docPDF = new jsPDF();
+        const margin = 15;
+        
+        docPDF.addFileToVFS("NotoSansKR-Regular.ttf", NotoSansKRFont);
+        docPDF.addFont("NotoSansKR-Regular.ttf", "NotoSansKR", "normal");
+        docPDF.setFont("NotoSansKR");
 
-    const isDialogue = assessment.assessmentType === 'dialogue';
+        docPDF.setFontSize(22);
+        docPDF.text('학생 리포트', margin, 20);
+        docPDF.setFontSize(12);
+        docPDF.setTextColor(100);
+        docPDF.text(`${studentResult.name} 학생 - ${assessment.title}`, margin, 30);
 
-    autoTable(docPDF, {
-      startY: 40,
-      head: [['항목', '세부 내용']],
-      body: [
-        ['학생 이름', studentResult.name],
-        ['평가명', assessment.title],
-        ['유형', isDialogue ? 'AI와 대화하기' : '혼자 말하기'],
-        ['제출일', studentResult.date],
-        ['내용 점수', `${studentResult.score}%`],
-        ['발음 점수', `${studentResult.pronunciationScore ?? 0}%`],
-      ],
-      theme: 'grid',
-      styles: { font: "NotoSansKR", fontSize: 10 },
-      headStyles: { fontStyle: 'bold', fillColor: [41, 128, 185], textColor: 255 }
-    });
+        const isDialogue = assessment.assessmentType === 'dialogue';
 
-    const finalY = (docPDF as any).lastAutoTable.finalY || 100;
+        autoTable(docPDF, {
+            startY: 40,
+            head: [['항목', '세부 내용']],
+            body: [
+                ['학생 이름', studentResult.name],
+                ['평가명', assessment.title],
+                ['유형', isDialogue ? 'AI와 대화하기' : '혼자 말하기'],
+                ['제출일', studentResult.date],
+                ['내용 점수', `${studentResult.score}%`],
+                ['발음 점수', `${studentResult.pronunciationScore ?? 0}%`],
+            ],
+            theme: 'grid',
+            styles: { font: "NotoSansKR", fontSize: 10 },
+            headStyles: { fontStyle: 'bold', fillColor: [41, 128, 185], textColor: 255 }
+        });
 
-    const addSection = (title: string, content: string, startY: number) => {
-      docPDF.setFontSize(14);
-      docPDF.setTextColor(0);
-      docPDF.text(title, margin, startY);
-      docPDF.setFontSize(10);
-      docPDF.setTextColor(100);
-      const splitContent = docPDF.splitTextToSize(content || "내용 없음", 180);
-      docPDF.text(splitContent, margin, startY + 8);
-      const contentHeight = docPDF.getTextDimensions(splitContent).h;
-      return startY + contentHeight + 15;
-    };
+        let finalY = (docPDF as any).lastAutoTable.finalY || 100;
 
-    let currentY = finalY + 10;
-    currentY = addSection('AI 피드백 (학생용)', studentResult.aiFeedback, currentY);
-    currentY = addSection('발음 분석', studentResult.pronunciationFeedback || 'N/A', currentY);
-    currentY = addSection(isDialogue ? '전체 대화 기록' : '답변 내용', studentResult.studentTranscript || '기록 없음', currentY);
-    currentY = addSection('교과과정 비고 초안', studentResult.curricularRemarks, currentY);
-    currentY = addSection('선생님을 위한 조언', studentResult.teacherGuidance, currentY);
-    addSection('학생 피드백 요약', studentResult.studentFeedbackSummary, currentY);
+        const addSection = (title: string, content: string, startY: number): number => {
+            if (startY > 260) { // Check if new page is needed
+                docPDF.addPage();
+                startY = 20;
+            }
+            docPDF.setFontSize(14);
+            docPDF.setTextColor(0);
+            docPDF.text(title, margin, startY);
+            docPDF.setFontSize(10);
+            docPDF.setTextColor(100);
+            
+            const splitContent = docPDF.splitTextToSize(content || "내용 없음", 180);
+            const lineHeight = docPDF.getLineHeight() / docPDF.getFontSize();
+            const contentHeight = splitContent.length * docPDF.getFontSize() * lineHeight;
 
+            if (startY + 8 + contentHeight > 280) { // Check if content fits on the page
+                docPDF.addPage();
+                startY = 20;
+            }
 
-    docPDF.save(`${studentResult.name}_${assessment.title}_Report.pdf`);
+            docPDF.text(splitContent, margin, startY + 8);
+            return startY + contentHeight + 15;
+        };
+
+        let currentY = finalY + 10;
+        currentY = addSection('AI 피드백 (학생용)', studentResult.aiFeedback, currentY);
+        currentY = addSection('발음 분석', studentResult.pronunciationFeedback || 'N/A', currentY);
+        currentY = addSection(isDialogue ? '전체 대화 기록' : '답변 내용', studentResult.studentTranscript || '기록 없음', currentY);
+        currentY = addSection('교과과정 비고 초안', studentResult.curricularRemarks, currentY);
+        currentY = addSection('선생님을 위한 조언', studentResult.teacherGuidance, currentY);
+        addSection('학생 피드백 요약', studentResult.studentFeedbackSummary, currentY);
+        
+        // Use a safe filename
+        const safeFileName = `report_${studentResult.studentId}_${assessmentId}.pdf`;
+        docPDF.save(safeFileName);
+
+        toast({ title: "성공", description: "리포트 다운로드가 시작되었습니다." });
+    } catch (error) {
+        console.error("Error generating PDF report:", error);
+        toast({ title: "오류", description: "PDF 리포트 생성에 실패했습니다.", variant: "destructive" });
+    } finally {
+        setIsDownloading(false);
+    }
   };
   
   if (isLoading || authLoading) {
@@ -158,9 +190,13 @@ export default function StudentResultPage() {
               <CardDescription>평가: <span className="font-semibold">{assessment.title}</span></CardDescription>
             </div>
             <div className="flex gap-2">
-                <Button variant="outline" onClick={handleDownloadReport}>
-                    <Download className="mr-2 h-4 w-4" />
-                    리포트 다운로드
+                <Button variant="outline" onClick={handleDownloadReport} disabled={isDownloading}>
+                    {isDownloading ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                        <Download className="mr-2 h-4 w-4" />
+                    )}
+                    {isDownloading ? "생성 중..." : "리포트 다운로드"}
                 </Button>
             </div>
           </CardHeader>
