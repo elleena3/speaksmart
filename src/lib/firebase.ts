@@ -1,12 +1,10 @@
-
 // src/lib/firebase.ts
-import { initializeApp, getApps, getApp } from "firebase/app";
+import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 // Firebase 구성 객체
-// Next.js는 .env 파일의 NEXT_PUBLIC_ 접두사가 붙은 변수를 자동으로 클라이언트 측에 노출시킵니다.
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
@@ -16,13 +14,10 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-// apiKey가 있는지 확인하여 오류를 방지합니다.
-if (!firebaseConfig.apiKey) {
-    console.error("Firebase API Key is missing. Check your .env file and ensure NEXT_PUBLIC_ variables are set.");
-}
+// Firebase 초기화 로직 강화
+// 앱이 이미 초기화되었는지 확인하여 중복 초기화를 방지합니다.
+const app: FirebaseApp = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-// Firebase 초기화
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const auth = getAuth(app);
 const db = getFirestore(app);
 const storage = getStorage(app);
