@@ -20,7 +20,6 @@ import { LogOut } from "lucide-react"
 import { useLanguage } from "@/context/language-context"
 import { translations } from "@/lib/locales"
 import { useAuth } from "@/context/auth-context"
-import { auth } from "@/lib/firebase"
 import { useToast } from "@/hooks/use-toast"
 import { Avatar, AvatarImage, AvatarFallback } from "./ui/avatar"
 
@@ -44,14 +43,9 @@ export function AppLayout({ children, navItems, titleKey }: AppLayoutProps) {
   const { toast } = useToast()
 
   const handleLogout = async () => {
-    try {
-        await auth.signOut();
-        router.push('/');
-        toast({ title: "로그아웃", description: "성공적으로 로그아웃되었습니다." });
-    } catch (error) {
-        console.error("Logout error", error);
-        toast({ title: "오류", description: "로그아웃 중 문제가 발생했습니다.", variant: "destructive" });
-    }
+    // Since login is disabled, this just navigates to the home page.
+    router.push('/');
+    toast({ title: "홈으로 이동", description: "시작 페이지로 돌아갑니다." });
   }
 
   return (

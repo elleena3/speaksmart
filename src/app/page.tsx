@@ -8,15 +8,10 @@ import { Logo } from "@/components/icons";
 import { useLanguage } from "@/context/language-context";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useRouter } from "next/navigation";
-import { GoogleAuthProvider, signInWithPopup, UserCredential } from "firebase/auth";
-import { auth, db } from "@/lib/firebase";
-import { doc, setDoc, getDoc } from "firebase/firestore";
-import { useToast } from "@/hooks/use-toast";
 
 export default function Home() {
   const { language, setLanguage, t } = useLanguage();
   const router = useRouter();
-  const { toast } = useToast();
   const [loadingRole, setLoadingRole] = useState<"student" | "teacher" | null>(null);
 
   const content = {
@@ -36,49 +31,9 @@ export default function Home() {
     }
   };
 
-  const handleLogin = async (role: "student" | "teacher") => {
+  const handleNavigation = (role: "student" | "teacher") => {
     setLoadingRole(role);
-    const provider = new GoogleAuthProvider();
-    try {
-      const result: UserCredential = await signInWithPopup(auth, provider);
-      const user = result.user;
-
-      const userRef = doc(db, "users", user.uid);
-      const userDoc = await getDoc(userRef);
-
-      if (!userDoc.exists()) {
-        await setDoc(userRef, {
-          uid: user.uid,
-          email: user.email,
-          displayName: user.displayName,
-          photoURL: user.photoURL,
-          role: role,
-        });
-      } else {
-        const userData = userDoc.data();
-        if (userData.role !== role) {
-          toast({
-            title: "역할 충돌",
-            description: `이미 ${userData.role === 'teacher' ? '교사' : '학생'} 계정으로 가입하셨습니다. 해당 역할로 로그인해주세요.`,
-            variant: "destructive"
-          });
-          await auth.signOut();
-          setLoadingRole(null);
-          return;
-        }
-      }
-      
-      router.push(`/${role}/dashboard`);
-
-    } catch (error: any) {
-      console.error("Login Error: ", error);
-      toast({
-        title: "로그인 오류",
-        description: error.message,
-        variant: "destructive",
-      });
-      setLoadingRole(null);
-    }
+    router.push(`/${role}/dashboard`);
   };
 
   return (
@@ -116,7 +71,7 @@ export default function Home() {
         <Button
           className="w-full"
           size="lg"
-          onClick={() => handleLogin("student")}
+          onClick={() => handleNavigation("student")}
           disabled={!!loadingRole}
         >
           {loadingRole === "student" ? (
@@ -131,7 +86,7 @@ export default function Home() {
           className="w-full"
           size="lg"
           variant="secondary"
-          onClick={() => handleLogin("teacher")}
+          onClick={() => handleNavigation("teacher")}
           disabled={!!loadingRole}
         >
           {loadingRole === "teacher" ? (
