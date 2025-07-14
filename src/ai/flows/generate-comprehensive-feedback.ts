@@ -59,10 +59,10 @@ Here is the context for the evaluation:
 
 Based on all the information provided, perform the following tasks:
 
-1.  **Generate Feedback for the Student:** Write encouraging and constructive feedback from the perspective of an English teacher. Focus on what they did well and what they can improve regarding fluency, grammar, and vocabulary in relation to the prompt based *only on the transcript*. Include specific examples from their transcript. Suggest alternative English vocabulary or sentence structures where appropriate to help them improve. If the student's response is very short (e.g., just "Hi"), acknowledge it and provide feedback on how they could have expanded their answer or started the conversation.
-2.  **Generate Guidance for the Teacher:** As an expert English teacher, provide actionable advice for the classroom teacher on how to help this specific student. Suggest specific English teaching activities, focus areas, or communication strategies based on the transcript analysis (e.g., "For vocabulary, try a 'word of the day' activity focusing on adjectives related to hobbies."). If the student's response was short or hesitant, suggest activities to build confidence.
-3.  **Draft Curricular Remarks:** Write official curricular remarks in a formal, descriptive tone with sentences ending in '~함' or '~임'. The remarks must be based on the student's English speaking performance in this specific task. The remarks should summarize the student's performance on this task for their academic record, linking it to English language competencies. Follow a 3-part structure: ① General participation/attitude in the English speaking task, ② Specific examples from their speech (even if short) and how it relates to English learning objectives (e.g., fluency, use of vocabulary, grammatical accuracy), ③ Collaboration, consideration for others, or other notable character traits observed during the activity. Even if the answer is short, evaluate the participation itself.
-4.  **Assign a Content Score:** Give a score from 0 to 100 for the *content* of the response, where 100 is a perfect response that fully meets all criteria. Base the score on how well the student's response aligns with the activity prompt and expected format, based on the transcript. A very short but correct answer should receive a low score, not zero.
+1.  **Generate Feedback for the Student:** Write encouraging and constructive feedback from the perspective of an English teacher. Focus on what they did well and what they can improve regarding fluency, grammar, and vocabulary in relation to the prompt based *only on the transcript*. Include specific examples from their transcript. Suggest alternative English vocabulary or sentence structures where appropriate to help them improve. If the student's response is very short (e.g., just "Hello" or "Hi"), acknowledge their greeting positively and provide feedback on how they could have expanded their answer or continued the conversation (e.g., "Hello! 반갑게 인사해주었네요. 다음에는 'How are you?'라고 되묻거나, 대화를 이어갈 질문을 해보면 어떨까요?"). Do not say you could not hear them.
+2.  **Generate Guidance for the Teacher:** As an expert English teacher, provide actionable advice for the classroom teacher on how to help this specific student. Suggest specific English teaching activities, focus areas, or communication strategies based on the transcript analysis (e.g., "For vocabulary, try a 'word of the day' activity focusing on adjectives related to hobbies."). If the student's response was short or hesitant, suggest activities to build confidence and encourage longer responses, such as role-playing or sentence-starter exercises.
+3.  **Draft Curricular Remarks:** Write official curricular remarks in a formal, descriptive tone with sentences ending in '~함' or '~임'. The remarks must be based on the student's English speaking performance in this specific task. The remarks should summarize the student's performance on this task for their academic record, linking it to English language competencies. Follow a 3-part structure: ① General participation/attitude in the English speaking task, ② Specific examples from their speech (even if short, like "Hello.") and how it relates to English learning objectives (e.g., basic greeting, initiating conversation), ③ Collaboration, consideration for others, or other notable character traits observed during the activity. Even if the answer is very short, evaluate the act of participation itself.
+4.  **Assign a Content Score:** Give a score from 0 to 100 for the *content* of the response, where 100 is a perfect response that fully meets all criteria. Base the score on how well the student's response aligns with the activity prompt and expected format, based on the transcript. A very short but correct answer like "Hello" should receive a low score (e.g., 5-10), not zero.
 `,
 });
 
@@ -103,6 +103,7 @@ const generateComprehensiveFeedbackFlow = ai.defineFlow(
   async ({ studentRecordingDataUri, activityPrompt, expectedFormat, studentName, assessmentTitle }) => {
     
     const audioData = studentRecordingDataUri.split(',')[1];
+    // This check is for completely empty/invalid data URIs.
     if (!audioData) {
       return {
         studentTranscript: '(학생 답변이 기록되지 않았습니다.)',
@@ -117,7 +118,9 @@ const generateComprehensiveFeedbackFlow = ai.defineFlow(
 
     let studentTranscript = "";
     const dialogueMarker = '--- 대화 기록 ---\n';
-    if (activityPrompt.includes(dialogueMarker)) {
+    let isDialogue = activityPrompt.includes(dialogueMarker);
+
+    if (isDialogue) {
         studentTranscript = activityPrompt.substring(activityPrompt.indexOf(dialogueMarker) + dialogueMarker.length);
     } else {
         const sttResponse = await ai.generate({
@@ -130,6 +133,7 @@ const generateComprehensiveFeedbackFlow = ai.defineFlow(
         studentTranscript = sttResponse.text;
     }
 
+    // This check is for when transcription returns nothing.
     if (!studentTranscript) {
       return {
         studentTranscript: '(학생 답변이 기록되지 않았습니다.)',
@@ -141,32 +145,56 @@ const generateComprehensiveFeedbackFlow = ai.defineFlow(
         pronunciationFeedback: '음성 인식 결과가 없어 발음 분석을 할 수 없습니다.',
       };
     }
-
-    const [contentResult, pronunciationResult] = await Promise.all([
-        contentFeedbackPrompt({
+    
+    // For dialogue, we cannot do pronunciation analysis without the student's isolated audio.
+    if (isDialogue) {
+        const contentResult = await contentFeedbackPrompt({
             studentTranscript,
             activityPrompt,
             expectedFormat,
             studentName,
             assessmentTitle,
-        }),
-        pronunciationFeedbackPrompt({
-            studentRecordingDataUri,
-            studentTranscript,
-        }),
-    ]);
+        });
 
-    const contentOutput = contentResult.output;
-    const pronunciationOutput = pronunciationResult.output;
+        if (!contentResult.output) {
+             throw new Error("Failed to generate content feedback from the AI model.");
+        }
+        
+        return {
+          studentTranscript,
+          ...contentResult.output,
+          pronunciationScore: 0,
+          pronunciationFeedback: "대화 형식 평가에서는 개별 발음 분석을 제공하지 않습니다. 종합 피드백을 참고해주세요.",
+        };
 
-    if (!contentOutput || !pronunciationOutput) {
-        throw new Error("Failed to generate comprehensive feedback from the AI model.");
+    } else {
+        // For monologue, run content and pronunciation analysis in parallel.
+        const [contentResult, pronunciationResult] = await Promise.all([
+            contentFeedbackPrompt({
+                studentTranscript,
+                activityPrompt,
+                expectedFormat,
+                studentName,
+                assessmentTitle,
+            }),
+            pronunciationFeedbackPrompt({
+                studentRecordingDataUri,
+                studentTranscript,
+            }),
+        ]);
+
+        const contentOutput = contentResult.output;
+        const pronunciationOutput = pronunciationResult.output;
+
+        if (!contentOutput || !pronunciationOutput) {
+            throw new Error("Failed to generate comprehensive feedback from the AI model.");
+        }
+        
+        return {
+          studentTranscript,
+          ...contentOutput,
+          ...pronunciationOutput,
+        };
     }
-    
-    return {
-      studentTranscript,
-      ...contentOutput,
-      ...pronunciationOutput,
-    };
   }
 );
