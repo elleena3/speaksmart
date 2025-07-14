@@ -9,7 +9,7 @@ import { getStorage } from "firebase/storage";
 // 예: apiKey: "AIzaSy...XYZ"
 // =================================================================
 export const firebaseConfig = {
-  apiKey: "AIzaSyCy_lqEnsU07EajtyI8lnmH_NZIYYoQvP8",
+  apiKey: "YOUR_API_KEY_HERE",
   authDomain: "YOUR_AUTH_DOMAIN_HERE",
   projectId: "YOUR_PROJECT_ID_HERE",
   storageBucket: "YOUR_STORAGE_BUCKET_HERE",
