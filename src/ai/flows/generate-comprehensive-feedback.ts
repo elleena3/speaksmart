@@ -45,7 +45,7 @@ const feedbackGenerationPrompt = ai.definePrompt({
     }).omit({ studentRecordingDataUri: true }),
   },
   output: { schema: GenerateComprehensiveFeedbackOutputSchema.omit({ studentTranscript: true }) },
-  prompt: `You are an AI English Teacher evaluating a student's monologue performance. Your persona is that of an expert English teacher providing constructive feedback for skill improvement.
+  prompt: `You are an AI English Teacher evaluating a student's performance. Your persona is that of an expert English teacher providing constructive feedback for skill improvement.
 Your entire response must be in the specified JSON format, and all text feedback must be in Korean.
 
 Here is the context for the evaluation:
@@ -57,10 +57,10 @@ Here is the context for the evaluation:
 
 Based on all the information provided, perform the following tasks:
 
-1.  **Generate Feedback for the Student:** Write encouraging and constructive feedback from the perspective of an English teacher. Focus on what they did well and what they can improve regarding fluency, pronunciation, grammar, and vocabulary in relation to the prompt. Include specific examples from their transcript. Suggest alternative English vocabulary or sentence structures where appropriate to help them improve.
-2.  **Generate Guidance for the Teacher:** As an expert English teacher, provide actionable advice for the classroom teacher on how to help this specific student. Suggest specific English teaching activities, focus areas, or communication strategies based on the transcript analysis (e.g., "For vocabulary, try a 'word of the day' activity focusing on adjectives related to hobbies.").
-3.  **Draft Curricular Remarks:** Write official curricular remarks in a formal, descriptive tone with sentences ending in '~함' or '~임'. The remarks must be based on the student's English speaking performance in this specific task. The remarks should summarize the student's performance on this task for their academic record, linking it to English language competencies. Follow a 3-part structure: ① General participation/attitude in the English speaking task, ② Specific examples from their speech and how it relates to English learning objectives (e.g., fluency, use of vocabulary, grammatical accuracy), ③ Collaboration, consideration for others, or other notable character traits observed during the activity.
-4.  **Assign a Score:** Give a score from 0 to 100, where 100 is a perfect response that fully meets all criteria. Base the score on how well the student's response aligns with the activity prompt and expected format.
+1.  **Generate Feedback for the Student:** Write encouraging and constructive feedback from the perspective of an English teacher. Focus on what they did well and what they can improve regarding fluency, pronunciation, grammar, and vocabulary in relation to the prompt. Include specific examples from their transcript. Suggest alternative English vocabulary or sentence structures where appropriate to help them improve. If the student's response is very short (e.g., just "Hi"), acknowledge it and provide feedback on how they could have expanded their answer or started the conversation.
+2.  **Generate Guidance for the Teacher:** As an expert English teacher, provide actionable advice for the classroom teacher on how to help this specific student. Suggest specific English teaching activities, focus areas, or communication strategies based on the transcript analysis (e.g., "For vocabulary, try a 'word of the day' activity focusing on adjectives related to hobbies."). If the student's response was short or hesitant, suggest activities to build confidence.
+3.  **Draft Curricular Remarks:** Write official curricular remarks in a formal, descriptive tone with sentences ending in '~함' or '~임'. The remarks must be based on the student's English speaking performance in this specific task. The remarks should summarize the student's performance on this task for their academic record, linking it to English language competencies. Follow a 3-part structure: ① General participation/attitude in the English speaking task, ② Specific examples from their speech (even if short) and how it relates to English learning objectives (e.g., fluency, use of vocabulary, grammatical accuracy), ③ Collaboration, consideration for others, or other notable character traits observed during the activity. Even if the answer is short, evaluate the participation itself.
+4.  **Assign a Score:** Give a score from 0 to 100, where 100 is a perfect response that fully meets all criteria. Base the score on how well the student's response aligns with the activity prompt and expected format. A very short but correct answer should receive a low score, not zero.
 `,
 });
 
@@ -85,17 +85,26 @@ const generateComprehensiveFeedbackFlow = ai.defineFlow(
       };
     }
 
-    // Step 1: Transcribe the student's audio recording, specifying English.
-    const sttResponse = await ai.generate({
-      model: googleAI.model('gemini-2.0-flash'),
-      prompt: [
-        { text: 'Transcribe this English audio.' },
-        { media: { url: studentRecordingDataUri } },
-      ],
-    });
-    const studentTranscript = sttResponse.text;
+    let studentTranscript = "";
+    // Check if this is a dialogue assessment by looking for the marker in the activity prompt
+    const dialogueMarker = '--- 대화 기록 ---\n';
+    if (activityPrompt.includes(dialogueMarker)) {
+        // For dialogue, the transcript is already part of the prompt
+        studentTranscript = activityPrompt.substring(activityPrompt.indexOf(dialogueMarker) + dialogueMarker.length);
+    } else {
+        // For monologue, transcribe the audio
+        const sttResponse = await ai.generate({
+          model: googleAI.model('gemini-2.0-flash'),
+          prompt: [
+            { text: 'Transcribe this English audio.' },
+            { media: { url: studentRecordingDataUri } },
+          ],
+        });
+        studentTranscript = sttResponse.text;
+    }
 
-    if (!studentTranscript?.trim()) {
+
+    if (!studentTranscript) { // Check for truly empty string, not just whitespace. Allows "Hi".
       // If transcription is empty, return a default "could not hear" response.
       return {
         studentTranscript: '(학생 답변이 기록되지 않았습니다.)',
