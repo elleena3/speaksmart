@@ -99,7 +99,7 @@ export default function NewAssessmentPage() {
 
     setIsSubmitting(true);
     
-    let submissionValues = { ...values };
+    let submissionValues: any = { ...values };
     if (isFreeTalkDialogue) {
         submissionValues.title = values.title || t.teacherAssessmentForm.scenarios.freeTalk;
         submissionValues.topic = values.topic || t.teacherAssessmentForm.freeTalkDefaults.topic;
@@ -120,6 +120,14 @@ export default function NewAssessmentPage() {
             dateCreated: new Date().toISOString().split('T')[0],
             createdAt: Date.now(),
         };
+
+        // Remove undefined date fields before sending to Firestore
+        if (newAssessmentData.startDate === undefined) {
+          delete newAssessmentData.startDate;
+        }
+        if (newAssessmentData.endDate === undefined) {
+          delete newAssessmentData.endDate;
+        }
 
         await addDoc(collection(db, "assessments"), newAssessmentData);
 
@@ -385,3 +393,5 @@ export default function NewAssessmentPage() {
     </Card>
   );
 }
+
+    

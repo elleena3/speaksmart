@@ -128,7 +128,7 @@ export default function EditAssessmentPage() {
     if (!user || !assessmentId) return;
     setIsSubmitting(true);
     
-    let submissionValues = { ...values };
+    let submissionValues: any = { ...values };
 
     if (isFreeTalkDialogue) {
         submissionValues.title = values.title || t.teacherAssessmentForm.scenarios.freeTalk;
@@ -140,9 +140,17 @@ export default function EditAssessmentPage() {
         submissionValues.expectedFormat = "발음, 문법, 단어, 문장 등을 평가 주제에 맞게 종합적으로 판단.";
     }
 
+    // Remove undefined date fields before sending to Firestore
+    if (submissionValues.startDate === undefined) {
+      delete submissionValues.startDate;
+    }
+    if (submissionValues.endDate === undefined) {
+      delete submissionValues.endDate;
+    }
+
     try {
         const assessmentRef = doc(db, "assessments", assessmentId);
-        await updateDoc(assessmentRef, submissionValues as any);
+        await updateDoc(assessmentRef, submissionValues);
         toast({
           title: t.teacherAssessmentForm.editSuccessToast.title,
           description: t.teacherAssessmentForm.editSuccessToast.description.replace('{title}', submissionValues.title),
@@ -407,3 +415,5 @@ export default function EditAssessmentPage() {
     </Card>
   );
 }
+
+    
