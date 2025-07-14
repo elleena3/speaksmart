@@ -14,7 +14,7 @@ export const firebaseConfig = {
   apiKey: "AIzaSyCy_1qEnsU07EajtyI81nmH_NZIYYoQvP8",
   authDomain: "speaksmart-evaluator.firebaseapp.com",
   projectId: "speaksmart-evaluator",
-  storageBucket: "speaksmart-evaluator.firebasestorage.app",
+  storageBucket: "speaksmart-evaluator.appspot.com",
   messagingSenderId: "467932902885",
   appId: "1:467932902885:web:713b072c717516dea72b0c"
 };
