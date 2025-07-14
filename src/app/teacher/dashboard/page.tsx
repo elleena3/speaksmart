@@ -1,15 +1,19 @@
 
+"use client";
 
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { PlusCircle, MoreHorizontal, ArrowRight, Users } from "lucide-react"
+import { PlusCircle, MoreHorizontal, ArrowRight, Users, Loader2 } from "lucide-react"
 import Link from "next/link"
 import { type TeacherAssessment } from "@/lib/types"
 import { OverviewChart } from "./overview-chart"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { getLanguage } from "@/lib/get-language"
+import { useLanguage } from "@/context/language-context"
+import { useAuth } from '@/context/auth-context';
 import { db } from "@/lib/firebase"
 import { collection, query, where, getDocs, orderBy, getCountFromServer } from "firebase/firestore"
 
@@ -17,42 +21,61 @@ type AssessmentWithCount = TeacherAssessment & {
     submissionCount: number;
 }
 
-async function getAssessments(teacherId: string): Promise<AssessmentWithCount[]> {
-    try {
-      const q = query(
-        collection(db, "assessments"), 
-        where("uid", "==", teacherId),
-        orderBy("createdAt", "desc")
-      );
-      const querySnapshot = await getDocs(q);
-      const assessmentsData = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as TeacherAssessment));
-      
-      const assessmentsWithCounts = await Promise.all(
-        assessmentsData.map(async (assessment) => {
-            const resultsQuery = query(collection(db, "results"), where("assessmentId", "==", assessment.id));
-            const snapshot = await getCountFromServer(resultsQuery);
-            return {
-                ...assessment,
-                submissionCount: snapshot.data().count
-            };
-        })
-      );
-      return assessmentsWithCounts;
+export default function TeacherDashboard() {
+  const { t } = useLanguage();
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
+  const [assessments, setAssessments] = useState<AssessmentWithCount[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-    } catch (error) {
-      console.error("Error fetching assessments: ", error);
-      return [];
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+        router.push('/');
+        return;
     }
-}
 
+    async function getAssessments(teacherId: string) {
+        try {
+          const q = query(
+            collection(db, "assessments"), 
+            where("uid", "==", teacherId),
+            orderBy("createdAt", "desc")
+          );
+          const querySnapshot = await getDocs(q);
+          const assessmentsData = querySnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          } as TeacherAssessment));
+          
+          const assessmentsWithCounts = await Promise.all(
+            assessmentsData.map(async (assessment) => {
+                const resultsQuery = query(collection(db, "results"), where("assessmentId", "==", assessment.id));
+                const snapshot = await getCountFromServer(resultsQuery);
+                return {
+                    ...assessment,
+                    submissionCount: snapshot.data().count
+                };
+            })
+          );
+          setAssessments(assessmentsWithCounts);
+        } catch (error) {
+          console.error("Error fetching assessments: ", error);
+        } finally {
+            setIsLoading(false);
+        }
+    }
+    
+    getAssessments(user.uid);
+  }, [user, authLoading, router]);
 
-export default async function TeacherDashboard() {
-  const t = getLanguage();
-  const mockTeacherId = "test-user-id";
-  const assessments = await getAssessments(mockTeacherId);
+  if (isLoading || authLoading) {
+    return (
+        <div className="flex justify-center items-center h-64">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
