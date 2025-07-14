@@ -8,7 +8,7 @@ export const translations = {
       dashboard: "대시보드",
       myResults: "내 결과",
       profile: "프로필",
-      assessments: "평가",
+      assessments: "평가 관리",
       settings: "설정",
       logout: "로그아웃",
     },
@@ -86,7 +86,7 @@ export const translations = {
       menuEdit: "편집",
       menuDelete: "삭제",
       deleteDialogTitle: "정말로 삭제하시겠습니까?",
-      deleteDialogDescription: "이 작업은 되돌릴 수 없습니다. 이 평가와 관련된 모든 데이터가 영구적으로 삭제됩니다.",
+      deleteDialogDescription: "이 작업은 되돌릴 수 없습니다. 평가를 삭제하면 관련된 모든 학생 결과도 함께 영구적으로 삭제됩니다.",
       deleteDialogCancel: "취소",
       deleteDialogConfirm: "삭제",
       deleteToast: {
@@ -364,4 +364,5 @@ export const translations = {
 
 export type Translation = typeof translations.ko;
 
+    
     
