@@ -7,10 +7,12 @@ import { useEffect, useState } from "react";
 import { type StudentResult, type ResultStatus } from "@/lib/types";
 import { useAuth } from "@/context/auth-context";
 import { db } from "@/lib/firebase";
-import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { collection, query, where, onSnapshot, doc, deleteDoc } from "firebase/firestore";
 import { Loader2, UploadCloud, FileText, BrainCircuit, BookCheck } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 
 const statusDetails: Record<ResultStatus, { icon: React.ElementType, text: string }> = {
     "업로드 중": { icon: UploadCloud, text: "오디오 파일 업로드 중..." },
@@ -25,9 +27,13 @@ export default function AssessmentResultsPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const params = useParams();
+  const { toast } = useToast();
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
+  
   const [result, setResult] = useState<StudentResult | null>(null);
+  const [resultId, setResultId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isCancelling, setIsCancelling] = useState(false);
   const [currentStatus, setCurrentStatus] = useState<ResultStatus>("업로드 중");
   const [currentProgress, setCurrentProgress] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
@@ -55,6 +61,8 @@ export default function AssessmentResultsPage() {
         const doc = querySnapshot.docs[0];
         const resultData = { id: doc.id, ...doc.data() } as StudentResult;
         
+        setResultId(doc.id);
+        
         if (resultData.status) {
             setResult(resultData);
             setCurrentStatus(resultData.status);
@@ -71,11 +79,15 @@ export default function AssessmentResultsPage() {
             }
         }
       } else {
-        // This case might happen if the doc is not created yet.
-        // It's better to show that it's still processing.
-        setIsLoading(true);
-        setCurrentStatus("업로드 중");
-        setCurrentProgress(0);
+        // This case can happen if the doc is not created yet, or if it has been cancelled.
+        // If we are already cancelling, don't show an error.
+        if (!isCancelling) {
+          // If still loading, it might just be a delay. Otherwise, maybe it was cancelled.
+          if (!isLoading) {
+            toast({ title: "평가가 취소되었거나 결과를 찾을 수 없습니다." });
+            router.push('/student/dashboard');
+          }
+        }
       }
     }, (err) => {
       console.error("Error fetching result with onSnapshot: ", err);
@@ -85,12 +97,31 @@ export default function AssessmentResultsPage() {
 
     return () => unsubscribe(); // Cleanup subscription on unmount
 
-  }, [id, user, authLoading, router]);
+  }, [id, user, authLoading, router, isCancelling, isLoading, toast]);
+  
+  const handleCancelAnalysis = async () => {
+    if (!resultId) {
+      toast({ title: "오류", description: "취소할 평가를 찾을 수 없습니다.", variant: "destructive" });
+      return;
+    }
+    setIsCancelling(true);
+    toast({ title: "분석을 취소하는 중..." });
+
+    try {
+      await deleteDoc(doc(db, "results", resultId));
+      toast({ title: "성공", description: "분석이 취소되었습니다." });
+      // The onSnapshot listener will handle the redirect.
+    } catch (error) {
+      console.error("Error cancelling analysis: ", error);
+      toast({ title: "오류", description: "분석 취소에 실패했습니다.", variant: "destructive" });
+      setIsCancelling(false);
+    }
+  };
 
   if (isLoading || authLoading) {
     const { icon: Icon, text } = statusDetails[currentStatus] || statusDetails["업로드 중"];
     return (
-      <Card className="flex flex-col items-center justify-center text-center p-8 h-80">
+      <Card className="flex flex-col items-center justify-center text-center p-8 h-96">
         <CardHeader>
           <Icon className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
           <CardTitle>AI 분석 진행 중</CardTitle>
@@ -101,6 +132,12 @@ export default function AssessmentResultsPage() {
             <p className="text-sm text-muted-foreground">{currentProgress}% 완료</p>
             <p className="text-sm text-muted-foreground mt-4">분석이 완료되면 이 페이지가 자동으로 새로고침됩니다.</p>
         </CardContent>
+        <CardFooter>
+            <Button variant="destructive" onClick={handleCancelAnalysis} disabled={isCancelling}>
+                {isCancelling ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
+                분석 취소
+            </Button>
+        </CardFooter>
       </Card>
     );
   }
