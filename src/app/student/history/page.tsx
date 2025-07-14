@@ -12,7 +12,9 @@ import { useAuth } from '@/context/auth-context';
 import { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { MOCK_STUDENT_RESULTS } from '@/lib/mock-data';
+import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { format } from 'date-fns';
 
 export default function HistoryPage() {
   const { t } = useLanguage();
@@ -28,11 +30,26 @@ export default function HistoryPage() {
       return;
     }
 
-    // 로컬 목업 데이터 사용
-    const results = MOCK_STUDENT_RESULTS.filter(r => r.studentId === user.uid);
-    setCompletedAssessments(results);
-    setIsLoading(false);
+    const fetchHistory = async () => {
+        setIsLoading(true);
+        try {
+            const q = query(
+                collection(db, "results"),
+                where("studentId", "==", user.uid),
+                where("status", "==", "채점 완료"),
+                orderBy("createdAt", "desc")
+            );
+            const querySnapshot = await getDocs(q);
+            const results = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as StudentResult));
+            setCompletedAssessments(results);
+        } catch (error) {
+            console.error("Error fetching history: ", error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
+    fetchHistory();
   }, [user, authLoading, router]);
 
   if (isLoading || authLoading) {
@@ -64,7 +81,7 @@ export default function HistoryPage() {
                     completedAssessments.map((assessment) => (
                         <TableRow key={assessment.id}>
                             <TableCell className="font-medium">{assessment.assessmentTitle}</TableCell>
-                            <TableCell>{assessment.date}</TableCell>
+                            <TableCell>{assessment.createdAt ? format(new Date(assessment.createdAt), 'yyyy-MM-dd') : 'N/A'}</TableCell>
                             <TableCell>
                                 <Badge variant="outline">{assessment.score}%</Badge>
                             </TableCell>

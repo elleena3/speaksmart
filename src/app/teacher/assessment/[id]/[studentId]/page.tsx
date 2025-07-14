@@ -11,8 +11,9 @@ import { Loader2, Paperclip, Download, User, Activity, BookText, FileText, Targe
 import { type TeacherAssessment, type StudentResult } from "@/lib/types";
 import { Progress } from "@/components/ui/progress";
 import { useAuth } from "@/context/auth-context";
+import { db } from "@/lib/firebase";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
-import { MOCK_STUDENT_RESULTS, MOCK_TEACHER_ASSESSMENTS } from "@/lib/mock-data";
 
 
 export default function StudentResultPage() {
@@ -30,31 +31,36 @@ export default function StudentResultPage() {
   const resultId = Array.isArray(params.studentId) ? params.studentId[0] : params.studentId;
 
   const fetchResultData = useCallback(async () => {
-    if (!user) return;
+    if (!user || !resultId) return;
+    setIsLoading(true);
     try {
-        // 로컬 목업 데이터 사용
-        const resultData = MOCK_STUDENT_RESULTS.find(r => r.id === resultId);
-        if (!resultData) {
+        const resultRef = doc(db, "results", resultId);
+        const resultSnap = await getDoc(resultRef);
+
+        if (!resultSnap.exists() || resultSnap.data().teacherUid !== user.uid) {
+            toast({ title: "오류", description: "결과를 찾을 수 없거나 접근 권한이 없습니다.", variant: "destructive" });
             notFound();
             return;
         }
+        const resultData = { id: resultSnap.id, ...resultSnap.data() } as StudentResult;
         setStudentResult(resultData);
 
-        const assessmentData = MOCK_TEACHER_ASSESSMENTS.find(a => a.id === resultData.assessmentId);
-        if (assessmentData) {
-            setAssessment(assessmentData);
+        const assessmentRef = doc(db, "assessments", resultData.assessmentId);
+        const assessmentSnap = await getDoc(assessmentRef);
+        if (assessmentSnap.exists()) {
+            setAssessment({ id: assessmentSnap.id, ...assessmentSnap.data() } as TeacherAssessment);
         } else {
             // Fallback if assessment is deleted but result remains
             setAssessment({ id: resultData.assessmentId, title: resultData.assessmentTitle } as any);
         }
     } catch (error) {
-        console.error("Error fetching mock result data:", error);
+        console.error("Error fetching result data:", error);
         toast({ title: "오류", description: "결과를 불러오는 중 오류가 발생했습니다.", variant: "destructive" });
         notFound();
     } finally {
         setIsLoading(false);
     }
-  }, [resultId, user, toast]);
+  }, [resultId, user, toast, notFound]);
 
 
   useEffect(() => {
@@ -73,23 +79,118 @@ export default function StudentResultPage() {
     if (!studentResult || !assessment) return;
 
     setIsDownloading(true);
-    toast({ title: "리포트 생성 중...", description: "PDF 파일을 준비하고 있습니다. (목업)" });
+    toast({ title: "리포트 생성 중...", description: "PDF 파일을 준비하고 있습니다." });
 
-    setTimeout(() => {
-      setIsDownloading(false);
-      toast({ title: "성공 (목업)", description: "실제 환경에서는 리포트 다운로드가 시작됩니다." });
-    }, 2000);
+    try {
+        const { default: jsPDF } = await import('jspdf');
+        const { default: autoTable } = await import('jspdf-autotable');
+        const { NanumGothicFont } = await import('@/lib/fonts/nanum-gothic-for-jspdf');
+        
+        const docPDF = new jsPDF();
+        
+        docPDF.addFileToVFS("NanumGothic.ttf", NanumGothicFont);
+        docPDF.addFont("NanumGothic.ttf", "NanumGothic", "normal");
+        docPDF.setFont("NanumGothic");
+
+        const margin = 15;
+        
+        docPDF.setFontSize(22);
+        docPDF.text('학생 리포트', margin, 20);
+        docPDF.setFontSize(12);
+        docPDF.setTextColor(100);
+        docPDF.text(`${studentResult.name} 학생 - ${assessment.title}`, margin, 30);
+
+        const isDialogue = assessment.assessmentType === 'dialogue';
+
+        autoTable(docPDF, {
+            startY: 40,
+            head: [['항목', '세부 내용']],
+            body: [
+                ['학생 이름', studentResult.name],
+                ['평가명', assessment.title],
+                ['유형', isDialogue ? 'AI와 대화하기' : '혼자 말하기'],
+                ['제출일', studentResult.date],
+                ['내용 점수', `${studentResult.score}%`],
+                ['발음 점수', `${studentResult.pronunciationScore ?? 0}%`],
+            ],
+            theme: 'grid',
+            styles: { font: "NanumGothic", fontSize: 10 },
+            headStyles: { fontStyle: 'bold', fillColor: [41, 128, 185], textColor: 255 },
+            didParseCell: (data) => {
+              if (data.section === 'body' && data.column.index === 1) {
+                 if (typeof data.cell.text[0] === 'string') {
+                    // Ensure content is a string before splitting
+                    data.cell.text = docPDF.splitTextToSize(data.cell.text[0], (data.table.columns[1].width - 10));
+                 }
+              }
+            }
+        });
+
+        let finalY = (docPDF as any).lastAutoTable.finalY || 100;
+
+        const addSection = (title: string, content: string, startY: number): number => {
+            if (startY > 260) { 
+                docPDF.addPage();
+                startY = 20;
+            }
+            docPDF.setFontSize(14);
+            docPDF.setTextColor(0);
+            docPDF.text(title, margin, startY);
+            docPDF.setFontSize(10);
+            docPDF.setTextColor(100);
+            
+            const splitContent = docPDF.splitTextToSize(content || "내용 없음", 180);
+            const lineHeight = docPDF.getLineHeight() / docPDF.getPointScale();
+            const numLines = splitContent.length;
+            const contentHeight = (lineHeight * numLines);
+
+            if (startY + 8 + contentHeight > 280) { 
+                docPDF.addPage();
+                startY = 20;
+            }
+
+            docPDF.text(splitContent, margin, startY + 8);
+            return startY + contentHeight + 15;
+        };
+
+        let currentY = finalY + 10;
+        currentY = addSection('AI 피드백 (학생용)', studentResult.aiFeedback, currentY);
+        currentY = addSection('발음 분석', studentResult.pronunciationFeedback || 'N/A', currentY);
+        currentY = addSection(isDialogue ? '전체 대화 기록' : '답변 내용', studentResult.studentTranscript || '기록 없음', currentY);
+        currentY = addSection('교과과정 비고 초안', studentResult.curricularRemarks, currentY);
+        currentY = addSection('선생님을 위한 조언', studentResult.teacherGuidance, currentY);
+        addSection('학생 피드백 요약', studentResult.studentFeedbackSummary, currentY);
+        
+        const safeFileName = `report_${studentResult.studentId}_${assessmentId}.pdf`;
+        docPDF.save(safeFileName);
+
+        toast({ title: "성공", description: "리포트 다운로드가 시작되었습니다." });
+    } catch (error) {
+        console.error("Error generating PDF report:", error);
+        toast({ title: "오류", description: "PDF 리포트 생성에 실패했습니다.", variant: "destructive" });
+    } finally {
+        setIsDownloading(false);
+    }
   };
 
   const handleSaveCurricularRemarks = async () => {
     if (!studentResult) return;
     setIsSaving(true);
-    console.log("Saving remarks (Mock):", studentResult.curricularRemarks);
-    toast({
-        title: "저장 완료 (목업)",
-        description: "교과과정 비고가 저장되었습니다."
-    });
-    setTimeout(() => setIsSaving(false), 1000);
+    try {
+        const resultRef = doc(db, "results", studentResult.id);
+        await updateDoc(resultRef, {
+            curricularRemarks: studentResult.curricularRemarks
+        });
+        toast({
+            title: "저장 완료",
+            description: "교과과정 비고가 저장되었습니다."
+        });
+    } catch (error) {
+        console.error("Error saving remarks:", error);
+        toast({ title: "저장 실패", description: "비고를 저장하는 중 오류가 발생했습니다.", variant: "destructive"});
+    } finally {
+        setIsSaving(false);
+    }
   };
   
   if (isLoading || authLoading) {

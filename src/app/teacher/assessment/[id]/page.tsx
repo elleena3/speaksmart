@@ -14,7 +14,9 @@ import { type TeacherAssessment, type StudentResult } from "@/lib/types";
 import { useLanguage } from "@/context/language-context";
 import { useAuth } from "@/context/auth-context";
 import { useToast } from "@/hooks/use-toast";
-import { MOCK_STUDENT_RESULTS, MOCK_TEACHER_ASSESSMENTS } from "@/lib/mock-data";
+import { collection, query, where, getDocs, doc, getDoc, orderBy } from 'firebase/firestore';
+import { db } from "@/lib/firebase";
+import { format } from "date-fns";
 
 
 export default function AssessmentSubmissionsPage() {
@@ -34,24 +36,32 @@ export default function AssessmentSubmissionsPage() {
     setIsLoading(true);
 
     try {
-        // 로컬 목업 데이터 사용
-        const mockAssessment = MOCK_TEACHER_ASSESSMENTS.find(a => a.id === assessmentId);
-        if (!mockAssessment) {
+        const assessmentRef = doc(db, "assessments", assessmentId);
+        const assessmentSnap = await getDoc(assessmentRef);
+
+        if (!assessmentSnap.exists() || assessmentSnap.data().uid !== user.uid) {
+            toast({ title: "오류", description: "평가를 찾을 수 없거나 접근 권한이 없습니다.", variant: "destructive"});
             notFound();
             return;
         }
-        setAssessment(mockAssessment);
-
-        const mockResults = MOCK_STUDENT_RESULTS.filter(r => r.assessmentId === assessmentId);
-        setStudentResults(mockResults);
+        setAssessment({ id: assessmentSnap.id, ...assessmentSnap.data() } as TeacherAssessment);
+        
+        const resultsQuery = query(
+            collection(db, "results"), 
+            where("assessmentId", "==", assessmentId), 
+            orderBy("createdAt", "desc")
+        );
+        const resultsSnapshot = await getDocs(resultsQuery);
+        const resultsData = resultsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as StudentResult));
+        setStudentResults(resultsData);
 
     } catch (error) {
-        console.error("Error fetching mock submissions:", error);
-        toast({ title: "오류", description: "목업 데이터를 불러오는 데 실패했습니다.", variant: "destructive" });
+        console.error("Error fetching submissions:", error);
+        toast({ title: "오류", description: "제출 현황을 불러오는 데 실패했습니다.", variant: "destructive" });
     } finally {
         setIsLoading(false);
     }
-  }, [assessmentId, user, toast]);
+  }, [assessmentId, user, toast, notFound]);
 
 
   useEffect(() => {
@@ -99,7 +109,7 @@ export default function AssessmentSubmissionsPage() {
               </TableHeader>
               <TableBody>
                 {studentResults.map((result) => (
-                  <TableRow key={result.studentId}>
+                  <TableRow key={result.id}>
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <Avatar className="h-9 w-9">
@@ -115,7 +125,7 @@ export default function AssessmentSubmissionsPage() {
                       </Badge>
                     </TableCell>
                     <TableCell>{result.score ? `${result.score}%` : "N/A"}</TableCell>
-                    <TableCell>{result.date}</TableCell>
+                    <TableCell>{result.createdAt ? format(new Date(result.createdAt), 'yyyy-MM-dd') : 'N/A'}</TableCell>
                     <TableCell className="text-right">
                        <Link href={`/teacher/assessment/${assessmentId}/${result.id}`}>
                          <Button variant="outline" size="sm">

@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -14,7 +14,8 @@ import { OverviewChart } from "./overview-chart"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { useLanguage } from "@/context/language-context"
 import { useAuth } from '@/context/auth-context';
-import { MOCK_TEACHER_ASSESSMENTS } from '@/lib/mock-data';
+import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 type AssessmentWithCount = TeacherAssessment & {
     submissionCount: number;
@@ -27,23 +28,47 @@ export default function TeacherDashboard() {
   const [assessments, setAssessments] = useState<AssessmentWithCount[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  const fetchAssessments = useCallback(async () => {
+    if (!user) return;
+    setIsLoading(true);
+
+    try {
+        const q = query(
+            collection(db, "assessments"), 
+            where("uid", "==", user.uid), 
+            orderBy("createdAt", "desc"),
+            limit(5)
+        );
+
+        const querySnapshot = await getDocs(q);
+        const assessmentsData = await Promise.all(
+            querySnapshot.docs.map(async (doc) => {
+                const assessment = { id: doc.id, ...doc.data() } as TeacherAssessment;
+                const resultsQuery = query(collection(db, "results"), where("assessmentId", "==", assessment.id));
+                const resultsSnapshot = await getDocs(resultsQuery);
+                return {
+                    ...assessment,
+                    submissionCount: resultsSnapshot.size,
+                };
+            })
+        );
+        setAssessments(assessmentsData);
+    } catch (error) {
+        console.error("Error fetching assessments:", error);
+    } finally {
+        setIsLoading(false);
+    }
+  }, [user]);
+
   useEffect(() => {
     if (authLoading) return;
     if (!user) {
-        // In local mode, this shouldn't happen if landing page is used
         router.push('/');
         return;
     }
+    fetchAssessments();
 
-    // 로컬 목업 데이터 사용
-    const assessmentsWithCounts = MOCK_TEACHER_ASSESSMENTS.map(assessment => ({
-        ...assessment,
-        submissionCount: Math.floor(Math.random() * 15) // Generate random submission count
-    }));
-    setAssessments(assessmentsWithCounts);
-    setIsLoading(false);
-
-  }, [user, authLoading, router]);
+  }, [user, authLoading, router, fetchAssessments]);
 
   if (isLoading || authLoading) {
     return (
@@ -91,7 +116,7 @@ export default function TeacherDashboard() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {assessments.length > 0 ? assessments.slice(0, 5).map((assessment) => (
+              {assessments.length > 0 ? assessments.map((assessment) => (
                 <TableRow key={assessment.id}>
                   <TableCell className="font-medium">
                     <Link href={`/teacher/assessment/${assessment.id}`} className="hover:underline text-primary">

@@ -22,6 +22,8 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { scenarios, type TeacherAssessment } from "@/lib/types";
 import { useAuth } from "@/context/auth-context";
+import { addDoc, collection } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 export default function NewAssessmentPage() {
   const router = useRouter();
@@ -99,36 +101,43 @@ export default function NewAssessmentPage() {
 
     setIsSubmitting(true);
     
-    let submissionValues: any = { ...values };
-    if (isFreeTalkDialogue) {
-        submissionValues.title = values.title || t.teacherAssessmentForm.scenarios.freeTalk;
-        submissionValues.topic = values.topic || t.teacherAssessmentForm.freeTalkDefaults.topic;
-        submissionValues.prompt = values.prompt || t.teacherAssessmentForm.freeTalkDefaults.prompt;
-    }
+    try {
+        let submissionValues: any = { ...values };
+        if (isFreeTalkDialogue) {
+            submissionValues.title = values.title || t.teacherAssessmentForm.scenarios.freeTalk;
+            submissionValues.topic = values.topic || t.teacherAssessmentForm.freeTalkDefaults.topic;
+            submissionValues.prompt = values.prompt || t.teacherAssessmentForm.freeTalkDefaults.prompt;
+        }
+        
+        if (submissionValues.assessmentType === 'dialogue' && !submissionValues.expectedFormat) {
+            submissionValues.expectedFormat = "발음, 문법, 단어, 문장 등을 평가 주제에 맞게 종합적으로 판단.";
+        }
+        
+        const docData: Omit<TeacherAssessment, "id"> = {
+            ...submissionValues,
+            uid: user.uid,
+            averageScore: 0,
+            dateCreated: new Date().toISOString().split('T')[0],
+            createdAt: Date.now(),
+            startDate: values.startDate ? values.startDate.toISOString() : undefined,
+            endDate: values.endDate ? values.endDate.toISOString() : undefined,
+        };
 
-    if (submissionValues.assessmentType === 'dialogue' && !submissionValues.expectedFormat) {
-        submissionValues.expectedFormat = "발음, 문법, 단어, 문장 등을 평가 주제에 맞게 종합적으로 판단.";
-    }
-    
-    const finalValues = {
-        ...submissionValues,
-        startDate: values.startDate?.toISOString(),
-        endDate: values.endDate?.toISOString(),
-    };
+        await addDoc(collection(db, "assessments"), docData);
 
-    // 로컬 목업 모드에서는 콘솔에 로그만 남기고 리디렉션합니다.
-    console.log("New Assessment Submitted (Mock):", finalValues);
-    
-    toast({
-        title: `${t.teacherAssessmentForm.createSuccessToast.title} (목업)`,
-        description: t.teacherAssessmentForm.createSuccessToast.description.replace('{title}', submissionValues.title),
-    });
-
-    // Simulate network delay
-    setTimeout(() => {
-        setIsSubmitting(false);
+        toast({
+            title: t.teacherAssessmentForm.createSuccessToast.title,
+            description: t.teacherAssessmentForm.createSuccessToast.description.replace('{title}', submissionValues.title),
+        });
+        
         router.push("/teacher/assessments");
-    }, 1000);
+
+    } catch (error) {
+        console.error("Error creating assessment: ", error);
+        toast({ title: "생성 오류", description: "평가를 생성하는 중 문제가 발생했습니다.", variant: "destructive" });
+    } finally {
+        setIsSubmitting(false);
+    }
   }
 
   if (authLoading) {

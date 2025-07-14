@@ -2,8 +2,13 @@
 // src/context/auth-context.tsx
 "use client";
 
-import React, { createContext, useContext, useState, ReactNode, useMemo } from 'react';
-import type { User } from 'firebase/auth';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo } from 'react';
+import { getAuth, onAuthStateChanged, type User } from 'firebase/auth';
+import { app } from '@/lib/firebase'; // Ensure app is initialized
+import { Loader2 } from 'lucide-react';
+
+// Get the Auth instance
+const auth = getAuth(app);
 
 // 로컬 테스트용 목업(가짜) 사용자 객체입니다.
 const mockUser: User = {
@@ -69,18 +74,42 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // This listener will be used if real Firebase Auth is implemented
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      // For now, we ignore the real auth state and rely on mock login
+      // setUser(user); 
+      setLoading(false);
+    });
+
+    // Clean up subscription on unmount
+    return () => unsubscribe();
+  }, []);
+
 
   const value = useMemo(() => ({
     user,
-    loading: false, // 로딩 상태를 항상 false로 설정
+    loading,
     loginAs: (role: 'teacher' | 'student') => {
+        setLoading(true);
         if (role === 'teacher') {
             setUser(mockUser);
         } else {
             setUser(mockStudent);
         }
+        setLoading(false);
     }
-  }), [user]);
+  }), [user, loading]);
+
+  if (loading) {
+     return (
+      <div className="flex h-screen w-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <AuthContext.Provider value={value}>

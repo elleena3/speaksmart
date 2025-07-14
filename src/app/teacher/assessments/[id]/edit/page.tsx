@@ -22,7 +22,8 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { scenarios, type TeacherAssessment } from "@/lib/types";
 import { useAuth } from "@/context/auth-context";
-import { MOCK_TEACHER_ASSESSMENTS } from "@/lib/mock-data";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 export default function EditAssessmentPage() {
   const router = useRouter();
@@ -88,22 +89,27 @@ export default function EditAssessmentPage() {
 
   const fetchAssessment = useCallback(async () => {
     if (!user || !assessmentId) return;
-    
-    // 로컬 목업 데이터 사용
-    const assessment = MOCK_TEACHER_ASSESSMENTS.find(a => a.id === assessmentId);
+    try {
+        const docRef = doc(db, "assessments", assessmentId);
+        const docSnap = await getDoc(docRef);
 
-    if (assessment) {
-        form.reset({
-          ...assessment,
-          startDate: assessment.startDate ? new Date(assessment.startDate) : undefined,
-          endDate: assessment.endDate ? new Date(assessment.endDate) : undefined,
-        });
-    } else {
-        toast({ title: "오류", description: "평가를 찾을 수 없습니다.", variant: "destructive" });
-        router.push("/teacher/assessments");
+        if (docSnap.exists() && docSnap.data().uid === user.uid) {
+            const data = docSnap.data() as TeacherAssessment;
+            form.reset({
+              ...data,
+              startDate: data.startDate ? new Date(data.startDate) : undefined,
+              endDate: data.endDate ? new Date(data.endDate) : undefined,
+            });
+        } else {
+            toast({ title: "오류", description: "평가를 찾을 수 없거나 수정할 권한이 없습니다.", variant: "destructive" });
+            router.push("/teacher/assessments");
+        }
+    } catch (error) {
+        toast({ title: "오류", description: "평가 정보를 불러오는 데 실패했습니다.", variant: "destructive" });
+        console.error("Error fetching assessment:", error);
+    } finally {
+        setIsLoading(false);
     }
-    setIsLoading(false);
-
   }, [assessmentId, user, form, router, toast]);
 
   useEffect(() => {
@@ -124,37 +130,38 @@ export default function EditAssessmentPage() {
     if (!user || !assessmentId) return;
     setIsSubmitting(true);
     
-    let submissionValues: any = { ...values };
+    try {
+        let submissionValues: any = { ...values };
 
-    if (isFreeTalkDialogue) {
-        submissionValues.title = values.title || t.teacherAssessmentForm.scenarios.freeTalk;
-        submissionValues.topic = values.topic || t.teacherAssessmentForm.freeTalkDefaults.topic;
-        submissionValues.prompt = values.prompt || t.teacherAssessmentForm.freeTalkDefaults.prompt;
-    }
-    
-    if (submissionValues.assessmentType === 'dialogue' && !submissionValues.expectedFormat) {
-        submissionValues.expectedFormat = "발음, 문법, 단어, 문장 등을 평가 주제에 맞게 종합적으로 판단.";
-    }
+        if (isFreeTalkDialogue) {
+            submissionValues.title = values.title || t.teacherAssessmentForm.scenarios.freeTalk;
+            submissionValues.topic = values.topic || t.teacherAssessmentForm.freeTalkDefaults.topic;
+            submissionValues.prompt = values.prompt || t.teacherAssessmentForm.freeTalkDefaults.prompt;
+        }
+        
+        if (submissionValues.assessmentType === 'dialogue' && !submissionValues.expectedFormat) {
+            submissionValues.expectedFormat = "발음, 문법, 단어, 문장 등을 평가 주제에 맞게 종합적으로 판단.";
+        }
 
-    // Convert dates to string for mock submission
-    const finalValues = {
-        ...submissionValues,
-        startDate: values.startDate?.toISOString(),
-        endDate: values.endDate?.toISOString(),
-    };
+        const docRef = doc(db, "assessments", assessmentId);
+        await updateDoc(docRef, {
+            ...submissionValues,
+            startDate: values.startDate ? values.startDate.toISOString() : undefined,
+            endDate: values.endDate ? values.endDate.toISOString() : undefined,
+        });
 
-    console.log("Updated Assessment (Mock):", finalValues);
-    
-    toast({
-        title: `${t.teacherAssessmentForm.editSuccessToast.title} (목업)`,
-        description: t.teacherAssessmentForm.editSuccessToast.description.replace('{title}', submissionValues.title),
-    });
-    
-    // Simulate network delay
-    setTimeout(() => {
-        setIsSubmitting(false);
+        toast({
+            title: t.teacherAssessmentForm.editSuccessToast.title,
+            description: t.teacherAssessmentForm.editSuccessToast.description.replace('{title}', submissionValues.title),
+        });
+        
         router.push("/teacher/assessments");
-    }, 1000);
+    } catch (error) {
+        console.error("Error updating assessment:", error);
+        toast({ title: "저장 오류", description: "평가를 수정하는 중 문제가 발생했습니다.", variant: "destructive" });
+    } finally {
+        setIsSubmitting(false);
+    }
   }
 
   if (isLoading || authLoading) {

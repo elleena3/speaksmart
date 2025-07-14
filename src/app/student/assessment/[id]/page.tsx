@@ -8,7 +8,8 @@ import { useParams, notFound, useRouter } from "next/navigation";
 import { type TeacherAssessment } from "@/lib/types";
 import { useAuth } from "@/context/auth-context";
 import { Loader2 } from "lucide-react";
-import { MOCK_TEACHER_ASSESSMENTS } from "@/lib/mock-data";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 export default function AssessmentPage() {
   const params = useParams();
@@ -26,15 +27,19 @@ export default function AssessmentPage() {
         return;
     }
     if (id) {
-        // 로컬 목업 데이터 사용
-        const assessment = MOCK_TEACHER_ASSESSMENTS.find(a => a.id === id);
-        if (assessment) {
-            setAssessmentDetails(assessment);
-        } else {
-            console.warn(`Mock assessment with ID ${id} not found.`);
-            notFound();
-        }
-        setIsLoading(false);
+        const fetchAssessment = async () => {
+            const docRef = doc(db, "assessments", id);
+            const docSnap = await getDoc(docRef);
+
+            if (docSnap.exists()) {
+                setAssessmentDetails({ id: docSnap.id, ...docSnap.data() } as TeacherAssessment);
+            } else {
+                console.warn(`Assessment with ID ${id} not found.`);
+                notFound();
+            }
+            setIsLoading(false);
+        };
+        fetchAssessment();
     }
   }, [id, user, authLoading, router]);
 

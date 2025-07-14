@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, MoreHorizontal, Copy, Users } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Copy, Users, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { type TeacherAssessment } from "@/lib/types";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -16,7 +16,8 @@ import { format } from "date-fns";
 import { useLanguage } from '@/context/language-context';
 import { useAuth } from '@/context/auth-context';
 import { useRouter } from 'next/navigation';
-import { MOCK_TEACHER_ASSESSMENTS } from '@/lib/mock-data';
+import { db } from '@/lib/firebase';
+import { collection, query, where, getDocs, doc, deleteDoc, addDoc, serverTimestamp, orderBy } from 'firebase/firestore';
 
 type AssessmentWithCount = TeacherAssessment & {
     submissionCount: number;
@@ -33,15 +34,33 @@ export default function AssessmentsPage() {
   const fetchAssessments = useCallback(async () => {
     if (!user) return;
     setIsLoading(true);
-    // 로컬 목업 데이터 사용
-    const assessmentsWithCounts = MOCK_TEACHER_ASSESSMENTS.map(assessment => ({
-        ...assessment,
-        submissionCount: Math.floor(Math.random() * 15) // Generate random submission count
-    }));
+    try {
+        const q = query(collection(db, "assessments"), where("uid", "==", user.uid), orderBy("createdAt", "desc"));
+        const querySnapshot = await getDocs(q);
 
-    setAssessments(assessmentsWithCounts);
-    setIsLoading(false);
-  }, [user]);
+        const assessmentsData = await Promise.all(
+          querySnapshot.docs.map(async (docSnapshot) => {
+            const assessment = { id: docSnapshot.id, ...docSnapshot.data() } as TeacherAssessment;
+            
+            const resultsQuery = query(collection(db, "results"), where("assessmentId", "==", assessment.id));
+            const resultsSnapshot = await getDocs(resultsQuery);
+            const submissionCount = resultsSnapshot.size;
+            
+            return {
+              ...assessment,
+              submissionCount: submissionCount
+            };
+          })
+        );
+        
+        setAssessments(assessmentsData);
+    } catch (error) {
+        console.error("Error fetching assessments: ", error);
+        toast({ title: "오류", description: "평가 목록을 불러오는 데 실패했습니다.", variant: "destructive" });
+    } finally {
+        setIsLoading(false);
+    }
+  }, [user, toast]);
 
   useEffect(() => {
     if (!authLoading) {
@@ -55,32 +74,43 @@ export default function AssessmentsPage() {
 
 
   const handleCopy = async (assessmentId: string) => {
-    // This is a mock implementation
     const assessmentToCopy = assessments.find(a => a.id === assessmentId);
     if (!assessmentToCopy) return;
 
-    const newAssessment = {
-        ...assessmentToCopy,
-        id: `mock-id-${Date.now()}`,
-        title: `${assessmentToCopy.title} - 복사본`,
+    try {
+      const { id, submissionCount, averageScore, ...copyData } = assessmentToCopy;
+      
+      await addDoc(collection(db, "assessments"), {
+        ...copyData,
+        title: `${copyData.title}${t.teacherAssessments.copySuffix}`,
         createdAt: Date.now(),
         dateCreated: new Date().toISOString().split('T')[0],
-        submissionCount: 0,
-    };
-    setAssessments(prev => [newAssessment, ...prev]);
-    toast({
-        title: "평가 복사됨 (목업)",
-        description: `'${assessmentToCopy.title}' 평가의 복사본이 생성되었습니다.`,
-    });
+      });
+
+      toast({
+        title: t.teacherAssessments.copyToast.title,
+        description: t.teacherAssessments.copyToast.description.replace('{title}', assessmentToCopy.title),
+      });
+      fetchAssessments();
+    } catch (error) {
+      console.error("Error copying assessment:", error);
+      toast({ title: "복사 실패", description: "평가를 복사하는 중 오류가 발생했습니다.", variant: "destructive"});
+    }
   }
 
   const handleDelete = async (assessmentId: string) => {
-    // This is a mock implementation
-    setAssessments(prev => prev.filter(a => a.id !== assessmentId));
-    toast({
-        title: "평가 삭제됨 (목업)",
-        description: "평가가 성공적으로 삭제되었습니다."
-    });
+    try {
+        await deleteDoc(doc(db, "assessments", assessmentId));
+        // Note: In a real-world scenario, you might want to handle related student results (e.g., delete them or archive them).
+        toast({
+            title: t.teacherAssessments.deleteToast.title,
+            description: t.teacherAssessments.deleteToast.description,
+        });
+        fetchAssessments(); // Re-fetch to update the list
+    } catch (error) {
+        console.error("Error deleting assessment:", error);
+        toast({ title: "삭제 실패", description: "평가를 삭제하는 중 오류가 발생했습니다.", variant: "destructive" });
+    }
   }
   
   const formatDateRange = (startDate?: string, endDate?: string) => {
@@ -121,8 +151,8 @@ export default function AssessmentsPage() {
       <Card>
         <CardContent className="p-0">
           {isLoading ? (
-            <div className="text-center py-24">
-              <p className="text-muted-foreground">평가 목록을 불러오는 중...</p>
+             <div className="flex justify-center items-center h-64">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
           ) : assessments.length > 0 ? (
              <Table>

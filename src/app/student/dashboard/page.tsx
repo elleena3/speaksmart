@@ -10,9 +10,10 @@ import { CheckCircle2, MessageCircle, Mic, Loader2, AlertCircle, UploadCloud } f
 import { useLanguage } from "@/context/language-context"
 import { useAuth } from "@/context/auth-context"
 import { useToast } from "@/hooks/use-toast"
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { MOCK_STUDENT_RESULTS, MOCK_TEACHER_ASSESSMENTS } from "@/lib/mock-data";
+import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 
 type CombinedAssessment = TeacherAssessment & {
@@ -92,31 +93,58 @@ export default function StudentDashboard() {
   const { t } = useLanguage();
   const [assessments, setAssessments] = useState<CombinedAssessment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
+
+  const fetchAssessments = useCallback(async () => {
+    if (!user) return;
+    setIsLoading(true);
+    try {
+        const assessmentsQuery = query(collection(db, "assessments"), orderBy("createdAt", "desc"));
+        const resultsQuery = query(collection(db, "results"), where("studentId", "==", user.uid));
+        
+        const [assessmentsSnapshot, resultsSnapshot] = await Promise.all([
+            getDocs(assessmentsQuery),
+            getDocs(resultsQuery),
+        ]);
+
+        const studentResultsMap = new Map<string, { status: StudentResult['status'], id: string }>();
+        resultsSnapshot.forEach(doc => {
+            const resultData = doc.data() as StudentResult;
+            studentResultsMap.set(resultData.assessmentId, { status: resultData.status, id: doc.id });
+        });
+        
+        const combined = assessmentsSnapshot.docs.map(doc => {
+            const assessment = { id: doc.id, ...doc.data() } as TeacherAssessment;
+            const resultInfo = studentResultsMap.get(assessment.id);
+            return {
+                ...assessment,
+                resultStatus: resultInfo ? resultInfo.status : null,
+                resultId: resultInfo ? resultInfo.id : undefined,
+            };
+        });
+        
+        setAssessments(combined);
+    } catch (error) {
+        console.error("Error fetching assessments:", error);
+        toast({
+            title: "데이터 로딩 오류",
+            description: "평가 목록을 불러오는 데 실패했습니다. 나중에 다시 시도해주세요.",
+            variant: "destructive",
+        });
+    } finally {
+        setIsLoading(false);
+    }
+  }, [user, toast]);
 
   useEffect(() => {
-    if (authLoading || !user) return;
-
-    // 로컬 목업 데이터 사용
-    const studentResultsMap = new Map<string, { status: StudentResult['status'], id: string }>();
-    MOCK_STUDENT_RESULTS.forEach(result => {
-        if (result.studentId === user.uid) {
-            studentResultsMap.set(result.assessmentId, { status: result.status, id: result.id });
-        }
-    });
-
-    const combined = MOCK_TEACHER_ASSESSMENTS.map(assessment => {
-        const resultInfo = studentResultsMap.get(assessment.id);
-        return {
-            ...assessment,
-            resultStatus: resultInfo ? resultInfo.status : null,
-            resultId: resultInfo ? resultInfo.id : undefined,
-        };
-    });
-    
-    setAssessments(combined);
-    setIsLoading(false);
-
-  }, [user, authLoading]);
+    if (!authLoading) {
+      if (!user) {
+        router.push('/');
+      } else {
+        fetchAssessments();
+      }
+    }
+  }, [user, authLoading, router, fetchAssessments]);
   
   if (isLoading || authLoading) {
       return (
