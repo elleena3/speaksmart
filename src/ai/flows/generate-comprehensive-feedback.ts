@@ -18,6 +18,7 @@ const GenerateComprehensiveFeedbackInputSchema = z.object({
   activityPrompt: z.string().describe('The prompt or instructions for the speaking activity.'),
   expectedFormat: z.string().describe('The expected format or key points of the response for grading.'),
   studentName: z.string().describe('The name of the student.'),
+  assessmentTitle: z.string().describe('The title of the assessment.'),
 });
 export type GenerateComprehensiveFeedbackInput = z.infer<typeof GenerateComprehensiveFeedbackInputSchema>;
 
@@ -49,6 +50,7 @@ Your entire response must be in the specified JSON format, and all text must be 
 
 Here is the context for the evaluation:
 - Student Name: {{{studentName}}}
+- Assessment Title: {{{assessmentTitle}}}
 - Activity Prompt: {{{activityPrompt}}}
 - Expected Response Format/Grading Criteria: {{{expectedFormat}}}
 - Student's Spoken Response (Transcript): {{{studentTranscript}}}
@@ -69,14 +71,17 @@ const generateComprehensiveFeedbackFlow = ai.defineFlow(
     inputSchema: GenerateComprehensiveFeedbackInputSchema,
     outputSchema: GenerateComprehensiveFeedbackOutputSchema,
   },
-  async ({ studentRecordingDataUri, activityPrompt, expectedFormat, studentName }) => {
-    // Step 1: Transcribe the student's audio recording.
+  async ({ studentRecordingDataUri, activityPrompt, expectedFormat, studentName, assessmentTitle }) => {
+    // Step 1: Transcribe the student's audio recording, specifying English.
     const sttResponse = await ai.generate({
       model: googleAI.model('gemini-2.0-flash'),
       prompt: [
         { text: 'Transcribe this audio.' },
         { media: { url: studentRecordingDataUri } },
       ],
+      config: {
+          language: 'en', // Specify English for transcription
+      }
     });
     const studentTranscript = sttResponse.text;
 
@@ -97,6 +102,7 @@ const generateComprehensiveFeedbackFlow = ai.defineFlow(
       activityPrompt,
       expectedFormat,
       studentName,
+      assessmentTitle,
     });
 
     if (!output) {

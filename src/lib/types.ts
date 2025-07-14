@@ -50,6 +50,7 @@ export type ConversationHistory = {
 export type StudentResult = {
   studentId: string;
   assessmentId: string;
+  assessmentTitle: string; // Add assessment title
   name: string;
   avatarUrl: string;
   status: "채점 완료";

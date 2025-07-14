@@ -1,22 +1,15 @@
 
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Mic, StopCircle, Loader2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { generateComprehensiveFeedback } from "@/ai/flows/generate-comprehensive-feedback"
-import { type StudentResult } from "@/lib/types"
+import { type StudentResult, type TeacherAssessment } from "@/lib/types"
 
-type AssessmentDetails = {
-  id: string,
-  title: string,
-  prompt: string,
-  expectedFormat: string
-}
-
-export function AssessmentView({ assessmentDetails }: { assessmentDetails: AssessmentDetails }) {
+export function AssessmentView({ assessmentDetails }: { assessmentDetails: TeacherAssessment }) {
   const [isRecording, setIsRecording] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
   const router = useRouter()
@@ -75,14 +68,16 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Asses
      try {
       const { aiFeedback, curricularRemarks, teacherGuidance, score, studentTranscript } = await generateComprehensiveFeedback({
         activityPrompt: assessmentDetails.prompt,
-        expectedFormat: assessmentDetails.expectedFormat,
+        expectedFormat: assessmentDetails.prompt, // Using prompt as expected format for monologue
         studentRecordingDataUri,
         studentName: "Alex Doe", // In a real app, this would be dynamic
+        assessmentTitle: assessmentDetails.title,
       });
 
       const studentResult: StudentResult = {
         studentId: "student-alex-doe",
         assessmentId: assessmentDetails.id,
+        assessmentTitle: assessmentDetails.title,
         name: "Alex Doe",
         avatarUrl: "https://placehold.co/40x40.png",
         status: "채점 완료",

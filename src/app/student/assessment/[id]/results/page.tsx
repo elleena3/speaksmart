@@ -49,7 +49,7 @@ export default function AssessmentResultsPage() {
   return (
     <FeedbackView
       assessmentId={id}
-      assessmentTitle="7단원: 취미와 관심사" // This might need to be dynamic in a real app
+      assessmentTitle={result.assessmentTitle || "평가 피드백"}
       aiFeedback={result.aiFeedback}
       studentTranscript={result.studentTranscript || "음성인식 결과가 없습니다."}
     />
