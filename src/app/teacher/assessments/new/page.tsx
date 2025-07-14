@@ -32,7 +32,7 @@ export default function NewAssessmentPage() {
     title: z.string(),
     topic: z.string(),
     prompt: z.string(),
-    expectedFormat: z.string(),
+    expectedFormat: z.string().optional(),
     startDate: z.date().optional(),
     endDate: z.date().optional(),
     assessmentType: z.enum(["monologue", "dialogue"]),
@@ -50,11 +50,12 @@ export default function NewAssessmentPage() {
       if (!data.prompt) {
         ctx.addIssue({ code: z.ZodIssueCode.custom, message: t.teacherAssessmentForm.errors.promptRequired, path: ['prompt'] });
       }
-      if (!data.expectedFormat) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, message: t.teacherAssessmentForm.errors.expectedFormatRequired, path: ['expectedFormat'] });
-      }
     }
     
+    if (data.assessmentType === 'monologue' && !data.expectedFormat) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: t.teacherAssessmentForm.errors.expectedFormatRequired, path: ['expectedFormat'] });
+    }
+
     if (data.startDate && data.endDate && data.endDate < data.startDate) {
       ctx.addIssue({ message: t.teacherAssessmentForm.errors.endDate, path: ["endDate"] });
     }
@@ -88,7 +89,11 @@ export default function NewAssessmentPage() {
         submissionValues.title = values.title || t.teacherAssessmentForm.scenarios.freeTalk;
         submissionValues.topic = values.topic || t.teacherAssessmentForm.freeTalkDefaults.topic;
         submissionValues.prompt = values.prompt || t.teacherAssessmentForm.freeTalkDefaults.prompt;
-        submissionValues.expectedFormat = values.expectedFormat || t.teacherAssessmentForm.freeTalkDefaults.expectedFormat;
+    }
+
+    // Use default expectedFormat for dialogue if it's empty
+    if (submissionValues.assessmentType === 'dialogue' && !submissionValues.expectedFormat) {
+        submissionValues.expectedFormat = "발음, 문법, 단어, 문장 등을 평가 주제에 맞게 종합적으로 판단.";
     }
     
     await new Promise(resolve => setTimeout(resolve, 1500));
@@ -98,6 +103,7 @@ export default function NewAssessmentPage() {
       title: submissionValues.title,
       topic: submissionValues.topic,
       prompt: submissionValues.prompt,
+      expectedFormat: submissionValues.expectedFormat,
       studentsCompleted: 0,
       totalStudents: 20, 
       averageScore: 0,
@@ -248,10 +254,10 @@ export default function NewAssessmentPage() {
               name="expectedFormat"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>{t.teacherAssessmentForm.expectedFormatLabel} {isFreeTalkDialogue && `(${t.teacherAssessmentForm.optional})`}</FormLabel>
+                  <FormLabel>{t.teacherAssessmentForm.expectedFormatLabel} {assessmentType === 'dialogue' && `(${t.teacherAssessmentForm.optional})`}</FormLabel>
                   <FormControl>
                     <Textarea
-                      placeholder={isFreeTalkDialogue ? t.teacherAssessmentForm.freeTalkDefaults.expectedFormat : t.teacherAssessmentForm.expectedFormatPlaceholder}
+                      placeholder={assessmentType === 'dialogue' ? '발음, 문법, 단어, 문장 등을 평가 주제에 맞게 종합적으로 판단.' : t.teacherAssessmentForm.expectedFormatPlaceholder}
                       rows={4}
                       {...field}
                     />
@@ -363,5 +369,3 @@ export default function NewAssessmentPage() {
     </Card>
   );
 }
-
-    

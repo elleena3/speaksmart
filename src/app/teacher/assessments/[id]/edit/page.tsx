@@ -23,7 +23,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { scenarios, type TeacherAssessment } from "@/lib/types";
 
 // Mock data for demonstration. In a real app, you'd fetch this from your database.
-const mockAssessments: { [key: string]: { title: string; topic: string; prompt: string; expectedFormat: string; startDate?: Date; endDate?: Date, assessmentType: "monologue" | "dialogue", scenario?: Scenario } } = {
+const mockAssessments: { [key: string]: { title: string; topic: string; prompt: string; expectedFormat?: string; startDate?: Date; endDate?: Date, assessmentType: "monologue" | "dialogue", scenario?: typeof scenarios[number] } } = {
   "1": { title: "5단원: 나의 일과", topic: "당신의 일반적인 하루에 대해 이야기하세요.", prompt: "아침에 일어나서 밤에 잠자리에 들 때까지 당신의 일과를 설명해주세요.", expectedFormat: "현재 시제를 사용하고 시간 표현을 포함해야 합니다.", assessmentType: "monologue" },
   "2": { title: "6단원: 사람 묘사하기", topic: "가족 구성원을 묘사하세요.", prompt: "가족 중 한 명을 선택하여 외모와 성격을 묘사해주세요.", expectedFormat: "형용사를 사용하여 외모와 성격을 자세히 묘사해야 합니다.", assessmentType: "monologue" },
   "3": { title: "중간 말하기 시험", topic: "지난 주말에 한 일에 대해 이야기하세요.", prompt: "지난 주말에 있었던 일에 대해 구체적으로 설명해주세요.", expectedFormat: "과거 시제를 정확하게 사용해야 합니다.", assessmentType: "monologue" },
@@ -44,7 +44,7 @@ export default function EditAssessmentPage() {
     title: z.string(),
     topic: z.string(),
     prompt: z.string(),
-    expectedFormat: z.string().optional(), // expectedFormat is not used in dialogue
+    expectedFormat: z.string().optional(),
     startDate: z.date().optional(),
     endDate: z.date().optional(),
     assessmentType: z.enum(["monologue", "dialogue"]),
@@ -123,22 +123,16 @@ export default function EditAssessmentPage() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsSubmitting(true);
     
-    let submissionValues: TeacherAssessment = {
-        id: assessmentId,
-        studentsCompleted: 0,
-        totalStudents: 20,
-        averageScore: 0,
-        dateCreated: new Date().toISOString().split('T')[0],
-        ...values,
-        title: values.title,
-        topic: values.topic,
-        prompt: values.prompt,
-    };
+    let submissionValues = { ...values };
 
     if (isFreeTalkDialogue) {
         submissionValues.title = values.title || t.teacherAssessmentForm.scenarios.freeTalk;
         submissionValues.topic = values.topic || t.teacherAssessmentForm.freeTalkDefaults.topic;
         submissionValues.prompt = values.prompt || t.teacherAssessmentForm.freeTalkDefaults.prompt;
+    }
+    
+    if (submissionValues.assessmentType === 'dialogue' && !submissionValues.expectedFormat) {
+        submissionValues.expectedFormat = "발음, 문법, 단어, 문장 등을 평가 주제에 맞게 종합적으로 판단.";
     }
 
     console.log(`Updating assessment ${assessmentId} with values:`, submissionValues);
@@ -155,7 +149,14 @@ export default function EditAssessmentPage() {
         const initialIndex = Object.keys(mockAssessments).indexOf(assessmentId);
         if (initialIndex > -1) {
             // It's a mock assessment, add it to our localStorage array to persist the edit.
-            assessments.push(submissionValues);
+             assessments.push({
+                id: assessmentId,
+                studentsCompleted: 0,
+                totalStudents: 20,
+                averageScore: 0,
+                dateCreated: new Date().toISOString().split('T')[0],
+                ...submissionValues
+             });
         } else {
              toast({ title: "Error", description: "Could not find assessment to update.", variant: "destructive" });
              setIsSubmitting(false);
@@ -305,27 +306,25 @@ export default function EditAssessmentPage() {
                 </FormItem>
               )}
             />
-
-            {assessmentType === 'monologue' && (
-              <FormField
-                control={form.control}
-                name="expectedFormat"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t.teacherAssessmentForm.expectedFormatLabel} {isFreeTalkDialogue && `(${t.teacherAssessmentForm.optional})`}</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder={isFreeTalkDialogue ? t.teacherAssessmentForm.freeTalkDefaults.expectedFormat : t.teacherAssessmentForm.expectedFormatPlaceholder}
-                        rows={4}
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormDescription>{t.teacherAssessmentForm.expectedFormatDescription}</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
+            
+            <FormField
+              control={form.control}
+              name="expectedFormat"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t.teacherAssessmentForm.expectedFormatLabel} {assessmentType === 'dialogue' && `(${t.teacherAssessmentForm.optional})`}</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder={assessmentType === 'dialogue' ? '발음, 문법, 단어, 문장 등을 평가 주제에 맞게 종합적으로 판단.' : t.teacherAssessmentForm.expectedFormatPlaceholder}
+                      rows={4}
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormDescription>{t.teacherAssessmentForm.expectedFormatDescription}</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                  <FormField
@@ -427,5 +426,3 @@ export default function EditAssessmentPage() {
     </Card>
   );
 }
-
-    
