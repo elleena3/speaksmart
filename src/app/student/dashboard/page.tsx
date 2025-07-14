@@ -6,12 +6,14 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import Link from "next/link"
 import { type TeacherAssessment, type StudentResult } from "@/lib/types"
-import { CheckCircle2, MessageCircle, Mic, Loader2, AlertCircle } from "lucide-react"
+import { CheckCircle2, MessageCircle, Mic, Loader2, AlertCircle, UploadCloud } from "lucide-react"
 import { useLanguage } from "@/context/language-context"
-import { db } from "@/lib/firebase"
+import { db, storage } from "@/lib/firebase"
 import { collection, query, where, getDocs, orderBy, onSnapshot } from "firebase/firestore"
+import { ref, uploadString } from "firebase/storage"
 import { useEffect, useState } from "react"
 import { useAuth } from "@/context/auth-context"
+import { useToast } from "@/hooks/use-toast"
 
 type CombinedAssessment = TeacherAssessment & {
     resultStatus?: '채점 완료' | '채점 중' | '오류' | null;
@@ -87,8 +89,36 @@ function AssessmentCard({ assessment, t }: { assessment: CombinedAssessment, t: 
 export default function StudentDashboard() {
   const { user, loading: authLoading } = useAuth();
   const { t } = useLanguage();
+  const { toast } = useToast();
   const [assessments, setAssessments] = useState<CombinedAssessment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isTestingUpload, setIsTestingUpload] = useState(false);
+
+  const handleUploadTest = async () => {
+    if (!user) return;
+    setIsTestingUpload(true);
+    toast({ title: "업로드 테스트 시작...", description: "Firebase Storage에 테스트 파일을 업로드합니다." });
+
+    const testContent = `Hello Storage! This is a test file from user ${user.uid} at ${new Date().toISOString()}`;
+    const testFileRef = ref(storage, `test-uploads/test-file-${user.uid}.txt`);
+
+    try {
+        await uploadString(testFileRef, testContent);
+        toast({
+            title: "✅ 업로드 성공!",
+            description: "Firebase Storage에서 'test-uploads' 폴더를 확인해주세요."
+        });
+    } catch (error: any) {
+        console.error("Storage Upload Test Failed:", error);
+        toast({
+            title: "❌ 업로드 실패",
+            description: `오류: ${error.message}`,
+            variant: "destructive"
+        });
+    } finally {
+        setIsTestingUpload(false);
+    }
+  };
 
   useEffect(() => {
     if (authLoading || !user) return;
@@ -141,10 +171,18 @@ export default function StudentDashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-1">
-        <h2 className="text-3xl font-bold tracking-tight">{t.studentDashboard.welcome}</h2>
-        <p className="text-muted-foreground">{t.studentDashboard.description}</p>
+      <div className="flex justify-between items-center">
+        <div className="space-y-1">
+            <h2 className="text-3xl font-bold tracking-tight">{t.studentDashboard.welcome}</h2>
+            <p className="text-muted-foreground">{t.studentDashboard.description}</p>
+        </div>
+        {/* 임시 테스트 버튼 */}
+        <Button onClick={handleUploadTest} variant="outline" disabled={isTestingUpload}>
+            {isTestingUpload ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-2 h-4 w-4" />}
+            스토리지 테스트 업로드
+        </Button>
       </div>
+
 
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {assessments.length > 0 ? assessments.map((assessment) => (
