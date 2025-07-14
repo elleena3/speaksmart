@@ -29,6 +29,37 @@ export default function StudentResultPage() {
   const assessmentId = Array.isArray(params.id) ? params.id[0] : params.id;
   const resultId = Array.isArray(params.studentId) ? params.studentId[0] : params.studentId;
 
+  const fetchResultData = useCallback(async () => {
+    if (!user) return;
+    try {
+        const resultRef = doc(db, "results", resultId);
+        const resultSnap = await getDoc(resultRef);
+
+        if (!resultSnap.exists() || resultSnap.data().teacherUid !== user.uid) {
+            notFound();
+            return;
+        }
+        const resultData = { id: resultSnap.id, ...resultSnap.data() } as StudentResult;
+        setStudentResult(resultData);
+
+        const assessmentRef = doc(db, "assessments", resultData.assessmentId);
+        const assessmentSnap = await getDoc(assessmentRef);
+        if (assessmentSnap.exists()) {
+            setAssessment({ id: assessmentSnap.id, ...assessmentSnap.data() } as TeacherAssessment);
+        } else {
+            // Fallback if assessment is deleted but result remains
+            setAssessment({ id: resultData.assessmentId, title: resultData.assessmentTitle } as any);
+        }
+    } catch (error) {
+        console.error("Error fetching result data:", error);
+        toast({ title: "오류", description: "결과를 불러오는 중 오류가 발생했습니다.", variant: "destructive" });
+        notFound();
+    } finally {
+        setIsLoading(false);
+    }
+  }, [resultId, user, toast, notFound]);
+
+
   useEffect(() => {
     if (authLoading) return;
     if (!user) {
@@ -37,39 +68,9 @@ export default function StudentResultPage() {
     }
 
     if (assessmentId && resultId) {
-        const fetchResultData = async () => {
-            setIsLoading(true);
-            try {
-                const resultRef = doc(db, "results", resultId);
-                const resultSnap = await getDoc(resultRef);
-
-                if (!resultSnap.exists() || resultSnap.data().teacherUid !== user.uid) {
-                    notFound();
-                    return;
-                }
-                const resultData = { id: resultSnap.id, ...resultSnap.data() } as StudentResult;
-                setStudentResult(resultData);
-
-                const assessmentRef = doc(db, "assessments", resultData.assessmentId);
-                const assessmentSnap = await getDoc(assessmentRef);
-                if (assessmentSnap.exists()) {
-                    setAssessment({ id: assessmentSnap.id, ...assessmentSnap.data() } as TeacherAssessment);
-                } else {
-                    // Fallback if assessment is deleted but result remains
-                    setAssessment({ id: resultData.assessmentId, title: resultData.assessmentTitle } as any);
-                }
-            } catch (error) {
-                console.error("Error fetching result data:", error);
-                toast({ title: "오류", description: "결과를 불러오는 중 오류가 발생했습니다.", variant: "destructive" });
-                notFound();
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
-        fetchResultData();
+      fetchResultData();
     }
-  }, [assessmentId, resultId, user, authLoading, router, toast]);
+  }, [assessmentId, resultId, user, authLoading, router, fetchResultData]);
 
   const handleDownloadReport = async () => {
     if (!studentResult || !assessment) return;
@@ -80,9 +81,14 @@ export default function StudentResultPage() {
     try {
         const { default: jsPDF } = await import('jspdf');
         const { default: autoTable } = await import('jspdf-autotable');
+        const { NanumGothicFont } = await import('@/lib/fonts/nanum-gothic-for-jspdf');
         
         const docPDF = new jsPDF();
         
+        docPDF.addFileToVFS("NanumGothic.ttf", NanumGothicFont);
+        docPDF.addFont("NanumGothic.ttf", "NanumGothic", "normal");
+        docPDF.setFont("NanumGothic");
+
         const margin = 15;
         
         docPDF.setFontSize(22);
@@ -110,7 +116,7 @@ export default function StudentResultPage() {
             didParseCell: (data) => {
               if (data.section === 'body' && data.column.index === 1) {
                  if (typeof data.cell.text[0] === 'string') {
-                    data.cell.text = docPDF.splitTextToSize(data.cell.text[0], (data.table.columns[1].width - 10));
+                    data.cell.text = docPDF.splitTextToSize(data.cell.text[0], ((data.table.columns[1] as any).width - 10));
                  }
               }
             }
@@ -310,5 +316,3 @@ export default function StudentResultPage() {
     </div>
   );
 }
-
-    
