@@ -47,6 +47,16 @@ export type ConversationHistory = {
   studentRecordingDataUri?: string;
 }
 
+export type ResultStatus = 
+  | "채점 중" 
+  | "채점 완료" 
+  | "오류" 
+  | "업로드 중"
+  | "텍스트 변환 중"
+  | "분석 중"
+  | "리포트 생성 중";
+
+
 export type StudentResult = {
   id: string; // Firestore document ID
   studentId: string; // Student's UID
@@ -54,7 +64,7 @@ export type StudentResult = {
   assessmentTitle: string; 
   name: string; // Student's display name
   avatarUrl: string;
-  status: "채점 완료" | "채점 중" | "오류";
+  status: ResultStatus;
   score: number;
   date: string;
   aiFeedback: string;

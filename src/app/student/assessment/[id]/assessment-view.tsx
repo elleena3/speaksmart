@@ -4,19 +4,27 @@
 import { useState, useRef, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Mic, StopCircle, Loader2, Timer } from "lucide-react"
+import { Mic, StopCircle, Loader2, Timer, UploadCloud, FileText, BrainCircuit, BookCheck } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { generateSpeakingAnalysis } from "@/ai/flows/generate-speaking-analysis-flow"
-import { type TeacherAssessment, type StudentResult } from "@/lib/types"
+import { type TeacherAssessment, type StudentResult, type ResultStatus } from "@/lib/types"
 import { useAuth } from "@/context/auth-context"
 import { db, storage } from "@/lib/firebase"
 import { collection, doc, updateDoc, setDoc } from "firebase/firestore"
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
 
+const processingSteps: { status: ResultStatus; icon: React.ElementType; text: string }[] = [
+  { status: "업로드 중", icon: UploadCloud, text: "오디오 파일 업로드 중..." },
+  { status: "텍스트 변환 중", icon: FileText, text: "음성을 텍스트로 변환 중..." },
+  { status: "분석 중", icon: BrainCircuit, text: "내용 및 발음 분석 중..." },
+  { status: "리포트 생성 중", icon: BookCheck, text: "최종 리포트 생성 중..." },
+];
+
 export function AssessmentView({ assessmentDetails }: { assessmentDetails: TeacherAssessment }) {
   const { user } = useAuth();
   const [isRecording, setIsRecording] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
+  const [processingStatus, setProcessingStatus] = useState<ResultStatus | null>(null);
   const [remainingTime, setRemainingTime] = useState<number | null>(null);
   const router = useRouter()
   const { toast } = useToast()
@@ -128,7 +136,7 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
         cleanup();
         
         // Immediately redirect user
-        router.push('/student/dashboard');
+        router.push(`/student/assessment/${assessmentDetails.id}/results`);
       };
 
       mediaRecorderRef.current.onerror = (event) => {
@@ -169,6 +177,11 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
 
      const newResultRef = doc(collection(db, "results"));
 
+     const updateStatus = async (status: ResultStatus, data: Partial<StudentResult> = {}) => {
+        setProcessingStatus(status);
+        await updateDoc(newResultRef, { status, ...data });
+     };
+
      try {
         const initialResultData: Partial<StudentResult> = {
             id: newResultRef.id,
@@ -177,33 +190,35 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
             assessmentTitle: assessmentDetails.title,
             name: user.displayName || "Student",
             avatarUrl: user.photoURL || `https://placehold.co/40x40.png?text=${user.displayName?.charAt(0)}`,
-            status: "채점 중",
+            status: "업로드 중",
             date: new Date().toISOString().split('T')[0],
             createdAt: Date.now(),
             teacherUid: assessmentDetails.uid,
         };
         await setDoc(newResultRef, initialResultData);
-
+        
+        await updateStatus("업로드 중");
         const audioFileName = `recordings/${user.uid}_${assessmentDetails.id}_${Date.now()}.webm`;
         const storageRef = ref(storage, audioFileName);
         await uploadBytes(storageRef, audioBlob);
         const downloadURL = await getDownloadURL(storageRef);
-
+        
+        await updateStatus("텍스트 변환 중", { studentRecordingDataUri: downloadURL });
         const analysisResult = await generateSpeakingAnalysis({
             studentRecordingDataUri,
             activityPrompt: assessmentDetails.prompt,
             expectedFormat: assessmentDetails.expectedFormat || "학생의 답변을 평가합니다.",
             studentName: user.displayName || "Student",
             assessmentTitle: assessmentDetails.title.replace(/ - 복사본(\s\d+)?$/, ''),
-        });
+        }, (status) => updateStatus(status as ResultStatus));
 
-        const finalResultData: Omit<StudentResult, 'id'> = {
+        await updateStatus("리포트 생성 중");
+        const finalResultData: Omit<StudentResult, 'id' | 'status'> = {
             studentId: user.uid,
             assessmentId: assessmentDetails.id,
             assessmentTitle: assessmentDetails.title,
             name: user.displayName || "Student",
             avatarUrl: user.photoURL || `https://placehold.co/40x40.png?text=${user.displayName?.charAt(0)}`,
-            status: "채점 완료",
             score: analysisResult.contentScore,
             date: new Date().toISOString().split('T')[0],
             createdAt: initialResultData.createdAt!,
@@ -217,8 +232,8 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
             pronunciationFeedback: analysisResult.pronunciationFeedback,
             teacherUid: assessmentDetails.uid,
         };
-
-        await updateDoc(newResultRef, finalResultData as { [x: string]: any });
+        
+        await updateStatus("채점 완료", finalResultData as Partial<StudentResult>);
         
     } catch (error) {
         console.error("Error processing assessment in background:", error);
@@ -247,10 +262,12 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
 
   const getButtonState = () => {
     if (isProcessing) {
+      const currentStep = processingSteps.find(step => step.status === processingStatus) || processingSteps[0];
+      const CurrentIcon = currentStep.icon;
       return (
         <Button size="lg" disabled className="w-full">
-          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-          제출 중...
+          <CurrentIcon className="mr-2 h-5 w-5 animate-spin" />
+          {currentStep.text}
         </Button>
       )
     }

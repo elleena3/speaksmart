@@ -27,8 +27,11 @@ import {
  * Main exported function to be called by the client.
  * It orchestrates the entire analysis process.
  */
-export async function generateSpeakingAnalysis(input: GenerateSpeakingAnalysisInput): Promise<GenerateSpeakingAnalysisOutput> {
-  return generateSpeakingAnalysisFlow(input);
+export async function generateSpeakingAnalysis(
+    input: GenerateSpeakingAnalysisInput,
+    onStatusUpdate?: (status: string) => void
+): Promise<GenerateSpeakingAnalysisOutput> {
+  return generateSpeakingAnalysisFlow(input, onStatusUpdate);
 }
 
 
@@ -106,7 +109,8 @@ const generateSpeakingAnalysisFlow = ai.defineFlow(
     inputSchema: GenerateSpeakingAnalysisInputSchema,
     outputSchema: GenerateSpeakingAnalysisOutputSchema,
   },
-  async (input) => {
+  async (input, onStatusUpdate) => {
+    onStatusUpdate?.("텍스트 변환 중");
     // Step 1: Transcribe the audio. This is the only blocking step at the start.
     const studentTranscript = await transcribeAudioFlow(input.studentRecordingDataUri);
 
@@ -123,6 +127,7 @@ const generateSpeakingAnalysisFlow = ai.defineFlow(
       };
     }
     
+    onStatusUpdate?.("분석 중");
     // Step 2: Run content and pronunciation analysis in PARALLEL.
     const [contentResult, pronunciationResult] = await Promise.all([
       // Content analysis
@@ -147,6 +152,7 @@ const generateSpeakingAnalysisFlow = ai.defineFlow(
         throw new Error("Failed to get a valid response from one or more analysis models.");
     }
 
+    onStatusUpdate?.("리포트 생성 중");
     // Step 3: Combine the results from the parallel flows and return.
     return {
       studentTranscript,
