@@ -10,12 +10,12 @@ import { getStorage } from "firebase/storage";
 // Firebase 콘솔의 '프로젝트 설정'에서 값을 복사하여 붙여넣으세요.
 // ====================================================================
 export const firebaseConfig = {
-  apiKey: "새 Firebase 프로젝트의 API 키를 여기에 붙여넣으세요",
-  authDomain: "새-프로젝트-ID.firebaseapp.com",
-  projectId: "새-프로젝트-ID",
-  storageBucket: "새-프로젝트-ID.appspot.com",
-  messagingSenderId: "새 숫자 메시징 발신자 ID",
-  appId: "새 앱 ID"
+  apiKey: "AIzaSyAX4QXJaFvRGm0pLLk8n6PdFW5bY_QkJNg",
+  authDomain: "speaksmart-evaluator.firebaseapp.com",
+  projectId: "speaksmart-evaluator",
+  storageBucket: "speaksmart-evaluator.appspot.com",
+  messagingSenderId: "467932902885",
+  appId: "1:467932902885:web:389f9b929bb5cd1aa72b0c"
 };
 
 
