@@ -76,10 +76,10 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
         pronunciationFeedback
       } = await generateComprehensiveFeedback({
         activityPrompt: assessmentDetails.prompt,
-        expectedFormat: assessmentDetails.prompt, // Using prompt as expected format for monologue
+        expectedFormat: assessmentDetails.expectedFormat || "학생의 답변을 평가합니다.", // Fallback if expectedFormat is missing
         studentRecordingDataUri,
         studentName: "Alex Doe", // In a real app, this would be dynamic
-        assessmentTitle: assessmentDetails.title,
+        assessmentTitle: assessmentDetails.title.replace(' - 복사본', ''),
       });
 
       const studentResult: StudentResult = {
