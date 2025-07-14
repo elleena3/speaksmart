@@ -107,7 +107,6 @@ export function FreeTalkView({ scenario, scenarioPrompt, assessment }: { scenari
       audioStreamRef.current = stream;
       mediaRecorderRef.current = new MediaRecorder(stream, { 
         mimeType: 'audio/webm',
-        audioBitsPerSecond: 16000 // Lower bitrate for smaller file size
       });
 
       mediaRecorderRef.current.ondataavailable = (event) => {

@@ -92,7 +92,6 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
       audioStreamRef.current = stream;
       mediaRecorderRef.current = new MediaRecorder(stream, { 
         mimeType: 'audio/webm',
-        audioBitsPerSecond: 16000
       });
       
       mediaRecorderRef.current.ondataavailable = (event) => {
