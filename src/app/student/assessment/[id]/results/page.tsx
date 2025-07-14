@@ -2,16 +2,19 @@
 "use client";
 
 import { FeedbackView } from "./feedback-view"
-import { redirect } from 'next/navigation';
+import { redirect, useParams } from 'next/navigation';
 import { useEffect, useState } from "react";
 import { type StudentResult } from "@/lib/types";
 
-export default function AssessmentResultsPage({ params }: { params: { id: string } }) {
+export default function AssessmentResultsPage() {
+  const params = useParams();
+  const id = Array.isArray(params.id) ? params.id[0] : params.id;
   const [result, setResult] = useState<StudentResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const { id } = params;
+    if (!id) return;
+    
     // This is a safeguard against incorrect routing.
     // Free talk assessments have their own specific results page.
     if (id === 'free-talk') {
@@ -27,7 +30,7 @@ export default function AssessmentResultsPage({ params }: { params: { id: string
       setResult(currentResult);
     } 
     setIsLoading(false);
-  }, [params]);
+  }, [id]);
 
 
   if (isLoading) {
@@ -45,8 +48,8 @@ export default function AssessmentResultsPage({ params }: { params: { id: string
 
   return (
     <FeedbackView
-      assessmentId={params.id}
-      assessmentTitle="7단원: 취미와 관심사"
+      assessmentId={id}
+      assessmentTitle="7단원: 취미와 관심사" // This might need to be dynamic in a real app
       aiFeedback={result.aiFeedback}
       studentTranscript={result.studentTranscript || "음성인식 결과가 없습니다."}
     />
