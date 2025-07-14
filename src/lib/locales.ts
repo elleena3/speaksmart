@@ -49,7 +49,7 @@ export const translations = {
       performanceOverview: "수업 성과 개요",
       avgScoreDescription: "최근 평가의 평균 점수입니다.",
       recentAssessments: "최근 평가",
-      recentAssessmentsDescription: "가장 최근에 생성된 말하기 평가입니다.",
+      recentAssessmentsDescription: "가장 최근에 생성된 말하기 평가 5개입니다.",
       title: "제목",
       completed: "완료",
       avgScore: "평균 점수",
@@ -59,7 +59,8 @@ export const translations = {
       edit: "편집",
       delete: "삭제",
       openMenu: "메뉴 열기",
-      noScore: "해당 없음"
+      noScore: "해당 없음",
+      viewAllAssessments: "모든 평가 보기"
     },
     teacherAssessments: {
       title: "평가 관리",
@@ -235,7 +236,7 @@ export const translations = {
         performanceOverview: "Class Performance Overview",
         avgScoreDescription: "Average scores from recent assessments.",
         recentAssessments: "Recent Assessments",
-        recentAssessmentsDescription: "Your most recently created speaking assessments.",
+        recentAssessmentsDescription: "Your 5 most recently created speaking assessments.",
         title: "Title",
         completed: "Completed",
         avgScore: "Avg. Score",
@@ -245,7 +246,8 @@ export const translations = {
         edit: "Edit",
         delete: "Delete",
         openMenu: "Open menu",
-        noScore: "N/A"
+        noScore: "N/A",
+        viewAllAssessments: "View All Assessments"
     },
     teacherAssessments: {
       title: "Assessment Management",

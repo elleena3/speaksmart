@@ -71,22 +71,24 @@ export default function AssessmentsPage() {
     try {
         const { id, ...assessmentDataToCopy } = assessmentToCopy;
         
-        // --- Improved copy title logic ---
         const copySuffix = t.teacherAssessments.copySuffix; // " - 복사본"
-        const baseTitle = assessmentToCopy.title.split(copySuffix)[0].trim();
+        const regex = new RegExp(`^(.+)${copySuffix}( \\d+)?$`);
+        const match = assessmentToCopy.title.match(regex);
+        const baseTitle = match ? match[1] : assessmentToCopy.title;
+
         let newTitle = `${baseTitle}${copySuffix}`;
         let copyNumber = 2;
         
-        // Check for existing copies and increment number if necessary
-        while (assessments.some(a => a.title === newTitle)) {
+        const existingTitles = new Set(assessments.map(a => a.title));
+        
+        while (existingTitles.has(newTitle)) {
             newTitle = `${baseTitle}${copySuffix} ${copyNumber}`;
             copyNumber++;
         }
-        // --- End of improved logic ---
 
         const newAssessment: Omit<TeacherAssessment, 'id'> = {
             ...assessmentDataToCopy,
-            title: newTitle, // Use the new unique title
+            title: newTitle,
             createdAt: Date.now(),
             dateCreated: new Date().toISOString().split('T')[0],
             studentsCompleted: 0,

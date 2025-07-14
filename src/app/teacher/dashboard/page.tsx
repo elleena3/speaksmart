@@ -1,9 +1,10 @@
 
+
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { PlusCircle, MoreHorizontal } from "lucide-react"
+import { PlusCircle, MoreHorizontal, ArrowRight } from "lucide-react"
 import Link from "next/link"
 import { type TeacherAssessment } from "@/lib/types"
 import { OverviewChart } from "./overview-chart"
@@ -119,6 +120,14 @@ export default async function TeacherDashboard() {
             </TableBody>
           </Table>
         </CardContent>
+        <CardFooter className="justify-end border-t pt-4">
+             <Link href="/teacher/assessments" passHref>
+                <Button variant="secondary" size="sm">
+                   {t.teacherDashboard.viewAllAssessments}
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+            </Link>
+        </CardFooter>
       </Card>
     </div>
   )
