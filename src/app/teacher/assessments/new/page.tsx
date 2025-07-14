@@ -22,8 +22,6 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { scenarios, type TeacherAssessment } from "@/lib/types";
 import { useAuth } from "@/context/auth-context";
-import { db } from "@/lib/firebase";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 
 export default function NewAssessmentPage() {
   const router = useRouter();
@@ -112,38 +110,19 @@ export default function NewAssessmentPage() {
         submissionValues.expectedFormat = "발음, 문법, 단어, 문장 등을 평가 주제에 맞게 종합적으로 판단.";
     }
     
-    try {
-        const newAssessmentData = {
-            ...submissionValues,
-            uid: user.uid,
-            averageScore: 0,
-            dateCreated: new Date().toISOString().split('T')[0],
-            createdAt: Date.now(),
-        };
-
-        // Remove undefined date fields before sending to Firestore
-        if (newAssessmentData.startDate === undefined) {
-          delete newAssessmentData.startDate;
-        }
-        if (newAssessmentData.endDate === undefined) {
-          delete newAssessmentData.endDate;
-        }
-
-        await addDoc(collection(db, "assessments"), newAssessmentData);
-
-        toast({
-        title: t.teacherAssessmentForm.createSuccessToast.title,
+    // 로컬 목업 모드에서는 콘솔에 로그만 남기고 리디렉션합니다.
+    console.log("New Assessment Submitted (Mock):", submissionValues);
+    
+    toast({
+        title: `${t.teacherAssessmentForm.createSuccessToast.title} (목업)`,
         description: t.teacherAssessmentForm.createSuccessToast.description.replace('{title}', submissionValues.title),
-        });
+    });
 
-        router.push("/teacher/assessments");
-
-    } catch (error) {
-        console.error("Error creating assessment: ", error);
-        toast({ title: "오류", description: "평가 생성에 실패했습니다.", variant: "destructive" });
-    } finally {
+    // Simulate network delay
+    setTimeout(() => {
         setIsSubmitting(false);
-    }
+        router.push("/teacher/assessments");
+    }, 1000);
   }
 
   if (authLoading) {

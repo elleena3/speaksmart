@@ -14,8 +14,7 @@ import { OverviewChart } from "./overview-chart"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { useLanguage } from "@/context/language-context"
 import { useAuth } from '@/context/auth-context';
-import { db } from "@/lib/firebase"
-import { collection, query, where, getDocs, orderBy, getCountFromServer } from "firebase/firestore"
+import { MOCK_TEACHER_ASSESSMENTS } from '@/lib/mock-data';
 
 type AssessmentWithCount = TeacherAssessment & {
     submissionCount: number;
@@ -31,42 +30,19 @@ export default function TeacherDashboard() {
   useEffect(() => {
     if (authLoading) return;
     if (!user) {
+        // In local mode, this shouldn't happen if landing page is used
         router.push('/');
         return;
     }
 
-    async function getAssessments(teacherId: string) {
-        try {
-          const q = query(
-            collection(db, "assessments"), 
-            where("uid", "==", teacherId),
-            orderBy("createdAt", "desc")
-          );
-          const querySnapshot = await getDocs(q);
-          const assessmentsData = querySnapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-          } as TeacherAssessment));
-          
-          const assessmentsWithCounts = await Promise.all(
-            assessmentsData.map(async (assessment) => {
-                const resultsQuery = query(collection(db, "results"), where("assessmentId", "==", assessment.id));
-                const snapshot = await getCountFromServer(resultsQuery);
-                return {
-                    ...assessment,
-                    submissionCount: snapshot.data().count
-                };
-            })
-          );
-          setAssessments(assessmentsWithCounts);
-        } catch (error) {
-          console.error("Error fetching assessments: ", error);
-        } finally {
-            setIsLoading(false);
-        }
-    }
-    
-    getAssessments(user.uid);
+    // 로컬 목업 데이터 사용
+    const assessmentsWithCounts = MOCK_TEACHER_ASSESSMENTS.map(assessment => ({
+        ...assessment,
+        submissionCount: Math.floor(Math.random() * 15) // Generate random submission count
+    }));
+    setAssessments(assessmentsWithCounts);
+    setIsLoading(false);
+
   }, [user, authLoading, router]);
 
   if (isLoading || authLoading) {

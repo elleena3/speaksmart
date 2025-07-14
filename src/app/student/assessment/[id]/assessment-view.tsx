@@ -9,9 +9,6 @@ import { useToast } from "@/hooks/use-toast"
 import { generateSpeakingAnalysis } from "@/ai/flows/generate-speaking-analysis-flow"
 import { type TeacherAssessment, type StudentResult } from "@/lib/types"
 import { useAuth } from "@/context/auth-context"
-import { db, storage } from "@/lib/firebase"
-import { collection, doc, updateDoc, setDoc } from "firebase/firestore"
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
 type RecordingState = "idle" | "recording" | "recorded" | "submitting";
@@ -151,130 +148,24 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
     }
     setRecordingState("submitting");
 
-    try {
-      const newResultRef = doc(collection(db, "results"));
-      
-      // Create initial result document in Firestore so user sees progress immediately
-      const initialResultData: Partial<StudentResult> = {
-          id: newResultRef.id,
-          studentId: user.uid,
-          assessmentId: assessmentDetails.id,
-          assessmentTitle: assessmentDetails.title,
-          name: user.displayName || "Student",
-          avatarUrl: user.photoURL || `https://placehold.co/40x40.png?text=${user.displayName?.charAt(0)}`,
-          status: "업로드 중",
-          progress: 10,
-          date: new Date().toISOString().split('T')[0],
-          createdAt: Date.now(),
-          teacherUid: assessmentDetails.uid,
-      };
-      await setDoc(newResultRef, initialResultData);
+    // 로컬 목업 모드에서는 AI 호출 없이 바로 결과 페이지로 이동합니다.
+    toast({
+        title: "제출 시작됨 (목업)",
+        description: "답변이 제출되었습니다. 로컬 목업 결과 페이지로 이동합니다.",
+    });
 
-      // Now that the initial doc is created, redirect the user.
-      // The rest of the process happens in the background.
-      router.push(`/student/assessment/${assessmentDetails.id}/results`);
-      
-      toast({
-          title: "제출 시작됨",
-          description: "답변이 제출되었습니다. AI 분석이 시작되며, 완료되면 알려드립니다.",
-      });
-
-      // Pass the blob and reference to the background processor
-      await processAssessmentInBackground(audioBlob, newResultRef.id);
-        
-    } catch(error) {
-        console.error("Error during submission process:", error);
-        toast({ title: "제출 오류", description: "답변 제출 중 오류가 발생했습니다.", variant: "destructive" });
-        setRecordingState("recorded"); // Allow user to try again
-    }
+    // Save mock result data to session storage to be picked up by results page
+    const reader = new FileReader();
+    reader.readAsDataURL(audioBlob);
+    reader.onloadend = () => {
+        sessionStorage.setItem('mockResult', JSON.stringify({
+            assessmentId: assessmentDetails.id,
+            studentRecordingDataUri: reader.result as string,
+        }));
+        router.push(`/student/assessment/${assessmentDetails.id}/results`);
+    };
   }
   
-  const processAssessmentInBackground = async (audioBlobToUpload: Blob, resultId: string) => {
-     if (!user) {
-        console.error("Authentication error: User not found for background processing.");
-        throw new Error("User not found");
-     }
-
-     const resultRef = doc(db, "results", resultId);
-
-     try {
-        // STEP 1: UPLOAD AUDIO TO FIREBASE STORAGE FIRST.
-        const audioFileName = `recordings/${user.uid}_${assessmentDetails.id}_${Date.now()}.webm`;
-        const storageRef = ref(storage, audioFileName);
-        await uploadBytes(storageRef, audioBlobToUpload);
-        const downloadURL = await getDownloadURL(storageRef);
-        
-        // Convert blob to data URI for AI analysis
-        const reader = new FileReader();
-        reader.readAsDataURL(audioBlobToUpload);
-        reader.onloadend = async () => {
-          try {
-            const studentRecordingDataUri = reader.result as string;
-            
-            // STEP 2: Update Firestore doc with the audio URL and start analysis.
-            await updateDoc(resultRef, { 
-              studentRecordingDataUri: downloadURL, // Store the public URL
-              status: "텍스트 변환 중",
-              progress: 25
-            });
-
-            // STEP 3: RUN AI ANALYSIS IN THE BACKGROUND.
-            const analysisResult = await generateSpeakingAnalysis({
-                studentRecordingDataUri,
-                activityPrompt: assessmentDetails.prompt,
-                expectedFormat: assessmentDetails.expectedFormat || "학생의 답변을 평가합니다.",
-                studentName: user.displayName || "Student",
-                assessmentTitle: assessmentDetails.title.replace(/ - 복사본(\s\d+)?$/, ''),
-            }, (status, progress) => {
-               updateDoc(resultRef, { status, progress });
-            });
-            
-            const finalResultData: Partial<Omit<StudentResult, 'id' | 'status' | 'progress'>> = {
-                score: analysisResult.contentScore,
-                aiFeedback: analysisResult.aiFeedback,
-                curricularRemarks: analysisResult.curricularRemarks,
-                studentFeedbackSummary: "학생이 평가에 대해 남긴 피드백이 없습니다.",
-                teacherGuidance: analysisResult.teacherGuidance,
-                studentTranscript: analysisResult.studentTranscript,
-                pronunciationScore: analysisResult.pronunciationScore,
-                pronunciationFeedback: analysisResult.pronunciationFeedback,
-            };
-            
-            await updateDoc(resultRef, { 
-                status: "채점 완료",
-                progress: 100,
-                ...finalResultData 
-            });
-
-          } catch (error) {
-              console.error("Error during AI analysis or final update:", error);
-              await updateDoc(resultRef, { 
-                  status: "오류", 
-                  progress: 100,
-                  aiFeedback: "결과를 분석하는 중 오류가 발생했습니다. 잠시 후 다시 시도하거나 관리자에게 문의하세요."
-              });
-          }
-        };
-        reader.onerror = async (error) => {
-          console.error("File reading error for AI analysis:", error);
-          await updateDoc(resultRef, { 
-              status: "오류", 
-              progress: 100,
-              aiFeedback: "업로드된 오디오 파일을 AI 분석용으로 변환하는 중 오류가 발생했습니다."
-          });
-        };
-        
-    } catch (error) {
-        console.error("Error in background process (likely upload failed):", error);
-        await updateDoc(resultRef, { 
-            status: "오류", 
-            progress: 100,
-            aiFeedback: "오디오 파일을 업로드하는 중 오류가 발생했습니다. 저장소 규칙을 확인하세요."
-        });
-        // We don't re-throw here because the user has already been redirected.
-    }
-  }
-
   useEffect(() => {
     if (remainingTime === 0) {
       handleStopRecording();
@@ -418,5 +309,3 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
     </div>
   )
 }
-
-  

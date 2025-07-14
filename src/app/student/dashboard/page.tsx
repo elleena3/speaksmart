@@ -8,12 +8,12 @@ import Link from "next/link"
 import { type TeacherAssessment, type StudentResult } from "@/lib/types"
 import { CheckCircle2, MessageCircle, Mic, Loader2, AlertCircle, UploadCloud } from "lucide-react"
 import { useLanguage } from "@/context/language-context"
-import { db, storage } from "@/lib/firebase"
-import { collection, query, where, getDocs, orderBy, onSnapshot } from "firebase/firestore"
-import { ref, uploadString } from "firebase/storage"
-import { useEffect, useState } from "react"
 import { useAuth } from "@/context/auth-context"
 import { useToast } from "@/hooks/use-toast"
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { MOCK_STUDENT_RESULTS, MOCK_TEACHER_ASSESSMENTS } from "@/lib/mock-data";
+
 
 type CombinedAssessment = TeacherAssessment & {
     resultStatus?: '채점 완료' | '채점 중' | '오류' | null;
@@ -88,76 +88,33 @@ function AssessmentCard({ assessment, t }: { assessment: CombinedAssessment, t: 
 
 export default function StudentDashboard() {
   const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
   const { t } = useLanguage();
-  const { toast } = useToast();
   const [assessments, setAssessments] = useState<CombinedAssessment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isTestingUpload, setIsTestingUpload] = useState(false);
-
-  const handleUploadTest = async () => {
-    if (!user) return;
-    setIsTestingUpload(true);
-    toast({ title: "업로드 테스트 시작...", description: "Firebase Storage에 테스트 파일을 업로드합니다." });
-
-    const testContent = `Hello Storage! This is a test file from user ${user.uid} at ${new Date().toISOString()}`;
-    const testFileRef = ref(storage, `test-uploads/test-file-${user.uid}.txt`);
-
-    try {
-        await uploadString(testFileRef, testContent);
-        toast({
-            title: "✅ 업로드 성공!",
-            description: "Firebase Storage에서 'test-uploads' 폴더를 확인해주세요."
-        });
-    } catch (error: any) {
-        console.error("Storage Upload Test Failed:", error);
-        toast({
-            title: "❌ 업로드 실패",
-            description: `오류: ${error.message}`,
-            variant: "destructive"
-        });
-    } finally {
-        setIsTestingUpload(false);
-    }
-  };
 
   useEffect(() => {
     if (authLoading || !user) return;
 
-    const assessmentsQuery = query(collection(db, "assessments"), orderBy("createdAt", "desc"));
-    
-    // Fetch all assessments once
-    getDocs(assessmentsQuery).then(assessmentsSnapshot => {
-        const teacherAssessments = assessmentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TeacherAssessment));
-
-        // Then, set up a real-time listener for results
-        const resultsQuery = query(collection(db, "results"), where("studentId", "==", user.uid));
-        const unsubscribe = onSnapshot(resultsQuery, (resultsSnapshot) => {
-            const resultsMap = new Map<string, { status: StudentResult['status'], id: string }>();
-            resultsSnapshot.forEach(doc => {
-                resultsMap.set(doc.data().assessmentId, { status: doc.data().status, id: doc.id });
-            });
-
-            const combined = teacherAssessments.map(assessment => {
-                const resultInfo = resultsMap.get(assessment.id);
-                return {
-                    ...assessment,
-                    resultStatus: resultInfo ? resultInfo.status : null,
-                    resultId: resultInfo ? resultInfo.id : undefined,
-                };
-            });
-            
-            setAssessments(combined);
-            setIsLoading(false);
-        }, (error) => {
-            console.error("Failed to listen for results", error);
-            setIsLoading(false);
-        });
-
-        return () => unsubscribe(); // Cleanup listener on unmount
-    }).catch(error => {
-        console.error("Failed to load assessments from Firestore", error);
-        setIsLoading(false);
+    // 로컬 목업 데이터 사용
+    const studentResultsMap = new Map<string, { status: StudentResult['status'], id: string }>();
+    MOCK_STUDENT_RESULTS.forEach(result => {
+        if (result.studentId === user.uid) {
+            studentResultsMap.set(result.assessmentId, { status: result.status, id: result.id });
+        }
     });
+
+    const combined = MOCK_TEACHER_ASSESSMENTS.map(assessment => {
+        const resultInfo = studentResultsMap.get(assessment.id);
+        return {
+            ...assessment,
+            resultStatus: resultInfo ? resultInfo.status : null,
+            resultId: resultInfo ? resultInfo.id : undefined,
+        };
+    });
+    
+    setAssessments(combined);
+    setIsLoading(false);
 
   }, [user, authLoading]);
   
@@ -176,11 +133,6 @@ export default function StudentDashboard() {
             <h2 className="text-3xl font-bold tracking-tight">{t.studentDashboard.welcome}</h2>
             <p className="text-muted-foreground">{t.studentDashboard.description}</p>
         </div>
-        {/* 임시 테스트 버튼 */}
-        <Button onClick={handleUploadTest} variant="outline" disabled={isTestingUpload}>
-            {isTestingUpload ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-2 h-4 w-4" />}
-            스토리지 테스트 업로드
-        </Button>
       </div>
 
 

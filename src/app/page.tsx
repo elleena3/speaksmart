@@ -8,9 +8,11 @@ import { Logo } from "@/components/icons";
 import { useLanguage } from "@/context/language-context";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/context/auth-context";
 
 export default function Home() {
   const { language, setLanguage, t } = useLanguage();
+  const { loginAs } = useAuth();
   const router = useRouter();
   const [loadingRole, setLoadingRole] = useState<"student" | "teacher" | null>(null);
 
@@ -33,6 +35,7 @@ export default function Home() {
 
   const handleNavigation = (role: "student" | "teacher") => {
     setLoadingRole(role);
+    loginAs(role); // Set the mock user based on role
     router.push(`/${role}/dashboard`);
   };
 

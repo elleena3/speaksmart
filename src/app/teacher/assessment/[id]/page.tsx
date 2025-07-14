@@ -13,8 +13,8 @@ import { Loader2, User, ArrowRight } from "lucide-react"
 import { type TeacherAssessment, type StudentResult } from "@/lib/types";
 import { useLanguage } from "@/context/language-context";
 import { useAuth } from "@/context/auth-context";
-import { db } from "@/lib/firebase";
-import { collection, query, where, getDocs, doc, getDoc, orderBy } from "firebase/firestore";
+import { useToast } from "@/hooks/use-toast";
+import { MOCK_STUDENT_RESULTS, MOCK_TEACHER_ASSESSMENTS } from "@/lib/mock-data";
 
 
 export default function AssessmentSubmissionsPage() {
@@ -25,6 +25,7 @@ export default function AssessmentSubmissionsPage() {
   const [assessment, setAssessment] = useState<TeacherAssessment | null>(null);
   const [studentResults, setStudentResults] = useState<StudentResult[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
 
   const assessmentId = Array.isArray(params.id) ? params.id[0] : params.id;
 
@@ -33,31 +34,24 @@ export default function AssessmentSubmissionsPage() {
     setIsLoading(true);
 
     try {
-        const assessmentRef = doc(db, "assessments", assessmentId);
-        const assessmentSnap = await getDoc(assessmentRef);
-
-        if (!assessmentSnap.exists() || assessmentSnap.data().uid !== user.uid) {
+        // 로컬 목업 데이터 사용
+        const mockAssessment = MOCK_TEACHER_ASSESSMENTS.find(a => a.id === assessmentId);
+        if (!mockAssessment) {
             notFound();
             return;
         }
-        setAssessment({ id: assessmentSnap.id, ...assessmentSnap.data() } as TeacherAssessment);
+        setAssessment(mockAssessment);
 
-        const resultsQuery = query(
-            collection(db, "results"), 
-            where("assessmentId", "==", assessmentId),
-            orderBy("createdAt", "desc")
-        );
-        const resultsSnapshot = await getDocs(resultsQuery);
-        const resultsData = resultsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as StudentResult));
-        setStudentResults(resultsData);
+        const mockResults = MOCK_STUDENT_RESULTS.filter(r => r.assessmentId === assessmentId);
+        setStudentResults(mockResults);
 
     } catch (error) {
-        console.error("Error fetching submissions:", error);
-        toast({ title: "오류", description: "제출 현황을 불러오는 데 실패했습니다.", variant: "destructive" });
+        console.error("Error fetching mock submissions:", error);
+        toast({ title: "오류", description: "목업 데이터를 불러오는 데 실패했습니다.", variant: "destructive" });
     } finally {
         setIsLoading(false);
     }
-  }, [assessmentId, user]);
+  }, [assessmentId, user, toast]);
 
 
   useEffect(() => {

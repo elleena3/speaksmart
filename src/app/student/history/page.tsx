@@ -7,13 +7,12 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { type StudentResult } from '@/lib/types';
-import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { useLanguage } from '@/context/language-context';
 import { useAuth } from '@/context/auth-context';
 import { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { MOCK_STUDENT_RESULTS } from '@/lib/mock-data';
 
 export default function HistoryPage() {
   const { t } = useLanguage();
@@ -29,24 +28,10 @@ export default function HistoryPage() {
       return;
     }
 
-    async function getHistory(studentId: string) {
-        try {
-            const q = query(
-                collection(db, "results"), 
-                where("studentId", "==", studentId),
-                orderBy("createdAt", "desc")
-            );
-            const querySnapshot = await getDocs(q);
-            const results = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as StudentResult));
-            setCompletedAssessments(results);
-        } catch (error) {
-            console.error("Error fetching student history: ", error);
-        } finally {
-            setIsLoading(false);
-        }
-    }
-    
-    getHistory(user.uid);
+    // 로컬 목업 데이터 사용
+    const results = MOCK_STUDENT_RESULTS.filter(r => r.studentId === user.uid);
+    setCompletedAssessments(results);
+    setIsLoading(false);
 
   }, [user, authLoading, router]);
 
