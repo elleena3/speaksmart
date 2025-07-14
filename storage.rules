@@ -1,20 +1,15 @@
 rules_version = '2';
 
-// Firebase Storage 보안 규칙
 service firebase.storage {
-  // /b/{bucket}/o 는 모든 버킷의 모든 파일을 의미합니다.
   match /b/{bucket}/o {
-    
-    // "recordings" 폴더와 그 하위 경로에 대한 규칙
+    // Allow authenticated users to write to the recordings folder
     match /recordings/{allPaths=**} {
-      
-      // 파일 읽기: 인증된 사용자(로그인한 사용자)만 허용합니다.
-      // 학생이 자신의 결과물을 보거나, 교사가 학생의 결과물을 볼 때 필요합니다.
-      allow read: if request.auth != null;
-      
-      // 파일 쓰기 (업로드, 수정, 삭제): 인증된 사용자만 허용합니다.
-      // 학생이 녹음 파일을 업로드할 때 필요합니다.
-      allow write: if request.auth != null;
+      allow read, write: if request.auth != null;
+    }
+    
+    // Allow authenticated users to write to the test-uploads folder for diagnostics
+    match /test-uploads/{allPaths=**} {
+      allow read, write: if request.auth != null;
     }
   }
 }
