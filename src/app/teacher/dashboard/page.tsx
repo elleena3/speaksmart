@@ -19,7 +19,6 @@ const initialAssessments: TeacherAssessment[] = [
   { id: "3", title: "중간 말하기 시험", topic: "성적 및 피드백 검토", studentsCompleted: 20, totalStudents: 20, averageScore: 91, dateCreated: "2024-05-24", assessmentType: "monologue", prompt: "" },
   { id: "2", title: "6단원: 사람 묘사하기", topic: "성적 및 피드백 검토", studentsCompleted: 15, totalStudents: 20, averageScore: 78, dateCreated: "2024-05-17", assessmentType: "monologue", prompt: "" },
   { id: "1", title: "5단원: 나의 일과", topic: "성적 및 피드백 검토", studentsCompleted: 18, totalStudents: 20, averageScore: 85, dateCreated: "2024-05-10", assessmentType: "monologue", prompt: "" },
-  { id: "free-talk-test", title: "자유 대화 테스트", topic: "1", studentsCompleted: 0, totalStudents: 20, averageScore: 0, dateCreated: "2024-06-02", assessmentType: "dialogue", scenario: "free-talk", prompt: "자유 대화 테스트입니다. AI와 대화하세요." },
 ];
 
 
@@ -123,10 +122,6 @@ export default function TeacherDashboard() {
                         <DropdownMenuItem asChild>
                           <Link href={`/teacher/assessment/${assessment.id}`}>{t.teacherDashboard.viewResults}</Link>
                         </DropdownMenuItem>
-                        <DropdownMenuItem asChild>
-                           <Link href={`/teacher/assessments/${assessment.id}/edit`}>{t.teacherDashboard.edit}</Link>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive focus:bg-destructive/10 focus:text-destructive">{t.teacherDashboard.delete}</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
