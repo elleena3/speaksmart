@@ -1,19 +1,22 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
-import { Send, ThumbsUp, ThumbsDown, MessageSquareQuote, Loader2 } from "lucide-react"
+import { Send, ThumbsUp, ThumbsDown, MessageSquareQuote, Loader2, FileText } from "lucide-react"
+import { summarizeStudentFeedback } from "@/ai/flows/summarize-student-feedback"
+import { type StudentResult } from "@/lib/types"
 
 type FeedbackViewProps = {
   assessmentId: string;
   assessmentTitle: string;
   aiFeedback: string;
+  studentTranscript: string;
 }
 
-export function FeedbackView({ assessmentId, assessmentTitle, aiFeedback }: FeedbackViewProps) {
+export function FeedbackView({ assessmentId, assessmentTitle, aiFeedback, studentTranscript }: FeedbackViewProps) {
   const [teacherFeedback, setTeacherFeedback] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [satisfaction, setSatisfaction] = useState<"good" | "bad" | null>(null);
@@ -29,48 +32,84 @@ export function FeedbackView({ assessmentId, assessmentTitle, aiFeedback }: Feed
       return
     }
     setIsSubmitting(true)
-    toast({ title: "피드백을 제출하는 중..." })
+    toast({ title: "피드백을 요약하여 제출하는 중..." })
     
-    // Simulate API call to summarizeStudentFeedback
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    setIsSubmitting(false)
-    setTeacherFeedback("")
-    toast({
-      title: "피드백이 제출되었습니다!",
-      description: "개선에 도움을 주셔서 감사합니다."
-    })
+    try {
+      const { summary } = await summarizeStudentFeedback({ feedbackText: teacherFeedback });
+
+      // Update the student result in localStorage with the summarized feedback
+      const existingResults: StudentResult[] = JSON.parse(localStorage.getItem('student_results') || '[]');
+      const resultIndex = existingResults.findIndex(r => r.assessmentId === assessmentId);
+
+      if (resultIndex > -1) {
+        existingResults[resultIndex].studentFeedbackSummary = summary;
+        localStorage.setItem('student_results', JSON.stringify(existingResults));
+      }
+      
+      setIsSubmitting(false)
+      setTeacherFeedback("")
+      toast({
+        title: "피드백이 제출되었습니다!",
+        description: "개선에 도움을 주셔서 감사합니다."
+      })
+    } catch(error) {
+        console.error("Error submitting feedback:", error);
+        toast({
+            title: "오류",
+            description: "피드백을 제출하는 중 문제가 발생했습니다.",
+            variant: "destructive"
+        })
+        setIsSubmitting(false);
+    }
   }
 
   return (
     <div className="grid gap-6 lg:grid-cols-3">
-      <Card className="lg:col-span-2">
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <MessageSquareQuote className="w-8 h-8 text-primary shrink-0" />
-            <div>
-              <CardTitle className="text-2xl">"{assessmentTitle}"에 대한 피드백</CardTitle>
-              <CardDescription>AI가 생성한 성과 분석입니다.</CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="p-4 bg-muted/50 rounded-lg whitespace-pre-wrap font-body text-sm leading-relaxed">
-            {aiFeedback}
-          </div>
-        </CardContent>
-        <CardFooter className="flex-col items-start gap-4">
-            <p className="text-sm font-medium">이 피드백이 도움이 되었나요?</p>
-            <div className="flex gap-2">
-                <Button variant={satisfaction === 'good' ? 'default' : 'outline'} onClick={() => setSatisfaction('good')}>
-                    <ThumbsUp className="mr-2 h-4 w-4" /> 유용함
-                </Button>
-                <Button variant={satisfaction === 'bad' ? 'destructive' : 'outline'} onClick={() => setSatisfaction('bad')}>
-                    <ThumbsDown className="mr-2 h-4 w-4" /> 유용하지 않음
-                </Button>
-            </div>
-        </CardFooter>
-      </Card>
+      <div className="lg:col-span-2 space-y-6">
+        <Card>
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <FileText className="w-8 h-8 text-primary shrink-0" />
+                <div>
+                  <CardTitle className="text-2xl">내 답변</CardTitle>
+                  <CardDescription>음성인식으로 변환된 나의 답변입니다.</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+                <div className="p-4 bg-muted/50 rounded-lg whitespace-pre-wrap font-mono text-sm leading-relaxed italic">
+                    "{studentTranscript}"
+                </div>
+            </CardContent>
+        </Card>
+        <Card>
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <MessageSquareQuote className="w-8 h-8 text-primary shrink-0" />
+                <div>
+                  <CardTitle className="text-2xl">"{assessmentTitle}"에 대한 AI 피드백</CardTitle>
+                  <CardDescription>AI가 생성한 성과 분석입니다.</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="p-4 bg-muted/50 rounded-lg whitespace-pre-wrap font-body text-sm leading-relaxed">
+                {aiFeedback}
+              </div>
+            </CardContent>
+            <CardFooter className="flex-col items-start gap-4">
+                <p className="text-sm font-medium">이 피드백이 도움이 되었나요?</p>
+                <div className="flex gap-2">
+                    <Button variant={satisfaction === 'good' ? 'default' : 'outline'} onClick={() => setSatisfaction('good')}>
+                        <ThumbsUp className="mr-2 h-4 w-4" /> 유용함
+                    </Button>
+                    <Button variant={satisfaction === 'bad' ? 'destructive' : 'outline'} onClick={() => setSatisfaction('bad')}>
+                        <ThumbsDown className="mr-2 h-4 w-4" /> 유용하지 않음
+                    </Button>
+                </div>
+            </CardFooter>
+        </Card>
+      </div>
       
       <Card>
         <CardHeader>

@@ -1,12 +1,12 @@
 
 "use client"
 
-import { useState } from "react"
+import { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Mic, StopCircle, Loader2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { generateSpeakingFeedback } from "@/ai/flows/generate-speaking-feedback"
+import { generateComprehensiveFeedback } from "@/ai/flows/generate-comprehensive-feedback"
 import { type StudentResult } from "@/lib/types"
 
 type AssessmentDetails = {
@@ -21,37 +21,64 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Asses
   const [isProcessing, setIsProcessing] = useState(false)
   const router = useRouter()
   const { toast } = useToast()
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
 
-  const handleStartRecording = () => {
-    setIsRecording(true)
-    toast({
-      title: "녹음 시작됨",
-      description: "1분 동안 말씀하실 수 있습니다.",
-    })
+  const handleStartRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorderRef.current = new MediaRecorder(stream);
+      mediaRecorderRef.current.ondataavailable = (event) => {
+        audioChunksRef.current.push(event.data);
+      };
+      mediaRecorderRef.current.onstart = () => {
+        setIsRecording(true)
+        toast({
+          title: "녹음 시작됨",
+          description: "말씀을 마치신 후 녹음 중지 버튼을 눌러주세요.",
+        })
+      };
+      mediaRecorderRef.current.start();
+    } catch (error) {
+      console.error("Error accessing microphone:", error)
+      toast({
+        title: "마이크 접근 오류",
+        description: "마이크 접근 권한을 허용해주세요.",
+        variant: "destructive"
+      });
+    }
   }
 
   const handleStopRecording = async () => {
-    setIsRecording(false)
-    setIsProcessing(true)
-    toast({
-      title: "녹음 중지됨",
-      description: "오디오를 처리 중입니다...",
-    })
-
-    try {
-      // In a real app, this would come from a microphone recording.
-      // For this demo, we'll use a placeholder short, silent audio data URI.
-      const studentRecordingDataUri = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA="
-
-      const feedbackResult = await generateSpeakingFeedback({
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+      mediaRecorderRef.current.onstop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const reader = new FileReader();
+        reader.readAsDataURL(audioBlob);
+        reader.onloadend = async () => {
+          const base64Audio = reader.result as string;
+          processAssessment(base64Audio);
+        };
+        audioChunksRef.current = [];
+      };
+      mediaRecorderRef.current.stop();
+      setIsRecording(false)
+      setIsProcessing(true)
+      toast({
+        title: "녹음 중지됨",
+        description: "오디오를 처리하고 AI 피드백을 생성 중입니다...",
+      })
+    }
+  }
+  
+  const processAssessment = async (studentRecordingDataUri: string) => {
+     try {
+      const { aiFeedback, curricularRemarks, teacherGuidance, score, studentTranscript } = await generateComprehensiveFeedback({
         activityPrompt: assessmentDetails.prompt,
         expectedFormat: assessmentDetails.expectedFormat,
         studentRecordingDataUri,
-        studentFeedbackInstructions: "Provide feedback on fluency, pronunciation, and vocabulary usage. Be encouraging."
+        studentName: "Alex Doe", // In a real app, this would be dynamic
       });
-
-      // In a real app, this would be more sophisticated.
-      const score = Math.floor(Math.random() * (98 - 80 + 1)) + 80;
 
       const studentResult: StudentResult = {
         studentId: "student-alex-doe",
@@ -61,17 +88,16 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Asses
         status: "채점 완료",
         score,
         date: new Date().toISOString().split('T')[0],
-        aiFeedback: feedbackResult.feedback,
-        // Mocking these for now as they require more complex flows
-        curricularRemarks: "학생은 주어진 주제에 대해 논리적으로 자신의 경험을 잘 설명함. 특히, 과거 시제를 적절히 사용하여 문장을 구성하는 능력이 돋보임. 어휘 사용 범위가 다소 제한적이었으나, 핵심 내용은 명확하게 전달함. 발음은 대체로 양호하나, 일부 단어에서 강세 위치를 개선할 필요가 있음. 전반적으로 성실하게 과제에 임하는 태도가 긍정적임.",
-        studentFeedbackSummary: "학생은 평가 주제가 흥미로웠다고 응답했으나, 답변 준비 시간이 조금 더 길었으면 좋겠다는 의견을 제시함. AI의 피드백이 전반적으로 도움이 되었다고 평가함.",
-        teacherGuidance: "이 학생은 문법 구조에 대한 이해도가 높습니다. 다양한 어휘를 사용할 수 있도록 유의어 및 관련 표현 학습을 독려해주세요. 역할극이나 짧은 발표 활동을 통해 자신감을 키워주는 것이 도움이 될 것입니다."
+        aiFeedback,
+        curricularRemarks,
+        studentFeedbackSummary: "학생이 평가에 대해 남긴 피드백이 없습니다.", // This will be updated later if the student provides it
+        teacherGuidance,
+        studentTranscript,
       }
       
       const existingResults: StudentResult[] = JSON.parse(localStorage.getItem('student_results') || '[]');
       const updatedResults = [...existingResults.filter(r => r.assessmentId !== assessmentDetails.id), studentResult];
       localStorage.setItem('student_results', JSON.stringify(updatedResults));
-      localStorage.setItem(`assessment_feedback_${assessmentDetails.id}`, feedbackResult.feedback);
 
       toast({
         title: "처리 완료!",

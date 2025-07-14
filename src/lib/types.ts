@@ -59,4 +59,5 @@ export type StudentResult = {
   curricularRemarks: string;
   studentFeedbackSummary: string;
   teacherGuidance: string;
+  studentTranscript?: string;
 }

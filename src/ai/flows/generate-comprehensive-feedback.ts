@@ -1,0 +1,111 @@
+'use server';
+
+/**
+ * @fileOverview Generates comprehensive feedback for a monologue speaking assessment.
+ * It transcribes student audio, then generates student feedback, teacher guidance, curricular remarks, and a score.
+ */
+
+import { ai } from '@/ai/genkit';
+import { googleAI } from '@genkit-ai/googleai';
+import { z } from 'zod';
+
+// Input schema for the entire comprehensive feedback generation flow
+const GenerateComprehensiveFeedbackInputSchema = z.object({
+  studentRecordingDataUri: z.string().describe(
+    "The student's voice recording as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
+  ),
+  activityPrompt: z.string().describe('The prompt or instructions for the speaking activity.'),
+  expectedFormat: z.string().describe('The expected format or key points of the response for grading.'),
+  studentName: z.string().describe('The name of the student.'),
+});
+export type GenerateComprehensiveFeedbackInput = z.infer<typeof GenerateComprehensiveFeedbackInputSchema>;
+
+// Output schema for the comprehensive feedback generation flow
+const GenerateComprehensiveFeedbackOutputSchema = z.object({
+  studentTranscript: z.string().describe("The transcript of the student's speech."),
+  aiFeedback: z.string().describe('The generated feedback for the student in Korean.'),
+  teacherGuidance: z.string().describe('Actionable guidance for the teacher based on the performance in Korean.'),
+  curricularRemarks: z.string().describe('A draft of curricular remarks suitable for the student’s academic record in Korean.'),
+  score: z.number().int().min(0).max(100).describe('A score from 0-100 for the performance.'),
+});
+export type GenerateComprehensiveFeedbackOutput = z.infer<typeof GenerateComprehensiveFeedbackOutputSchema>;
+
+export async function generateComprehensiveFeedback(input: GenerateComprehensiveFeedbackInput): Promise<GenerateComprehensiveFeedbackOutput> {
+  return generateComprehensiveFeedbackFlow(input);
+}
+
+// 1. Define the prompt for generating the analysis and feedback
+const feedbackGenerationPrompt = ai.definePrompt({
+  name: 'feedbackGenerationPrompt',
+  input: {
+    schema: GenerateComprehensiveFeedbackInputSchema.extend({
+      studentTranscript: z.string(),
+    }).omit({ studentRecordingDataUri: true }),
+  },
+  output: { schema: GenerateComprehensiveFeedbackOutputSchema.omit({ studentTranscript: true }) },
+  prompt: `You are an AI English Teacher evaluating a student's monologue performance.
+Your entire response must be in the specified JSON format, and all text must be in Korean.
+
+Here is the context for the evaluation:
+- Student Name: {{{studentName}}}
+- Activity Prompt: {{{activityPrompt}}}
+- Expected Response Format/Grading Criteria: {{{expectedFormat}}}
+- Student's Spoken Response (Transcript): {{{studentTranscript}}}
+
+Based on all the information provided, perform the following tasks:
+
+1.  **Generate Feedback for the Student:** Write encouraging and constructive feedback. Focus on what they did well and what they can improve regarding fluency, pronunciation, grammar, and vocabulary in relation to the prompt.
+2.  **Generate Guidance for the Teacher:** Provide actionable advice for the teacher on how to help this specific student. Suggest activities or focus areas.
+3.  **Draft Curricular Remarks:** Write official curricular remarks in a formal, descriptive tone with sentences ending in '~함' or '~임'. The remarks should summarize the student's performance on this task for their academic record. Follow a 3-part structure: ① General participation/attitude, ② Specific examples from their speech and how it relates to learning objectives, ③ Collaboration, consideration for others, or other notable character traits.
+4.  **Assign a Score:** Give a score from 0 to 100, where 100 is a perfect response that fully meets all criteria. Base the score on how well the student's response aligns with the activity prompt and expected format.
+`,
+});
+
+// 2. Define the main flow
+const generateComprehensiveFeedbackFlow = ai.defineFlow(
+  {
+    name: 'generateComprehensiveFeedbackFlow',
+    inputSchema: GenerateComprehensiveFeedbackInputSchema,
+    outputSchema: GenerateComprehensiveFeedbackOutputSchema,
+  },
+  async ({ studentRecordingDataUri, activityPrompt, expectedFormat, studentName }) => {
+    // Step 1: Transcribe the student's audio recording.
+    const sttResponse = await ai.generate({
+      model: googleAI.model('gemini-2.0-flash'),
+      prompt: [
+        { text: 'Transcribe this audio.' },
+        { media: { url: studentRecordingDataUri } },
+      ],
+    });
+    const studentTranscript = sttResponse.text;
+
+    if (!studentTranscript?.trim()) {
+      // If transcription is empty, return a default "could not hear" response.
+      return {
+        studentTranscript: '(음성을 인식할 수 없습니다.)',
+        aiFeedback: '죄송합니다, 답변을 제대로 듣지 못했습니다. 마이크를 확인하고 다시 시도해주세요.',
+        teacherGuidance: '학생의 음성이 녹음되지 않았거나 인식이 불가능했습니다. 학생이 마이크를 올바르게 사용하고 있는지 확인이 필요합니다.',
+        curricularRemarks: '음성 파일이 비어있어 평가를 진행할 수 없음.',
+        score: 0,
+      };
+    }
+
+    // Step 2: Call the prompt to generate feedback, remarks, guidance, and score.
+    const { output } = await feedbackGenerationPrompt({
+      studentTranscript,
+      activityPrompt,
+      expectedFormat,
+      studentName,
+    });
+
+    if (!output) {
+        throw new Error("Failed to generate comprehensive feedback from the AI model.");
+    }
+
+    // Step 3: Return the combined result.
+    return {
+      studentTranscript,
+      ...output,
+    };
+  }
+);
