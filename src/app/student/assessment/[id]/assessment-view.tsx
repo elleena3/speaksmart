@@ -1,7 +1,7 @@
 
 "use client"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Mic, StopCircle, Loader2 } from "lucide-react"
@@ -10,7 +10,7 @@ import { generateComprehensiveFeedback } from "@/ai/flows/generate-comprehensive
 import { type StudentResult, type TeacherAssessment } from "@/lib/types"
 import { useAuth } from "@/context/auth-context"
 import { db } from "@/lib/firebase"
-import { collection, addDoc } from "firebase/firestore"
+import { collection, addDoc, doc, writeBatch, query, where, getDocs } from "firebase/firestore"
 
 export function AssessmentView({ assessmentDetails }: { assessmentDetails: TeacherAssessment }) {
   const { user } = useAuth();
@@ -20,35 +20,51 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
   const { toast } = useToast()
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const audioStreamRef = useRef<MediaStream | null>(null);
+
+  const cleanup = () => {
+    if (audioStreamRef.current) {
+      audioStreamRef.current.getTracks().forEach(track => track.stop());
+      audioStreamRef.current = null;
+    }
+    if (mediaRecorderRef.current) {
+      mediaRecorderRef.current.ondataavailable = null;
+      mediaRecorderRef.current.onstop = null;
+      mediaRecorderRef.current.onerror = null;
+      mediaRecorderRef.current = null;
+    }
+    audioChunksRef.current = [];
+  };
 
   const handleStartRecording = async () => {
+    // Clear previous refs
+    cleanup();
+    setIsRecording(true);
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioStreamRef.current = stream;
       mediaRecorderRef.current = new MediaRecorder(stream);
+      
       mediaRecorderRef.current.ondataavailable = (event) => {
-        audioChunksRef.current.push(event.data);
+        if (event.data.size > 0) {
+            audioChunksRef.current.push(event.data);
+        }
       };
-      mediaRecorderRef.current.onstart = () => {
-        setIsRecording(true)
-        toast({
-          title: "녹음 시작됨",
-          description: "말씀을 마치신 후 녹음 중지 버튼을 눌러주세요.",
-        })
-      };
-      mediaRecorderRef.current.start();
-    } catch (error) {
-      console.error("Error accessing microphone:", error)
-      toast({
-        title: "마이크 접근 오류",
-        description: "마이크 접근 권한을 허용해주세요.",
-        variant: "destructive"
-      });
-    }
-  }
 
-  const handleStopRecording = async () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
       mediaRecorderRef.current.onstop = () => {
+        if (audioChunksRef.current.length === 0) {
+            console.warn("No audio data recorded.");
+            toast({
+                title: "녹음된 오디오 없음",
+                description: "오디오가 녹음되지 않았습니다. 마이크를 확인하고 다시 시도해주세요.",
+                variant: "destructive"
+            });
+            setIsProcessing(false);
+            cleanup();
+            return;
+        }
+
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         const reader = new FileReader();
         reader.readAsDataURL(audioBlob);
@@ -56,15 +72,47 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
           const base64Audio = reader.result as string;
           processAssessment(base64Audio);
         };
-        audioChunksRef.current = [];
+        cleanup();
       };
-      mediaRecorderRef.current.stop();
+
+      mediaRecorderRef.current.onerror = (event) => {
+        console.error("MediaRecorder error:", event);
+        toast({
+            title: "녹음 오류",
+            description: "녹음 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
+            variant: "destructive"
+        });
+        setIsRecording(false);
+        setIsProcessing(false);
+        cleanup();
+      }
+
+      mediaRecorderRef.current.start();
+      toast({
+        title: "녹음 시작됨",
+        description: "말씀을 마치신 후 녹음 중지 버튼을 눌러주세요.",
+      });
+
+    } catch (error) {
+      console.error("Error accessing microphone:", error)
+      toast({
+        title: "마이크 접근 오류",
+        description: "마이크 접근 권한을 허용해주세요.",
+        variant: "destructive"
+      });
+      setIsRecording(false);
+    }
+  }
+
+  const handleStopRecording = async () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
       setIsRecording(false)
       setIsProcessing(true)
+      mediaRecorderRef.current.stop(); // This will trigger the onstop event
       toast({
         title: "녹음 중지됨",
         description: "오디오를 처리하고 AI 피드백을 생성 중입니다...",
-      })
+      });
     }
   }
   
@@ -113,25 +161,40 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
         teacherUid: assessmentDetails.uid,
       };
 
-      await addDoc(collection(db, "results"), resultData);
+      const resultsRef = collection(db, "results");
+      const q = query(resultsRef, where("assessmentId", "==", assessmentDetails.id), where("studentId", "==", user.uid));
+      const existingDocs = await getDocs(q);
+
+      const batch = writeBatch(db);
+      existingDocs.forEach(doc => batch.delete(doc.ref));
+      const newResultRef = doc(collection(db, "results"));
+      batch.set(newResultRef, resultData);
+      await batch.commit();
 
       toast({
         title: "처리 완료!",
         description: "피드백을 확인할 준비가 되었습니다.",
-      })
+      });
 
-      router.push(`/student/assessment/${assessmentDetails.id}/results`)
+      router.push(`/student/assessment/${assessmentDetails.id}/results`);
 
     } catch (error) {
-      console.error("Error processing assessment:", error)
+      console.error("Error processing assessment:", error);
       toast({
         title: "오류",
         description: "녹음을 처리하는 중에 문제가 발생했습니다. 다시 시도해 주세요.",
         variant: "destructive",
-      })
-      setIsProcessing(false)
+      });
+      setIsProcessing(false);
     }
   }
+  
+  useEffect(() => {
+    // Cleanup on component unmount
+    return () => {
+      cleanup();
+    };
+  }, []);
 
   const getButtonState = () => {
     if (isProcessing) {

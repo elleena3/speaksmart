@@ -18,6 +18,7 @@ export function FreeTalkView({ scenario, scenarioPrompt, assessment }: { scenari
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
   const [interimTranscript, setInterimTranscript] = useState<string | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioStreamRef = useRef<MediaStream | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const studentAudioChunksRef = useRef<Blob[]>([]); // To collect all student audio blobs
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
@@ -25,9 +26,31 @@ export function FreeTalkView({ scenario, scenarioPrompt, assessment }: { scenari
   const router = useRouter();
   const { toast } = useToast();
 
+  const cleanupRecorder = () => {
+    if (audioStreamRef.current) {
+        audioStreamRef.current.getTracks().forEach(track => track.stop());
+        audioStreamRef.current = null;
+    }
+    if (mediaRecorderRef.current) {
+        mediaRecorderRef.current.ondataavailable = null;
+        mediaRecorderRef.current.onstop = null;
+        mediaRecorderRef.current.onerror = null;
+        mediaRecorderRef.current = null;
+    }
+    audioChunksRef.current = [];
+  };
+
   useEffect(() => {
     // Clear history when component mounts for a clean start
     sessionStorage.removeItem(SESSION_STORAGE_KEY);
+    // Cleanup on component unmount
+    return () => {
+      cleanupRecorder();
+      if(audioPlayerRef.current){
+        audioPlayerRef.current.pause();
+        audioPlayerRef.current.src = "";
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -74,16 +97,60 @@ export function FreeTalkView({ scenario, scenarioPrompt, assessment }: { scenari
 
   const handleStartRecording = async () => {
     if (sessionState !== 'waiting_for_user') return;
+    
+    cleanupRecorder();
     setSessionState("recording");
     setInterimTranscript("듣고 있어요...");
-    audioChunksRef.current = [];
+    
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioStreamRef.current = stream;
       mediaRecorderRef.current = new MediaRecorder(stream);
+
       mediaRecorderRef.current.ondataavailable = (event) => {
-        audioChunksRef.current.push(event.data);
+        if (event.data.size > 0) {
+            audioChunksRef.current.push(event.data);
+        }
       };
+
+      mediaRecorderRef.current.onstop = () => {
+        if (audioChunksRef.current.length === 0) {
+            console.warn("No audio data recorded for this turn.");
+            setInterimTranscript(null);
+            setSessionState("waiting_for_user");
+            toast({
+                title: "목소리가 들리지 않아요",
+                description: "마이크를 확인하고 다시 말씀해주세요.",
+                variant: "destructive"
+            });
+            cleanupRecorder();
+            return;
+        }
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        studentAudioChunksRef.current.push(audioBlob); // Collect the student's audio chunk
+        const reader = new FileReader();
+        reader.readAsDataURL(audioBlob);
+        reader.onloadend = async () => {
+          const base64Audio = reader.result as string;
+          processAudio(base64Audio);
+        };
+        cleanupRecorder();
+      };
+      
+      mediaRecorderRef.current.onerror = (event) => {
+          console.error("MediaRecorder error:", event);
+          toast({
+              title: "녹음 오류",
+              description: "녹음 중 오류가 발생했습니다. 다시 시도해주세요.",
+              variant: "destructive",
+          });
+          setInterimTranscript(null);
+          setSessionState("waiting_for_user");
+          cleanupRecorder();
+      };
+
       mediaRecorderRef.current.start();
+
     } catch (error) {
       console.error("Error accessing microphone:", error);
       toast({
@@ -98,19 +165,9 @@ export function FreeTalkView({ scenario, scenarioPrompt, assessment }: { scenari
 
   const handleStopRecording = () => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
-      mediaRecorderRef.current.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        studentAudioChunksRef.current.push(audioBlob); // Collect the student's audio chunk
-        const reader = new FileReader();
-        reader.readAsDataURL(audioBlob);
-        reader.onloadend = async () => {
-          const base64Audio = reader.result as string;
-          processAudio(base64Audio);
-        };
-      };
-      mediaRecorderRef.current.stop();
       setSessionState("processing");
       setInterimTranscript("처리 중...");
+      mediaRecorderRef.current.stop();
     }
   };
 
@@ -151,6 +208,14 @@ export function FreeTalkView({ scenario, scenarioPrompt, assessment }: { scenari
 
   const handleFinishSession = () => {
     // Combine all student audio chunks into one blob
+    if (studentAudioChunksRef.current.length === 0) {
+        toast({
+            title: "저장할 음성 없음",
+            description: "대화를 먼저 진행해주세요.",
+            variant: "destructive"
+        });
+        return;
+    }
     const combinedBlob = new Blob(studentAudioChunksRef.current, { type: 'audio/webm' });
     const reader = new FileReader();
     reader.readAsDataURL(combinedBlob);
@@ -226,7 +291,7 @@ export function FreeTalkView({ scenario, scenarioPrompt, assessment }: { scenari
             );
         default:
             return (
-                <Button onClick={handleFinishSession} variant="secondary" disabled={isBusy || conversation.length <= 1}>
+                <Button onClick={handleFinishSession} variant="secondary" disabled={isBusy || studentAudioChunksRef.current.length === 0}>
                     <CornerDownLeft className="mr-2 h-5 w-5"/>
                     대화 종료
                 </Button>
