@@ -80,14 +80,9 @@ export default function StudentResultPage() {
     try {
         const { default: jsPDF } = await import('jspdf');
         const { default: autoTable } = await import('jspdf-autotable');
-        const { NanumGothicFont } = await import('@/lib/fonts/nanum-gothic-for-jspdf');
         
         const docPDF = new jsPDF();
         
-        docPDF.addFileToVFS("NanumGothic.ttf", NanumGothicFont);
-        docPDF.addFont("NanumGothic.ttf", "NanumGothic", "normal");
-        docPDF.setFont("NanumGothic");
-
         const margin = 15;
         
         docPDF.setFontSize(22);
@@ -137,7 +132,7 @@ export default function StudentResultPage() {
             
             const splitContent = docPDF.splitTextToSize(content || "내용 없음", 180);
             const lineHeight = docPDF.getLineHeight();
-            const contentHeight = splitContent.length * lineHeight * 0.352777; // Adjust multiplier as needed
+            const contentHeight = splitContent.length * lineHeight;
 
             if (startY + 8 + contentHeight > pageHeight - 20) {
                 docPDF.addPage();
@@ -315,3 +310,5 @@ export default function StudentResultPage() {
     </div>
   );
 }
+
+    
