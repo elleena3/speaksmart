@@ -70,25 +70,25 @@ export default function StudentResultPage() {
   const handleDownloadReport = () => {
     if (!studentResult || !assessment) return;
 
-    const doc = new jsPDF();
+    const docPDF = new jsPDF();
 
     // Add Korean font
-    doc.addFileToVFS("NotoSansKR-Regular.ttf", NotoSansKRFont);
-    doc.addFont("NotoSansKR-Regular.ttf", "NotoSansKR", "normal");
-    doc.setFont("NotoSansKR");
+    docPDF.addFileToVFS("NotoSansKR-Regular.ttf", NotoSansKRFont);
+    docPDF.addFont("NotoSansKR-Regular.ttf", "NotoSansKR", "normal");
+    docPDF.setFont("NotoSansKR");
 
     const margin = 15;
     let finalY = 20;
 
-    doc.setFontSize(22);
-    doc.text('학생 답변 종합 리포트', margin, finalY);
+    docPDF.setFontSize(22);
+    docPDF.text('학생 답변 종합 리포트', margin, finalY);
     finalY += 10;
     
-    doc.setDrawColor(200, 200, 200);
-    doc.line(margin, finalY, 210 - margin, finalY);
+    docPDF.setDrawColor(200, 200, 200);
+    docPDF.line(margin, finalY, 210 - margin, finalY);
     finalY += 10;
     
-    doc.setFontSize(12);
+    docPDF.setFontSize(12);
     
     const isDialogue = assessment.assessmentType === 'dialogue';
 
@@ -113,7 +113,7 @@ export default function StudentResultPage() {
       [studentResult.studentFeedbackSummary],
     ];
 
-    autoTable(doc, {
+    autoTable(docPDF, {
       startY: finalY,
       head: [['항목', '내용']],
       body: bodyData,
@@ -129,20 +129,18 @@ export default function StudentResultPage() {
         textColor: 255,
       },
       didParseCell: function(data) {
-        // For section titles that span across columns
         if (typeof data.cell.raw === 'object' && !Array.isArray(data.cell.raw)) {
           data.cell.styles.halign = 'center';
-          data.cell.text = data.cell.raw.content;
+          data.cell.text = (data.cell.raw as any).content;
           data.cell.colSpan = 2;
         }
-        // For single column content
         if (Array.isArray(data.cell.raw) && data.cell.raw.length === 1) {
             data.cell.colSpan = 2;
         }
       }
     });
 
-    doc.save(`${studentResult.name}_${assessment.title}_리포트.pdf`);
+    docPDF.save(`${studentResult.name}_${assessment.title}_리포트.pdf`);
   };
   
   if (isLoading || authLoading) {
@@ -283,5 +281,5 @@ export default function StudentResultPage() {
         </div>
       </div>
     </div>
-  )
+  );
 }
