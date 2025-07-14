@@ -95,8 +95,8 @@ export default function EditAssessmentPage() {
     if (assessment) {
         form.reset({
           ...assessment,
-          startDate: assessment.startDate,
-          endDate: assessment.endDate,
+          startDate: assessment.startDate ? new Date(assessment.startDate) : undefined,
+          endDate: assessment.endDate ? new Date(assessment.endDate) : undefined,
         });
     } else {
         toast({ title: "오류", description: "평가를 찾을 수 없습니다.", variant: "destructive" });
@@ -136,7 +136,14 @@ export default function EditAssessmentPage() {
         submissionValues.expectedFormat = "발음, 문법, 단어, 문장 등을 평가 주제에 맞게 종합적으로 판단.";
     }
 
-    console.log("Updated Assessment (Mock):", submissionValues);
+    // Convert dates to string for mock submission
+    const finalValues = {
+        ...submissionValues,
+        startDate: values.startDate?.toISOString(),
+        endDate: values.endDate?.toISOString(),
+    };
+
+    console.log("Updated Assessment (Mock):", finalValues);
     
     toast({
         title: `${t.teacherAssessmentForm.editSuccessToast.title} (목업)`,

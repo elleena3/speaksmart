@@ -83,17 +83,17 @@ export default function AssessmentsPage() {
     });
   }
   
-  const formatDateRange = (startDate?: Date, endDate?: Date) => {
+  const formatDateRange = (startDate?: string, endDate?: string) => {
     const { periodAlways, periodFrom, periodTo } = t.teacherAssessments;
     
     if (startDate && endDate) {
-      return `${format(startDate, "yy/MM/dd")} - ${format(endDate, "yy/MM/dd")}`;
+      return `${format(new Date(startDate), "yy/MM/dd")} - ${format(new Date(endDate), "yy/MM/dd")}`;
     }
     if (startDate) {
-      return periodFrom.replace('{date}', format(startDate, "yy/MM/dd"));
+      return periodFrom.replace('{date}', format(new Date(startDate), "yy/MM/dd"));
     }
     if (endDate) {
-      return periodTo.replace('{date}', format(endDate, "yy/MM/dd"));
+      return periodTo.replace('{date}', format(new Date(endDate), "yy/MM/dd"));
     }
     return periodAlways;
   };

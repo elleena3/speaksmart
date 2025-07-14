@@ -110,8 +110,14 @@ export default function NewAssessmentPage() {
         submissionValues.expectedFormat = "발음, 문법, 단어, 문장 등을 평가 주제에 맞게 종합적으로 판단.";
     }
     
+    const finalValues = {
+        ...submissionValues,
+        startDate: values.startDate?.toISOString(),
+        endDate: values.endDate?.toISOString(),
+    };
+
     // 로컬 목업 모드에서는 콘솔에 로그만 남기고 리디렉션합니다.
-    console.log("New Assessment Submitted (Mock):", submissionValues);
+    console.log("New Assessment Submitted (Mock):", finalValues);
     
     toast({
         title: `${t.teacherAssessmentForm.createSuccessToast.title} (목업)`,

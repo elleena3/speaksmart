@@ -31,8 +31,8 @@ export type TeacherAssessment = {
   prompt: string;
   averageScore: number;
   dateCreated: string;
-  startDate?: Date;
-  endDate?: Date;
+  startDate?: string;
+  endDate?: string;
   assessmentType: 'monologue' | 'dialogue';
   scenario?: Scenario;
   expectedFormat?: string;
