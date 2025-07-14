@@ -11,12 +11,12 @@ import { getStorage } from "firebase/storage";
 // YOUR_..._HERE 부분을 실제 값으로 교체해야 합니다.
 // ====================================================================
 export const firebaseConfig = {
-  apiKey: "YOUR_API_KEY_HERE",
-  authDomain: "YOUR_AUTH_DOMAIN_HERE",
-  projectId: "YOUR_PROJECT_ID_HERE",
-  storageBucket: "YOUR_STORAGE_BUCKET_HERE",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID_HERE",
-  appId: "YOUR_APP_ID_HERE"
+  apiKey: "AIzaSyCy_1qEnsU07EajtyI81nmH_NZIYYoQvP8",
+  authDomain: "speaksmart-evaluator.firebaseapp.com",
+  projectId: "speaksmart-evaluator",
+  storageBucket: "speaksmart-evaluator.firebasestorage.app",
+  messagingSenderId: "467932902885",
+  appId: "1:467932902885:web:713b072c717516dea72b0c"
 };
 
 
