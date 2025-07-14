@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState, useEffect } from "react"
@@ -93,7 +94,7 @@ export function FeedbackView({ assessmentId, assessmentTitle, aiFeedback, studen
               </div>
             </CardHeader>
             <CardContent>
-              <div className="p-4 bg-muted/50 rounded-lg whitespace-pre-wrap font-body text-sm leading-relaxed">
+              <div className="p-4 bg-muted/50 rounded-lg whitespace-pre-wrap font-body text-base leading-relaxed">
                 {aiFeedback}
               </div>
             </CardContent>

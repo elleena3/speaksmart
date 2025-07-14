@@ -56,8 +56,6 @@ export default function StudentResultPage() {
     return null; // Should be handled by the redirection logic
   }
 
-  const isDialogue = assessment.assessmentType === 'dialogue';
-
   const noFeedbackMessage = "학생이 평가에 대해 남긴 피드백이 없습니다.";
   const hasFeedback = student.studentFeedbackSummary && student.studentFeedbackSummary !== noFeedbackMessage;
 
@@ -84,7 +82,7 @@ export default function StudentResultPage() {
                 <CardDescription>학생의 실제 답변을 텍스트로 변환한 내용입니다.</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-sm p-4 bg-muted/50 rounded-lg italic font-mono">
+                <div className="text-sm p-4 bg-muted/50 rounded-lg italic font-mono whitespace-pre-wrap">
                     "{student.studentTranscript || "학생 답변이 기록되지 않았습니다."}"
                 </div>
               </CardContent>
@@ -96,7 +94,7 @@ export default function StudentResultPage() {
                 <CardDescription>학생의 성과에 기반한 AI 생성 초안입니다.</CardDescription>
               </CardHeader>
               <CardContent>
-                <Textarea readOnly value={student.curricularRemarks} className="h-48 bg-muted/50 font-mono text-sm" />
+                <Textarea readOnly value={student.curricularRemarks} className="h-48 bg-muted/50 font-mono text-sm whitespace-pre-wrap" />
                 <Button className="w-full mt-4">
                   <Paperclip className="mr-2 h-4 w-4" /> 생활기록부에 저장
                 </Button>
@@ -126,7 +124,7 @@ export default function StudentResultPage() {
                   <CardDescription>학생의 답변 분석에 기반한 AI 조언입니다.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-sm text-muted-foreground p-4 bg-muted/50 rounded-lg">
+                  <div className="text-sm text-muted-foreground p-4 bg-muted/50 rounded-lg whitespace-pre-wrap">
                     {student.teacherGuidance}
                   </div>
                 </CardContent>
