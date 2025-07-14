@@ -24,7 +24,7 @@ function AssessmentCard({ assessment, t }: { assessment: CombinedAssessment, t: 
   const hasError = assessment.resultStatus === '오류';
 
   const getStatusText = () => {
-    if (hasError) return "오류";
+    if (hasError) return "오류 발생";
     if (isGrading) return "채점 중...";
     if (isCompleted) return t.studentDashboard.status.graded;
     return t.studentDashboard.status.todo;
@@ -74,7 +74,7 @@ function AssessmentCard({ assessment, t }: { assessment: CombinedAssessment, t: 
       <CardContent className="flex-grow" />
       <CardFooter>
         <Link href={getLink()} passHref className="w-full">
-          <Button className="w-full" disabled={isGrading}>
+          <Button className="w-full">
             {getIcon()}
             <span className="ml-2">{getButtonText()}</span>
           </Button>

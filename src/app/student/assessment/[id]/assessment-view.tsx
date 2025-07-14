@@ -99,8 +99,8 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
         if(timerIntervalRef.current) clearInterval(timerIntervalRef.current);
         
         toast({
-            title: "녹음 처리 중...",
-            description: "AI 분석이 시작되었습니다. 완료되면 알려드립니다.",
+            title: "제출 완료",
+            description: "답변이 제출되었습니다. AI 분석이 시작되며, 완료되면 알려드립니다.",
         });
 
         if (audioChunksRef.current.length === 0) {

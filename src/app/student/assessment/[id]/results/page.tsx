@@ -55,8 +55,8 @@ export default function AssessmentResultsPage() {
         }
       } else {
         // This case might happen if the doc is not created yet, or no results exist.
-        // It might be better to show a "not found" or "not started" message.
-        setIsLoading(false);
+        // It's better to show that it's still grading.
+        setIsLoading(true);
       }
     }, (err) => {
       console.error("Error fetching result with onSnapshot: ", err);
