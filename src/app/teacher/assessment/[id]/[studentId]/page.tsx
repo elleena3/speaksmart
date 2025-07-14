@@ -15,7 +15,6 @@ import { db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import jsPDF from "jspdf";
 import autoTable from 'jspdf-autotable';
-import { NotoSansKRFont } from "@/lib/fonts/noto-sans-kr-for-jspdf";
 
 export default function StudentResultPage() {
   const params = useParams();
@@ -71,17 +70,14 @@ export default function StudentResultPage() {
     if (!studentResult || !assessment) return;
 
     const docPDF = new jsPDF();
-
-    // Add Korean font
-    docPDF.addFileToVFS("NotoSansKR-Regular.ttf", NotoSansKRFont);
-    docPDF.addFont("NotoSansKR-Regular.ttf", "NotoSansKR", "normal");
-    docPDF.setFont("NotoSansKR");
-
     const margin = 15;
     let finalY = 20;
 
+    // Use a basic font that supports English characters.
+    docPDF.setFont("Helvetica");
+
     docPDF.setFontSize(22);
-    docPDF.text('학생 답변 종합 리포트', margin, finalY);
+    docPDF.text('Student Report', margin, finalY);
     finalY += 10;
     
     docPDF.setDrawColor(200, 200, 200);
@@ -93,33 +89,32 @@ export default function StudentResultPage() {
     const isDialogue = assessment.assessmentType === 'dialogue';
 
     const bodyData = [
-      ['학생 이름', studentResult.name],
-      ['평가명', assessment.title],
-      ['평가 유형', isDialogue ? 'AI와 대화하기' : '혼자 말하기'],
-      ['평가 날짜', studentResult.date],
-      ['내용 점수', `${studentResult.score}%`],
-      ['발음 점수', `${studentResult.pronunciationScore ?? 0}%`],
-      { content: 'AI 피드백 (학생용)', styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } },
+      ['Student Name', studentResult.name],
+      ['Assessment', assessment.title],
+      ['Type', isDialogue ? 'Dialogue with AI' : 'Monologue'],
+      ['Date', studentResult.date],
+      ['Content Score', `${studentResult.score}%`],
+      ['Pronunciation Score', `${studentResult.pronunciationScore ?? 0}%`],
+      { content: 'AI Feedback (for Student)', styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } },
       [studentResult.aiFeedback],
-      { content: '발음 분석', styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } },
+      { content: 'Pronunciation Analysis', styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } },
       [studentResult.pronunciationFeedback || 'N/A'],
-      { content: `전체 ${isDialogue ? '대화' : '답변'} 기록`, styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } },
-      [studentResult.studentTranscript || '기록 없음'],
-      { content: '교과과정 비고 초안 (생활기록부용)', styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } },
+      { content: `Full ${isDialogue ? 'Conversation' : 'Response'} Transcript`, styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } },
+      [studentResult.studentTranscript || 'No transcript available'],
+      { content: 'Draft Curricular Remarks', styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } },
       [studentResult.curricularRemarks],
-      { content: '선생님을 위한 조언', styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } },
+      { content: 'Guidance for Teacher', styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } },
       [studentResult.teacherGuidance],
-      { content: '학생 피드백 요약', styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } },
+      { content: 'Student Feedback Summary', styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } },
       [studentResult.studentFeedbackSummary],
     ];
 
     autoTable(docPDF, {
       startY: finalY,
-      head: [['항목', '내용']],
+      head: [['Item', 'Details']],
       body: bodyData,
       theme: 'grid',
       styles: {
-        font: 'NotoSansKR',
         cellPadding: 3,
         fontSize: 10,
       },
@@ -140,7 +135,7 @@ export default function StudentResultPage() {
       }
     });
 
-    docPDF.save(`${studentResult.name}_${assessment.title}_리포트.pdf`);
+    docPDF.save(`${studentResult.name}_${assessment.title}_Report.pdf`);
   };
   
   if (isLoading || authLoading) {
