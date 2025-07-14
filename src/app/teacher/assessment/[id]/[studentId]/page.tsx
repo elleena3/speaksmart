@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { Loader2, Paperclip, Download, User, Activity, BookText, FileText, Target } from "lucide-react"
+import { Loader2, Paperclip, Download, User, Activity, BookText, FileText, Target, Mic } from "lucide-react"
 import { type TeacherAssessment, type StudentResult } from "@/lib/types";
 import { useLanguage } from "@/context/language-context";
 import { Progress } from "@/components/ui/progress";
@@ -66,6 +66,65 @@ export default function StudentResultPage() {
     }
   }, [assessmentId, resultId, user, authLoading, router]);
 
+  const handleDownloadReport = () => {
+    if (!studentResult || !assessment) return;
+
+    const reportContent = `
+# 학생 답변 종합 리포트
+
+## 기본 정보
+- 학생 이름: ${studentResult.name}
+- 평가명: ${assessment.title}
+- 평가 유형: ${assessment.assessmentType === 'dialogue' ? 'AI와 대화하기' : '혼자 말하기'}
+- 평가 날짜: ${studentResult.date}
+
+---
+
+## 종합 점수
+- 내용 점수: ${studentResult.score}%
+- 발음 점수: ${studentResult.pronunciationScore}%
+
+---
+
+## AI 피드백: 학생에게
+${studentResult.aiFeedback}
+
+---
+
+## 발음 분석
+${studentResult.pronunciationFeedback}
+
+---
+
+## 전체 ${assessment.assessmentType === 'dialogue' ? '대화' : '답변'} 기록
+${studentResult.studentTranscript}
+
+---
+
+## 교과과정 비고 초안 (생활기록부용)
+${studentResult.curricularRemarks}
+
+---
+
+## 선생님을 위한 조언
+${studentResult.teacherGuidance}
+
+---
+
+## 학생 피드백 요약
+${studentResult.studentFeedbackSummary}
+`;
+    const blob = new Blob([reportContent.trim()], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${studentResult.name}_${assessment.title}_리포트.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+  
   if (isLoading || authLoading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -90,9 +149,15 @@ export default function StudentResultPage() {
                 <AvatarImage src={studentResult.avatarUrl} alt={studentResult.name} data-ai-hint="person portrait" />
                 <AvatarFallback>{studentResult.name.charAt(0)}</AvatarFallback>
             </Avatar>
-            <div>
+            <div className="flex-grow">
               <CardTitle className="text-2xl">{studentResult.name} 학생 결과</CardTitle>
               <CardDescription>평가: <span className="font-semibold">{assessment.title}</span></CardDescription>
+            </div>
+            <div className="flex gap-2">
+                <Button variant="outline" onClick={handleDownloadReport}>
+                    <Download className="mr-2 h-4 w-4" />
+                    리포트 다운로드
+                </Button>
             </div>
           </CardHeader>
        </Card>
@@ -113,10 +178,16 @@ export default function StudentResultPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 {studentResult.studentRecordingDataUri && (
-                  <div>
+                  <div className="flex flex-col gap-2">
                     <audio controls src={studentResult.studentRecordingDataUri} className="w-full">
                       Your browser does not support the audio element.
                     </audio>
+                     <a href={studentResult.studentRecordingDataUri} download={`${studentResult.name}_${assessment.title}_녹음.webm`} className="w-full">
+                        <Button variant="secondary" className="w-full">
+                            <Mic className="mr-2 h-4 w-4" />
+                            음성 파일 다운로드
+                        </Button>
+                    </a>
                   </div>
                 )}
                 <div className="text-sm p-4 bg-muted/50 rounded-lg font-mono whitespace-pre-wrap max-h-96 overflow-y-auto">
@@ -187,9 +258,6 @@ export default function StudentResultPage() {
                  <div className="text-sm text-muted-foreground p-4 bg-muted/50 rounded-lg italic">
                     {hasFeedback ? studentResult.studentFeedbackSummary : "피드백 없음"}
                  </div>
-                <Button variant="outline" className="w-full mt-4" disabled={!hasFeedback}>
-                  <Download className="mr-2 h-4 w-4" /> 전체 피드백 다운로드
-                </Button>
               </CardContent>
             </Card>
         </div>
