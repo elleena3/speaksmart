@@ -24,6 +24,7 @@ export default function StudentResultPage() {
   const [studentResult, setStudentResult] = useState<StudentResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
 
   const assessmentId = Array.isArray(params.id) ? params.id[0] : params.id;
@@ -81,14 +82,18 @@ export default function StudentResultPage() {
     try {
         const { default: jsPDF } = await import('jspdf');
         const { default: autoTable } = await import('jspdf-autotable');
+        const { NanumGothicFont } = await import('@/lib/fonts/nanum-gothic-for-jspdf');
         
         const docPDF = new jsPDF();
+        
+        docPDF.addFileToVFS("NanumGothic.ttf", NanumGothicFont);
+        docPDF.addFont("NanumGothic.ttf", "NanumGothic", "normal");
         
         const margin = 15;
         
         // This is the key change: Set font in styles, and jsPDF-autoTable will handle loading it.
         const tableStyles = {
-            font: "NanumGothic", // Use the built-in NanumGothic font
+            font: "NanumGothic", // Use the registered font
             fontStyle: 'normal',
             fontSize: 10
         };
@@ -142,7 +147,7 @@ export default function StudentResultPage() {
             docPDF.setTextColor(100);
             
             const splitContent = docPDF.splitTextToSize(content || "내용 없음", 180);
-            const lineHeight = docPDF.getLineHeight();
+            const lineHeight = docPDF.getLineHeight() / docPDF.getPointScale();
             const contentHeight = splitContent.length * lineHeight;
 
             if (startY + 8 + contentHeight > pageHeight - 20) {
@@ -182,6 +187,7 @@ export default function StudentResultPage() {
 
   const handleSaveCurricularRemarks = async () => {
     if (!studentResult) return;
+    setIsSaving(true);
     try {
         await updateDoc(doc(db, "results", studentResult.id), {
             curricularRemarks: studentResult.curricularRemarks,
@@ -193,6 +199,8 @@ export default function StudentResultPage() {
     } catch (error) {
         console.error("Error saving remarks:", error);
         toast({ title: "오류", description: "저장에 실패했습니다.", variant: "destructive" });
+    } finally {
+        setIsSaving(false);
     }
   };
   
@@ -281,8 +289,9 @@ export default function StudentResultPage() {
                   value={studentResult.curricularRemarks} 
                   onChange={(e) => setStudentResult({...studentResult, curricularRemarks: e.target.value})}
                   className="h-48 bg-background font-mono text-sm whitespace-pre-wrap" />
-                <Button className="w-full mt-4" onClick={handleSaveCurricularRemarks}>
-                  <Paperclip className="mr-2 h-4 w-4" /> 생활기록부에 저장
+                <Button className="w-full mt-4" onClick={handleSaveCurricularRemarks} disabled={isSaving}>
+                  {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Paperclip className="mr-2 h-4 w-4" />}
+                  {isSaving ? "저장 중..." : "생활기록부에 저장"}
                 </Button>
               </CardContent>
             </Card>
@@ -341,5 +350,3 @@ export default function StudentResultPage() {
     </div>
   );
 }
-
-    
