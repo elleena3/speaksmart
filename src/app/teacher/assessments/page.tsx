@@ -69,37 +69,50 @@ export default function AssessmentsPage() {
     if (!assessmentToCopy || !user) return;
 
     try {
-      const { id, ...assessmentDataToCopy } = assessmentToCopy;
-      
-      const newAssessment: Omit<TeacherAssessment, 'id'> = {
-        ...assessmentDataToCopy,
-        title: `${assessmentToCopy.title}${t.teacherAssessments.copySuffix}`,
-        createdAt: Date.now(),
-        dateCreated: new Date().toISOString().split('T')[0],
-        studentsCompleted: 0,
-        averageScore: 0,
-      };
+        const { id, ...assessmentDataToCopy } = assessmentToCopy;
+        
+        // --- Improved copy title logic ---
+        const copySuffix = t.teacherAssessments.copySuffix; // " - 복사본"
+        const baseTitle = assessmentToCopy.title.split(copySuffix)[0].trim();
+        let newTitle = `${baseTitle}${copySuffix}`;
+        let copyNumber = 2;
+        
+        // Check for existing copies and increment number if necessary
+        while (assessments.some(a => a.title === newTitle)) {
+            newTitle = `${baseTitle}${copySuffix} ${copyNumber}`;
+            copyNumber++;
+        }
+        // --- End of improved logic ---
 
-      // Remove undefined date fields before sending to Firestore
-      if (newAssessment.startDate === undefined) {
-        delete (newAssessment as any).startDate;
-      }
-      if (newAssessment.endDate === undefined) {
-        delete (newAssessment as any).endDate;
-      }
+        const newAssessment: Omit<TeacherAssessment, 'id'> = {
+            ...assessmentDataToCopy,
+            title: newTitle, // Use the new unique title
+            createdAt: Date.now(),
+            dateCreated: new Date().toISOString().split('T')[0],
+            studentsCompleted: 0,
+            averageScore: 0,
+        };
 
-      await addDoc(collection(db, "assessments"), newAssessment);
+        if (newAssessment.startDate === undefined) {
+            delete (newAssessment as any).startDate;
+        }
+        if (newAssessment.endDate === undefined) {
+            delete (newAssessment as any).endDate;
+        }
 
-      toast({
-        title: t.teacherAssessments.copyToast.title,
-        description: t.teacherAssessments.copyToast.description.replace('{title}', assessmentToCopy.title),
-      });
-      fetchAssessments(); // Refresh list
+        await addDoc(collection(db, "assessments"), newAssessment);
+
+        toast({
+            title: t.teacherAssessments.copyToast.title,
+            description: t.teacherAssessments.copyToast.description.replace('{title}', assessmentToCopy.title),
+        });
+        fetchAssessments(); // Refresh list
+
     } catch (error) {
-      console.error("Error copying assessment: ", error);
-      toast({ title: "오류", description: "평가 복사에 실패했습니다.", variant: "destructive" });
+        console.error("Error copying assessment: ", error);
+        toast({ title: "오류", description: "평가 복사에 실패했습니다.", variant: "destructive" });
     }
-  }
+}
 
   const handleDelete = async (assessmentId: string) => {
     try {
