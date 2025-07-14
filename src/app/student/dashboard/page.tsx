@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import Link from "next/link"
-import { type Assessment, type TeacherAssessment } from "@/lib/types"
+import { type Assessment, type TeacherAssessment, type StudentResult } from "@/lib/types"
 import { CheckCircle2, MessageCircle, Mic } from "lucide-react"
 import { useLanguage } from "@/context/language-context"
 import { useEffect, useState } from "react"
@@ -92,35 +92,30 @@ export default function StudentDashboard() {
 
   useEffect(() => {
     try {
+      let assessmentsForStudent: TeacherAssessment[] = [];
       const storedAssessments = localStorage.getItem(LOCAL_STORAGE_KEY_ASSESSMENTS);
-      const teacherCreatedAssessments: TeacherAssessment[] = storedAssessments ? JSON.parse(storedAssessments) : [];
       
-      const studentResults = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY_RESULTS) || '[]');
+      if (storedAssessments) {
+        assessmentsForStudent = JSON.parse(storedAssessments);
+      } else {
+        // If no assessments in local storage, use the initial/mock data.
+        assessmentsForStudent = initialAssessments;
+      }
+      
+      const studentResults: StudentResult[] = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY_RESULTS) || '[]');
       const completedAssessmentIds = new Set(studentResults.map((r: any) => r.assessmentId));
 
-      const combinedMap = new Map<string, Assessment>();
+      const combined = assessmentsForStudent.map(assessment => ({
+        ...assessment,
+        status: completedAssessmentIds.has(assessment.id) ? '채점 완료' : '할 일',
+      }));
       
-      // Add initial assessments first
-      initialAssessments.forEach(item => {
-        if (completedAssessmentIds.has(item.id)) {
-          combinedMap.set(item.id, { ...item, status: '채점 완료' });
-        } else {
-          combinedMap.set(item.id, item);
-        }
-      });
-      
-      // Add or overwrite with assessments from localStorage (teacher-created)
-      teacherCreatedAssessments.forEach(item => {
-        const status = completedAssessmentIds.has(item.id) ? '채점 완료' : '할 일';
-        combinedMap.set(item.id, { ...item, status });
-      });
-
-      const combined = Array.from(combinedMap.values());
-      setAllAssessments(combined);
+      setAllAssessments(combined as Assessment[]);
       
     } catch (error) {
       console.error("Failed to load assessments from localStorage", error);
-      setAllAssessments(initialAssessments); // Fallback to initial data on error
+      // Fallback to initial data on error
+      setAllAssessments(initialAssessments); 
     }
   }, []);
 
