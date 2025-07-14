@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
-import { Send, ThumbsUp, ThumbsDown, MessageSquareQuote, Loader2, FileText } from "lucide-react"
+import { Send, ThumbsUp, ThumbsDown, MessageSquareQuote, Loader2, FileText, PlayCircle } from "lucide-react"
 import { summarizeStudentFeedback } from "@/ai/flows/summarize-student-feedback"
 import { type StudentResult } from "@/lib/types"
 
@@ -15,9 +15,10 @@ type FeedbackViewProps = {
   assessmentTitle: string;
   aiFeedback: string;
   studentTranscript: string;
+  studentRecordingDataUri?: string;
 }
 
-export function FeedbackView({ assessmentId, assessmentTitle, aiFeedback, studentTranscript }: FeedbackViewProps) {
+export function FeedbackView({ assessmentId, assessmentTitle, aiFeedback, studentTranscript, studentRecordingDataUri }: FeedbackViewProps) {
   const [teacherFeedback, setTeacherFeedback] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [satisfaction, setSatisfaction] = useState<"good" | "bad" | null>(null);
@@ -73,11 +74,18 @@ export function FeedbackView({ assessmentId, assessmentTitle, aiFeedback, studen
                 <FileText className="w-8 h-8 text-primary shrink-0" />
                 <div>
                   <CardTitle className="text-2xl">내 답변</CardTitle>
-                  <CardDescription>음성인식으로 변환된 나의 답변입니다.</CardDescription>
+                  <CardDescription>음성인식으로 변환된 나의 답변과 녹음 파일입니다.</CardDescription>
                 </div>
               </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-4">
+                {studentRecordingDataUri && (
+                    <div>
+                        <audio controls src={studentRecordingDataUri} className="w-full">
+                            Your browser does not support the audio element.
+                        </audio>
+                    </div>
+                )}
                 <div className="p-4 bg-muted/50 rounded-lg whitespace-pre-wrap font-mono text-sm leading-relaxed italic">
                     "{studentTranscript}"
                 </div>

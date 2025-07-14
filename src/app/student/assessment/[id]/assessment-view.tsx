@@ -88,6 +88,7 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
         studentFeedbackSummary: "학생이 평가에 대해 남긴 피드백이 없습니다.", // This will be updated later if the student provides it
         teacherGuidance,
         studentTranscript,
+        studentRecordingDataUri,
       }
       
       const existingResults: StudentResult[] = JSON.parse(localStorage.getItem('student_results') || '[]');

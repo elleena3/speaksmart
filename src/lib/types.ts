@@ -61,4 +61,5 @@ export type StudentResult = {
   studentFeedbackSummary: string;
   teacherGuidance: string;
   studentTranscript?: string;
+  studentRecordingDataUri?: string;
 }

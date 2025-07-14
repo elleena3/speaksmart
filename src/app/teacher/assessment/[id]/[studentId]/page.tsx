@@ -79,9 +79,16 @@ export default function StudentResultPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5 text-primary"/> 학생 답변 내용</CardTitle>
-                <CardDescription>학생의 실제 답변을 텍스트로 변환한 내용입니다.</CardDescription>
+                <CardDescription>학생의 실제 답변 텍스트와 녹음 파일입니다.</CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
+                {student.studentRecordingDataUri && (
+                  <div>
+                    <audio controls src={student.studentRecordingDataUri} className="w-full">
+                      Your browser does not support the audio element.
+                    </audio>
+                  </div>
+                )}
                 <div className="text-sm p-4 bg-muted/50 rounded-lg italic font-mono whitespace-pre-wrap">
                     "{student.studentTranscript || "학생 답변이 기록되지 않았습니다."}"
                 </div>
