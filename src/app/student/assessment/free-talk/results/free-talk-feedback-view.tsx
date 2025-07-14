@@ -4,33 +4,21 @@
 import { useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { Loader2, ThumbsUp, ThumbsDown } from "lucide-react";
-import { generateFreeTalkFeedback, GenerateFreeTalkFeedbackOutput } from "@/ai/flows/generate-free-talk-feedback";
-import { type ConversationHistory, type StudentResult } from "@/lib/types";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Progress } from "@/components/ui/progress";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Loader2 } from "lucide-react";
+import { generateComprehensiveFeedback, GenerateComprehensiveFeedbackOutput } from "@/ai/flows/generate-comprehensive-feedback";
+import { type ConversationHistory, type StudentResult, type TeacherAssessment } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
+import { FeedbackView } from "../../../[id]/results/feedback-view";
 
 const SESSION_STORAGE_KEY = 'freeTalkConversationHistory';
 
-function RubricItem({ title, score, feedback }: { title: string, score: number, feedback: string }) {
-    return (
-        <div>
-            <div className="flex justify-between items-center mb-1">
-                <h4 className="font-semibold">{title}</h4>
-                <span className="text-sm font-mono">{score} / 5</span>
-            </div>
-            <Progress value={score * 20} className="h-2" />
-            <p className="text-sm text-muted-foreground mt-2">{feedback}</p>
-        </div>
-    )
-}
 
 export function FreeTalkFeedbackView() {
-    const [feedback, setFeedback] = useState<GenerateFreeTalkFeedbackOutput | null>(null);
     const [isLoading, setIsLoading] = useState(true);
-    const [satisfaction, setSatisfaction] = useState<"good" | "bad" | null>(null);
+    const [result, setResult] = useState<StudentResult | null>(null);
+    const [assessmentDetails, setAssessmentDetails] = useState<TeacherAssessment | null>(null);
+
     const router = useRouter();
     const searchParams = useSearchParams();
     const { toast } = useToast();
@@ -39,53 +27,82 @@ export function FreeTalkFeedbackView() {
 
     useEffect(() => {
         const storedData = sessionStorage.getItem(SESSION_STORAGE_KEY);
-        if (storedData) {
-            const conversationData: ConversationHistory = JSON.parse(storedData);
-            const fullTranscript = conversationData.history
-                .map(turn => `${turn.role === 'user' ? 'Student' : 'AI'}: ${turn.text}`)
-                .join('\n');
-
-            generateFeedback(fullTranscript);
-        } else {
+        if (!assessmentId || !storedData) {
             toast({
-                title: "대화 기록 없음",
-                description: "분석할 대화 기록을 찾을 수 없습니다. 대시보드로 돌아갑니다.",
+                title: "오류",
+                description: "분석할 대화 기록이나 평가 정보를 찾을 수 없습니다. 대시보드로 돌아갑니다.",
                 variant: "destructive"
             });
             router.push('/student/dashboard');
+            return;
         }
-    }, [router, toast]);
 
-    const generateFeedback = async (conversationTranscript: string) => {
+        // Fetch assessment details from localStorage
+        const allAssessments: TeacherAssessment[] = JSON.parse(localStorage.getItem('assessments') || '[]');
+        const currentAssessment = allAssessments.find(a => a.id === assessmentId);
+        
+        if(!currentAssessment) {
+             toast({
+                title: "평가 정보 없음",
+                description: "평가 정보를 찾을 수 없습니다.",
+                variant: "destructive"
+            });
+            router.push('/student/dashboard');
+            return;
+        }
+        setAssessmentDetails(currentAssessment);
+
+        const conversationData: ConversationHistory = JSON.parse(storedData);
+        generateFeedback(conversationData, currentAssessment);
+        
+    }, [assessmentId, router, toast]);
+
+    const generateFeedback = async (conversationData: ConversationHistory, assessment: TeacherAssessment) => {
         setIsLoading(true);
         try {
-            const result = await generateFreeTalkFeedback({ conversationTranscript });
-            setFeedback(result);
+            // Create a fake audio data URI since we already have the transcript.
+            // The comprehensive feedback flow requires this field.
+            const fakeAudioDataUri = "data:audio/webm;base64,"; 
+            
+            // The comprehensive feedback flow uses the transcript from the audio,
+            // but for dialogues, we have the full conversation. We'll pass it in the prompt.
+            const fullTranscript = conversationData.history
+                .map(turn => `${turn.role === 'user' ? '학생' : 'AI'}: ${turn.text}`)
+                .join('\n');
+            
+            const generatedResult = await generateComprehensiveFeedback({
+                 // We pass the full transcript in the activity prompt to give the AI context.
+                activityPrompt: `${assessment.prompt}\n\n--- 대화 기록 ---\n${fullTranscript}`,
+                expectedFormat: "AI와의 자연스러운 대화 능력을 평가합니다. 유창성, 발음, 어휘, 문법을 종합적으로 고려하여 피드백을 제공해주세요.",
+                studentRecordingDataUri: fakeAudioDataUri, // Pass fake audio
+                studentName: "Alex Doe", 
+                assessmentTitle: assessment.title,
+            });
 
-            if (assessmentId) {
-                 // Calculate a score based on rubric
-                const rubric = result.studentFeedback.rubric;
-                const totalScore = rubric.fluency.score + rubric.pronunciation.score + rubric.vocabulary.score + rubric.grammar.score;
-                const averageScore = Math.round((totalScore / 20) * 100);
+            // Calculate a score based on the AI's scoring
+            const score = generatedResult.score;
 
-                const studentResult: StudentResult = {
-                    studentId: "student-alex-doe",
-                    assessmentId: assessmentId,
-                    name: "Alex Doe",
-                    avatarUrl: "https://placehold.co/40x40.png",
-                    status: "채점 완료",
-                    score: averageScore,
-                    date: new Date().toISOString().split('T')[0],
-                    aiFeedback: result.studentFeedback.overall,
-                    curricularRemarks: `AI와의 자유 대화에서 유창성과 어휘 사용 능력이 돋보였습니다. ${result.studentFeedback.rubric.fluency.feedback} ${result.studentFeedback.rubric.vocabulary.feedback}`,
-                    studentFeedbackSummary: "학생이 평가에 대해 남긴 피드백이 없습니다.", // This would be a separate flow/feature
-                    teacherGuidance: result.teacherGuidance,
-                }
-                
-                const existingResults: StudentResult[] = JSON.parse(localStorage.getItem('student_results') || '[]');
-                const updatedResults = [...existingResults.filter(r => r.assessmentId !== assessmentId), studentResult];
-                localStorage.setItem('student_results', JSON.stringify(updatedResults));
+            const studentResult: StudentResult = {
+                studentId: "student-alex-doe",
+                assessmentId: assessment.id,
+                assessmentTitle: assessment.title,
+                name: "Alex Doe",
+                avatarUrl: "https://placehold.co/40x40.png",
+                status: "채점 완료",
+                score: score,
+                date: new Date().toISOString().split('T')[0],
+                aiFeedback: generatedResult.aiFeedback,
+                curricularRemarks: generatedResult.curricularRemarks,
+                studentFeedbackSummary: "학생이 평가에 대해 남긴 피드백이 없습니다.",
+                teacherGuidance: generatedResult.teacherGuidance,
+                studentTranscript: fullTranscript
             }
+            
+            const existingResults: StudentResult[] = JSON.parse(localStorage.getItem('student_results') || '[]');
+            const updatedResults = [...existingResults.filter(r => r.assessmentId !== assessmentId), studentResult];
+            localStorage.setItem('student_results', JSON.stringify(updatedResults));
+            
+            setResult(studentResult);
 
         } catch (error) {
             console.error("Error generating feedback:", error);
@@ -109,49 +126,20 @@ export function FreeTalkFeedbackView() {
         );
     }
 
-    if (!feedback) {
+    if (!result) {
         return <div className="text-center p-8">피드백을 불러오지 못했습니다.</div>;
     }
 
-    const { studentFeedback } = feedback;
 
     return (
         <div className="space-y-6">
-            <Card>
-                <CardHeader>
-                    <CardTitle className="text-2xl">자유 대화 결과</CardTitle>
-                    <CardDescription>AI와의 대화를 바탕으로 한 종합 분석입니다.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                    <div>
-                        <h3 className="text-lg font-semibold mb-2">종합 평가</h3>
-                        <p className="p-4 bg-muted/50 rounded-lg text-sm leading-relaxed">{studentFeedback.overall}</p>
-                    </div>
-
-                    <Accordion type="single" collapsible className="w-full" defaultValue="item-1">
-                        <AccordionItem value="item-1">
-                            <AccordionTrigger className="text-lg font-semibold">세부 평가 항목</AccordionTrigger>
-                            <AccordionContent className="space-y-6 pt-4">
-                                <RubricItem title="유창성 (Fluency)" {...studentFeedback.rubric.fluency} />
-                                <RubricItem title="발음 (Pronunciation)" {...studentFeedback.rubric.pronunciation} />
-                                <RubricItem title="어휘 (Vocabulary)" {...studentFeedback.rubric.vocabulary} />
-                                <RubricItem title="문법 (Grammar)" {...studentFeedback.rubric.grammar} />
-                            </AccordionContent>
-                        </AccordionItem>
-                    </Accordion>
-                </CardContent>
-                <CardFooter className="flex-col items-start gap-4">
-                    <p className="text-sm font-medium">이 피드백이 도움이 되었나요?</p>
-                    <div className="flex gap-2">
-                        <Button variant={satisfaction === 'good' ? 'default' : 'outline'} onClick={() => setSatisfaction('good')}>
-                            <ThumbsUp className="mr-2 h-4 w-4" /> 유용함
-                        </Button>
-                        <Button variant={satisfaction === 'bad' ? 'destructive' : 'outline'} onClick={() => setSatisfaction('bad')}>
-                            <ThumbsDown className="mr-2 h-4 w-4" /> 유용하지 않음
-                        </Button>
-                    </div>
-                </CardFooter>
-            </Card>
+            <FeedbackView 
+                assessmentId={result.assessmentId}
+                assessmentTitle={result.assessmentTitle}
+                aiFeedback={result.aiFeedback}
+                studentTranscript={result.studentTranscript || "대화 기록이 없습니다."}
+                studentRecordingDataUri={undefined} // No single recording for dialogues
+            />
             <div className="text-center">
                 <Button onClick={() => router.push('/student/dashboard')}>대시보드로 돌아가기</Button>
             </div>
