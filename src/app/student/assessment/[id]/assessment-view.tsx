@@ -10,7 +10,7 @@ import { generateComprehensiveFeedback } from "@/ai/flows/generate-comprehensive
 import { type StudentResult, type TeacherAssessment } from "@/lib/types"
 import { useAuth } from "@/context/auth-context"
 import { db, storage } from "@/lib/firebase"
-import { collection, addDoc, doc, writeBatch, query, where, getDocs } from "firebase/firestore"
+import { collection, addDoc, doc, writeBatch, query, where, getDocs, runTransaction } from "firebase/firestore"
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
 
 export function AssessmentView({ assessmentDetails }: { assessmentDetails: TeacherAssessment }) {
@@ -60,7 +60,7 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
       });
     }
   }, [toast]);
-
+  
   const startTimer = () => {
     if (timeLimit) {
       setRemainingTime(timeLimit);
