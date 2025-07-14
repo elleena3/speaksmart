@@ -23,14 +23,7 @@ let app: FirebaseApp;
 
 // 앱이 이미 초기화되었는지 확인하여 중복 초기화를 방지합니다.
 if (!getApps().length) {
-  // firebaseConfig 객체가 비어있거나 기본값 그대로인지 확인합니다.
-  if (!firebaseConfig.apiKey || firebaseConfig.apiKey.includes('여기에')) {
-    // 유효하지 않은 설정일 경우, 초기화하지 않습니다.
-    // 이 상태는 auth-context.tsx에서 감지하여 사용자에게 안내 메시지를 보여줍니다.
-    console.error("Firebase 설정이 비어있거나 미완성입니다. src/lib/firebase.ts 파일에 새 프로젝트의 설정을 추가해주세요.");
-  } else {
-    app = initializeApp(firebaseConfig);
-  }
+  app = initializeApp(firebaseConfig);
 } else {
   app = getApp();
 }

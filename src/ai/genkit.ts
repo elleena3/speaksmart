@@ -7,11 +7,6 @@ import {googleAI} from '@genkit-ai/googleai';
 // ====================================================================
 const GOOGLE_API_KEY = "새 Google AI API 키를 여기에 붙여넣으세요";
 
-if (!GOOGLE_API_KEY || GOOGLE_API_KEY.includes("여기에")) {
-    console.error("FATAL: Google AI API Key is not configured in src/ai/genkit.ts");
-    console.error("Please add your new Google AI API key.");
-}
-
 export const ai = genkit({
   plugins: [
     googleAI({
