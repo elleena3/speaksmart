@@ -81,16 +81,19 @@ export default function StudentResultPage() {
     try {
         const { default: jsPDF } = await import('jspdf');
         const { default: autoTable } = await import('jspdf-autotable');
-        const { NanumGothicFont } = await import('@/lib/fonts/nanum-gothic-for-jspdf');
         
         const docPDF = new jsPDF();
         
-        docPDF.addFileToVFS("NanumGothic.ttf", NanumGothicFont);
-        docPDF.addFont("NanumGothic.ttf", "NanumGothic", "normal");
-        docPDF.setFont("NanumGothic");
-
         const margin = 15;
         
+        // This is the key change: Set font in styles, and jsPDF-autoTable will handle loading it.
+        const tableStyles = {
+            font: "NanumGothic", // Use the built-in NanumGothic font
+            fontStyle: 'normal',
+            fontSize: 10
+        };
+
+        docPDF.setFont("NanumGothic", "normal");
         docPDF.setFontSize(22);
         docPDF.text('학생 리포트', margin, 20);
         docPDF.setFontSize(12);
@@ -111,7 +114,7 @@ export default function StudentResultPage() {
                 ['발음 점수', `${studentResult.pronunciationScore ?? 0}%`],
             ],
             theme: 'grid',
-            styles: { font: "NanumGothic", fontSize: 10 },
+            styles: tableStyles,
             headStyles: { fontStyle: 'bold', fillColor: [41, 128, 185], textColor: 255 },
             didParseCell: (data) => {
               if (data.section === 'body' && data.column.index === 1) {
@@ -132,7 +135,9 @@ export default function StudentResultPage() {
             }
             docPDF.setFontSize(14);
             docPDF.setTextColor(0);
+            docPDF.setFont("NanumGothic", "normal");
             docPDF.text(title, margin, startY);
+            
             docPDF.setFontSize(10);
             docPDF.setTextColor(100);
             
@@ -145,13 +150,14 @@ export default function StudentResultPage() {
                 startY = 20;
                 docPDF.setFontSize(14);
                 docPDF.setTextColor(0);
+                docPDF.setFont("NanumGothic", "normal");
                 docPDF.text(title, margin, startY);
                 docPDF.setFontSize(10);
                 docPDF.setTextColor(100);
             }
 
             docPDF.text(splitContent, margin, startY + 8);
-            return startY + contentHeight + 15;
+            return startY + 8 + contentHeight + 15;
         };
 
         let currentY = finalY + 10;
@@ -316,3 +322,5 @@ export default function StudentResultPage() {
     </div>
   );
 }
+
+    
