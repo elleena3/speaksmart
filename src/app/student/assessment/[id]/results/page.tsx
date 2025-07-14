@@ -7,26 +7,27 @@ import { useEffect, useState } from "react";
 import { type StudentResult } from "@/lib/types";
 
 export default function AssessmentResultsPage({ params }: { params: { id: string } }) {
+  const { id } = params;
   const [result, setResult] = useState<StudentResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     // This is a safeguard against incorrect routing.
     // Free talk assessments have their own specific results page.
-    if (params.id === 'free-talk') {
+    if (id === 'free-talk') {
       redirect('/student/assessment/free-talk/results');
       return;
     }
     
     // Fetch result from localStorage
     const storedResults: StudentResult[] = JSON.parse(localStorage.getItem('student_results') || '[]');
-    const currentResult = storedResults.find(r => r.assessmentId === params.id);
+    const currentResult = storedResults.find(r => r.assessmentId === id);
     
     if (currentResult) {
       setResult(currentResult);
     } 
     setIsLoading(false);
-  }, [params.id]);
+  }, [id]);
 
 
   if (isLoading) {
@@ -44,7 +45,7 @@ export default function AssessmentResultsPage({ params }: { params: { id: string
 
   return (
     <FeedbackView
-      assessmentId={params.id}
+      assessmentId={id}
       assessmentTitle="7단원: 취미와 관심사"
       aiFeedback={result.aiFeedback}
       studentTranscript={result.studentTranscript || "음성인식 결과가 없습니다."}
