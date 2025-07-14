@@ -22,7 +22,7 @@ export function FreeTalkView({ scenario, scenarioPrompt, assessment }: { scenari
   const audioChunksRef = useRef<Blob[]>([]);
   const studentAudioChunksRef = useRef<Blob[]>([]); // To collect all student audio blobs
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
-  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement | null>(null);
   const router = useRouter();
   const { toast } = useToast();
 
@@ -105,7 +105,10 @@ export function FreeTalkView({ scenario, scenarioPrompt, assessment }: { scenari
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioStreamRef.current = stream;
-      mediaRecorderRef.current = new MediaRecorder(stream);
+      mediaRecorderRef.current = new MediaRecorder(stream, { 
+        mimeType: 'audio/webm',
+        audioBitsPerSecond: 16000 // Lower bitrate for smaller file size
+      });
 
       mediaRecorderRef.current.ondataavailable = (event) => {
         if (event.data.size > 0) {

@@ -1,7 +1,7 @@
 
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Mic, StopCircle, Loader2, Timer } from "lucide-react"
@@ -29,7 +29,7 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
     ? assessmentDetails.recordingTimeLimit * 60 
     : null;
 
-  const cleanup = () => {
+  const cleanup = useCallback(() => {
     if (audioStreamRef.current) {
       audioStreamRef.current.getTracks().forEach(track => track.stop());
       audioStreamRef.current = null;
@@ -46,7 +46,20 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
     }
     setRemainingTime(timeLimit);
     audioChunksRef.current = [];
-  };
+  }, [timeLimit]);
+
+  const handleStopRecording = useCallback(() => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+      setIsRecording(false);
+      setIsProcessing(true);
+      mediaRecorderRef.current.stop(); // This will trigger the onstop event
+      if(timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+      toast({
+        title: "녹음 중지됨",
+        description: "오디오를 처리하고 AI 피드백을 생성 중입니다...",
+      });
+    }
+  }, [toast]);
 
   const startTimer = () => {
     if (timeLimit) {
@@ -54,7 +67,6 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
       timerIntervalRef.current = setInterval(() => {
         setRemainingTime(prevTime => {
           if (prevTime === null || prevTime <= 1) {
-            if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
             return 0;
           }
           return prevTime - 1;
@@ -70,7 +82,10 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioStreamRef.current = stream;
-      mediaRecorderRef.current = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+      mediaRecorderRef.current = new MediaRecorder(stream, { 
+        mimeType: 'audio/webm',
+        audioBitsPerSecond: 16000 // Lower bitrate for smaller file size
+      });
       
       mediaRecorderRef.current.ondataavailable = (event) => {
         if (event.data.size > 0) {
@@ -93,12 +108,10 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
 
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         
-        // Convert blob to base64 for Genkit
         const reader = new FileReader();
         reader.readAsDataURL(audioBlob);
         reader.onloadend = async () => {
           const base64Audio = reader.result as string;
-          // Process assessment with both blob and base64
           await processAssessment(audioBlob, base64Audio);
         };
         cleanup();
@@ -133,19 +146,6 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
       setIsRecording(false);
     }
   }
-
-  const handleStopRecording = async () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
-      setIsRecording(false)
-      setIsProcessing(true)
-      mediaRecorderRef.current.stop(); // This will trigger the onstop event
-      if(timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-      toast({
-        title: "녹음 중지됨",
-        description: "오디오를 처리하고 AI 피드백을 생성 중입니다...",
-      });
-    }
-  }
   
   const processAssessment = async (audioBlob: Blob, studentRecordingDataUri: string) => {
      if (!user) {
@@ -155,15 +155,11 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
      }
 
      try {
-      // 1. Upload audio to Firebase Storage
       const audioFileName = `recordings/${user.uid}_${assessmentDetails.id}_${Date.now()}.webm`;
       const storageRef = ref(storage, audioFileName);
       await uploadBytes(storageRef, audioBlob);
-
-      // 2. Get download URL
       const downloadURL = await getDownloadURL(storageRef);
 
-      // 3. Generate AI Feedback with base64 data
       const { 
         aiFeedback, 
         curricularRemarks, 
@@ -195,7 +191,7 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
         studentFeedbackSummary: "학생이 평가에 대해 남긴 피드백이 없습니다.",
         teacherGuidance,
         studentTranscript,
-        studentRecordingDataUri: downloadURL, // Store the URL, not the base64 data
+        studentRecordingDataUri: downloadURL,
         pronunciationScore,
         pronunciationFeedback,
         teacherUid: assessmentDetails.uid,
@@ -230,24 +226,19 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
   }
   
   useEffect(() => {
-    // Set initial time on mount
     if (timeLimit) {
       setRemainingTime(timeLimit);
     }
-    // Cleanup on component unmount
     return () => {
       cleanup();
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timeLimit]);
+  }, [timeLimit, cleanup]);
 
-  // This effect handles stopping the recording when the timer reaches 0.
   useEffect(() => {
     if (remainingTime === 0 && isRecording) {
       handleStopRecording();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [remainingTime, isRecording]);
+  }, [remainingTime, isRecording, handleStopRecording]);
 
   const formatTime = (seconds: number | null) => {
     if (seconds === null) return null;
