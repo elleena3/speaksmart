@@ -16,8 +16,8 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
 const processingSteps: { status: ResultStatus; icon: React.ElementType; text: string }[] = [
   { status: "업로드 중", icon: UploadCloud, text: "오디오 파일 업로드 중..." },
   { status: "텍스트 변환 중", icon: FileText, text: "음성을 텍스트로 변환 중..." },
-  { status: "분석 중", icon: BrainCircuit, text: "내용 및 발음 분석 중..." },
-  { status: "리포트 생성 중", icon: BookCheck, text: "최종 리포트 생성 중..." },
+  { status: "분석 중", icon: BrainCircuit, text: "AI가 답변을 분석 중입니다..." },
+  { status: "리포트 생성 중", icon: BookCheck, text: "최종 리포트를 생성하고 있습니다..." },
 ];
 
 export function AssessmentView({ assessmentDetails }: { assessmentDetails: TeacherAssessment }) {
@@ -178,11 +178,12 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
      const newResultRef = doc(collection(db, "results"));
 
      const updateStatus = async (status: ResultStatus, data: Partial<StudentResult> = {}) => {
-        setProcessingStatus(status);
+        // This function is called from the AI flow to update the document in Firestore
         await updateDoc(newResultRef, { status, ...data });
      };
 
      try {
+        setProcessingStatus("업로드 중");
         const initialResultData: Partial<StudentResult> = {
             id: newResultRef.id,
             studentId: user.uid,
@@ -197,13 +198,12 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
         };
         await setDoc(newResultRef, initialResultData);
         
-        await updateStatus("업로드 중");
         const audioFileName = `recordings/${user.uid}_${assessmentDetails.id}_${Date.now()}.webm`;
         const storageRef = ref(storage, audioFileName);
         await uploadBytes(storageRef, audioBlob);
         const downloadURL = await getDownloadURL(storageRef);
         
-        await updateStatus("텍스트 변환 중", { studentRecordingDataUri: downloadURL });
+        // This will now call the updated flow which internally calls updateStatus
         const analysisResult = await generateSpeakingAnalysis({
             studentRecordingDataUri,
             activityPrompt: assessmentDetails.prompt,
@@ -212,7 +212,7 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
             assessmentTitle: assessmentDetails.title.replace(/ - 복사본(\s\d+)?$/, ''),
         }, (status) => updateStatus(status as ResultStatus));
 
-        await updateStatus("리포트 생성 중");
+        // The final update to "채점 완료"
         const finalResultData: Omit<StudentResult, 'id' | 'status'> = {
             studentId: user.uid,
             assessmentId: assessmentDetails.id,
@@ -261,16 +261,8 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
   };
 
   const getButtonState = () => {
-    if (isProcessing) {
-      const currentStep = processingSteps.find(step => step.status === processingStatus) || processingSteps[0];
-      const CurrentIcon = currentStep.icon;
-      return (
-        <Button size="lg" disabled className="w-full">
-          <CurrentIcon className="mr-2 h-5 w-5 animate-spin" />
-          {currentStep.text}
-        </Button>
-      )
-    }
+    // This component no longer needs to show processing steps, as the user is redirected.
+    // It only manages the recording state.
     if (isRecording) {
       return (
         <Button size="lg" onClick={handleStopRecording} className="w-full" variant="destructive">
@@ -280,9 +272,9 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
       )
     }
     return (
-      <Button size="lg" onClick={handleStartRecording} className="w-full">
-        <Mic className="mr-2 h-5 w-5" />
-        녹음 시작
+      <Button size="lg" onClick={handleStartRecording} className="w-full" disabled={isProcessing}>
+        {isProcessing ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Mic className="mr-2 h-5 w-5" />}
+        {isProcessing ? "제출 중..." : "녹음 시작"}
       </Button>
     )
   }
@@ -294,7 +286,7 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
       {timeLimit && (
         <div className="flex items-center gap-2 text-lg font-semibold text-muted-foreground">
           <Timer className="h-6 w-6" />
-          <span>{isRecording || isProcessing ? timerDisplay : formatTime(timeLimit)}</span>
+          <span>{isRecording ? timerDisplay : formatTime(timeLimit)}</span>
         </div>
       )}
       <div className="relative flex items-center justify-center w-32 h-32 rounded-full bg-background">

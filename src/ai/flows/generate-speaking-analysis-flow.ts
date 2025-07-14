@@ -110,7 +110,9 @@ const generateSpeakingAnalysisFlow = ai.defineFlow(
     outputSchema: GenerateSpeakingAnalysisOutputSchema,
   },
   async (input, onStatusUpdate) => {
+    // This status update happens when the flow is called by the client background process
     onStatusUpdate?.("텍스트 변환 중");
+    
     // Step 1: Transcribe the audio. This is the only blocking step at the start.
     const studentTranscript = await transcribeAudioFlow(input.studentRecordingDataUri);
 
@@ -127,7 +129,9 @@ const generateSpeakingAnalysisFlow = ai.defineFlow(
       };
     }
     
+    // This status update indicates that the parallel analysis is about to start.
     onStatusUpdate?.("분석 중");
+
     // Step 2: Run content and pronunciation analysis in PARALLEL.
     const [contentResult, pronunciationResult] = await Promise.all([
       // Content analysis
@@ -151,8 +155,10 @@ const generateSpeakingAnalysisFlow = ai.defineFlow(
     if (!contentOutput || !pronunciationOutput) {
         throw new Error("Failed to get a valid response from one or more analysis models.");
     }
-
+    
+    // This status update indicates the final report is being compiled.
     onStatusUpdate?.("리포트 생성 중");
+
     // Step 3: Combine the results from the parallel flows and return.
     return {
       studentTranscript,

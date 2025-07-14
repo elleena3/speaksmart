@@ -7,16 +7,16 @@ import { useEffect, useState } from "react";
 import { type StudentResult, type ResultStatus } from "@/lib/types";
 import { useAuth } from "@/context/auth-context";
 import { db } from "@/lib/firebase";
-import { collection, query, where, getDocs, onSnapshot, doc } from "firebase/firestore";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { Loader2, UploadCloud, FileText, BrainCircuit, BookCheck } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 const statusDetails: Record<ResultStatus, { icon: React.ElementType, text: string }> = {
     "업로드 중": { icon: UploadCloud, text: "오디오 파일 업로드 중..." },
     "텍스트 변환 중": { icon: FileText, text: "음성을 텍스트로 변환 중..." },
-    "분석 중": { icon: BrainCircuit, text: "답변 내용과 발음을 분석하고 있어요." },
-    "리포트 생성 중": { icon: BookCheck, text: "AI가 최종 리포트를 생성하고 있습니다." },
-    "채점 중": { icon: Loader2, text: "AI가 채점 중입니다. 잠시만 기다려주세요." },
+    "분석 중": { icon: BrainCircuit, text: "AI가 답변을 분석하고 있습니다." },
+    "리포트 생성 중": { icon: BookCheck, text: "최종 리포트를 생성하고 있습니다." },
+    "채점 중": { icon: Loader2, text: "AI가 채점 중입니다. 잠시만 기다려주세요." }, // Fallback
     "채점 완료": { icon: Loader2, text: "채점 완료!" },
     "오류": { icon: Loader2, text: "오류 발생" },
 };
@@ -69,6 +69,7 @@ export default function AssessmentResultsPage() {
         // This case might happen if the doc is not created yet, or no results exist.
         // It's better to show that it's still grading.
         setIsLoading(true);
+        setCurrentStatus("채점 중");
       }
     }, (err) => {
       console.error("Error fetching result with onSnapshot: ", err);
