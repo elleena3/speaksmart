@@ -7,11 +7,11 @@ import { useEffect, useState } from "react";
 import { type StudentResult } from "@/lib/types";
 
 export default function AssessmentResultsPage({ params }: { params: { id: string } }) {
-  const { id } = params;
   const [result, setResult] = useState<StudentResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    const { id } = params;
     // This is a safeguard against incorrect routing.
     // Free talk assessments have their own specific results page.
     if (id === 'free-talk') {
@@ -27,7 +27,7 @@ export default function AssessmentResultsPage({ params }: { params: { id: string
       setResult(currentResult);
     } 
     setIsLoading(false);
-  }, [id]);
+  }, [params]);
 
 
   if (isLoading) {
@@ -45,7 +45,7 @@ export default function AssessmentResultsPage({ params }: { params: { id: string
 
   return (
     <FeedbackView
-      assessmentId={id}
+      assessmentId={params.id}
       assessmentTitle="7단원: 취미와 관심사"
       aiFeedback={result.aiFeedback}
       studentTranscript={result.studentTranscript || "음성인식 결과가 없습니다."}
