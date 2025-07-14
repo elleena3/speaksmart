@@ -1,4 +1,3 @@
-
 // src/lib/firebase.ts
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
@@ -15,11 +14,6 @@ const firebaseConfig = {
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
-
-// apiKey가 있는지 확인하여 오류를 방지합니다.
-if (!firebaseConfig.apiKey) {
-    console.error("Firebase API Key is missing. Check your .env file and ensure NEXT_PUBLIC_ variables are set.");
-}
 
 // Firebase 초기화
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
