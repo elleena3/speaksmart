@@ -193,11 +193,8 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
      }
 
      const newResultRef = doc(collection(db, "results"));
-
-     const updateStatus = async (status: ResultStatus, progress: number, data: Partial<StudentResult> = {}) => {
-        await updateDoc(newResultRef, { status, progress, ...data });
-     };
-     
+      
+     // Create initial result document in Firestore so user sees progress immediately
      const initialResultData: Partial<StudentResult> = {
           id: newResultRef.id,
           studentId: user.uid,
@@ -214,20 +211,30 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
       await setDoc(newResultRef, initialResultData);
 
      try {
+        // STEP 1: UPLOAD AUDIO TO FIREBASE STORAGE FIRST. THIS IS THE MOST CRITICAL PART.
         const audioFileName = `recordings/${user.uid}_${assessmentDetails.id}_${Date.now()}.webm`;
         const storageRef = ref(storage, audioFileName);
         await uploadBytes(storageRef, audioBlobToUpload);
         const downloadURL = await getDownloadURL(storageRef);
 
-        await updateStatus("텍스트 변환 중", 25, { studentRecordingDataUri: downloadURL });
+        // STEP 2: Update Firestore doc with the audio URL and start analysis.
+        await updateDoc(newResultRef, { 
+          studentRecordingDataUri: downloadURL,
+          status: "텍스트 변환 중",
+          progress: 25
+        });
 
+        // STEP 3: RUN AI ANALYSIS IN THE BACKGROUND.
+        // This is wrapped in a promise to handle errors without stopping the whole function.
         generateSpeakingAnalysis({
             studentRecordingDataUri,
             activityPrompt: assessmentDetails.prompt,
             expectedFormat: assessmentDetails.expectedFormat || "학생의 답변을 평가합니다.",
             studentName: user.displayName || "Student",
             assessmentTitle: assessmentDetails.title.replace(/ - 복사본(\s\d+)?$/, ''),
-        }, (status, progress) => updateStatus(status as ResultStatus, progress))
+        }, (status, progress) => {
+           updateDoc(newResultRef, { status, progress });
+        })
         .then(analysisResult => {
             const finalResultData: Partial<Omit<StudentResult, 'id' | 'status' | 'progress'>> = {
                 score: analysisResult.contentScore,
@@ -247,7 +254,7 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
             });
         })
         .catch(error => {
-            console.error("Error processing assessment in background:", error);
+            console.error("Error during AI analysis background execution:", error);
             updateDoc(newResultRef, { 
                 status: "오류", 
                 progress: 100,
@@ -256,13 +263,13 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
         });
         
     } catch (error) {
-        console.error("Error setting up background process:", error);
+        console.error("Error in background process (likely upload failed):", error);
         await updateDoc(newResultRef, { 
             status: "오류", 
             progress: 100,
-            aiFeedback: "백그라운드 분석을 시작하는 중 오류가 발생했습니다."
+            aiFeedback: "오디오 파일을 업로드하는 중 오류가 발생했습니다."
         });
-        throw error;
+        throw error; // Re-throw to be caught by the handleSubmit's catch block
     }
   }
 
@@ -409,5 +416,3 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
     </div>
   )
 }
-
-  
