@@ -62,4 +62,6 @@ export type StudentResult = {
   teacherGuidance: string;
   studentTranscript?: string;
   studentRecordingDataUri?: string;
+  pronunciationScore?: number;
+  pronunciationFeedback?: string;
 }

@@ -47,12 +47,6 @@ export default function AssessmentResultsPage() {
   }
 
   return (
-    <FeedbackView
-      assessmentId={id}
-      assessmentTitle={result.assessmentTitle || "평가 피드백"}
-      aiFeedback={result.aiFeedback}
-      studentTranscript={result.studentTranscript || "음성인식 결과가 없습니다."}
-      studentRecordingDataUri={result.studentRecordingDataUri}
-    />
+    <FeedbackView result={result} />
   )
 }

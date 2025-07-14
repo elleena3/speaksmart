@@ -6,7 +6,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
-import { generateComprehensiveFeedback, GenerateComprehensiveFeedbackOutput } from "@/ai/flows/generate-comprehensive-feedback";
+import { generateComprehensiveFeedback } from "@/ai/flows/generate-comprehensive-feedback";
 import { type ConversationHistory, type StudentResult, type TeacherAssessment } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { FeedbackView } from "../../[id]/results/feedback-view";
@@ -59,6 +59,9 @@ export function FreeTalkFeedbackView() {
     const generateFeedback = async (conversationData: ConversationHistory, assessment: TeacherAssessment) => {
         setIsLoading(true);
         try {
+            // Note: For dialogue, we don't have a single audio recording.
+            // We pass a placeholder, and the AI flow knows to use the transcript for content feedback.
+            // Pronunciation feedback is not available for dialogue assessments in this implementation.
             const fakeAudioDataUri = "data:audio/webm;base64,"; 
             
             const fullTranscript = conversationData.history
@@ -68,12 +71,10 @@ export function FreeTalkFeedbackView() {
             const generatedResult = await generateComprehensiveFeedback({
                 activityPrompt: `${assessment.prompt}\n\n--- 대화 기록 ---\n${fullTranscript}`,
                 expectedFormat: "AI와의 자연스러운 대화 능력을 평가합니다. 유창성, 발음, 어휘, 문법을 종합적으로 고려하여 피드백을 제공해주세요.",
-                studentRecordingDataUri: fakeAudioDataUri,
+                studentRecordingDataUri: fakeAudioDataUri, // Placeholder for dialogue
                 studentName: "Alex Doe", 
                 assessmentTitle: assessment.title,
             });
-
-            const score = generatedResult.score;
 
             const studentResult: StudentResult = {
                 studentId: "student-alex-doe",
@@ -82,13 +83,16 @@ export function FreeTalkFeedbackView() {
                 name: "Alex Doe",
                 avatarUrl: "https://placehold.co/40x40.png",
                 status: "채점 완료",
-                score: score,
+                score: generatedResult.score,
                 date: new Date().toISOString().split('T')[0],
                 aiFeedback: generatedResult.aiFeedback,
                 curricularRemarks: generatedResult.curricularRemarks,
                 studentFeedbackSummary: "학생이 평가에 대해 남긴 피드백이 없습니다.",
                 teacherGuidance: generatedResult.teacherGuidance,
-                studentTranscript: fullTranscript
+                studentTranscript: fullTranscript,
+                studentRecordingDataUri: undefined, // No single recording for dialogue
+                pronunciationScore: generatedResult.pronunciationScore,
+                pronunciationFeedback: "대화 형식 평가에서는 개별 발음 분석을 제공하지 않습니다. 종합 피드백을 참고해주세요.", // Specific note for dialogue
             }
             
             const existingResults: StudentResult[] = JSON.parse(localStorage.getItem('student_results') || '[]');
@@ -126,13 +130,7 @@ export function FreeTalkFeedbackView() {
 
     return (
         <div className="space-y-6">
-            <FeedbackView 
-                assessmentId={result.assessmentId}
-                assessmentTitle={result.assessmentTitle}
-                aiFeedback={result.aiFeedback}
-                studentTranscript={result.studentTranscript || "대화 기록이 없습니다."}
-                studentRecordingDataUri={undefined}
-            />
+            <FeedbackView result={result} />
             <div className="text-center">
                 <Button onClick={() => router.push('/student/dashboard')}>대시보드로 돌아가기</Button>
             </div>

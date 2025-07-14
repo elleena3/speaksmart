@@ -7,9 +7,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { Loader2, Paperclip, Download, User, Activity, BookText, FileText } from "lucide-react"
+import { Loader2, Paperclip, Download, User, Activity, BookText, FileText, Target } from "lucide-react"
 import { type TeacherAssessment, type StudentResult } from "@/lib/types";
 import { useLanguage } from "@/context/language-context";
+import { Progress } from "@/components/ui/progress";
 
 export default function StudentResultPage() {
   const params = useParams();
@@ -115,7 +116,45 @@ export default function StudentResultPage() {
         </div>
         
         <div className="space-y-6">
+            {student.pronunciationScore !== undefined && student.pronunciationFeedback && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Target className="h-5 w-5 text-primary"/> 
+                    발음 분석 결과
+                  </CardTitle>
+                  <CardDescription>학생의 발음 정확도와 AI의 상세 피드백입니다.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="flex items-center gap-4">
+                        <div className="w-full">
+                            <div className="flex justify-between mb-1">
+                                <span className="text-base font-medium text-primary">발음 점수</span>
+                                <span className="text-sm font-medium text-primary">{student.pronunciationScore}%</span>
+                            </div>
+                            <Progress value={student.pronunciationScore} className="h-2" />
+                        </div>
+                    </div>
+                    <div className="text-sm text-muted-foreground p-4 bg-muted/50 rounded-lg whitespace-pre-wrap">
+                        {student.pronunciationFeedback}
+                    </div>
+                </CardContent>
+              </Card>
+            )}
+
             <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2"><Activity className="h-5 w-5 text-primary"/> 선생님을 위한 조언</CardTitle>
+                  <CardDescription>학생의 답변 분석에 기반한 AI 조언입니다.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-sm text-muted-foreground p-4 bg-muted/50 rounded-lg whitespace-pre-wrap">
+                    {student.teacherGuidance}
+                  </div>
+                </CardContent>
+              </Card>
+
+             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2"><User className="h-5 w-5 text-primary"/> 학생 피드백 요약</CardTitle>
                  <CardDescription>이 평가 활동에 대한 학생의 AI 요약 피드백입니다.</CardDescription>
@@ -129,18 +168,6 @@ export default function StudentResultPage() {
                 </Button>
               </CardContent>
             </Card>
-
-             <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2"><Activity className="h-5 w-5 text-primary"/> 선생님을 위한 조언</CardTitle>
-                  <CardDescription>학생의 답변 분석에 기반한 AI 조언입니다.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-sm text-muted-foreground p-4 bg-muted/50 rounded-lg whitespace-pre-wrap">
-                    {student.teacherGuidance}
-                  </div>
-                </CardContent>
-              </Card>
         </div>
       </div>
     </div>

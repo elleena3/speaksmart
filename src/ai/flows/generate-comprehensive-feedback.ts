@@ -2,8 +2,8 @@
 'use server';
 
 /**
- * @fileOverview Generates comprehensive feedback for a monologue speaking assessment.
- * It transcribes student audio, then generates student feedback, teacher guidance, curricular remarks, and a score.
+ * @fileOverview Generates comprehensive feedback for a speaking assessment, including pronunciation analysis.
+ * It transcribes student audio, then generates student feedback, teacher guidance, curricular remarks, a content score, and a pronunciation score.
  */
 
 import { ai } from '@/ai/genkit';
@@ -28,7 +28,9 @@ const GenerateComprehensiveFeedbackOutputSchema = z.object({
   aiFeedback: z.string().describe('The generated feedback for the student in Korean.'),
   teacherGuidance: z.string().describe('Actionable guidance for the teacher based on the performance in Korean.'),
   curricularRemarks: z.string().describe('A draft of curricular remarks suitable for the student’s academic record in Korean.'),
-  score: z.number().int().min(0).max(100).describe('A score from 0-100 for the performance.'),
+  score: z.number().int().min(0).max(100).describe('A score from 0-100 for the performance content.'),
+  pronunciationScore: z.number().int().min(0).max(100).describe('A score from 0-100 for pronunciation.'),
+  pronunciationFeedback: z.string().describe('Specific feedback on the student\'s pronunciation in Korean.'),
 });
 export type GenerateComprehensiveFeedbackOutput = z.infer<typeof GenerateComprehensiveFeedbackOutputSchema>;
 
@@ -36,16 +38,16 @@ export async function generateComprehensiveFeedback(input: GenerateComprehensive
   return generateComprehensiveFeedbackFlow(input);
 }
 
-// 1. Define the prompt for generating the analysis and feedback
-const feedbackGenerationPrompt = ai.definePrompt({
-  name: 'feedbackGenerationPrompt',
+// 1. Define the prompt for generating the content analysis and feedback
+const contentFeedbackPrompt = ai.definePrompt({
+  name: 'contentFeedbackPrompt',
   input: {
     schema: GenerateComprehensiveFeedbackInputSchema.extend({
       studentTranscript: z.string(),
     }).omit({ studentRecordingDataUri: true }),
   },
-  output: { schema: GenerateComprehensiveFeedbackOutputSchema.omit({ studentTranscript: true }) },
-  prompt: `You are an AI English Teacher evaluating a student's performance. Your persona is that of an expert English teacher providing constructive feedback for skill improvement.
+  output: { schema: GenerateComprehensiveFeedbackOutputSchema.omit({ studentTranscript: true, pronunciationScore: true, pronunciationFeedback: true }) },
+  prompt: `You are an AI English Teacher evaluating a student's performance based on a transcript. Your persona is that of an expert English teacher providing constructive feedback for skill improvement.
 Your entire response must be in the specified JSON format, and all text feedback must be in Korean.
 
 Here is the context for the evaluation:
@@ -57,14 +59,41 @@ Here is the context for the evaluation:
 
 Based on all the information provided, perform the following tasks:
 
-1.  **Generate Feedback for the Student:** Write encouraging and constructive feedback from the perspective of an English teacher. Focus on what they did well and what they can improve regarding fluency, pronunciation, grammar, and vocabulary in relation to the prompt. Include specific examples from their transcript. Suggest alternative English vocabulary or sentence structures where appropriate to help them improve. If the student's response is very short (e.g., just "Hi"), acknowledge it and provide feedback on how they could have expanded their answer or started the conversation.
+1.  **Generate Feedback for the Student:** Write encouraging and constructive feedback from the perspective of an English teacher. Focus on what they did well and what they can improve regarding fluency, grammar, and vocabulary in relation to the prompt based *only on the transcript*. Include specific examples from their transcript. Suggest alternative English vocabulary or sentence structures where appropriate to help them improve. If the student's response is very short (e.g., just "Hi"), acknowledge it and provide feedback on how they could have expanded their answer or started the conversation.
 2.  **Generate Guidance for the Teacher:** As an expert English teacher, provide actionable advice for the classroom teacher on how to help this specific student. Suggest specific English teaching activities, focus areas, or communication strategies based on the transcript analysis (e.g., "For vocabulary, try a 'word of the day' activity focusing on adjectives related to hobbies."). If the student's response was short or hesitant, suggest activities to build confidence.
 3.  **Draft Curricular Remarks:** Write official curricular remarks in a formal, descriptive tone with sentences ending in '~함' or '~임'. The remarks must be based on the student's English speaking performance in this specific task. The remarks should summarize the student's performance on this task for their academic record, linking it to English language competencies. Follow a 3-part structure: ① General participation/attitude in the English speaking task, ② Specific examples from their speech (even if short) and how it relates to English learning objectives (e.g., fluency, use of vocabulary, grammatical accuracy), ③ Collaboration, consideration for others, or other notable character traits observed during the activity. Even if the answer is short, evaluate the participation itself.
-4.  **Assign a Score:** Give a score from 0 to 100, where 100 is a perfect response that fully meets all criteria. Base the score on how well the student's response aligns with the activity prompt and expected format. A very short but correct answer should receive a low score, not zero.
+4.  **Assign a Content Score:** Give a score from 0 to 100 for the *content* of the response, where 100 is a perfect response that fully meets all criteria. Base the score on how well the student's response aligns with the activity prompt and expected format, based on the transcript. A very short but correct answer should receive a low score, not zero.
 `,
 });
 
-// 2. Define the main flow
+// 2. Define the prompt for generating pronunciation feedback
+const pronunciationFeedbackPrompt = ai.definePrompt({
+    name: 'pronunciationFeedbackPrompt',
+    input: {
+        schema: z.object({
+            studentRecordingDataUri: z.string(),
+            studentTranscript: z.string(),
+        })
+    },
+    output: { schema: GenerateComprehensiveFeedbackOutputSchema.pick({ pronunciationScore: true, pronunciationFeedback: true }) },
+    prompt: `You are an expert English pronunciation coach. Your task is to evaluate a student's spoken English based on their audio recording and the corresponding transcript. Provide all feedback in Korean.
+
+    - Student's Audio Recording: {{media url=studentRecordingDataUri}}
+    - AI-generated Transcript: {{{studentTranscript}}}
+
+    Please perform the following steps:
+    1.  Listen carefully to the audio recording.
+    2.  Compare the student's pronunciation with the words in the transcript.
+    3.  Evaluate the student's pronunciation in terms of accuracy, clarity, intonation, and fluency.
+    4.  **Assign a Pronunciation Score:** Give a score from 0 to 100. A score of 100 represents a native-like, clear pronunciation. A score of 0 means the speech is completely unintelligible.
+    5.  **Provide Pronunciation Feedback:** Write specific, constructive feedback in Korean. Point out specific words or sounds that were pronounced well and those that need improvement. For words that need improvement, provide tips on how to pronounce them correctly (e.g., "The 'r' sound in 'friend' was a bit weak, try to curl your tongue more."). Be encouraging.
+    
+    If the transcript is very short (e.g., "Hi"), provide feedback on the pronunciation of that specific word. If the transcript is empty or indicates no speech, provide a score of 0 and state that no speech was detected.
+    `,
+});
+
+
+// 3. Define the main flow
 const generateComprehensiveFeedbackFlow = ai.defineFlow(
   {
     name: 'generateComprehensiveFeedbackFlow',
@@ -73,7 +102,6 @@ const generateComprehensiveFeedbackFlow = ai.defineFlow(
   },
   async ({ studentRecordingDataUri, activityPrompt, expectedFormat, studentName, assessmentTitle }) => {
     
-    // Handle cases with no audio data to prevent API errors.
     const audioData = studentRecordingDataUri.split(',')[1];
     if (!audioData) {
       return {
@@ -82,17 +110,16 @@ const generateComprehensiveFeedbackFlow = ai.defineFlow(
         teacherGuidance: '학생 답변이 없어 조언 불가',
         curricularRemarks: '학생 답변이 없어 판별 불가',
         score: 0,
+        pronunciationScore: 0,
+        pronunciationFeedback: '녹음된 오디오가 없어 발음 분석을 할 수 없습니다.',
       };
     }
 
     let studentTranscript = "";
-    // Check if this is a dialogue assessment by looking for the marker in the activity prompt
     const dialogueMarker = '--- 대화 기록 ---\n';
     if (activityPrompt.includes(dialogueMarker)) {
-        // For dialogue, the transcript is already part of the prompt
         studentTranscript = activityPrompt.substring(activityPrompt.indexOf(dialogueMarker) + dialogueMarker.length);
     } else {
-        // For monologue, transcribe the audio
         const sttResponse = await ai.generate({
           model: googleAI.model('gemini-2.0-flash'),
           prompt: [
@@ -103,35 +130,43 @@ const generateComprehensiveFeedbackFlow = ai.defineFlow(
         studentTranscript = sttResponse.text;
     }
 
-
-    if (!studentTranscript) { // Check for truly empty string, not just whitespace. Allows "Hi".
-      // If transcription is empty, return a default "could not hear" response.
+    if (!studentTranscript) {
       return {
         studentTranscript: '(학생 답변이 기록되지 않았습니다.)',
         aiFeedback: '죄송합니다, 답변을 제대로 듣지 못했습니다. 마이크를 확인하고 다시 시도해주세요.',
         teacherGuidance: '학생 답변이 없어 조언 불가',
         curricularRemarks: '학생 답변이 없어 판별 불가',
         score: 0,
+        pronunciationScore: 0,
+        pronunciationFeedback: '음성 인식 결과가 없어 발음 분석을 할 수 없습니다.',
       };
     }
 
-    // Step 2: Call the prompt to generate feedback, remarks, guidance, and score.
-    const { output } = await feedbackGenerationPrompt({
-      studentTranscript,
-      activityPrompt,
-      expectedFormat,
-      studentName,
-      assessmentTitle,
-    });
+    const [contentResult, pronunciationResult] = await Promise.all([
+        contentFeedbackPrompt({
+            studentTranscript,
+            activityPrompt,
+            expectedFormat,
+            studentName,
+            assessmentTitle,
+        }),
+        pronunciationFeedbackPrompt({
+            studentRecordingDataUri,
+            studentTranscript,
+        }),
+    ]);
 
-    if (!output) {
+    const contentOutput = contentResult.output;
+    const pronunciationOutput = pronunciationResult.output;
+
+    if (!contentOutput || !pronunciationOutput) {
         throw new Error("Failed to generate comprehensive feedback from the AI model.");
     }
-
-    // Step 3: Return the combined result.
+    
     return {
       studentTranscript,
-      ...output,
+      ...contentOutput,
+      ...pronunciationOutput,
     };
   }
 );

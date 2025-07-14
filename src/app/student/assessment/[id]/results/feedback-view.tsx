@@ -1,28 +1,35 @@
 
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
-import { Send, ThumbsUp, ThumbsDown, MessageSquareQuote, Loader2, FileText, PlayCircle } from "lucide-react"
+import { Send, ThumbsUp, ThumbsDown, MessageSquareQuote, Loader2, FileText, Target } from "lucide-react"
 import { summarizeStudentFeedback } from "@/ai/flows/summarize-student-feedback"
 import { type StudentResult } from "@/lib/types"
+import { Progress } from "@/components/ui/progress"
 
 type FeedbackViewProps = {
-  assessmentId: string;
-  assessmentTitle: string;
-  aiFeedback: string;
-  studentTranscript: string;
-  studentRecordingDataUri?: string;
+  result: StudentResult
 }
 
-export function FeedbackView({ assessmentId, assessmentTitle, aiFeedback, studentTranscript, studentRecordingDataUri }: FeedbackViewProps) {
+export function FeedbackView({ result }: FeedbackViewProps) {
   const [teacherFeedback, setTeacherFeedback] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [satisfaction, setSatisfaction] = useState<"good" | "bad" | null>(null);
   const { toast } = useToast()
+
+  const {
+    assessmentId,
+    assessmentTitle,
+    aiFeedback,
+    studentTranscript,
+    studentRecordingDataUri,
+    pronunciationScore,
+    pronunciationFeedback
+  } = result;
 
   const handleSubmitFeedback = async () => {
     if (!teacherFeedback.trim()) {
@@ -86,11 +93,40 @@ export function FeedbackView({ assessmentId, assessmentTitle, aiFeedback, studen
                         </audio>
                     </div>
                 )}
-                <div className="p-4 bg-muted/50 rounded-lg whitespace-pre-wrap font-mono text-sm leading-relaxed italic">
+                <div className="p-4 bg-muted/50 rounded-lg whitespace-pre-wrap font-mono text-sm leading-relaxed italic max-h-60 overflow-y-auto">
                     "{studentTranscript}"
                 </div>
             </CardContent>
         </Card>
+        
+        {pronunciationScore !== undefined && pronunciationFeedback && (
+          <Card>
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <Target className="w-8 h-8 text-primary shrink-0" />
+                  <div>
+                    <CardTitle className="text-2xl">발음 분석</CardTitle>
+                    <CardDescription>AI가 분석한 발음 정확도와 피드백입니다.</CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                  <div className="flex items-center gap-4">
+                      <div className="w-full">
+                         <div className="flex justify-between mb-1">
+                            <span className="text-base font-medium text-primary">발음 점수</span>
+                            <span className="text-sm font-medium text-primary">{pronunciationScore}%</span>
+                        </div>
+                        <Progress value={pronunciationScore} className="h-2" />
+                      </div>
+                  </div>
+                  <div className="p-4 bg-muted/50 rounded-lg whitespace-pre-wrap font-body text-base leading-relaxed">
+                    {pronunciationFeedback}
+                  </div>
+              </CardContent>
+          </Card>
+        )}
+
         <Card>
             <CardHeader>
               <div className="flex items-center gap-3">

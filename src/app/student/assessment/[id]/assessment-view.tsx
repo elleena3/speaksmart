@@ -66,7 +66,15 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
   
   const processAssessment = async (studentRecordingDataUri: string) => {
      try {
-      const { aiFeedback, curricularRemarks, teacherGuidance, score, studentTranscript } = await generateComprehensiveFeedback({
+      const { 
+        aiFeedback, 
+        curricularRemarks, 
+        teacherGuidance, 
+        score, 
+        studentTranscript,
+        pronunciationScore,
+        pronunciationFeedback
+      } = await generateComprehensiveFeedback({
         activityPrompt: assessmentDetails.prompt,
         expectedFormat: assessmentDetails.prompt, // Using prompt as expected format for monologue
         studentRecordingDataUri,
@@ -89,6 +97,8 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
         teacherGuidance,
         studentTranscript,
         studentRecordingDataUri,
+        pronunciationScore,
+        pronunciationFeedback,
       }
       
       const existingResults: StudentResult[] = JSON.parse(localStorage.getItem('student_results') || '[]');
