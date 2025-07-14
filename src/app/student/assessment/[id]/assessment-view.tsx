@@ -22,6 +22,7 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
   const [remainingTime, setRemainingTime] = useState<number | null>(null);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [audioSize, setAudioSize] = useState<number | null>(null);
   
   const router = useRouter()
   const { toast } = useToast()
@@ -56,12 +57,14 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
       URL.revokeObjectURL(audioUrl);
       setAudioUrl(null);
     }
+    setAudioSize(null);
   }, [audioUrl]);
 
 
   const handleStartRecording = async () => {
     setAudioBlob(null);
     setAudioUrl(null);
+    setAudioSize(null);
     if(recordingState !== 'idle') {
       cleanupRecorder();
     }
@@ -99,6 +102,7 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
         const newAudioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         setAudioBlob(newAudioBlob);
         setAudioUrl(URL.createObjectURL(newAudioBlob));
+        setAudioSize(newAudioBlob.size);
         setRecordingState("recorded");
         toast({ title: "녹음 완료", description: "아래에서 녹음을 확인하고 제출해주세요." });
         cleanupRecorder();
@@ -299,6 +303,15 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
     return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
   };
 
+  const formatFileSize = (bytes: number | null) => {
+    if (bytes === null) return "";
+    if (bytes === 0) return "0 Bytes";
+    const k = 1024;
+    const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `(파일 크기: ${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]})`;
+  };
+
   const timerDisplay = formatTime(remainingTime);
 
   const renderIdleState = () => (
@@ -336,7 +349,9 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
      <Card className="w-full max-w-md bg-background">
         <CardHeader>
             <CardTitle>녹음 확인</CardTitle>
-            <CardDescription>아래에서 녹음된 내용을 확인하고 제출하세요.</CardDescription>
+            <CardDescription>
+                아래에서 녹음된 내용을 확인하고 제출하세요. {formatFileSize(audioSize)}
+            </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
             {audioUrl && (
@@ -394,3 +409,5 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
     </div>
   )
 }
+
+  
