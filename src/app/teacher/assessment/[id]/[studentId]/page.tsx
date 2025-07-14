@@ -98,7 +98,7 @@ export default function StudentResultPage() {
       ['평가 유형', isDialogue ? 'AI와 대화하기' : '혼자 말하기'],
       ['평가 날짜', studentResult.date],
       ['내용 점수', `${studentResult.score}%`],
-      ['발음 점수', `${studentResult.pronunciationScore}%`],
+      ['발음 점수', `${studentResult.pronunciationScore ?? 0}%`],
       { content: 'AI 피드백 (학생용)', styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } },
       [studentResult.aiFeedback],
       { content: '발음 분석', styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } },
@@ -229,31 +229,29 @@ export default function StudentResultPage() {
         </div>
         
         <div className="space-y-6">
-            {studentResult.pronunciationScore !== undefined && studentResult.pronunciationFeedback && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Target className="h-5 w-5 text-primary"/> 
-                    발음 분석 결과
-                  </CardTitle>
-                  <CardDescription>학생의 발음 정확도와 AI의 상세 피드백입니다.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="flex items-center gap-4">
-                        <div className="w-full">
-                            <div className="flex justify-between mb-1">
-                                <span className="text-base font-medium text-primary">발음 점수</span>
-                                <span className="text-sm font-medium text-primary">{studentResult.pronunciationScore}%</span>
-                            </div>
-                            <Progress value={studentResult.pronunciationScore} className="h-2" />
-                        </div>
-                    </div>
-                    <div className="text-sm text-muted-foreground p-4 bg-muted/50 rounded-lg whitespace-pre-wrap">
-                        {studentResult.pronunciationFeedback}
-                    </div>
-                </CardContent>
-              </Card>
-            )}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Target className="h-5 w-5 text-primary"/> 
+                  발음 분석 결과
+                </CardTitle>
+                <CardDescription>학생의 발음 정확도와 AI의 상세 피드백입니다.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                  <div className="flex items-center gap-4">
+                      <div className="w-full">
+                          <div className="flex justify-between mb-1">
+                              <span className="text-base font-medium text-primary">발음 점수</span>
+                              <span className="text-sm font-medium text-primary">{studentResult.pronunciationScore ?? 0}%</span>
+                          </div>
+                          <Progress value={studentResult.pronunciationScore} className="h-2" />
+                      </div>
+                  </div>
+                  <div className="text-sm text-muted-foreground p-4 bg-muted/50 rounded-lg whitespace-pre-wrap">
+                      {studentResult.pronunciationFeedback || "발음 분석 결과가 없습니다."}
+                  </div>
+              </CardContent>
+            </Card>
 
             <Card>
                 <CardHeader>
@@ -271,7 +269,7 @@ export default function StudentResultPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2"><User className="h-5 w-5 text-primary"/> 학생 피드백 요약</CardTitle>
                  <CardDescription>이 평가 활동에 대한 학생의 AI 요약 피드백입니다.</CardDescription>
-              </Header>
+              </CardHeader>
               <CardContent>
                  <div className="text-sm text-muted-foreground p-4 bg-muted/50 rounded-lg italic">
                     {hasFeedback ? studentResult.studentFeedbackSummary : "피드백 없음"}
