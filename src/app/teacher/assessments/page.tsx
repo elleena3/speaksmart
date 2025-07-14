@@ -80,6 +80,14 @@ export default function AssessmentsPage() {
         averageScore: 0,
       };
 
+      // Remove undefined date fields before sending to Firestore
+      if (newAssessment.startDate === undefined) {
+        delete (newAssessment as any).startDate;
+      }
+      if (newAssessment.endDate === undefined) {
+        delete (newAssessment as any).endDate;
+      }
+
       await addDoc(collection(db, "assessments"), newAssessment);
 
       toast({
