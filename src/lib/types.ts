@@ -45,6 +45,7 @@ export type TeacherAssessment = {
 // Add conversation history type to be stored in localStorage
 export type ConversationHistory = {
   history: ConversationTurn[];
+  studentRecordingDataUri?: string;
 }
 
 export type StudentResult = {

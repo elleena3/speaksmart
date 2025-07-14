@@ -19,6 +19,7 @@ export function FreeTalkView({ scenario, scenarioPrompt, assessmentId }: { scena
   const [interimTranscript, setInterimTranscript] = useState<string | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const studentAudioChunksRef = useRef<Blob[]>([]); // To collect all student audio blobs
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
@@ -99,6 +100,7 @@ export function FreeTalkView({ scenario, scenarioPrompt, assessmentId }: { scena
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
       mediaRecorderRef.current.onstop = () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        studentAudioChunksRef.current.push(audioBlob); // Collect the student's audio chunk
         const reader = new FileReader();
         reader.readAsDataURL(audioBlob);
         reader.onloadend = async () => {
@@ -148,13 +150,22 @@ export function FreeTalkView({ scenario, scenarioPrompt, assessmentId }: { scena
   };
 
   const handleFinishSession = () => {
-    const fullTranscript = conversation.map(turn => `${turn.role === 'user' ? 'Student' : 'AI'}: ${turn.text}`).join('\n');
-    
-    // Store the final transcript in session storage to be picked up by the results page
-    sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({ history: conversation }));
-    
-    const url = assessmentId ? `/student/assessment/free-talk/results?id=${assessmentId}` : '/student/assessment/free-talk/results';
-    router.push(url);
+    // Combine all student audio chunks into one blob
+    const combinedBlob = new Blob(studentAudioChunksRef.current, { type: 'audio/webm' });
+    const reader = new FileReader();
+    reader.readAsDataURL(combinedBlob);
+    reader.onloadend = () => {
+        const studentRecordingDataUri = reader.result as string;
+        
+        // Store the final transcript and the combined audio in session storage
+        sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({ 
+            history: conversation,
+            studentRecordingDataUri: studentRecordingDataUri
+        }));
+        
+        const url = assessmentId ? `/student/assessment/free-talk/results?id=${assessmentId}` : '/student/assessment/free-talk/results';
+        router.push(url);
+    };
   }
 
   const getButtonState = () => {
