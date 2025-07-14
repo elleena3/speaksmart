@@ -17,12 +17,16 @@ import { useLanguage } from '@/context/language-context';
 import { useAuth } from '@/context/auth-context';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, orderBy, addDoc, deleteDoc, doc, writeBatch } from "firebase/firestore";
+import { collection, query, where, getDocs, orderBy, addDoc, deleteDoc, doc, writeBatch,getCountFromServer } from "firebase/firestore";
+
+type AssessmentWithCount = TeacherAssessment & {
+    submissionCount: number;
+}
 
 export default function AssessmentsPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
-  const [assessments, setAssessments] = useState<TeacherAssessment[]>([]);
+  const [assessments, setAssessments] = useState<AssessmentWithCount[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
   const { t } = useLanguage();
@@ -40,11 +44,22 @@ export default function AssessmentsPage() {
       const assessmentsData = querySnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
-        // Convert Firestore Timestamps to JS Dates if they exist
         startDate: doc.data().startDate?.toDate(),
         endDate: doc.data().endDate?.toDate(),
       } as TeacherAssessment));
-      setAssessments(assessmentsData);
+      
+      const assessmentsWithCounts = await Promise.all(
+        assessmentsData.map(async (assessment) => {
+            const resultsQuery = query(collection(db, "results"), where("assessmentId", "==", assessment.id));
+            const snapshot = await getCountFromServer(resultsQuery);
+            return {
+                ...assessment,
+                submissionCount: snapshot.data().count
+            };
+        })
+      );
+
+      setAssessments(assessmentsWithCounts);
     } catch (error) {
       console.error("Error fetching assessments: ", error);
       toast({ title: "오류", description: "평가 목록을 불러오는 데 실패했습니다.", variant: "destructive" });
@@ -69,7 +84,7 @@ export default function AssessmentsPage() {
     if (!assessmentToCopy || !user) return;
 
     try {
-        const { id, ...assessmentDataToCopy } = assessmentToCopy;
+        const { id, submissionCount, ...assessmentDataToCopy } = assessmentToCopy;
         
         const copySuffix = t.teacherAssessments.copySuffix; // " - 복사본"
         const regex = new RegExp(`^(.*?)(${copySuffix}( \\d+)?)?$`);
@@ -101,9 +116,6 @@ export default function AssessmentsPage() {
         if (newAssessment.endDate === undefined) {
             delete (newAssessment as any).endDate;
         }
-        if (newAssessment.totalStudents) {
-          delete (newAssessment as any).totalStudents;
-        }
 
         await addDoc(collection(db, "assessments"), newAssessment);
 
@@ -121,10 +133,8 @@ export default function AssessmentsPage() {
 
   const handleDelete = async (assessmentId: string) => {
     try {
-      // Delete the assessment document
       await deleteDoc(doc(db, "assessments", assessmentId));
 
-      // Also delete associated student results to maintain data consistency
       const resultsQuery = query(collection(db, "results"), where("assessmentId", "==", assessmentId));
       const resultsSnapshot = await getDocs(resultsQuery);
       
@@ -215,7 +225,9 @@ export default function AssessmentsPage() {
                    <TableCell className="text-center">
                       <div className="flex items-center justify-center gap-1.5">
                         <Users className="h-4 w-4 text-muted-foreground" />
-                        <Badge variant="secondary">{assessment.studentsCompleted}</Badge>
+                        <Badge variant={assessment.submissionCount > 0 ? "default" : "secondary"}>
+                          {assessment.submissionCount}
+                        </Badge>
                       </div>
                    </TableCell>
                    <TableCell className="text-center">

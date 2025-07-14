@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { FeedbackView } from "../../[id]/results/feedback-view";
 import { useAuth } from "@/context/auth-context";
 import { db } from "@/lib/firebase";
-import { collection, doc, query, where, getDocs, writeBatch, runTransaction, increment } from "firebase/firestore";
+import { collection, doc, query, where, getDocs, writeBatch } from "firebase/firestore";
 
 const SESSION_STORAGE_KEY = 'freeTalkConversationHistory';
 
@@ -94,27 +94,11 @@ export function FreeTalkFeedbackView() {
             const resultsRef = collection(db, "results");
             const q = query(resultsRef, where("assessmentId", "==", assessment.id), where("studentId", "==", user.uid));
             const existingDocs = await getDocs(q);
-
-            if (existingDocs.empty) {
-                 // This is a new submission, so increment the counter
-                const assessmentRef = doc(db, "assessments", assessment.id);
-                try {
-                    await runTransaction(db, async (transaction) => {
-                        const assessmentDoc = await transaction.get(assessmentRef);
-                        if (!assessmentDoc.exists()) {
-                            throw "Assessment document does not exist!";
-                        }
-                        transaction.update(assessmentRef, { studentsCompleted: increment(1) });
-                    });
-                } catch (e) {
-                    console.error("Transaction failed: ", e);
-                }
-            }
             
             const batch = writeBatch(db);
-            existingDocs.forEach(doc => batch.delete(doc.ref)); // Delete old results to replace
+            existingDocs.forEach(doc => batch.delete(doc.ref));
             const newResultRef = doc(collection(db, "results"));
-            batch.set(newResultRef, resultData); // Add new result
+            batch.set(newResultRef, resultData);
             await batch.commit();
             
             setResult({ id: newResultRef.id, ...resultData });

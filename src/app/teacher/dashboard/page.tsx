@@ -11,9 +11,13 @@ import { OverviewChart } from "./overview-chart"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { getLanguage } from "@/lib/get-language"
 import { db } from "@/lib/firebase"
-import { collection, query, where, getDocs, orderBy } from "firebase/firestore"
+import { collection, query, where, getDocs, orderBy, getCountFromServer } from "firebase/firestore"
 
-async function getAssessments(teacherId: string): Promise<TeacherAssessment[]> {
+type AssessmentWithCount = TeacherAssessment & {
+    submissionCount: number;
+}
+
+async function getAssessments(teacherId: string): Promise<AssessmentWithCount[]> {
     try {
       const q = query(
         collection(db, "assessments"), 
@@ -21,10 +25,23 @@ async function getAssessments(teacherId: string): Promise<TeacherAssessment[]> {
         orderBy("createdAt", "desc")
       );
       const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(doc => ({
+      const assessmentsData = querySnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       } as TeacherAssessment));
+      
+      const assessmentsWithCounts = await Promise.all(
+        assessmentsData.map(async (assessment) => {
+            const resultsQuery = query(collection(db, "results"), where("assessmentId", "==", assessment.id));
+            const snapshot = await getCountFromServer(resultsQuery);
+            return {
+                ...assessment,
+                submissionCount: snapshot.data().count
+            };
+        })
+      );
+      return assessmentsWithCounts;
+
     } catch (error) {
       console.error("Error fetching assessments: ", error);
       return [];
@@ -34,7 +51,6 @@ async function getAssessments(teacherId: string): Promise<TeacherAssessment[]> {
 
 export default async function TeacherDashboard() {
   const t = getLanguage();
-  // We'll use a mock user ID since login is disabled
   const mockTeacherId = "test-user-id";
   const assessments = await getAssessments(mockTeacherId);
 
@@ -86,7 +102,9 @@ export default async function TeacherDashboard() {
                   <TableCell className="text-center">
                     <div className="flex items-center justify-center gap-1.5">
                       <Users className="h-4 w-4 text-muted-foreground" />
-                      <Badge variant="secondary">{assessment.studentsCompleted}</Badge>
+                      <Badge variant={assessment.submissionCount > 0 ? "default" : "secondary"}>
+                        {assessment.submissionCount}
+                      </Badge>
                     </div>
                   </TableCell>
                   <TableCell className="text-center">
