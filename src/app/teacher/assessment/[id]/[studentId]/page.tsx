@@ -80,9 +80,14 @@ export default function StudentResultPage() {
     try {
         const { default: jsPDF } = await import('jspdf');
         const { default: autoTable } = await import('jspdf-autotable');
+        const { NanumGothicFont } = await import('@/lib/fonts/nanum-gothic-for-jspdf');
         
         const docPDF = new jsPDF();
         
+        docPDF.addFileToVFS("NanumGothic.ttf", NanumGothicFont);
+        docPDF.addFont("NanumGothic.ttf", "NanumGothic", "normal");
+        docPDF.setFont("NanumGothic");
+
         const margin = 15;
         
         docPDF.setFontSize(22);
@@ -110,7 +115,6 @@ export default function StudentResultPage() {
             didParseCell: (data) => {
               if (data.section === 'body' && data.column.index === 1) {
                  if (typeof data.cell.text[0] === 'string') {
-                    // Ensure content is a string before splitting
                     data.cell.text = docPDF.splitTextToSize(data.cell.text[0], (data.table.columns[1].width - 10));
                  }
               }
@@ -121,7 +125,7 @@ export default function StudentResultPage() {
 
         const addSection = (title: string, content: string, startY: number): number => {
             const pageHeight = docPDF.internal.pageSize.height;
-            if (startY > pageHeight - 40) { // check for space before adding content
+            if (startY > pageHeight - 40) {
                 docPDF.addPage();
                 startY = 20;
             }
@@ -132,13 +136,12 @@ export default function StudentResultPage() {
             docPDF.setTextColor(100);
             
             const splitContent = docPDF.splitTextToSize(content || "내용 없음", 180);
-            const lineHeight = docPDF.getLineHeight() / docPDF.getPointScale();
-            const contentHeight = splitContent.length * lineHeight;
+            const lineHeight = docPDF.getLineHeight();
+            const contentHeight = splitContent.length * lineHeight * 0.35; // Adjust multiplier as needed
 
-            if (startY + 8 + contentHeight > pageHeight - 20) { // check for space including content
+            if (startY + 8 + contentHeight > pageHeight - 20) {
                 docPDF.addPage();
                 startY = 20;
-                // re-add title on new page
                 docPDF.setFontSize(14);
                 docPDF.setTextColor(0);
                 docPDF.text(title, margin, startY);
