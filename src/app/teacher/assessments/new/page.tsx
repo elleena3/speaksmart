@@ -41,6 +41,7 @@ export default function NewAssessmentPage() {
     endDate: z.date().optional(),
     assessmentType: z.enum(["monologue", "dialogue"]),
     scenario: z.enum(scenarios).optional(),
+    recordingTimeLimit: z.coerce.number().int().min(0).optional(),
   }).superRefine((data, ctx) => {
     const isFreeTalk = data.assessmentType === 'dialogue' && data.scenario === 'free-talk';
 
@@ -73,7 +74,8 @@ export default function NewAssessmentPage() {
       prompt: "",
       expectedFormat: "",
       assessmentType: "monologue",
-      scenario: "free-talk"
+      scenario: "free-talk",
+      recordingTimeLimit: 0,
     },
   });
 
@@ -114,7 +116,6 @@ export default function NewAssessmentPage() {
         const newAssessmentData = {
             ...submissionValues,
             uid: user.uid,
-            studentsCompleted: 0,
             averageScore: 0,
             dateCreated: new Date().toISOString().split('T')[0],
             createdAt: Date.now(),
@@ -291,6 +292,28 @@ export default function NewAssessmentPage() {
               )}
             />
 
+            {assessmentType === 'monologue' && (
+              <FormField
+                control={form.control}
+                name="recordingTimeLimit"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t.teacherAssessmentForm.timeLimitLabel}</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        placeholder={t.teacherAssessmentForm.timeLimitPlaceholder}
+                        {...field}
+                        onChange={event => field.onChange(parseInt(event.target.value, 10) || 0)}
+                      />
+                    </FormControl>
+                    <FormDescription>{t.teacherAssessmentForm.timeLimitDescription}</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                  <FormField
                     control={form.control}
@@ -392,5 +415,3 @@ export default function NewAssessmentPage() {
     </Card>
   );
 }
-
-    

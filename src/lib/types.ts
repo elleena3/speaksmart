@@ -29,8 +29,6 @@ export type TeacherAssessment = {
   title: string;
   topic: string;
   prompt: string;
-  studentsCompleted: number;
-  totalStudents: number;
   averageScore: number;
   dateCreated: string;
   startDate?: Date;
@@ -38,6 +36,7 @@ export type TeacherAssessment = {
   assessmentType: 'monologue' | 'dialogue';
   scenario?: Scenario;
   expectedFormat?: string;
+  recordingTimeLimit?: number; // Optional recording time limit in minutes
   // For Firestore timestamp
   createdAt: number;
 };

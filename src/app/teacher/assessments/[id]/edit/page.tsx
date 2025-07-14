@@ -45,6 +45,7 @@ export default function EditAssessmentPage() {
     endDate: z.date().optional(),
     assessmentType: z.enum(["monologue", "dialogue"]),
     scenario: z.enum(scenarios).optional(),
+    recordingTimeLimit: z.coerce.number().int().min(0).optional(),
   }).superRefine((data, ctx) => {
     const isFreeTalk = data.assessmentType === 'dialogue' && data.scenario === 'free-talk';
 
@@ -77,7 +78,8 @@ export default function EditAssessmentPage() {
       prompt: "",
       expectedFormat: "",
       assessmentType: "monologue",
-      scenario: "free-talk"
+      scenario: "free-talk",
+      recordingTimeLimit: 0,
     },
   });
 
@@ -315,6 +317,29 @@ export default function EditAssessmentPage() {
               )}
             />
             
+            {assessmentType === 'monologue' && (
+              <FormField
+                control={form.control}
+                name="recordingTimeLimit"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t.teacherAssessmentForm.timeLimitLabel}</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        placeholder={t.teacherAssessmentForm.timeLimitPlaceholder}
+                        {...field}
+                        value={field.value ?? ""}
+                        onChange={event => field.onChange(parseInt(event.target.value, 10) || 0)}
+                      />
+                    </FormControl>
+                    <FormDescription>{t.teacherAssessmentForm.timeLimitDescription}</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                  <FormField
                     control={form.control}
@@ -415,5 +440,3 @@ export default function EditAssessmentPage() {
     </Card>
   );
 }
-
-    

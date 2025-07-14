@@ -4,7 +4,7 @@
 import { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Mic, StopCircle, Loader2 } from "lucide-react"
+import { Mic, StopCircle, Loader2, Timer } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { generateComprehensiveFeedback } from "@/ai/flows/generate-comprehensive-feedback"
 import { type StudentResult, type TeacherAssessment } from "@/lib/types"
@@ -16,11 +16,17 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
   const { user } = useAuth();
   const [isRecording, setIsRecording] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
+  const [remainingTime, setRemainingTime] = useState<number | null>(null);
   const router = useRouter()
   const { toast } = useToast()
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const audioStreamRef = useRef<MediaStream | null>(null);
+  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  const timeLimit = assessmentDetails.recordingTimeLimit && assessmentDetails.recordingTimeLimit > 0 
+    ? assessmentDetails.recordingTimeLimit * 60 
+    : null;
 
   const cleanup = () => {
     if (audioStreamRef.current) {
@@ -33,11 +39,31 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
       mediaRecorderRef.current.onerror = null;
       mediaRecorderRef.current = null;
     }
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+    }
+    setRemainingTime(timeLimit);
     audioChunksRef.current = [];
   };
 
+  const startTimer = () => {
+    if (timeLimit) {
+      setRemainingTime(timeLimit);
+      timerIntervalRef.current = setInterval(() => {
+        setRemainingTime(prevTime => {
+          if (prevTime === null || prevTime <= 1) {
+            if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+            handleStopRecording();
+            return 0;
+          }
+          return prevTime - 1;
+        });
+      }, 1000);
+    }
+  };
+
   const handleStartRecording = async () => {
-    // Clear previous refs
     cleanup();
     setIsRecording(true);
 
@@ -88,6 +114,7 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
       }
 
       mediaRecorderRef.current.start();
+      startTimer();
       toast({
         title: "녹음 시작됨",
         description: "말씀을 마치신 후 녹음 중지 버튼을 눌러주세요.",
@@ -109,6 +136,7 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
       setIsRecording(false)
       setIsProcessing(true)
       mediaRecorderRef.current.stop(); // This will trigger the onstop event
+      if(timerIntervalRef.current) clearInterval(timerIntervalRef.current);
       toast({
         title: "녹음 중지됨",
         description: "오디오를 처리하고 AI 피드백을 생성 중입니다...",
@@ -190,11 +218,22 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
   }
   
   useEffect(() => {
+    // Set initial time on mount
+    if (timeLimit) {
+      setRemainingTime(timeLimit);
+    }
     // Cleanup on component unmount
     return () => {
       cleanup();
     };
-  }, []);
+  }, [timeLimit]);
+
+  const formatTime = (seconds: number | null) => {
+    if (seconds === null) return null;
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  };
 
   const getButtonState = () => {
     if (isProcessing) {
@@ -221,8 +260,16 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
     )
   }
 
+  const timerDisplay = formatTime(remainingTime);
+
   return (
     <div className="flex flex-col items-center gap-6 p-8 border rounded-lg bg-muted/50">
+      {timeLimit && (
+        <div className="flex items-center gap-2 text-lg font-semibold text-muted-foreground">
+          <Timer className="h-6 w-6" />
+          <span>{isRecording ? timerDisplay : formatTime(timeLimit)}</span>
+        </div>
+      )}
       <div className="relative flex items-center justify-center w-32 h-32 rounded-full bg-background">
         <Mic className={`h-16 w-16 text-primary transition-all ${isRecording ? 'scale-110' : ''}`} />
         {isRecording && <div className="absolute inset-0 rounded-full bg-destructive/20 animate-pulse"></div>}
