@@ -4,7 +4,7 @@
 import { useState, useRef, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Mic, StopCircle, Loader2, Timer, UploadCloud, FileText, BrainCircuit, BookCheck, Play, RefreshCw, Send } from "lucide-react"
+import { Mic, StopCircle, Loader2, Timer, Send, RefreshCw } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { generateSpeakingAnalysis } from "@/ai/flows/generate-speaking-analysis-flow"
 import { type TeacherAssessment, type StudentResult, type ResultStatus } from "@/lib/types"
@@ -54,15 +54,17 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
     audioChunksRef.current = [];
     if (audioUrl) {
       URL.revokeObjectURL(audioUrl);
+      setAudioUrl(null);
     }
   }, [audioUrl]);
 
 
   const handleStartRecording = async () => {
-    // Reset previous recording if any
     setAudioBlob(null);
     setAudioUrl(null);
-    cleanupRecorder();
+    if(recordingState !== 'idle') {
+      cleanupRecorder();
+    }
     
     setRecordingState("recording");
     if(timeLimit) setRemainingTime(timeLimit);
@@ -144,27 +146,49 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
         return;
     }
     setRecordingState("submitting");
-    toast({
-        title: "제출 완료",
-        description: "답변이 제출되었습니다. AI 분석이 시작되며, 완료되면 알려드립니다.",
-    });
 
-    const reader = new FileReader();
-    reader.readAsDataURL(audioBlob);
-    reader.onloadend = async () => {
-      const base64Audio = reader.result as string;
-      // This runs in the background. The user is redirected immediately.
-      processAssessmentInBackground(audioBlob, base64Audio);
-    };
-    
-    // Immediately redirect user
-    router.push(`/student/assessment/${assessmentDetails.id}/results`);
+    // This runs in the background. The user is redirected after submission is confirmed.
+    try {
+      const reader = new FileReader();
+      reader.readAsDataURL(audioBlob);
+      
+      reader.onloadend = async () => {
+        try {
+            const base64Audio = reader.result as string;
+            // The processAssessmentInBackground function will now handle everything.
+            // We await its completion before redirecting.
+            await processAssessmentInBackground(audioBlob, base64Audio);
+            
+            toast({
+                title: "제출 완료",
+                description: "답변이 제출되었습니다. AI 분석이 시작되며, 완료되면 알려드립니다.",
+            });
+            
+            // Redirect user ONLY after the initial setup is done
+            router.push(`/student/assessment/${assessmentDetails.id}/results`);
+        } catch(error) {
+            console.error("Error during submission process:", error);
+            toast({ title: "제출 오류", description: "답변 제출 중 오류가 발생했습니다.", variant: "destructive" });
+            setRecordingState("recorded"); // Go back to recorded state so user can retry
+        }
+      };
+
+      reader.onerror = () => {
+          console.error("File reading error");
+          toast({ title: "파일 읽기 오류", description: "녹음된 파일을 읽는 중 오류가 발생했습니다.", variant: "destructive"});
+          setRecordingState("recorded");
+      }
+    } catch (e) {
+      console.error("Error setting up submission:", e);
+      toast({ title: "제출 설정 오류", description: "제출 과정 설정 중 오류가 발생했습니다.", variant: "destructive" });
+      setRecordingState("recorded");
+    }
   }
   
   const processAssessmentInBackground = async (audioBlobToUpload: Blob, studentRecordingDataUri: string) => {
      if (!user) {
         console.error("Authentication error: User not found for background processing.");
-        return;
+        throw new Error("User not found");
      }
 
      const newResultRef = doc(collection(db, "results"));
@@ -172,23 +196,24 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
      const updateStatus = async (status: ResultStatus, progress: number, data: Partial<StudentResult> = {}) => {
         await updateDoc(newResultRef, { status, progress, ...data });
      };
+     
+     // Create the initial document in firestore so the results page can listen to it.
+     const initialResultData: Partial<StudentResult> = {
+          id: newResultRef.id,
+          studentId: user.uid,
+          assessmentId: assessmentDetails.id,
+          assessmentTitle: assessmentDetails.title,
+          name: user.displayName || "Student",
+          avatarUrl: user.photoURL || `https://placehold.co/40x40.png?text=${user.displayName?.charAt(0)}`,
+          status: "업로드 중",
+          progress: 10,
+          date: new Date().toISOString().split('T')[0],
+          createdAt: Date.now(),
+          teacherUid: assessmentDetails.uid,
+      };
+      await setDoc(newResultRef, initialResultData);
 
      try {
-        const initialResultData: Partial<StudentResult> = {
-            id: newResultRef.id,
-            studentId: user.uid,
-            assessmentId: assessmentDetails.id,
-            assessmentTitle: assessmentDetails.title,
-            name: user.displayName || "Student",
-            avatarUrl: user.photoURL || `https://placehold.co/40x40.png?text=${user.displayName?.charAt(0)}`,
-            status: "업로드 중",
-            progress: 10,
-            date: new Date().toISOString().split('T')[0],
-            createdAt: Date.now(),
-            teacherUid: assessmentDetails.uid,
-        };
-        await setDoc(newResultRef, initialResultData);
-        
         const audioFileName = `recordings/${user.uid}_${assessmentDetails.id}_${Date.now()}.webm`;
         const storageRef = ref(storage, audioFileName);
         await uploadBytes(storageRef, audioBlobToUpload);
@@ -196,46 +221,58 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
 
         await updateStatus("텍스트 변환 중", 25, { studentRecordingDataUri: downloadURL });
 
-        const analysisResult = await generateSpeakingAnalysis({
+        // This part continues in the background after the user has been redirected.
+        generateSpeakingAnalysis({
             studentRecordingDataUri,
             activityPrompt: assessmentDetails.prompt,
             expectedFormat: assessmentDetails.expectedFormat || "학생의 답변을 평가합니다.",
             studentName: user.displayName || "Student",
             assessmentTitle: assessmentDetails.title.replace(/ - 복사본(\s\d+)?$/, ''),
-        }, (status, progress) => updateStatus(status as ResultStatus, progress));
-        
-        const finalResultData: Omit<StudentResult, 'id' | 'status' | 'progress' | 'studentRecordingDataUri'> = {
-            studentId: user.uid,
-            assessmentId: assessmentDetails.id,
-            assessmentTitle: assessmentDetails.title,
-            name: user.displayName || "Student",
-            avatarUrl: user.photoURL || `https://placehold.co/40x40.png?text=${user.displayName?.charAt(0)}`,
-            score: analysisResult.contentScore,
-            date: new Date().toISOString().split('T')[0],
-            createdAt: initialResultData.createdAt!,
-            aiFeedback: analysisResult.aiFeedback,
-            curricularRemarks: analysisResult.curricularRemarks,
-            studentFeedbackSummary: "학생이 평가에 대해 남긴 피드백이 없습니다.",
-            teacherGuidance: analysisResult.teacherGuidance,
-            studentTranscript: analysisResult.studentTranscript,
-            pronunciationScore: analysisResult.pronunciationScore,
-            pronunciationFeedback: analysisResult.pronunciationFeedback,
-            teacherUid: assessmentDetails.uid,
-        };
-        
-        await updateDoc(newResultRef, { 
-            status: "채점 완료",
-            progress: 100,
-            ...finalResultData 
+        }, (status, progress) => updateStatus(status as ResultStatus, progress))
+        .then(analysisResult => {
+            const finalResultData: Omit<StudentResult, 'id' | 'status' | 'progress' | 'studentRecordingDataUri'> = {
+                studentId: user.uid,
+                assessmentId: assessmentDetails.id,
+                assessmentTitle: assessmentDetails.title,
+                name: user.displayName || "Student",
+                avatarUrl: user.photoURL || `https://placehold.co/40x40.png?text=${user.displayName?.charAt(0)}`,
+                score: analysisResult.contentScore,
+                date: new Date().toISOString().split('T')[0],
+                createdAt: initialResultData.createdAt!,
+                aiFeedback: analysisResult.aiFeedback,
+                curricularRemarks: analysisResult.curricularRemarks,
+                studentFeedbackSummary: "학생이 평가에 대해 남긴 피드백이 없습니다.",
+                teacherGuidance: analysisResult.teacherGuidance,
+                studentTranscript: analysisResult.studentTranscript,
+                pronunciationScore: analysisResult.pronunciationScore,
+                pronunciationFeedback: analysisResult.pronunciationFeedback,
+                teacherUid: assessmentDetails.uid,
+            };
+            
+            return updateDoc(newResultRef, { 
+                status: "채점 완료",
+                progress: 100,
+                ...finalResultData 
+            });
+        })
+        .catch(error => {
+            console.error("Error processing assessment in background:", error);
+            updateDoc(newResultRef, { 
+                status: "오류", 
+                progress: 100,
+                aiFeedback: "결과를 분석하는 중 오류가 발생했습니다. 잠시 후 다시 시도하거나 관리자에게 문의하세요."
+            });
         });
         
     } catch (error) {
-        console.error("Error processing assessment in background:", error);
+        console.error("Error setting up background process:", error);
         await updateDoc(newResultRef, { 
             status: "오류", 
             progress: 100,
-            aiFeedback: "결과를 분석하는 중 오류가 발생했습니다. 잠시 후 다시 시도하거나 관리자에게 문의하세요."
+            aiFeedback: "백그라운드 분석을 시작하는 중 오류가 발생했습니다."
         });
+        // re-throw the error to be caught by the handleSubmit function
+        throw error;
     }
   }
 
@@ -344,7 +381,7 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
                 제출 중...
             </Button>
         </div>
-        <p className="text-sm text-muted-foreground">분석 페이지로 이동합니다.</p>
+        <p className="text-sm text-muted-foreground">답변을 서버로 전송하고 있습니다.</p>
     </>
   );
 
@@ -361,7 +398,7 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
 
   return (
     <div className="flex flex-col items-center gap-6 p-8 border rounded-lg bg-muted/50 min-h-[350px] justify-center">
-      {timeLimit && (
+      {timeLimit && recordingState !== 'submitting' && (
         <div className={`flex items-center gap-2 text-lg font-semibold text-muted-foreground ${recordingState === 'recorded' ? 'mb-4' : ''}`}>
           <Timer className="h-6 w-6" />
           <span>{recordingState === 'recording' ? timerDisplay : formatTime(timeLimit)}</span>
