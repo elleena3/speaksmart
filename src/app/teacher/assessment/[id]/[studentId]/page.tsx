@@ -24,11 +24,9 @@ export default function StudentResultPage() {
 
   useEffect(() => {
     if (assessmentId && studentId) {
-        // Fetch assessment details
         const storedTeacherAssessments: TeacherAssessment[] = JSON.parse(localStorage.getItem('assessments') || '[]');
         const foundAssessment = storedTeacherAssessments.find(a => a.id === assessmentId);
 
-        // Fetch student result details
         const allStudentResults: StudentResult[] = JSON.parse(localStorage.getItem('student_results') || '[]');
         const foundStudentResult = allStudentResults.find(r => r.assessmentId === assessmentId && r.studentId === studentId);
 
@@ -37,7 +35,6 @@ export default function StudentResultPage() {
             setStudent(foundStudentResult);
         } else {
             console.warn("Assessment or student result not found in localStorage. Redirecting.");
-            // Redirecting is safer than notFound() in a client component after initial render
             router.push('/teacher/dashboard');
         }
         setIsLoading(false);
@@ -53,11 +50,12 @@ export default function StudentResultPage() {
   }
 
   if (!assessment || !student) {
-    return null; // Should be handled by the redirection logic
+    return null; 
   }
 
   const noFeedbackMessage = "학생이 평가에 대해 남긴 피드백이 없습니다.";
   const hasFeedback = student.studentFeedbackSummary && student.studentFeedbackSummary !== noFeedbackMessage;
+  const isDialogue = assessment.assessmentType === 'dialogue';
 
   return (
     <div className="space-y-6">
@@ -78,19 +76,26 @@ export default function StudentResultPage() {
         <div className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5 text-primary"/> 학생 답변 내용</CardTitle>
-                <CardDescription>학생의 실제 답변 텍스트와 녹음 파일입니다.</CardDescription>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-primary"/> 
+                  {isDialogue ? "전체 대화 기록" : "학생 답변 내용"}
+                </CardTitle>
+                <CardDescription>
+                  {isDialogue 
+                    ? "학생과 AI의 전체 대화 내용입니다." 
+                    : "학생의 실제 답변 텍스트와 녹음 파일입니다."}
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {student.studentRecordingDataUri && (
+                {!isDialogue && student.studentRecordingDataUri && (
                   <div>
                     <audio controls src={student.studentRecordingDataUri} className="w-full">
                       Your browser does not support the audio element.
                     </audio>
                   </div>
                 )}
-                <div className="text-sm p-4 bg-muted/50 rounded-lg italic font-mono whitespace-pre-wrap">
-                    "{student.studentTranscript || "학생 답변이 기록되지 않았습니다."}"
+                <div className="text-sm p-4 bg-muted/50 rounded-lg font-mono whitespace-pre-wrap max-h-96 overflow-y-auto">
+                    {student.studentTranscript || "학생 답변이 기록되지 않았습니다."}
                 </div>
               </CardContent>
             </Card>

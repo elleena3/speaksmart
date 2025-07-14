@@ -37,7 +37,6 @@ export function FreeTalkFeedbackView() {
             return;
         }
 
-        // Fetch assessment details from localStorage
         const allAssessments: TeacherAssessment[] = JSON.parse(localStorage.getItem('assessments') || '[]');
         const currentAssessment = allAssessments.find(a => a.id === assessmentId);
         
@@ -60,26 +59,20 @@ export function FreeTalkFeedbackView() {
     const generateFeedback = async (conversationData: ConversationHistory, assessment: TeacherAssessment) => {
         setIsLoading(true);
         try {
-            // Create a fake audio data URI since we already have the transcript.
-            // The comprehensive feedback flow requires this field.
             const fakeAudioDataUri = "data:audio/webm;base64,"; 
             
-            // The comprehensive feedback flow uses the transcript from the audio,
-            // but for dialogues, we have the full conversation. We'll pass it in the prompt.
             const fullTranscript = conversationData.history
                 .map(turn => `${turn.role === 'user' ? '학생' : 'AI'}: ${turn.text}`)
                 .join('\n');
             
             const generatedResult = await generateComprehensiveFeedback({
-                 // We pass the full transcript in the activity prompt to give the AI context.
                 activityPrompt: `${assessment.prompt}\n\n--- 대화 기록 ---\n${fullTranscript}`,
                 expectedFormat: "AI와의 자연스러운 대화 능력을 평가합니다. 유창성, 발음, 어휘, 문법을 종합적으로 고려하여 피드백을 제공해주세요.",
-                studentRecordingDataUri: fakeAudioDataUri, // Pass fake audio
+                studentRecordingDataUri: fakeAudioDataUri,
                 studentName: "Alex Doe", 
                 assessmentTitle: assessment.title,
             });
 
-            // Calculate a score based on the AI's scoring
             const score = generatedResult.score;
 
             const studentResult: StudentResult = {
@@ -138,7 +131,7 @@ export function FreeTalkFeedbackView() {
                 assessmentTitle={result.assessmentTitle}
                 aiFeedback={result.aiFeedback}
                 studentTranscript={result.studentTranscript || "대화 기록이 없습니다."}
-                studentRecordingDataUri={undefined} // No single recording for dialogues
+                studentRecordingDataUri={undefined}
             />
             <div className="text-center">
                 <Button onClick={() => router.push('/student/dashboard')}>대시보드로 돌아가기</Button>
