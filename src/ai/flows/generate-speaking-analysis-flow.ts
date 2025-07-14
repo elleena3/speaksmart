@@ -6,36 +6,22 @@
  * It orchestrates transcription, content analysis, and pronunciation analysis in an efficient, parallel manner.
  *
  * - generateSpeakingAnalysis - The main function to call for a full speaking assessment.
- * - GenerateSpeakingAnalysisInput - The input type for the main function.
- * - GenerateSpeakingAnalysisOutput - The return type for the main function.
  */
 
 import { ai } from '@/ai/genkit';
 import { googleAI } from '@genkit-ai/googleai';
 import { z } from 'zod';
+import {
+  GenerateSpeakingAnalysisInputSchema,
+  GenerateSpeakingAnalysisOutputSchema,
+  type GenerateSpeakingAnalysisInput,
+  type GenerateSpeakingAnalysisOutput,
+  ContentAnalysisInputSchema,
+  ContentAnalysisOutputSchema,
+  PronunciationAnalysisInputSchema,
+  PronunciationAnalysisOutputSchema
+} from '@/lib/types/ai-schemas';
 
-// 1. Schemas for external interface (input and output of the entire flow)
-export const GenerateSpeakingAnalysisInputSchema = z.object({
-  studentRecordingDataUri: z.string().describe(
-    "The student's voice recording as a data URI. Expected format: 'data:<mimetype>;base64,<encoded_data>'"
-  ),
-  activityPrompt: z.string().describe('The prompt or instructions for the speaking activity.'),
-  expectedFormat: z.string().describe('The expected format or key points of the response for grading.'),
-  studentName: z.string().describe('The name of the student.'),
-  assessmentTitle: z.string().describe('The title of the assessment.'),
-});
-export type GenerateSpeakingAnalysisInput = z.infer<typeof GenerateSpeakingAnalysisInputSchema>;
-
-export const GenerateSpeakingAnalysisOutputSchema = z.object({
-  studentTranscript: z.string().describe("The transcript of the student's speech."),
-  aiFeedback: z.string().describe('The generated feedback for the student in Korean.'),
-  teacherGuidance: z.string().describe('Actionable guidance for the teacher based on the performance in Korean.'),
-  curricularRemarks: z.string().describe('A draft of curricular remarks for the student’s academic record in Korean.'),
-  contentScore: z.number().int().min(0).max(100).describe('A score from 0-100 for the performance content.'),
-  pronunciationScore: z.number().int().min(0).max(100).describe('A score from 0-100 for pronunciation.'),
-  pronunciationFeedback: z.string().describe('Specific feedback on the student\'s pronunciation in Korean.'),
-});
-export type GenerateSpeakingAnalysisOutput = z.infer<typeof GenerateSpeakingAnalysisOutputSchema>;
 
 /**
  * Main exported function to be called by the client.
@@ -73,21 +59,6 @@ const transcribeAudioFlow = ai.defineFlow(
 
 
 // 2b. Content Analysis Prompt
-const ContentAnalysisInputSchema = z.object({
-    studentTranscript: z.string(),
-    activityPrompt: z.string(),
-    expectedFormat: z.string(),
-    studentName: z.string(),
-    assessmentTitle: z.string(),
-});
-
-const ContentAnalysisOutputSchema = z.object({
-    aiFeedback: z.string().describe('The generated feedback for the student in Korean.'),
-    teacherGuidance: z.string().describe('Actionable guidance for the teacher based on the performance in Korean.'),
-    curricularRemarks: z.string().describe('A draft of curricular remarks suitable for the student’s academic record in Korean.'),
-    contentScore: z.number().int().min(0).max(100).describe('A score from 0-100 for the performance content.'),
-});
-
 const contentAnalysisPrompt = ai.definePrompt({
   name: 'contentAnalysisPrompt',
   input: { schema: ContentAnalysisInputSchema },
@@ -110,16 +81,6 @@ Based on all the information provided, perform the following tasks:
 });
 
 // 2c. Pronunciation Analysis Prompt
-const PronunciationAnalysisInputSchema = z.object({
-    studentRecordingDataUri: z.string(),
-    studentTranscript: z.string(),
-});
-
-const PronunciationAnalysisOutputSchema = z.object({
-    pronunciationScore: z.number().int().min(0).max(100).describe('A score from 0-100 for pronunciation.'),
-    pronunciationFeedback: z.string().describe('Specific, constructive feedback on the student\'s pronunciation in Korean.'),
-});
-
 const pronunciationAnalysisPrompt = ai.definePrompt({
     name: 'pronunciationAnalysisPrompt',
     input: { schema: PronunciationAnalysisInputSchema },

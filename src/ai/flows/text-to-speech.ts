@@ -15,7 +15,6 @@ import {
   ConverseWithStudentInputSchema,
   ConverseWithStudentOutput,
   ConverseWithStudentOutputSchema,
-  ConversationTurn,
   ConversationTurnSchema,
 } from '@/lib/types/ai-schemas';
 import wav from 'wav';
