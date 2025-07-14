@@ -21,7 +21,7 @@ const MissingFirebaseConfig = () => (
                 Firebase 앱이 아직 설정되지 않았습니다. 앱이 정상적으로 작동하려면 설정이 필요합니다.
             </p>
             <p className="text-sm">
-                <strong>해결 방법:</strong> <code>src/lib/firebase.ts</code> 파일을 열고, <code>firebaseConfig</code> 객체에 당신의 Firebase 프로젝트 설정 값을 직접 붙여넣어 주세요.
+                <strong>해결 방법:</strong> 프로젝트의 <code>.env</code> 파일을 열고, <code>NEXT_PUBLIC_...</code> 변수에 당신의 Firebase 프로젝트 설정 값을 직접 붙여넣어 주세요.
             </p>
         </div>
     </div>
@@ -34,8 +34,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   
-  // Check if Firebase config is missing or is still the placeholder.
-  if (!firebaseConfig.apiKey || firebaseConfig.apiKey === "YOUR_API_KEY_HERE") {
+  // Check if Firebase config is missing.
+  if (!firebaseConfig.apiKey) {
     return <MissingFirebaseConfig />;
   }
 
