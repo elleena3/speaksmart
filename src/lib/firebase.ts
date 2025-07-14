@@ -1,3 +1,4 @@
+
 // src/lib/firebase.ts
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
@@ -22,8 +23,8 @@ if (!firebaseConfig.apiKey) {
 
 // Firebase 초기화
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-const db = getFirestore(app);
 const auth = getAuth(app);
+const db = getFirestore(app);
 const storage = getStorage(app);
 
 export { db, auth, storage, app };
