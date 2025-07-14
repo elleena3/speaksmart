@@ -147,7 +147,6 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
     }
     setRecordingState("submitting");
 
-    // This runs in the background. The user is redirected after submission is confirmed.
     try {
       const reader = new FileReader();
       reader.readAsDataURL(audioBlob);
@@ -155,8 +154,7 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
       reader.onloadend = async () => {
         try {
             const base64Audio = reader.result as string;
-            // The processAssessmentInBackground function will now handle everything.
-            // We await its completion before redirecting.
+            // Pass both blob and data uri to the background processor
             await processAssessmentInBackground(audioBlob, base64Audio);
             
             toast({
@@ -164,12 +162,11 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
                 description: "답변이 제출되었습니다. AI 분석이 시작되며, 완료되면 알려드립니다.",
             });
             
-            // Redirect user ONLY after the initial setup is done
             router.push(`/student/assessment/${assessmentDetails.id}/results`);
         } catch(error) {
             console.error("Error during submission process:", error);
             toast({ title: "제출 오류", description: "답변 제출 중 오류가 발생했습니다.", variant: "destructive" });
-            setRecordingState("recorded"); // Go back to recorded state so user can retry
+            setRecordingState("recorded");
         }
       };
 
@@ -197,7 +194,6 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
         await updateDoc(newResultRef, { status, progress, ...data });
      };
      
-     // Create the initial document in firestore so the results page can listen to it.
      const initialResultData: Partial<StudentResult> = {
           id: newResultRef.id,
           studentId: user.uid,
@@ -219,11 +215,8 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
         await uploadBytes(storageRef, audioBlobToUpload);
         const downloadURL = await getDownloadURL(storageRef);
 
-        // Now that upload is complete, update status and store the downloadable URL.
         await updateStatus("텍스트 변환 중", 25, { studentRecordingDataUri: downloadURL });
 
-        // This part continues in the background after the user has been redirected.
-        // It uses the in-memory base64 data for analysis to avoid re-downloading.
         generateSpeakingAnalysis({
             studentRecordingDataUri,
             activityPrompt: assessmentDetails.prompt,
@@ -265,7 +258,6 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
             progress: 100,
             aiFeedback: "백그라운드 분석을 시작하는 중 오류가 발생했습니다."
         });
-        // re-throw the error to be caught by the handleSubmit function
         throw error;
     }
   }
@@ -402,5 +394,3 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
     </div>
   )
 }
-
-    
