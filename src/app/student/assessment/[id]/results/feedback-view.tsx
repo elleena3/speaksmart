@@ -88,7 +88,7 @@ export function FeedbackView({ assessmentId, assessmentTitle, aiFeedback, studen
               <div className="flex items-center gap-3">
                 <MessageSquareQuote className="w-8 h-8 text-primary shrink-0" />
                 <div>
-                  <CardTitle className="text-2xl">"{assessmentTitle}"에 대한 AI 피드백</CardTitle>
+                  <CardTitle className="text-2xl">"{assessmentTitle}"에 대한 AI 영어 회화 평가 피드백</CardTitle>
                   <CardDescription>AI가 생성한 성과 분석입니다.</CardDescription>
                 </div>
               </div>
