@@ -171,7 +171,7 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
       await uploadBytes(storageRef, audioBlob);
       const downloadURL = await getDownloadURL(storageRef);
       
-      const contentPromise = generateContentFeedback({
+      const contentResult = await generateContentFeedback({
         activityPrompt: assessmentDetails.prompt,
         expectedFormat: assessmentDetails.expectedFormat || "학생의 답변을 평가합니다.",
         studentRecordingDataUri,
@@ -179,14 +179,10 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
         assessmentTitle: assessmentDetails.title.replace(/ - 복사본(\s\d+)?$/, ''),
       });
 
-      const [contentResult] = await Promise.all([contentPromise]);
-
-      const pronunciationPromise = generatePronunciationFeedback({
+      const pronunciationResult = await generatePronunciationFeedback({
         studentRecordingDataUri,
         studentTranscript: contentResult.studentTranscript,
       });
-
-      const [pronunciationResult] = await Promise.all([pronunciationPromise]);
 
       const resultData = {
         studentId: user.uid,
