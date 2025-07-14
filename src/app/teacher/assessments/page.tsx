@@ -4,12 +4,12 @@
 import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, MoreHorizontal } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Copy } from 'lucide-react';
 import Link from 'next/link';
 import { type TeacherAssessment } from "@/lib/types";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
 import { format } from "date-fns";
@@ -32,7 +32,7 @@ const LOCAL_STORAGE_KEY_RESULTS = 'student_results';
 export default function AssessmentsPage() {
   const [assessments, setAssessments] = useState<TeacherAssessment[]>([]);
   const { toast } = useToast();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
 
   useEffect(() => {
     // Load assessments from localStorage on component mount
@@ -48,6 +48,29 @@ export default function AssessmentsPage() {
     
     setAssessments(assessmentsData);
   }, []);
+
+  const handleCopy = (assessmentId: string) => {
+    const assessmentToCopy = assessments.find(a => a.id === assessmentId);
+    if (!assessmentToCopy) return;
+
+    const newAssessment: TeacherAssessment = {
+      ...assessmentToCopy,
+      id: new Date().getTime().toString(),
+      title: `${assessmentToCopy.title}${t.teacherAssessments.copySuffix}`,
+      dateCreated: new Date().toISOString().split('T')[0],
+      studentsCompleted: 0,
+      averageScore: 0,
+    };
+
+    const updatedAssessments = [newAssessment, ...assessments];
+    setAssessments(updatedAssessments);
+    localStorage.setItem(LOCAL_STORAGE_KEY_ASSESSMENTS, JSON.stringify(updatedAssessments));
+
+    toast({
+      title: t.teacherAssessments.copyToast.title,
+      description: t.teacherAssessments.copyToast.description.replace('{title}', assessmentToCopy.title),
+    });
+  }
 
   const handleDelete = (assessmentId: string) => {
     // Delete the assessment itself
@@ -162,6 +185,11 @@ export default function AssessmentsPage() {
                            <DropdownMenuItem asChild>
                              <Link href={`/teacher/assessments/${assessment.id}/edit`}>{t.teacherAssessments.menuEdit}</Link>
                            </DropdownMenuItem>
+                           <DropdownMenuItem onClick={() => handleCopy(assessment.id)}>
+                            <Copy className="mr-2 h-4 w-4" />
+                            {t.teacherAssessments.menuCopy}
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
                            <AlertDialogTrigger asChild>
                             <DropdownMenuItem className="text-destructive focus:bg-destructive/10 focus:text-destructive" onSelect={(e) => e.preventDefault()}>
                                 {t.teacherAssessments.menuDelete}

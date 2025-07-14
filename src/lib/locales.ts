@@ -84,6 +84,8 @@ export const translations = {
       menuOpen: "메뉴 열기",
       menuViewResults: "결과 보기",
       menuEdit: "편집",
+      menuCopy: "복사",
+      copySuffix: " - 복사본",
       menuDelete: "삭제",
       deleteDialogTitle: "정말로 삭제하시겠습니까?",
       deleteDialogDescription: "이 작업은 되돌릴 수 없습니다. 평가를 삭제하면 관련된 모든 학생 결과도 함께 영구적으로 삭제됩니다.",
@@ -92,6 +94,10 @@ export const translations = {
       deleteToast: {
         title: "평가 삭제됨",
         description: "평가가 성공적으로 삭제되었습니다."
+      },
+      copyToast: {
+          title: "평가 복사됨",
+          description: "'{title}' 평가의 복사본이 생성되었습니다.",
       },
       noAssessments: {
           title: "아직 생성된 평가가 없습니다.",
@@ -264,14 +270,20 @@ export const translations = {
       menuOpen: "Open menu",
       menuViewResults: "View Results",
       menuEdit: "Edit",
+      menuCopy: "Copy",
+      copySuffix: " - Copy",
       menuDelete: "Delete",
       deleteDialogTitle: "Are you absolutely sure?",
-      deleteDialogDescription: "This action cannot be undone. This will permanently delete the assessment and all related data.",
+      deleteDialogDescription: "This action cannot be undone. This will permanently delete the assessment and all related student results.",
       deleteDialogCancel: "Cancel",
       deleteDialogConfirm: "Delete",
       deleteToast: {
         title: "Assessment Deleted",
         description: "The assessment has been successfully deleted."
+      },
+      copyToast: {
+        title: "Assessment Copied",
+        description: "A copy of the '{title}' assessment has been created.",
       },
       noAssessments: {
           title: "No assessments created yet.",
@@ -363,6 +375,3 @@ export const translations = {
 };
 
 export type Translation = typeof translations.ko;
-
-    
-    
