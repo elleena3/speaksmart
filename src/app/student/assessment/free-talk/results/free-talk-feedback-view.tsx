@@ -10,14 +10,15 @@ import { type StudentResult, type TeacherAssessment } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { FeedbackView } from "../../[id]/results/feedback-view";
 import { useAuth } from "@/context/auth-context";
-import { db } from "@/lib/firebase";
+import { db, storage } from "@/lib/firebase";
 import { collection, doc, query, where, getDocs, writeBatch } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 const SESSION_STORAGE_KEY = 'freeTalkConversationHistory';
 
 type StoredConversationData = {
     history: any[];
-    studentRecordingDataUri: string;
+    studentRecordingDataUri: string; // This is the base64 URI
     assessment: TeacherAssessment;
 }
 
@@ -62,10 +63,22 @@ export function FreeTalkFeedbackView() {
                 .map(turn => `${turn.role === 'user' ? '학생' : 'AI'}: ${turn.text}`)
                 .join('\n');
             
+            // 1. Upload audio to Firebase Storage
+            // Convert base64 to blob first
+            const fetchRes = await fetch(studentRecordingDataUri);
+            const audioBlob = await fetchRes.blob();
+            const audioFileName = `recordings/${user.uid}_${assessment.id}_${Date.now()}.webm`;
+            const storageRef = ref(storage, audioFileName);
+            await uploadBytes(storageRef, audioBlob);
+
+            // 2. Get download URL
+            const downloadURL = await getDownloadURL(storageRef);
+
+            // 3. Generate AI feedback with the base64 data
             const generatedResult = await generateComprehensiveFeedback({
                 activityPrompt: `${assessment.prompt}\n\n--- 대화 기록 ---\n${fullTranscript}`,
                 expectedFormat: assessment.expectedFormat || "AI와의 자연스러운 대화 능력을 평가합니다.",
-                studentRecordingDataUri: studentRecordingDataUri,
+                studentRecordingDataUri: studentRecordingDataUri, // Use base64 for Genkit
                 studentName: user.displayName || "Student", 
                 assessmentTitle: assessment.title.replace(' - 복사본', ''),
             });
@@ -85,7 +98,7 @@ export function FreeTalkFeedbackView() {
                 studentFeedbackSummary: "학생이 평가에 대해 남긴 피드백이 없습니다.",
                 teacherGuidance: generatedResult.teacherGuidance,
                 studentTranscript: fullTranscript,
-                studentRecordingDataUri: studentRecordingDataUri,
+                studentRecordingDataUri: downloadURL, // Store the URL, not the base64
                 pronunciationScore: generatedResult.pronunciationScore,
                 pronunciationFeedback: generatedResult.pronunciationFeedback,
                 teacherUid: assessment.uid,

@@ -9,8 +9,9 @@ import { useToast } from "@/hooks/use-toast"
 import { generateComprehensiveFeedback } from "@/ai/flows/generate-comprehensive-feedback"
 import { type StudentResult, type TeacherAssessment } from "@/lib/types"
 import { useAuth } from "@/context/auth-context"
-import { db } from "@/lib/firebase"
-import { collection, addDoc, doc, writeBatch, query, where, getDocs, getCountFromServer, runTransaction } from "firebase/firestore"
+import { db, storage } from "@/lib/firebase"
+import { collection, addDoc, doc, writeBatch, query, where, getDocs } from "firebase/firestore"
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
 
 export function AssessmentView({ assessmentDetails }: { assessmentDetails: TeacherAssessment }) {
   const { user } = useAuth();
@@ -69,7 +70,7 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioStreamRef.current = stream;
-      mediaRecorderRef.current = new MediaRecorder(stream);
+      mediaRecorderRef.current = new MediaRecorder(stream, { mimeType: 'audio/webm' });
       
       mediaRecorderRef.current.ondataavailable = (event) => {
         if (event.data.size > 0) {
@@ -77,7 +78,7 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
         }
       };
 
-      mediaRecorderRef.current.onstop = () => {
+      mediaRecorderRef.current.onstop = async () => {
         if (audioChunksRef.current.length === 0) {
             console.warn("No audio data recorded.");
             toast({
@@ -91,11 +92,14 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
         }
 
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        
+        // Convert blob to base64 for Genkit
         const reader = new FileReader();
         reader.readAsDataURL(audioBlob);
         reader.onloadend = async () => {
           const base64Audio = reader.result as string;
-          processAssessment(base64Audio);
+          // Process assessment with both blob and base64
+          await processAssessment(audioBlob, base64Audio);
         };
         cleanup();
       };
@@ -143,7 +147,7 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
     }
   }
   
-  const processAssessment = async (studentRecordingDataUri: string) => {
+  const processAssessment = async (audioBlob: Blob, studentRecordingDataUri: string) => {
      if (!user) {
         toast({ title: "인증 오류", description: "사용자 정보를 찾을 수 없습니다.", variant: "destructive" });
         setIsProcessing(false);
@@ -151,6 +155,15 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
      }
 
      try {
+      // 1. Upload audio to Firebase Storage
+      const audioFileName = `recordings/${user.uid}_${assessmentDetails.id}_${Date.now()}.webm`;
+      const storageRef = ref(storage, audioFileName);
+      await uploadBytes(storageRef, audioBlob);
+
+      // 2. Get download URL
+      const downloadURL = await getDownloadURL(storageRef);
+
+      // 3. Generate AI Feedback with base64 data
       const { 
         aiFeedback, 
         curricularRemarks, 
@@ -182,7 +195,7 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
         studentFeedbackSummary: "학생이 평가에 대해 남긴 피드백이 없습니다.",
         teacherGuidance,
         studentTranscript,
-        studentRecordingDataUri,
+        studentRecordingDataUri: downloadURL, // Store the URL, not the base64 data
         pronunciationScore,
         pronunciationFeedback,
         teacherUid: assessmentDetails.uid,
