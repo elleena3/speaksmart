@@ -9,7 +9,7 @@ import { Loader2 } from "lucide-react";
 import { generateComprehensiveFeedback, GenerateComprehensiveFeedbackOutput } from "@/ai/flows/generate-comprehensive-feedback";
 import { type ConversationHistory, type StudentResult, type TeacherAssessment } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
-import { FeedbackView } from "../../../[id]/results/feedback-view";
+import { FeedbackView } from "../../[id]/results/feedback-view";
 
 const SESSION_STORAGE_KEY = 'freeTalkConversationHistory';
 
