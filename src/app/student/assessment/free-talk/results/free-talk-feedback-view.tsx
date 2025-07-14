@@ -5,8 +5,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
-import { generateContentFeedback } from "@/ai/flows/generate-content-feedback";
-import { generatePronunciationFeedback } from "@/ai/flows/generate-pronunciation-feedback";
+import { generateSpeakingAnalysis } from "@/ai/flows/generate-speaking-analysis-flow";
 import { type StudentResult, type TeacherAssessment } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { FeedbackView } from "../../[id]/results/feedback-view";
@@ -72,21 +71,14 @@ export function FreeTalkFeedbackView() {
             await uploadBytes(storageRef, audioBlob);
             const downloadURL = await getDownloadURL(storageRef);
 
-            // 2. Generate content and pronunciation feedback in parallel
-            const [contentResult, pronunciationResult] = await Promise.all([
-                generateContentFeedback({
-                    activityPrompt: `${assessment.prompt}\n\n--- 대화 기록 ---\n${fullTranscript}`,
-                    expectedFormat: assessment.expectedFormat || "AI와의 자연스러운 대화 능력을 평가합니다.",
-                    studentRecordingDataUri: studentRecordingDataUri, 
-                    studentName: user.displayName || "Student", 
-                    assessmentTitle: assessment.title.replace(/ - 복사본(\s\d+)?$/, ''),
-                }),
-                generatePronunciationFeedback({
-                    studentRecordingDataUri,
-                    studentTranscript: fullTranscript, // Use the full conversation transcript for context
-                })
-            ]);
-
+            // 2. Generate all feedback using the new optimized flow
+            const analysisResult = await generateSpeakingAnalysis({
+                activityPrompt: `${assessment.prompt}\n\n--- 대화 기록 ---\n${fullTranscript}`,
+                expectedFormat: assessment.expectedFormat || "AI와의 자연스러운 대화 능력을 평가합니다.",
+                studentRecordingDataUri: studentRecordingDataUri, 
+                studentName: user.displayName || "Student", 
+                assessmentTitle: assessment.title.replace(/ - 복사본(\s\d+)?$/, ''),
+            });
 
             const resultData: Omit<StudentResult, 'id'> = {
                 studentId: user.uid,
@@ -95,17 +87,17 @@ export function FreeTalkFeedbackView() {
                 name: user.displayName || "Student",
                 avatarUrl: user.photoURL || `https://placehold.co/40x40.png?text=${user.displayName?.charAt(0)}`,
                 status: "채점 완료",
-                score: contentResult.score,
+                score: analysisResult.contentScore,
                 date: new Date().toISOString().split('T')[0],
                 createdAt: Date.now(),
-                aiFeedback: contentResult.aiFeedback,
-                curricularRemarks: contentResult.curricularRemarks,
+                aiFeedback: analysisResult.aiFeedback,
+                curricularRemarks: analysisResult.curricularRemarks,
                 studentFeedbackSummary: "학생이 평가에 대해 남긴 피드백이 없습니다.",
-                teacherGuidance: contentResult.teacherGuidance,
-                studentTranscript: fullTranscript,
+                teacherGuidance: analysisResult.teacherGuidance,
+                studentTranscript: analysisResult.studentTranscript,
                 studentRecordingDataUri: downloadURL,
-                pronunciationScore: pronunciationResult.pronunciationScore,
-                pronunciationFeedback: pronunciationResult.pronunciationFeedback,
+                pronunciationScore: analysisResult.pronunciationScore,
+                pronunciationFeedback: analysisResult.pronunciationFeedback,
                 teacherUid: assessment.uid,
             };
 
@@ -139,7 +131,7 @@ export function FreeTalkFeedbackView() {
             <div className="flex flex-col items-center justify-center text-center p-8 border rounded-lg bg-muted/50 h-96">
                 <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
                 <h2 className="text-xl font-semibold">대화 내용 분석 중...</h2>
-                <p className="text-muted-foreground">AI가 대화 내용을 바탕으로 상세 피드백을 생성하고 있습니다.</p>
+                <p className="text-muted-foreground">AI가 대화 내용을 바탕으로 상세 피드백을 생성하고 있습니다. (최대 1-2분 소요)</p>
             </div>
         );
     }

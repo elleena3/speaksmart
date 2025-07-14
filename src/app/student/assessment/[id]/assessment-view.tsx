@@ -6,12 +6,11 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Mic, StopCircle, Loader2, Timer } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { generateContentFeedback } from "@/ai/flows/generate-content-feedback"
-import { generatePronunciationFeedback } from "@/ai/flows/generate-pronunciation-feedback"
+import { generateSpeakingAnalysis } from "@/ai/flows/generate-speaking-analysis-flow"
 import { type TeacherAssessment, type StudentResult } from "@/lib/types"
 import { useAuth } from "@/context/auth-context"
 import { db, storage } from "@/lib/firebase"
-import { collection, doc, updateDoc, writeBatch, query, where, getDocs, serverTimestamp, setDoc } from "firebase/firestore"
+import { collection, doc, updateDoc, setDoc } from "firebase/firestore"
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
 
 export function AssessmentView({ assessmentDetails }: { assessmentDetails: TeacherAssessment }) {
@@ -164,8 +163,6 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
   
   const processAssessmentInBackground = async (audioBlob: Blob, studentRecordingDataUri: string) => {
      if (!user) {
-        // This toast might not be visible as the user is redirected.
-        // Logging is more important here.
         console.error("Authentication error: User not found for background processing.");
         return;
      }
@@ -173,7 +170,6 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
      const newResultRef = doc(collection(db, "results"));
 
      try {
-        // 1. Create initial result document with '채점 중' status
         const initialResultData: Partial<StudentResult> = {
             id: newResultRef.id,
             studentId: user.uid,
@@ -188,35 +184,19 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
         };
         await setDoc(newResultRef, initialResultData);
 
-        // 2. Upload audio file to storage
         const audioFileName = `recordings/${user.uid}_${assessmentDetails.id}_${Date.now()}.webm`;
         const storageRef = ref(storage, audioFileName);
         await uploadBytes(storageRef, audioBlob);
         const downloadURL = await getDownloadURL(storageRef);
 
-        // 3. Run AI feedback generation in parallel
-        const [contentResult, pronunciationResult] = await Promise.all([
-          generateContentFeedback({
+        const analysisResult = await generateSpeakingAnalysis({
+            studentRecordingDataUri,
             activityPrompt: assessmentDetails.prompt,
             expectedFormat: assessmentDetails.expectedFormat || "학생의 답변을 평가합니다.",
-            studentRecordingDataUri,
             studentName: user.displayName || "Student",
             assessmentTitle: assessmentDetails.title.replace(/ - 복사본(\s\d+)?$/, ''),
-          }),
-          generatePronunciationFeedback({
-            studentRecordingDataUri,
-            studentTranscript: "temp", // Will be replaced by contentResult's transcript
-          })
-        ]);
-        
-        // Use the transcript from contentResult for the second call if needed, or just use the result
-        const finalPronunciationResult = contentResult.studentTranscript ? await generatePronunciationFeedback({
-            studentRecordingDataUri,
-            studentTranscript: contentResult.studentTranscript,
-        }) : pronunciationResult;
+        });
 
-
-        // 4. Update the result document with AI feedback and '채점 완료' status
         const finalResultData: Omit<StudentResult, 'id'> = {
             studentId: user.uid,
             assessmentId: assessmentDetails.id,
@@ -224,27 +204,24 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
             name: user.displayName || "Student",
             avatarUrl: user.photoURL || `https://placehold.co/40x40.png?text=${user.displayName?.charAt(0)}`,
             status: "채점 완료",
-            score: contentResult.score,
+            score: analysisResult.contentScore,
             date: new Date().toISOString().split('T')[0],
             createdAt: initialResultData.createdAt!,
-            aiFeedback: contentResult.aiFeedback,
-            curricularRemarks: contentResult.curricularRemarks,
+            aiFeedback: analysisResult.aiFeedback,
+            curricularRemarks: analysisResult.curricularRemarks,
             studentFeedbackSummary: "학생이 평가에 대해 남긴 피드백이 없습니다.",
-            teacherGuidance: contentResult.teacherGuidance,
-            studentTranscript: contentResult.studentTranscript,
+            teacherGuidance: analysisResult.teacherGuidance,
+            studentTranscript: analysisResult.studentTranscript,
             studentRecordingDataUri: downloadURL,
-            pronunciationScore: finalPronunciationResult.pronunciationScore,
-            pronunciationFeedback: finalPronunciationResult.pronunciationFeedback,
+            pronunciationScore: analysisResult.pronunciationScore,
+            pronunciationFeedback: analysisResult.pronunciationFeedback,
             teacherUid: assessmentDetails.uid,
         };
 
         await updateDoc(newResultRef, finalResultData as { [x: string]: any });
         
-        // Optional: Send a notification to the user upon completion (future feature)
-
     } catch (error) {
         console.error("Error processing assessment in background:", error);
-        // Update the document to show an error state
         await updateDoc(newResultRef, { 
             status: "오류", 
             aiFeedback: "결과를 분석하는 중 오류가 발생했습니다. 잠시 후 다시 시도하거나 관리자에게 문의하세요."
