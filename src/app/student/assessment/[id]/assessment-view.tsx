@@ -54,7 +54,8 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
         setRemainingTime(prevTime => {
           if (prevTime === null || prevTime <= 1) {
             if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-            handleStopRecording();
+            // We don't call handleStopRecording here anymore.
+            // It will be triggered by the useEffect below.
             return 0;
           }
           return prevTime - 1;
@@ -226,7 +227,16 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
     return () => {
       cleanup();
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timeLimit]);
+
+  // This effect handles stopping the recording when the timer reaches 0.
+  useEffect(() => {
+    if (remainingTime === 0 && isRecording) {
+      handleStopRecording();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [remainingTime, isRecording]);
 
   const formatTime = (seconds: number | null) => {
     if (seconds === null) return null;
