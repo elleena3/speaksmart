@@ -13,7 +13,7 @@ import { z } from 'zod';
 // Input schema for the entire comprehensive feedback generation flow
 const GenerateComprehensiveFeedbackInputSchema = z.object({
   studentRecordingDataUri: z.string().describe(
-    "The student's voice recording as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
+    "The student's voice recording as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'"
   ),
   activityPrompt: z.string().describe('The prompt or instructions for the speaking activity.'),
   expectedFormat: z.string().describe('The expected format or key points of the response for grading.'),
@@ -58,8 +58,8 @@ Here is the context for the evaluation:
 Based on all the information provided, perform the following tasks:
 
 1.  **Generate Feedback for the Student:** Write encouraging and constructive feedback from the perspective of an English teacher. Focus on what they did well and what they can improve regarding fluency, pronunciation, grammar, and vocabulary in relation to the prompt. Include specific examples from their transcript. Suggest alternative English vocabulary or sentence structures where appropriate to help them improve.
-2.  **Generate Guidance for the Teacher:** Provide actionable advice for the teacher on how to help this specific student. Suggest activities or focus areas based on the transcript analysis.
-3.  **Draft Curricular Remarks:** Write official curricular remarks in a formal, descriptive tone with sentences ending in '~함' or '~임'. The remarks should summarize the student's performance on this task for their academic record. Follow a 3-part structure: ① General participation/attitude, ② Specific examples from their speech and how it relates to learning objectives, ③ Collaboration, consideration for others, or other notable character traits.
+2.  **Generate Guidance for the Teacher:** As an expert English teacher, provide actionable advice for the classroom teacher on how to help this specific student. Suggest specific English teaching activities, focus areas, or communication strategies based on the transcript analysis (e.g., "For vocabulary, try a 'word of the day' activity focusing on adjectives related to hobbies.").
+3.  **Draft Curricular Remarks:** Write official curricular remarks in a formal, descriptive tone with sentences ending in '~함' or '~임'. The remarks must be based on the student's English speaking performance in this specific task. The remarks should summarize the student's performance on this task for their academic record, linking it to English language competencies. Follow a 3-part structure: ① General participation/attitude in the English speaking task, ② Specific examples from their speech and how it relates to English learning objectives (e.g., fluency, use of vocabulary, grammatical accuracy), ③ Collaboration, consideration for others, or other notable character traits observed during the activity.
 4.  **Assign a Score:** Give a score from 0 to 100, where 100 is a perfect response that fully meets all criteria. Base the score on how well the student's response aligns with the activity prompt and expected format.
 `,
 });
