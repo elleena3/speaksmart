@@ -8,7 +8,7 @@ import { Loader2 } from "lucide-react";
 import { generateSpeakingAnalysis } from "@/ai/flows/generate-speaking-analysis-flow";
 import { type StudentResult, type TeacherAssessment } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
-import { FeedbackView } from "../../[id]/results/feedback-view";
+import { FeedbackView } from "../../assessment/[id]/results/feedback-view";
 import { useAuth } from "@/context/auth-context";
 import { db, storage } from "@/lib/firebase";
 import { collection, doc, query, where, getDocs, writeBatch } from "firebase/firestore";
@@ -64,6 +64,7 @@ export function FreeTalkFeedbackView() {
                 .join('\n');
             
             // 1. Upload audio to Firebase Storage first.
+            // Convert base64 data URI to Blob for uploading
             const fetchRes = await fetch(studentRecordingDataUri);
             const audioBlob = await fetchRes.blob();
             const audioFileName = `recordings/${user.uid}_${assessment.id}_${Date.now()}.webm`;
@@ -72,6 +73,7 @@ export function FreeTalkFeedbackView() {
             const downloadURL = await getDownloadURL(storageRef);
 
             // 2. Generate all feedback using the analysis flow.
+            // The flow still receives the base64 URI for immediate processing without re-downloading.
             const analysisResult = await generateSpeakingAnalysis({
                 activityPrompt: `${assessment.prompt}\n\n--- 대화 기록 ---\n${fullTranscript}`,
                 expectedFormat: assessment.expectedFormat || "AI와의 자연스러운 대화 능력을 평가합니다.",
@@ -152,3 +154,5 @@ export function FreeTalkFeedbackView() {
         </div>
     );
 }
+
+    

@@ -12,7 +12,7 @@ import { type TeacherAssessment, type StudentResult } from "@/lib/types";
 import { Progress } from "@/components/ui/progress";
 import { useAuth } from "@/context/auth-context";
 import { db } from "@/lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 
 
@@ -57,7 +57,7 @@ export default function StudentResultPage() {
     } finally {
         setIsLoading(false);
     }
-  }, [resultId, user, toast, notFound]);
+  }, [resultId, user, toast]);
 
 
   useEffect(() => {
@@ -179,6 +179,22 @@ export default function StudentResultPage() {
         setIsDownloading(false);
     }
   };
+
+  const handleSaveCurricularRemarks = async () => {
+    if (!studentResult) return;
+    try {
+        await updateDoc(doc(db, "results", studentResult.id), {
+            curricularRemarks: studentResult.curricularRemarks,
+        });
+        toast({
+            title: "저장 완료",
+            description: "교과과정 비고가 저장되었습니다."
+        });
+    } catch (error) {
+        console.error("Error saving remarks:", error);
+        toast({ title: "오류", description: "저장에 실패했습니다.", variant: "destructive" });
+    }
+  };
   
   if (isLoading || authLoading) {
     return (
@@ -241,7 +257,7 @@ export default function StudentResultPage() {
                     <audio controls src={studentResult.studentRecordingDataUri} className="w-full">
                       Your browser does not support the audio element.
                     </audio>
-                     <a href={studentResult.studentRecordingDataUri} download={`${studentResult.name}_${assessment.title}_녹음.webm`} className="w-full">
+                     <a href={studentResult.studentRecordingDataUri} target="_blank" rel="noopener noreferrer" download={`${studentResult.name}_${assessment.title}_녹음.webm`} className="w-full">
                         <Button variant="secondary" className="w-full">
                             <Mic className="mr-2 h-4 w-4" />
                             음성 파일 다운로드
@@ -257,12 +273,15 @@ export default function StudentResultPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2"><BookText className="h-5 w-5 text-primary"/> 교과과정 비고 초안</CardTitle>
-                <CardDescription>학생의 성과에 기반한 AI 생성 초안입니다.</CardDescription>
+                <CardTitle className="flex items-center gap-2"><BookText className="h-5 w-5 text-primary"/> 교과과정 비고</CardTitle>
+                <CardDescription>AI 생성 초안을 수정하고 저장할 수 있습니다.</CardDescription>
               </CardHeader>
               <CardContent>
-                <Textarea readOnly value={studentResult.curricularRemarks} className="h-48 bg-muted/50 font-mono text-sm whitespace-pre-wrap" />
-                <Button className="w-full mt-4">
+                <Textarea 
+                  value={studentResult.curricularRemarks} 
+                  onChange={(e) => setStudentResult({...studentResult, curricularRemarks: e.target.value})}
+                  className="h-48 bg-background font-mono text-sm whitespace-pre-wrap" />
+                <Button className="w-full mt-4" onClick={handleSaveCurricularRemarks}>
                   <Paperclip className="mr-2 h-4 w-4" /> 생활기록부에 저장
                 </Button>
               </CardContent>

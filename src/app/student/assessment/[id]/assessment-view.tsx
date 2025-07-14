@@ -219,9 +219,11 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
         await uploadBytes(storageRef, audioBlobToUpload);
         const downloadURL = await getDownloadURL(storageRef);
 
+        // Now that upload is complete, update status and store the downloadable URL.
         await updateStatus("텍스트 변환 중", 25, { studentRecordingDataUri: downloadURL });
 
         // This part continues in the background after the user has been redirected.
+        // It uses the in-memory base64 data for analysis to avoid re-downloading.
         generateSpeakingAnalysis({
             studentRecordingDataUri,
             activityPrompt: assessmentDetails.prompt,
@@ -230,15 +232,8 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
             assessmentTitle: assessmentDetails.title.replace(/ - 복사본(\s\d+)?$/, ''),
         }, (status, progress) => updateStatus(status as ResultStatus, progress))
         .then(analysisResult => {
-            const finalResultData: Omit<StudentResult, 'id' | 'status' | 'progress' | 'studentRecordingDataUri'> = {
-                studentId: user.uid,
-                assessmentId: assessmentDetails.id,
-                assessmentTitle: assessmentDetails.title,
-                name: user.displayName || "Student",
-                avatarUrl: user.photoURL || `https://placehold.co/40x40.png?text=${user.displayName?.charAt(0)}`,
+            const finalResultData: Partial<Omit<StudentResult, 'id' | 'status' | 'progress'>> = {
                 score: analysisResult.contentScore,
-                date: new Date().toISOString().split('T')[0],
-                createdAt: initialResultData.createdAt!,
                 aiFeedback: analysisResult.aiFeedback,
                 curricularRemarks: analysisResult.curricularRemarks,
                 studentFeedbackSummary: "학생이 평가에 대해 남긴 피드백이 없습니다.",
@@ -246,7 +241,6 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
                 studentTranscript: analysisResult.studentTranscript,
                 pronunciationScore: analysisResult.pronunciationScore,
                 pronunciationFeedback: analysisResult.pronunciationFeedback,
-                teacherUid: assessmentDetails.uid,
             };
             
             return updateDoc(newResultRef, { 
