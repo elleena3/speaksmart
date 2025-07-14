@@ -1,3 +1,4 @@
+
 // src/lib/firebase.ts
 import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
@@ -14,12 +15,23 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-// Firebase 초기화 로직 강화
-// 앱이 이미 초기화되었는지 확인하여 중복 초기화를 방지합니다.
-const app: FirebaseApp = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+let app: FirebaseApp;
+let auth: any;
+let db: any;
+let storage: any;
 
-const auth = getAuth(app);
-const db = getFirestore(app);
-const storage = getStorage(app);
+// apiKey가 있는지 확인하여, 클라이언트 사이드에서만 초기화하고 명확한 에러를 제공합니다.
+// This check ensures we only try to initialize when the keys are present.
+if (firebaseConfig.apiKey) {
+    app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+    auth = getAuth(app);
+    db = getFirestore(app);
+    storage = getStorage(app);
+} else {
+    console.error("Firebase API 키가 .env 파일에 설정되지 않았습니다!");
+    // We are deliberately not initializing Firebase services here.
+    // The AuthProvider will handle showing a message to the user.
+}
 
-export { db, auth, storage, app };
+
+export { db, auth, storage, app, firebaseConfig };
