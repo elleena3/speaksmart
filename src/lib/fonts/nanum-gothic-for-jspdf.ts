@@ -109,7 +109,6 @@ export default function StudentResultPage() {
             didParseCell: (data) => {
               if (data.section === 'body' && data.column.index === 1) {
                  if (typeof data.cell.text[0] === 'string') {
-                    // Ensure content is a string before splitting
                     data.cell.text = docPDF.splitTextToSize(data.cell.text[0], (data.table.columns[1].width - 10));
                  }
               }
@@ -118,9 +117,9 @@ export default function StudentResultPage() {
 
         let finalY = (docPDF as any).lastAutoTable.finalY || 100;
 
-        const addSection = (title: string, content: string, startY: number): number => {
+        const addSection = (title: string, content: string | undefined, startY: number): number => {
             const pageHeight = docPDF.internal.pageSize.height;
-            if (startY > pageHeight - 40) { // check for space before adding content
+            if (startY > pageHeight - 40) {
                 docPDF.addPage();
                 startY = 20;
             }
@@ -131,13 +130,12 @@ export default function StudentResultPage() {
             docPDF.setTextColor(100);
             
             const splitContent = docPDF.splitTextToSize(content || "내용 없음", 180);
-            const lineHeight = docPDF.getLineHeight() / docPDF.getPointScale();
-            const contentHeight = splitContent.length * lineHeight;
+            const lineHeight = docPDF.getLineHeight();
+            const contentHeight = splitContent.length * lineHeight * 0.352777; // Adjust multiplier as needed
 
-            if (startY + 8 + contentHeight > pageHeight - 20) { // check for space including content
+            if (startY + 8 + contentHeight > pageHeight - 20) {
                 docPDF.addPage();
                 startY = 20;
-                // re-add title on new page
                 docPDF.setFontSize(14);
                 docPDF.setTextColor(0);
                 docPDF.text(title, margin, startY);
@@ -151,8 +149,8 @@ export default function StudentResultPage() {
 
         let currentY = finalY + 10;
         currentY = addSection('AI 피드백 (학생용)', studentResult.aiFeedback, currentY);
-        currentY = addSection('발음 분석', studentResult.pronunciationFeedback || 'N/A', currentY);
-        currentY = addSection(isDialogue ? '전체 대화 기록' : '답변 내용', studentResult.studentTranscript || '기록 없음', currentY);
+        currentY = addSection('발음 분석', studentResult.pronunciationFeedback, currentY);
+        currentY = addSection(isDialogue ? '전체 대화 기록' : '답변 내용', studentResult.studentTranscript, currentY);
         currentY = addSection('교과과정 비고 초안', studentResult.curricularRemarks, currentY);
         currentY = addSection('선생님을 위한 조언', studentResult.teacherGuidance, currentY);
         addSection('학생 피드백 요약', studentResult.studentFeedbackSummary, currentY);

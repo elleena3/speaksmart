@@ -80,14 +80,9 @@ export default function StudentResultPage() {
     try {
         const { default: jsPDF } = await import('jspdf');
         const { default: autoTable } = await import('jspdf-autotable');
-        const { NanumGothicFont } = await import('@/lib/fonts/nanum-gothic-for-jspdf');
         
         const docPDF = new jsPDF();
         
-        docPDF.addFileToVFS("NanumGothic.ttf", NanumGothicFont);
-        docPDF.addFont("NanumGothic.ttf", "NanumGothic", "normal");
-        docPDF.setFont("NanumGothic");
-
         const margin = 15;
         
         docPDF.setFontSize(22);
@@ -123,7 +118,7 @@ export default function StudentResultPage() {
 
         let finalY = (docPDF as any).lastAutoTable.finalY || 100;
 
-        const addSection = (title: string, content: string, startY: number): number => {
+        const addSection = (title: string, content: string | undefined, startY: number): number => {
             const pageHeight = docPDF.internal.pageSize.height;
             if (startY > pageHeight - 40) {
                 docPDF.addPage();
@@ -137,7 +132,7 @@ export default function StudentResultPage() {
             
             const splitContent = docPDF.splitTextToSize(content || "내용 없음", 180);
             const lineHeight = docPDF.getLineHeight();
-            const contentHeight = splitContent.length * lineHeight * 0.35; // Adjust multiplier as needed
+            const contentHeight = splitContent.length * lineHeight * 0.352777; // Adjust multiplier as needed
 
             if (startY + 8 + contentHeight > pageHeight - 20) {
                 docPDF.addPage();
@@ -155,8 +150,8 @@ export default function StudentResultPage() {
 
         let currentY = finalY + 10;
         currentY = addSection('AI 피드백 (학생용)', studentResult.aiFeedback, currentY);
-        currentY = addSection('발음 분석', studentResult.pronunciationFeedback || 'N/A', currentY);
-        currentY = addSection(isDialogue ? '전체 대화 기록' : '답변 내용', studentResult.studentTranscript || '기록 없음', currentY);
+        currentY = addSection('발음 분석', studentResult.pronunciationFeedback, currentY);
+        currentY = addSection(isDialogue ? '전체 대화 기록' : '답변 내용', studentResult.studentTranscript, currentY);
         currentY = addSection('교과과정 비고 초안', studentResult.curricularRemarks, currentY);
         currentY = addSection('선생님을 위한 조언', studentResult.teacherGuidance, currentY);
         addSection('학생 피드백 요약', studentResult.studentFeedbackSummary, currentY);
