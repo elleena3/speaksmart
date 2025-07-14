@@ -147,7 +147,7 @@ const converseWithStudentFlow = ai.defineFlow(
       const sttResponse = await ai.generate({
         model: googleAI.model('gemini-2.0-flash'),
         prompt: [
-          { text: 'Transcribe this audio.' },
+          { text: 'Transcribe this English audio.' },
           { media: { url: studentRecordingDataUri } },
         ],
       });
