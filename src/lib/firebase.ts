@@ -6,16 +6,18 @@ import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 // ====================================================================
-// 중요: 새 Firebase 프로젝트의 설정 값으로 이 부분을 교체해야 합니다.
-// Firebase 콘솔의 '프로젝트 설정'에서 값을 복사하여 붙여넣으세요.
+// 중요: 새로 만든 Firebase 프로젝트의 설정을 아래에 붙여넣어 주세요.
+// Firebase 콘솔 > 프로젝트 설정 (톱니바퀴 아이콘) > 일반 탭 > '내 앱' 섹션에서 찾을 수 있습니다.
+//
+// 1. 아래의 placeholder 값들을 실제 프로젝트 값으로 교체하세요.
 // ====================================================================
 export const firebaseConfig = {
-  apiKey: "AIzaSyAX4QXJaFvRGm0pLLk8n6PdFW5bY_QkJNg",
-  authDomain: "speaksmart-evaluator.firebaseapp.com",
-  projectId: "speaksmart-evaluator",
-  storageBucket: "speaksmart-evaluator.appspot.com",
-  messagingSenderId: "467932902885",
-  appId: "1:467932902885:web:389f9b929bb5cd1aa72b0c"
+  apiKey: "새 Firebase 프로젝트의 API 키를 여기에 붙여넣으세요",
+  authDomain: "새-프로젝트-ID.firebaseapp.com",
+  projectId: "새-프로젝트-ID",
+  storageBucket: "새-프로젝트-ID.appspot.com",
+  messagingSenderId: "새 숫자 메시징 발신자 ID",
+  appId: "새 앱 ID"
 };
 
 
@@ -28,10 +30,9 @@ if (!getApps().length) {
   app = getApp();
 }
 
-// app이 초기화된 경우에만 서비스를 가져옵니다.
-const auth = getApps().length ? getAuth(app!) : ({} as any);
-const db = getApps().length ? getFirestore(app!) : ({} as any);
-const storage = getApps().length ? getStorage(app!) : ({} as any);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const storage = getStorage(app);
 
 
 export { db, auth, storage, app };
