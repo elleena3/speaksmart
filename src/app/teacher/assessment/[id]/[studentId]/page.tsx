@@ -58,6 +58,9 @@ export default function StudentResultPage() {
 
   const isDialogue = assessment.assessmentType === 'dialogue';
 
+  const noFeedbackMessage = "학생이 평가에 대해 남긴 피드백이 없습니다.";
+  const hasFeedback = student.studentFeedbackSummary && student.studentFeedbackSummary !== noFeedbackMessage;
+
   return (
     <div className="space-y-6">
        <Card>
@@ -109,9 +112,9 @@ export default function StudentResultPage() {
               </CardHeader>
               <CardContent>
                  <div className="text-sm text-muted-foreground p-4 bg-muted/50 rounded-lg italic">
-                    {student.studentFeedbackSummary}
+                    {hasFeedback ? student.studentFeedbackSummary : "피드백 없음"}
                  </div>
-                <Button variant="outline" className="w-full mt-4">
+                <Button variant="outline" className="w-full mt-4" disabled={!hasFeedback}>
                   <Download className="mr-2 h-4 w-4" /> 전체 피드백 다운로드
                 </Button>
               </CardContent>

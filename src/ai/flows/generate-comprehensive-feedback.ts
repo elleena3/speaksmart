@@ -82,10 +82,10 @@ const generateComprehensiveFeedbackFlow = ai.defineFlow(
     if (!studentTranscript?.trim()) {
       // If transcription is empty, return a default "could not hear" response.
       return {
-        studentTranscript: '(음성을 인식할 수 없습니다.)',
+        studentTranscript: '(학생 답변이 기록되지 않았습니다.)',
         aiFeedback: '죄송합니다, 답변을 제대로 듣지 못했습니다. 마이크를 확인하고 다시 시도해주세요.',
-        teacherGuidance: '학생의 음성이 녹음되지 않았거나 인식이 불가능했습니다. 학생이 마이크를 올바르게 사용하고 있는지 확인이 필요합니다.',
-        curricularRemarks: '음성 파일이 비어있어 평가를 진행할 수 없음.',
+        teacherGuidance: '학생 답변이 없어 조언 불가',
+        curricularRemarks: '학생 답변이 없어 판별 불가',
         score: 0,
       };
     }
