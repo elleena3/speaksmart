@@ -27,23 +27,25 @@ const LOCAL_STORAGE_KEY = 'assessments';
 
 export default function TeacherDashboard() {
   const { t } = useLanguage();
-  const [assessments, setAssessments] = useState<TeacherAssessment[]>(initialAssessments);
+  const [assessments, setAssessments] = useState<TeacherAssessment[]>([]);
 
   useEffect(() => {
     try {
       const storedAssessments = localStorage.getItem(LOCAL_STORAGE_KEY);
-      const localData: TeacherAssessment[] = storedAssessments ? JSON.parse(storedAssessments) : [];
-      
-      const combinedMap = new Map<string, TeacherAssessment>();
-      
-      initialAssessments.forEach(item => combinedMap.set(item.id, item));
-      localData.forEach(item => combinedMap.set(item.id, item));
+      let assessmentsData: TeacherAssessment[] = [];
 
-      const combined = Array.from(combinedMap.values());
+      if (storedAssessments) {
+        // If there's data in localStorage, use it.
+        assessmentsData = JSON.parse(storedAssessments);
+      } else {
+        // Otherwise, initialize localStorage with the initial mock data.
+        assessmentsData = initialAssessments;
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(initialAssessments));
+      }
       
       // Sort by creation date descending to show recent ones first
-      combined.sort((a, b) => new Date(b.dateCreated).getTime() - new Date(a.dateCreated).getTime());
-      setAssessments(combined);
+      assessmentsData.sort((a, b) => new Date(b.dateCreated).getTime() - new Date(a.dateCreated).getTime());
+      setAssessments(assessmentsData);
       
     } catch (error) {
       console.error("Failed to load assessments from localStorage", error);

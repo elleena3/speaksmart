@@ -34,27 +34,22 @@ export default function AssessmentsPage() {
   useEffect(() => {
     // Load assessments from localStorage on component mount
     const storedAssessments = localStorage.getItem(LOCAL_STORAGE_KEY);
-    const localData: TeacherAssessment[] = storedAssessments ? JSON.parse(storedAssessments) : [];
+    let assessmentsData: TeacherAssessment[] = [];
     
-    // Combine initial mock data with data from localStorage, preventing duplicates
-    const combinedMap = new Map<string, TeacherAssessment>();
-      
-    initialAssessments.forEach(item => combinedMap.set(item.id, item));
-    localData.forEach(item => combinedMap.set(item.id, item));
-
-    const combined = Array.from(combinedMap.values());
-    setAssessments(combined);
+    if (storedAssessments) {
+      assessmentsData = JSON.parse(storedAssessments);
+    } else {
+      assessmentsData = initialAssessments;
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(initialAssessments));
+    }
+    
+    setAssessments(assessmentsData);
   }, []);
 
   const handleDelete = (assessmentId: string) => {
     const updatedAssessments = assessments.filter(a => a.id !== assessmentId);
     setAssessments(updatedAssessments);
-    
-    // Also update localStorage
-    const storedAssessments = localStorage.getItem(LOCAL_STORAGE_KEY);
-    const localData: TeacherAssessment[] = storedAssessments ? JSON.parse(storedAssessments) : [];
-    const updatedLocalData = localData.filter(a => a.id !== assessmentId);
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updatedLocalData));
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updatedAssessments));
 
     toast({
       title: t.teacherAssessments.deleteToast.title,
