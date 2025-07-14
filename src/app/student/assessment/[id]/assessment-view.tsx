@@ -8,10 +8,10 @@ import { Mic, StopCircle, Loader2, Timer } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { generateContentFeedback } from "@/ai/flows/generate-content-feedback"
 import { generatePronunciationFeedback } from "@/ai/flows/generate-pronunciation-feedback"
-import { type StudentResult, type TeacherAssessment } from "@/lib/types"
+import { type TeacherAssessment, type StudentResult } from "@/lib/types"
 import { useAuth } from "@/context/auth-context"
 import { db, storage } from "@/lib/firebase"
-import { collection, addDoc, doc, writeBatch, query, where, getDocs, runTransaction } from "firebase/firestore"
+import { collection, doc, updateDoc, writeBatch, query, where, getDocs, serverTimestamp, setDoc } from "firebase/firestore"
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
 
 export function AssessmentView({ assessmentDetails }: { assessmentDetails: TeacherAssessment }) {
@@ -85,7 +85,7 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
       audioStreamRef.current = stream;
       mediaRecorderRef.current = new MediaRecorder(stream, { 
         mimeType: 'audio/webm',
-        audioBitsPerSecond: 16000 // Lower bitrate for smaller file size
+        audioBitsPerSecond: 16000
       });
       
       mediaRecorderRef.current.ondataavailable = (event) => {
@@ -100,8 +100,8 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
         if(timerIntervalRef.current) clearInterval(timerIntervalRef.current);
         
         toast({
-            title: "녹음 중지됨",
-            description: "오디오를 처리하고 AI 피드백을 생성 중입니다...",
+            title: "녹음 처리 중...",
+            description: "AI 분석이 시작되었습니다. 완료되면 알려드립니다.",
         });
 
         if (audioChunksRef.current.length === 0) {
@@ -123,9 +123,13 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
         reader.readAsDataURL(audioBlob);
         reader.onloadend = async () => {
           const base64Audio = reader.result as string;
-          await processAssessment(audioBlob, base64Audio);
+          // Don't await this. Let it run in the background.
+          processAssessmentInBackground(audioBlob, base64Audio);
         };
         cleanup();
+        
+        // Immediately redirect user
+        router.push('/student/dashboard');
       };
 
       mediaRecorderRef.current.onerror = (event) => {
@@ -158,78 +162,93 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
     }
   }
   
-  const processAssessment = async (audioBlob: Blob, studentRecordingDataUri: string) => {
+  const processAssessmentInBackground = async (audioBlob: Blob, studentRecordingDataUri: string) => {
      if (!user) {
-        toast({ title: "인증 오류", description: "사용자 정보를 찾을 수 없습니다.", variant: "destructive" });
-        setIsProcessing(false);
+        // This toast might not be visible as the user is redirected.
+        // Logging is more important here.
+        console.error("Authentication error: User not found for background processing.");
         return;
      }
 
+     const newResultRef = doc(collection(db, "results"));
+
      try {
-      const audioFileName = `recordings/${user.uid}_${assessmentDetails.id}_${Date.now()}.webm`;
-      const storageRef = ref(storage, audioFileName);
-      await uploadBytes(storageRef, audioBlob);
-      const downloadURL = await getDownloadURL(storageRef);
-      
-      const contentResult = await generateContentFeedback({
-        activityPrompt: assessmentDetails.prompt,
-        expectedFormat: assessmentDetails.expectedFormat || "학생의 답변을 평가합니다.",
-        studentRecordingDataUri,
-        studentName: user.displayName || "Student",
-        assessmentTitle: assessmentDetails.title.replace(/ - 복사본(\s\d+)?$/, ''),
-      });
+        // 1. Create initial result document with '채점 중' status
+        const initialResultData: Partial<StudentResult> = {
+            id: newResultRef.id,
+            studentId: user.uid,
+            assessmentId: assessmentDetails.id,
+            assessmentTitle: assessmentDetails.title,
+            name: user.displayName || "Student",
+            avatarUrl: user.photoURL || `https://placehold.co/40x40.png?text=${user.displayName?.charAt(0)}`,
+            status: "채점 중",
+            date: new Date().toISOString().split('T')[0],
+            createdAt: Date.now(),
+            teacherUid: assessmentDetails.uid,
+        };
+        await setDoc(newResultRef, initialResultData);
 
-      const pronunciationResult = await generatePronunciationFeedback({
-        studentRecordingDataUri,
-        studentTranscript: contentResult.studentTranscript,
-      });
+        // 2. Upload audio file to storage
+        const audioFileName = `recordings/${user.uid}_${assessmentDetails.id}_${Date.now()}.webm`;
+        const storageRef = ref(storage, audioFileName);
+        await uploadBytes(storageRef, audioBlob);
+        const downloadURL = await getDownloadURL(storageRef);
 
-      const resultData = {
-        studentId: user.uid,
-        assessmentId: assessmentDetails.id,
-        assessmentTitle: assessmentDetails.title,
-        name: user.displayName || "Student",
-        avatarUrl: user.photoURL || `https://placehold.co/40x40.png?text=${user.displayName?.charAt(0)}`,
-        status: "채점 완료",
-        score: contentResult.score,
-        date: new Date().toISOString().split('T')[0],
-        createdAt: Date.now(),
-        aiFeedback: contentResult.aiFeedback,
-        curricularRemarks: contentResult.curricularRemarks,
-        studentFeedbackSummary: "학생이 평가에 대해 남긴 피드백이 없습니다.",
-        teacherGuidance: contentResult.teacherGuidance,
-        studentTranscript: contentResult.studentTranscript,
-        studentRecordingDataUri: downloadURL,
-        pronunciationScore: pronunciationResult.pronunciationScore,
-        pronunciationFeedback: pronunciationResult.pronunciationFeedback,
-        teacherUid: assessmentDetails.uid,
-      };
+        // 3. Run AI feedback generation in parallel
+        const [contentResult, pronunciationResult] = await Promise.all([
+          generateContentFeedback({
+            activityPrompt: assessmentDetails.prompt,
+            expectedFormat: assessmentDetails.expectedFormat || "학생의 답변을 평가합니다.",
+            studentRecordingDataUri,
+            studentName: user.displayName || "Student",
+            assessmentTitle: assessmentDetails.title.replace(/ - 복사본(\s\d+)?$/, ''),
+          }),
+          generatePronunciationFeedback({
+            studentRecordingDataUri,
+            studentTranscript: "temp", // Will be replaced by contentResult's transcript
+          })
+        ]);
+        
+        // Use the transcript from contentResult for the second call if needed, or just use the result
+        const finalPronunciationResult = contentResult.studentTranscript ? await generatePronunciationFeedback({
+            studentRecordingDataUri,
+            studentTranscript: contentResult.studentTranscript,
+        }) : pronunciationResult;
 
-      const resultsRef = collection(db, "results");
-      const q = query(resultsRef, where("assessmentId", "==", assessmentDetails.id), where("studentId", "==", user.uid));
-      const existingDocs = await getDocs(q);
 
-      const batch = writeBatch(db);
-      existingDocs.forEach(doc => batch.delete(doc.ref));
-      const newResultRef = doc(collection(db, "results"));
-      batch.set(newResultRef, resultData);
-      await batch.commit();
+        // 4. Update the result document with AI feedback and '채점 완료' status
+        const finalResultData: Omit<StudentResult, 'id'> = {
+            studentId: user.uid,
+            assessmentId: assessmentDetails.id,
+            assessmentTitle: assessmentDetails.title,
+            name: user.displayName || "Student",
+            avatarUrl: user.photoURL || `https://placehold.co/40x40.png?text=${user.displayName?.charAt(0)}`,
+            status: "채점 완료",
+            score: contentResult.score,
+            date: new Date().toISOString().split('T')[0],
+            createdAt: initialResultData.createdAt!,
+            aiFeedback: contentResult.aiFeedback,
+            curricularRemarks: contentResult.curricularRemarks,
+            studentFeedbackSummary: "학생이 평가에 대해 남긴 피드백이 없습니다.",
+            teacherGuidance: contentResult.teacherGuidance,
+            studentTranscript: contentResult.studentTranscript,
+            studentRecordingDataUri: downloadURL,
+            pronunciationScore: finalPronunciationResult.pronunciationScore,
+            pronunciationFeedback: finalPronunciationResult.pronunciationFeedback,
+            teacherUid: assessmentDetails.uid,
+        };
 
-      toast({
-        title: "처리 완료!",
-        description: "피드백을 확인할 준비가 되었습니다.",
-      });
-
-      router.push(`/student/assessment/${assessmentDetails.id}/results`);
+        await updateDoc(newResultRef, finalResultData as { [x: string]: any });
+        
+        // Optional: Send a notification to the user upon completion (future feature)
 
     } catch (error) {
-      console.error("Error processing assessment:", error);
-      toast({
-        title: "오류",
-        description: "녹음을 처리하는 중에 문제가 발생했습니다. 다시 시도해 주세요.",
-        variant: "destructive",
-      });
-      setIsProcessing(false);
+        console.error("Error processing assessment in background:", error);
+        // Update the document to show an error state
+        await updateDoc(newResultRef, { 
+            status: "오류", 
+            aiFeedback: "결과를 분석하는 중 오류가 발생했습니다. 잠시 후 다시 시도하거나 관리자에게 문의하세요."
+        });
     }
   }
   
@@ -254,7 +273,7 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
       return (
         <Button size="lg" disabled className="w-full">
           <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-          처리 중...
+          제출 중...
         </Button>
       )
     }

@@ -54,7 +54,7 @@ export type StudentResult = {
   assessmentTitle: string; 
   name: string; // Student's display name
   avatarUrl: string;
-  status: "채점 완료";
+  status: "채점 완료" | "채점 중" | "오류";
   score: number;
   date: string;
   aiFeedback: string;
