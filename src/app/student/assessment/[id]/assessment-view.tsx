@@ -10,7 +10,7 @@ import { generateComprehensiveFeedback } from "@/ai/flows/generate-comprehensive
 import { type StudentResult, type TeacherAssessment } from "@/lib/types"
 import { useAuth } from "@/context/auth-context"
 import { db } from "@/lib/firebase"
-import { collection, addDoc, doc, writeBatch, query, where, getDocs } from "firebase/firestore"
+import { collection, addDoc, doc, writeBatch, query, where, getDocs, getCountFromServer, runTransaction } from "firebase/firestore"
 
 export function AssessmentView({ assessmentDetails }: { assessmentDetails: TeacherAssessment }) {
   const { user } = useAuth();
@@ -54,8 +54,6 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
         setRemainingTime(prevTime => {
           if (prevTime === null || prevTime <= 1) {
             if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-            // We don't call handleStopRecording here anymore.
-            // It will be triggered by the useEffect below.
             return 0;
           }
           return prevTime - 1;
@@ -166,7 +164,7 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
         expectedFormat: assessmentDetails.expectedFormat || "학생의 답변을 평가합니다.",
         studentRecordingDataUri,
         studentName: user.displayName || "Student",
-        assessmentTitle: assessmentDetails.title.replace(' - 복사본', ''),
+        assessmentTitle: assessmentDetails.title.replace(/ - 복사본(\s\d+)?$/, ''),
       });
       
       const resultData = {
