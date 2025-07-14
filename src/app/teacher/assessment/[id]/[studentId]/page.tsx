@@ -80,9 +80,14 @@ export default function StudentResultPage() {
     try {
         const { default: jsPDF } = await import('jspdf');
         const { default: autoTable } = await import('jspdf-autotable');
+        const { NanumGothicFont } = await import('@/lib/fonts/nanum-gothic-for-jspdf');
         
         const docPDF = new jsPDF();
         
+        docPDF.addFileToVFS("NanumGothic.ttf", NanumGothicFont);
+        docPDF.addFont("NanumGothic.ttf", "NanumGothic", "normal");
+        docPDF.setFont("NanumGothic");
+
         const margin = 15;
         
         docPDF.setFontSize(22);
