@@ -1,3 +1,4 @@
+
 // src/context/auth-context.tsx
 "use client";
 
@@ -6,7 +7,7 @@ import { onAuthStateChanged, User } from 'firebase/auth';
 import { auth, firebaseConfig } from '@/lib/firebase';
 import { Loader2 } from 'lucide-react';
 
-// A fallback component to render if Firebase is not configured.
+// 설정이 누락되었을 때 보여줄 전용 컴포넌트
 const MissingFirebaseConfig = () => (
     <div className="flex h-screen w-full items-center justify-center p-8">
         <div className="max-w-md w-full text-center bg-destructive/10 border border-destructive text-destructive p-8 rounded-lg">
@@ -33,7 +34,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   
-  // Check if Firebase config is missing.
+  // AuthProvider가 렌더링될 때 Firebase 설정 값을 명시적으로 확인합니다.
   if (!firebaseConfig.apiKey || firebaseConfig.apiKey.includes("YOUR_")) {
     return <MissingFirebaseConfig />;
   }
