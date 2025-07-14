@@ -1,12 +1,16 @@
 import {genkit} from 'genkit';
 import {googleAI} from '@genkit-ai/googleai';
+import {config} from 'dotenv';
+config();
 
-// IMPORTANT: Replace this with your actual server-side API key.
-// This key should have NO website restrictions.
-const GOOGLE_API_KEY = "YOUR_SERVER_API_KEY_HERE";
+// IMPORTANT: The API key is now managed via Google Cloud Console.
+// Ensure the "Browser key (auto created by Firebase)" has Application restrictions set to "None"
+// and API restrictions set to "Generative Language API".
+const GOOGLE_API_KEY = process.env.GOOGLE_GENAI_API_KEY;
 
-if (!GOOGLE_API_KEY || GOOGLE_API_KEY === "YOUR_SERVER_API_KEY_HERE") {
-    console.warn("Google AI API Key is not configured in src/ai/genkit.ts. AI features will not work.");
+if (!GOOGLE_API_KEY) {
+    console.warn("Google AI API Key is not configured. AI features might not work.");
+    console.warn("Please ensure you have a .env file with GOOGLE_GENAI_API_KEY set, or that the key is available in your deployment environment.");
 }
 
 export const ai = genkit({
