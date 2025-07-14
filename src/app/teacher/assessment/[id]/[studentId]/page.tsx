@@ -80,8 +80,14 @@ export default function StudentResultPage() {
     try {
         const { default: jsPDF } = await import('jspdf');
         const { default: autoTable } = await import('jspdf-autotable');
+        const { NanumGothicFont } = await import('@/lib/fonts/nanum-gothic-for-jspdf');
         
         const docPDF = new jsPDF();
+        
+        docPDF.addFileToVFS("NanumGothic.ttf", NanumGothicFont);
+        docPDF.addFont("NanumGothic.ttf", "NanumGothic", "normal");
+        docPDF.setFont("NanumGothic");
+
         const margin = 15;
         
         docPDF.setFontSize(22);
@@ -104,11 +110,14 @@ export default function StudentResultPage() {
                 ['발음 점수', `${studentResult.pronunciationScore ?? 0}%`],
             ],
             theme: 'grid',
-            styles: { font: "NotoSansKR", fontSize: 10 },
+            styles: { font: "NanumGothic", fontSize: 10 },
             headStyles: { fontStyle: 'bold', fillColor: [41, 128, 185], textColor: 255 },
             didParseCell: (data) => {
-              if (data.section === 'body') {
-                data.cell.styles.font = 'NotoSansKR';
+              if (data.section === 'body' && data.column.index === 1) {
+                 if (typeof data.cell.text[0] === 'string') {
+                    // Ensure content is a string before splitting
+                    data.cell.text = docPDF.splitTextToSize(data.cell.text[0], (data.table.columns[1].width - 10));
+                 }
               }
             }
         });
@@ -131,7 +140,6 @@ export default function StudentResultPage() {
             const numLines = splitContent.length;
             const contentHeight = (lineHeight * numLines);
 
-
             if (startY + 8 + contentHeight > 280) { 
                 docPDF.addPage();
                 startY = 20;
@@ -140,11 +148,6 @@ export default function StudentResultPage() {
             docPDF.text(splitContent, margin, startY + 8);
             return startY + contentHeight + 15;
         };
-        
-        const { NotoSansKRFont } = await import('@/lib/fonts/noto-sans-kr-for-jspdf');
-        docPDF.addFileToVFS("NotoSansKR-Regular.ttf", NotoSansKRFont);
-        docPDF.addFont("NotoSansKR-Regular.ttf", "NotoSansKR", "normal");
-        docPDF.setFont("NotoSansKR");
 
         let currentY = finalY + 10;
         currentY = addSection('AI 피드백 (학생용)', studentResult.aiFeedback, currentY);
