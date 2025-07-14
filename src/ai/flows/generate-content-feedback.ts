@@ -2,16 +2,16 @@
 'use server';
 
 /**
- * @fileOverview Generates comprehensive feedback for a speaking assessment, including pronunciation analysis.
- * It transcribes student audio, then generates student feedback, teacher guidance, curricular remarks, a content score, and a pronunciation score.
+ * @fileOverview Generates content-based feedback for a speaking assessment.
+ * It transcribes student audio, then generates student feedback, teacher guidance, curricular remarks, and a content score.
  */
 
 import { ai } from '@/ai/genkit';
 import { googleAI } from '@genkit-ai/googleai';
 import { z } from 'zod';
 
-// Input schema for the entire comprehensive feedback generation flow
-const GenerateComprehensiveFeedbackInputSchema = z.object({
+// Input schema for the content feedback generation flow
+const GenerateContentFeedbackInputSchema = z.object({
   studentRecordingDataUri: z.string().describe(
     "The student's voice recording as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'"
   ),
@@ -20,33 +20,33 @@ const GenerateComprehensiveFeedbackInputSchema = z.object({
   studentName: z.string().describe('The name of the student.'),
   assessmentTitle: z.string().describe('The title of the assessment.'),
 });
-export type GenerateComprehensiveFeedbackInput = z.infer<typeof GenerateComprehensiveFeedbackInputSchema>;
+export type GenerateContentFeedbackInput = z.infer<typeof GenerateContentFeedbackInputSchema>;
 
-// Output schema for the comprehensive feedback generation flow
-const GenerateComprehensiveFeedbackOutputSchema = z.object({
+// Output schema for the content feedback generation flow
+const GenerateContentFeedbackOutputSchema = z.object({
   studentTranscript: z.string().describe("The transcript of the student's speech."),
   aiFeedback: z.string().describe('The generated feedback for the student in Korean.'),
   teacherGuidance: z.string().describe('Actionable guidance for the teacher based on the performance in Korean.'),
   curricularRemarks: z.string().describe('A draft of curricular remarks suitable for the student’s academic record in Korean.'),
   score: z.number().int().min(0).max(100).describe('A score from 0-100 for the performance content.'),
-  pronunciationScore: z.number().int().min(0).max(100).describe('A score from 0-100 for pronunciation.'),
-  pronunciationFeedback: z.string().describe('Specific feedback on the student\'s pronunciation in Korean.'),
 });
-export type GenerateComprehensiveFeedbackOutput = z.infer<typeof GenerateComprehensiveFeedbackOutputSchema>;
+export type GenerateContentFeedbackOutput = z.infer<typeof GenerateContentFeedbackOutputSchema>;
 
-export async function generateComprehensiveFeedback(input: GenerateComprehensiveFeedbackInput): Promise<GenerateComprehensiveFeedbackOutput> {
-  return generateComprehensiveFeedbackFlow(input);
+
+export async function generateContentFeedback(input: GenerateContentFeedbackInput): Promise<GenerateContentFeedbackOutput> {
+  return generateContentFeedbackFlow(input);
 }
+
 
 // 1. Define the prompt for generating the content analysis and feedback
 const contentFeedbackPrompt = ai.definePrompt({
   name: 'contentFeedbackPrompt',
   input: {
-    schema: GenerateComprehensiveFeedbackInputSchema.extend({
+    schema: GenerateContentFeedbackInputSchema.extend({
       studentTranscript: z.string(),
     }).omit({ studentRecordingDataUri: true }),
   },
-  output: { schema: GenerateComprehensiveFeedbackOutputSchema.omit({ studentTranscript: true, pronunciationScore: true, pronunciationFeedback: true }) },
+  output: { schema: GenerateContentFeedbackOutputSchema.omit({ studentTranscript: true }) },
   prompt: `You are an AI English Teacher evaluating a student's performance based on a transcript. Your persona is that of an expert English teacher providing constructive feedback for skill improvement.
 Your entire response must be in the specified JSON format, and all text feedback must be in Korean.
 
@@ -66,44 +66,16 @@ Based on all the information provided, perform the following tasks:
 `,
 });
 
-// 2. Define the prompt for generating pronunciation feedback
-const pronunciationFeedbackPrompt = ai.definePrompt({
-    name: 'pronunciationFeedbackPrompt',
-    input: {
-        schema: z.object({
-            studentRecordingDataUri: z.string(),
-            studentTranscript: z.string(),
-        })
-    },
-    output: { schema: GenerateComprehensiveFeedbackOutputSchema.pick({ pronunciationScore: true, pronunciationFeedback: true }) },
-    prompt: `You are an expert English pronunciation coach. Your task is to evaluate a student's spoken English based on their audio recording and the corresponding transcript. Provide all feedback in Korean.
 
-    - Student's Audio Recording: {{media url=studentRecordingDataUri}}
-    - AI-generated Transcript: {{{studentTranscript}}}
-
-    Please perform the following steps:
-    1.  Listen carefully to the audio recording.
-    2.  Compare the student's pronunciation with the words in the transcript.
-    3.  Evaluate the student's pronunciation in terms of accuracy, clarity, intonation, and fluency.
-    4.  **Assign a Pronunciation Score:** Give a score from 0 to 100. A score of 100 represents a native-like, clear pronunciation. A score of 0 means the speech is completely unintelligible.
-    5.  **Provide Pronunciation Feedback:** Write specific, constructive feedback in Korean. Point out specific words or sounds that were pronounced well and those that need improvement. For words that need improvement, provide tips on how to pronounce them correctly (e.g., "The 'r' sound in 'friend' was a bit weak, try to curl your tongue more."). Be encouraging.
-    
-    If the transcript is very short (e.g., "Hi"), provide feedback on the pronunciation of that specific word. If the transcript is empty or indicates no speech, provide a score of 0 and state that no speech was detected.
-    `,
-});
-
-
-// 3. Define the main flow
-const generateComprehensiveFeedbackFlow = ai.defineFlow(
+const generateContentFeedbackFlow = ai.defineFlow(
   {
-    name: 'generateComprehensiveFeedbackFlow',
-    inputSchema: GenerateComprehensiveFeedbackInputSchema,
-    outputSchema: GenerateComprehensiveFeedbackOutputSchema,
+    name: 'generateContentFeedbackFlow',
+    inputSchema: GenerateContentFeedbackInputSchema,
+    outputSchema: GenerateContentFeedbackOutputSchema,
   },
   async ({ studentRecordingDataUri, activityPrompt, expectedFormat, studentName, assessmentTitle }) => {
     
     const audioData = studentRecordingDataUri.split(',')[1];
-    // This check is for completely empty/invalid data URIs.
     if (!audioData) {
       return {
         studentTranscript: '(학생 답변이 기록되지 않았습니다.)',
@@ -111,8 +83,6 @@ const generateComprehensiveFeedbackFlow = ai.defineFlow(
         teacherGuidance: '학생 답변이 없어 조언 불가',
         curricularRemarks: '학생 답변이 없어 판별 불가',
         score: 0,
-        pronunciationScore: 0,
-        pronunciationFeedback: '녹음된 오디오가 없어 발음 분석을 할 수 없습니다.',
       };
     }
 
@@ -133,7 +103,6 @@ const generateComprehensiveFeedbackFlow = ai.defineFlow(
         studentTranscript = sttResponse.text;
     }
 
-    // This check is for when transcription returns nothing.
     if (!studentTranscript) {
       return {
         studentTranscript: '(학생 답변이 기록되지 않았습니다.)',
@@ -141,36 +110,24 @@ const generateComprehensiveFeedbackFlow = ai.defineFlow(
         teacherGuidance: '학생 답변이 없어 조언 불가',
         curricularRemarks: '학생 답변이 없어 판별 불가',
         score: 0,
-        pronunciationScore: 0,
-        pronunciationFeedback: '음성 인식 결과가 없어 발음 분석을 할 수 없습니다.',
       };
     }
     
-    const [contentResult, pronunciationResult] = await Promise.all([
-        contentFeedbackPrompt({
-            studentTranscript,
-            activityPrompt,
-            expectedFormat,
-            studentName,
-            assessmentTitle,
-        }),
-        pronunciationFeedbackPrompt({
-            studentRecordingDataUri,
-            studentTranscript,
-        }),
-    ]);
+    const { output } = await contentFeedbackPrompt({
+        studentTranscript,
+        activityPrompt,
+        expectedFormat,
+        studentName,
+        assessmentTitle,
+    });
 
-    const contentOutput = contentResult.output;
-    const pronunciationOutput = pronunciationResult.output;
-
-    if (!contentOutput || !pronunciationOutput) {
-        throw new Error("Failed to generate comprehensive feedback from the AI model.");
+    if (!output) {
+        throw new Error("Failed to generate content feedback from the AI model.");
     }
     
     return {
       studentTranscript,
-      ...contentOutput,
-      ...pronunciationOutput,
+      ...output,
     };
   }
 );

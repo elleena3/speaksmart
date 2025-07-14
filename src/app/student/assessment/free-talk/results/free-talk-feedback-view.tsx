@@ -5,7 +5,8 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
-import { generateComprehensiveFeedback } from "@/ai/flows/generate-comprehensive-feedback";
+import { generateContentFeedback } from "@/ai/flows/generate-content-feedback";
+import { generatePronunciationFeedback } from "@/ai/flows/generate-pronunciation-feedback";
 import { type StudentResult, type TeacherAssessment } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { FeedbackView } from "../../[id]/results/feedback-view";
@@ -64,23 +65,26 @@ export function FreeTalkFeedbackView() {
                 .join('\n');
             
             // 1. Upload audio to Firebase Storage
-            // Convert base64 to blob first
             const fetchRes = await fetch(studentRecordingDataUri);
             const audioBlob = await fetchRes.blob();
             const audioFileName = `recordings/${user.uid}_${assessment.id}_${Date.now()}.webm`;
             const storageRef = ref(storage, audioFileName);
             await uploadBytes(storageRef, audioBlob);
-
-            // 2. Get download URL
             const downloadURL = await getDownloadURL(storageRef);
 
-            // 3. Generate AI feedback with the base64 data
-            const generatedResult = await generateComprehensiveFeedback({
+            // 2. Generate content feedback
+            const contentResult = await generateContentFeedback({
                 activityPrompt: `${assessment.prompt}\n\n--- 대화 기록 ---\n${fullTranscript}`,
                 expectedFormat: assessment.expectedFormat || "AI와의 자연스러운 대화 능력을 평가합니다.",
-                studentRecordingDataUri: studentRecordingDataUri, // Use base64 for Genkit
+                studentRecordingDataUri: studentRecordingDataUri, 
                 studentName: user.displayName || "Student", 
-                assessmentTitle: assessment.title.replace(' - 복사본', ''),
+                assessmentTitle: assessment.title.replace(/ - 복사본(\s\d+)?$/, ''),
+            });
+
+            // 3. Generate pronunciation feedback
+            const pronunciationResult = await generatePronunciationFeedback({
+                studentRecordingDataUri,
+                studentTranscript: fullTranscript, // Use the full conversation transcript for context
             });
 
             const resultData: Omit<StudentResult, 'id'> = {
@@ -90,17 +94,17 @@ export function FreeTalkFeedbackView() {
                 name: user.displayName || "Student",
                 avatarUrl: user.photoURL || `https://placehold.co/40x40.png?text=${user.displayName?.charAt(0)}`,
                 status: "채점 완료",
-                score: generatedResult.score,
+                score: contentResult.score,
                 date: new Date().toISOString().split('T')[0],
                 createdAt: Date.now(),
-                aiFeedback: generatedResult.aiFeedback,
-                curricularRemarks: generatedResult.curricularRemarks,
+                aiFeedback: contentResult.aiFeedback,
+                curricularRemarks: contentResult.curricularRemarks,
                 studentFeedbackSummary: "학생이 평가에 대해 남긴 피드백이 없습니다.",
-                teacherGuidance: generatedResult.teacherGuidance,
+                teacherGuidance: contentResult.teacherGuidance,
                 studentTranscript: fullTranscript,
-                studentRecordingDataUri: downloadURL, // Store the URL, not the base64
-                pronunciationScore: generatedResult.pronunciationScore,
-                pronunciationFeedback: generatedResult.pronunciationFeedback,
+                studentRecordingDataUri: downloadURL,
+                pronunciationScore: pronunciationResult.pronunciationScore,
+                pronunciationFeedback: pronunciationResult.pronunciationFeedback,
                 teacherUid: assessment.uid,
             };
 

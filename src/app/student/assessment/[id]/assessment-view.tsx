@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Mic, StopCircle, Loader2, Timer } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { generateComprehensiveFeedback } from "@/ai/flows/generate-comprehensive-feedback"
+import { generateContentFeedback } from "@/ai/flows/generate-content-feedback"
+import { generatePronunciationFeedback } from "@/ai/flows/generate-pronunciation-feedback"
 import { type StudentResult, type TeacherAssessment } from "@/lib/types"
 import { useAuth } from "@/context/auth-context"
 import { db, storage } from "@/lib/firebase"
@@ -67,6 +68,7 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
       timerIntervalRef.current = setInterval(() => {
         setRemainingTime(prevTime => {
           if (prevTime === null || prevTime <= 1) {
+            handleStopRecording();
             return 0;
           }
           return prevTime - 1;
@@ -160,20 +162,17 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
       await uploadBytes(storageRef, audioBlob);
       const downloadURL = await getDownloadURL(storageRef);
 
-      const { 
-        aiFeedback, 
-        curricularRemarks, 
-        teacherGuidance, 
-        score, 
-        studentTranscript,
-        pronunciationScore,
-        pronunciationFeedback
-      } = await generateComprehensiveFeedback({
+      const contentResult = await generateContentFeedback({
         activityPrompt: assessmentDetails.prompt,
         expectedFormat: assessmentDetails.expectedFormat || "학생의 답변을 평가합니다.",
         studentRecordingDataUri,
         studentName: user.displayName || "Student",
         assessmentTitle: assessmentDetails.title.replace(/ - 복사본(\s\d+)?$/, ''),
+      });
+
+      const pronunciationResult = await generatePronunciationFeedback({
+        studentRecordingDataUri,
+        studentTranscript: contentResult.studentTranscript,
       });
       
       const resultData = {
@@ -183,17 +182,17 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
         name: user.displayName || "Student",
         avatarUrl: user.photoURL || `https://placehold.co/40x40.png?text=${user.displayName?.charAt(0)}`,
         status: "채점 완료",
-        score,
+        score: contentResult.score,
         date: new Date().toISOString().split('T')[0],
         createdAt: Date.now(),
-        aiFeedback,
-        curricularRemarks,
+        aiFeedback: contentResult.aiFeedback,
+        curricularRemarks: contentResult.curricularRemarks,
         studentFeedbackSummary: "학생이 평가에 대해 남긴 피드백이 없습니다.",
-        teacherGuidance,
-        studentTranscript,
+        teacherGuidance: contentResult.teacherGuidance,
+        studentTranscript: contentResult.studentTranscript,
         studentRecordingDataUri: downloadURL,
-        pronunciationScore,
-        pronunciationFeedback,
+        pronunciationScore: pronunciationResult.pronunciationScore,
+        pronunciationFeedback: pronunciationResult.pronunciationFeedback,
         teacherUid: assessmentDetails.uid,
       };
 
@@ -233,12 +232,6 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
       cleanup();
     };
   }, [timeLimit, cleanup]);
-
-  useEffect(() => {
-    if (remainingTime === 0 && isRecording) {
-      handleStopRecording();
-    }
-  }, [remainingTime, isRecording, handleStopRecording]);
 
   const formatTime = (seconds: number | null) => {
     if (seconds === null) return null;
