@@ -14,8 +14,6 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useToast } from '@/hooks/use-toast';
 import { format } from "date-fns";
 import { useLanguage } from '@/context/language-context';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
 import { type StudentResult } from '@/lib/types';
 
 
@@ -33,7 +31,6 @@ const LOCAL_STORAGE_KEY_RESULTS = 'student_results';
 
 export default function AssessmentsPage() {
   const [assessments, setAssessments] = useState<TeacherAssessment[]>([]);
-  const [deleteStudentResults, setDeleteStudentResults] = useState(false);
   const { toast } = useToast();
   const { t } = useLanguage();
 
@@ -58,15 +55,11 @@ export default function AssessmentsPage() {
     setAssessments(updatedAssessments);
     localStorage.setItem(LOCAL_STORAGE_KEY_ASSESSMENTS, JSON.stringify(updatedAssessments));
 
-    // Optionally, delete associated student results
-    if (deleteStudentResults) {
-      const allResults: StudentResult[] = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY_RESULTS) || '[]');
-      const updatedResults = allResults.filter(r => r.assessmentId !== assessmentId);
-      localStorage.setItem(LOCAL_STORAGE_KEY_RESULTS, JSON.stringify(updatedResults));
-    }
+    // Also delete associated student results to maintain data consistency
+    const allResults: StudentResult[] = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY_RESULTS) || '[]');
+    const updatedResults = allResults.filter(r => r.assessmentId !== assessmentId);
+    localStorage.setItem(LOCAL_STORAGE_KEY_RESULTS, JSON.stringify(updatedResults));
 
-    // Reset checkbox state and show toast
-    setDeleteStudentResults(false);
     toast({
       title: t.teacherAssessments.deleteToast.title,
       description: t.teacherAssessments.deleteToast.description
@@ -154,7 +147,7 @@ export default function AssessmentsPage() {
                      </Badge>
                    </TableCell>
                    <TableCell>
-                     <AlertDialog onOpenChange={() => setDeleteStudentResults(false)}>
+                     <AlertDialog>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" className="h-8 w-8 p-0">
@@ -183,16 +176,6 @@ export default function AssessmentsPage() {
                                   {t.teacherAssessments.deleteDialogDescription}
                               </AlertDialogDescription>
                           </AlertDialogHeader>
-                          <div className="flex items-center space-x-2 my-4">
-                            <Checkbox 
-                                id="delete-results-checkbox" 
-                                checked={deleteStudentResults}
-                                onCheckedChange={(checked) => setDeleteStudentResults(!!checked)}
-                            />
-                            <Label htmlFor="delete-results-checkbox" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                                학생들의 평가 결과도 함께 삭제하시겠습니까?
-                            </Label>
-                          </div>
                           <AlertDialogFooter>
                               <AlertDialogCancel>{t.teacherAssessments.deleteDialogCancel}</AlertDialogCancel>
                               <AlertDialogAction onClick={() => handleDelete(assessment.id)} className="bg-destructive hover:bg-destructive/90">{t.teacherAssessments.deleteDialogConfirm}</AlertDialogAction>
