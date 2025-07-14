@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { FeedbackView } from "../../[id]/results/feedback-view";
 import { useAuth } from "@/context/auth-context";
 import { db } from "@/lib/firebase";
-import { collection, addDoc, query, where, getDocs, writeBatch } from "firebase/firestore";
+import { collection, doc, query, where, getDocs, writeBatch } from "firebase/firestore";
 
 const SESSION_STORAGE_KEY = 'freeTalkConversationHistory';
 
