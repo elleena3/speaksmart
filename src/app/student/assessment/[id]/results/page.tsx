@@ -17,7 +17,6 @@ const statusDetails: Record<ResultStatus, { icon: React.ElementType, text: strin
     "텍스트 변환 중": { icon: FileText, text: "음성을 텍스트로 변환 중..." },
     "분석 중": { icon: BrainCircuit, text: "AI가 답변을 분석하고 있습니다." },
     "리포트 생성 중": { icon: BookCheck, text: "최종 리포트를 생성하고 있습니다." },
-    "채점 중": { icon: Loader2, text: "AI가 채점 중입니다. 잠시만 기다려주세요." }, // Fallback
     "채점 완료": { icon: Loader2, text: "채점 완료!" },
     "오류": { icon: Loader2, text: "오류 발생" },
 };
@@ -29,7 +28,7 @@ export default function AssessmentResultsPage() {
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
   const [result, setResult] = useState<StudentResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [currentStatus, setCurrentStatus] = useState<ResultStatus>("채점 중");
+  const [currentStatus, setCurrentStatus] = useState<ResultStatus>("업로드 중");
   const [currentProgress, setCurrentProgress] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
 
@@ -55,24 +54,27 @@ export default function AssessmentResultsPage() {
       if (!querySnapshot.empty) {
         const doc = querySnapshot.docs[0];
         const resultData = { id: doc.id, ...doc.data() } as StudentResult;
-        setResult(resultData);
-        setCurrentStatus(resultData.status);
-        setCurrentProgress(resultData.progress || 0);
+        
+        if (resultData.status) {
+            setResult(resultData);
+            setCurrentStatus(resultData.status);
+            setCurrentProgress(resultData.progress || 0);
 
-        if (resultData.status === '오류') {
-          setError(resultData.aiFeedback || "분석 중 오류가 발생했습니다.");
-          setIsLoading(false);
-        } else if (resultData.status === '채점 완료') {
-          setIsLoading(false);
-          setError(null);
-        } else {
-          setIsLoading(true); // Still grading
+            if (resultData.status === '오류') {
+              setError(resultData.aiFeedback || "분석 중 오류가 발생했습니다.");
+              setIsLoading(false);
+            } else if (resultData.status === '채점 완료') {
+              setIsLoading(false);
+              setError(null);
+            } else {
+              setIsLoading(true); // Still grading
+            }
         }
       } else {
-        // This case might happen if the doc is not created yet, or no results exist.
-        // It's better to show that it's still grading.
+        // This case might happen if the doc is not created yet.
+        // It's better to show that it's still processing.
         setIsLoading(true);
-        setCurrentStatus("채점 중");
+        setCurrentStatus("업로드 중");
         setCurrentProgress(0);
       }
     }, (err) => {
@@ -86,7 +88,7 @@ export default function AssessmentResultsPage() {
   }, [id, user, authLoading, router]);
 
   if (isLoading || authLoading) {
-    const { icon: Icon, text } = statusDetails[currentStatus] || statusDetails["채점 중"];
+    const { icon: Icon, text } = statusDetails[currentStatus] || statusDetails["업로드 중"];
     return (
       <Card className="flex flex-col items-center justify-center text-center p-8 h-80">
         <CardHeader>

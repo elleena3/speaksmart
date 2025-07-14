@@ -48,7 +48,6 @@ export type ConversationHistory = {
 }
 
 export type ResultStatus = 
-  | "채점 중" 
   | "채점 완료" 
   | "오류" 
   | "업로드 중"
