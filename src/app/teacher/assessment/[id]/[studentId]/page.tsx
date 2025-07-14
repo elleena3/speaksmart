@@ -9,11 +9,12 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Loader2, Paperclip, Download, User, Activity, BookText, FileText, Target, Mic } from "lucide-react"
 import { type TeacherAssessment, type StudentResult } from "@/lib/types";
-import { useLanguage } from "@/context/language-context";
 import { Progress } from "@/components/ui/progress";
 import { useAuth } from "@/context/auth-context";
 import { db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
+import jsPDF from "jspdf";
+import { Noto_Sans_KR } from "@/lib/fonts/noto-sans-kr";
 
 export default function StudentResultPage() {
   const params = useParams();
@@ -51,7 +52,6 @@ export default function StudentResultPage() {
                 if (assessmentSnap.exists()) {
                     setAssessment({ id: assessmentSnap.id, ...assessmentSnap.data() } as TeacherAssessment);
                 } else {
-                    // Handle case where assessment is deleted but result still exists
                     setAssessment({ id: resultData.assessmentId, title: resultData.assessmentTitle } as any);
                 }
             } catch (error) {
@@ -69,60 +69,53 @@ export default function StudentResultPage() {
   const handleDownloadReport = () => {
     if (!studentResult || !assessment) return;
 
-    const reportContent = `
-# 학생 답변 종합 리포트
+    const doc = new jsPDF();
 
-## 기본 정보
-- 학생 이름: ${studentResult.name}
-- 평가명: ${assessment.title}
-- 평가 유형: ${assessment.assessmentType === 'dialogue' ? 'AI와 대화하기' : '혼자 말하기'}
-- 평가 날짜: ${studentResult.date}
+    // Add Korean font
+    doc.addFileToVFS("NotoSansKR-Regular.ttf", Noto_Sans_KR);
+    doc.addFont("NotoSansKR-Regular.ttf", "NotoSansKR", "normal");
+    doc.setFont("NotoSansKR");
 
----
+    const margin = 15;
+    let y = 20;
 
-## 종합 점수
-- 내용 점수: ${studentResult.score}%
-- 발음 점수: ${studentResult.pronunciationScore}%
+    const addWrappedText = (text: string, options: { x?: number, y: number, maxWidth: number, lineHeight?: number, style?: 'normal' | 'bold' }) => {
+        const { x = margin, maxWidth, lineHeight = 1.6, style = 'normal' } = options;
+        const lines = doc.splitTextToSize(text, maxWidth);
+        doc.setFont('NotoSansKR', style);
+        doc.text(lines, x, y);
+        y += (lines.length * doc.getLineHeight() * 0.35) * lineHeight;
+    };
+    
+    doc.setFontSize(22);
+    addWrappedText('학생 답변 종합 리포트', { y, maxWidth: 180, style: 'bold' });
+    y += 5;
 
----
+    doc.setDrawColor(200, 200, 200);
+    doc.line(margin, y, 210 - margin, y);
+    y += 10;
+    
+    doc.setFontSize(12);
 
-## AI 피드백: 학생에게
-${studentResult.aiFeedback}
-
----
-
-## 발음 분석
-${studentResult.pronunciationFeedback}
-
----
-
-## 전체 ${assessment.assessmentType === 'dialogue' ? '대화' : '답변'} 기록
-${studentResult.studentTranscript}
-
----
-
-## 교과과정 비고 초안 (생활기록부용)
-${studentResult.curricularRemarks}
-
----
-
-## 선생님을 위한 조언
-${studentResult.teacherGuidance}
-
----
-
-## 학생 피드백 요약
-${studentResult.studentFeedbackSummary}
-`;
-    const blob = new Blob([reportContent.trim()], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${studentResult.name}_${assessment.title}_리포트.txt`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    const addSection = (title: string, content: string | null | undefined) => {
+        if (!content) return;
+        doc.setFontSize(16);
+        addWrappedText(title, { y, maxWidth: 180, style: 'bold' });
+        doc.setFontSize(11);
+        addWrappedText(content, { y, maxWidth: 180 });
+        y += 5;
+    };
+    
+    addSection('기본 정보', `학생 이름: ${studentResult.name}\n평가명: ${assessment.title}\n평가 유형: ${assessment.assessmentType === 'dialogue' ? 'AI와 대화하기' : '혼자 말하기'}\n평가 날짜: ${studentResult.date}`);
+    addSection('종합 점수', `내용 점수: ${studentResult.score}%\n발음 점수: ${studentResult.pronunciationScore}%`);
+    addSection('AI 피드백: 학생에게', studentResult.aiFeedback);
+    addSection('발음 분석', studentResult.pronunciationFeedback);
+    addSection(`전체 ${assessment.assessmentType === 'dialogue' ? '대화' : '답변'} 기록`, studentResult.studentTranscript);
+    addSection('교과과정 비고 초안 (생활기록부용)', studentResult.curricularRemarks);
+    addSection('선생님을 위한 조언', studentResult.teacherGuidance);
+    addSection('학생 피드백 요약', studentResult.studentFeedbackSummary);
+    
+    doc.save(`${studentResult.name}_${assessment.title}_리포트.pdf`);
   };
   
   if (isLoading || authLoading) {
