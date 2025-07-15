@@ -28,7 +28,7 @@ export function FeedbackView({ result }: FeedbackViewProps) {
     assessmentTitle,
     aiFeedback,
     studentTranscript,
-    studentRecordingDataUri,
+    studentRecordingUrl,
     pronunciationScore,
     pronunciationFeedback
   } = result;
@@ -86,9 +86,9 @@ export function FeedbackView({ result }: FeedbackViewProps) {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-                {studentRecordingDataUri && (
+                {studentRecordingUrl && (
                     <div>
-                        <audio controls src={studentRecordingDataUri} className="w-full">
+                        <audio controls src={studentRecordingUrl} className="w-full">
                             Your browser does not support the audio element.
                         </audio>
                     </div>

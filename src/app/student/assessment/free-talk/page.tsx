@@ -4,7 +4,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { FreeTalkView } from "./free-talk-view"
 import { useSearchParams, useRouter, notFound } from "next/navigation"
-import { type Scenario, type TeacherAssessment } from "@/lib/types"
+import { type TeacherAssessment } from "@/lib/types"
 import { useEffect, useState } from "react"
 import { useAuth } from "@/context/auth-context"
 import { doc, getDoc } from "firebase/firestore"
@@ -15,7 +15,7 @@ export default function FreeTalkPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [details, setDetails] = useState<TeacherAssessment | null>(null);
+  const [assessment, setAssessment] = useState<TeacherAssessment | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const assessmentId = searchParams.get('id');
@@ -33,19 +33,20 @@ export default function FreeTalkPage() {
             const docSnap = await getDoc(docRef);
 
             if (docSnap.exists()) {
-                setDetails({ id: docSnap.id, ...docSnap.data() } as TeacherAssessment);
+                setAssessment({ id: docSnap.id, ...docSnap.data() } as TeacherAssessment);
             } else {
                 notFound();
             }
         } else {
             // This is a generic free-talk practice, not tied to a specific assessment
-            setDetails({
+            setAssessment({
                 id: "free-talk-practice",
                 uid: "system",
                 title: "자유 대화 연습",
                 prompt: "AI와 자유롭게 영어로 대화해 보세요. 이 대화는 저장되지 않습니다.",
                 assessmentType: "dialogue",
-                scenario: "free-talk"
+                scenario: "free-talk",
+                expectedFormat: "자연스러운 대화 능력 평가"
             } as any);
         }
         setIsLoading(false);
@@ -60,7 +61,7 @@ export default function FreeTalkPage() {
     return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin"/></div>; 
   }
 
-  if (!details) {
+  if (!assessment) {
     notFound();
     return null;
   }
@@ -69,14 +70,12 @@ export default function FreeTalkPage() {
     <div className="max-w-3xl mx-auto">
       <Card>
         <CardHeader>
-          <CardTitle className="text-2xl">{details.title}</CardTitle>
-          <CardDescription>{details.prompt}</CardDescription>
+          <CardTitle className="text-2xl">{assessment.title}</CardTitle>
+          <CardDescription>{assessment.prompt}</CardDescription>
         </CardHeader>
         <CardContent>
           <FreeTalkView 
-            scenario={details.scenario!} 
-            scenarioPrompt={details.prompt} 
-            assessment={details} 
+            assessment={assessment} 
           />
         </CardContent>
       </Card>

@@ -35,9 +35,9 @@ export async function generateMonologueAnalysis(
 const transcriptionPrompt = ai.definePrompt({
     name: 'transcribeAudioPrompt',
     model: googleAI.model('gemini-2.0-flash'),
-    input: { schema: z.object({ audioDataUri: z.string() }) },
+    input: { schema: z.object({ studentRecordingUrl: z.string() }) },
     prompt: `Transcribe this English audio.
-Audio: {{media url=audioDataUri contentType='audio/webm;codecs=opus'}}
+Audio: {{media url=studentRecordingUrl}}
 `,
 });
 
@@ -76,13 +76,13 @@ const pronunciationAnalysisPrompt = ai.definePrompt({
     name: 'monologuePronunciationAnalysisPrompt',
     model: googleAI.model('gemini-2.0-flash'),
     input: { schema: z.object({
-        studentRecordingDataUri: z.string(),
+        studentRecordingUrl: z.string(),
         studentTranscript: z.string(),
     }) },
     output: { schema: PronunciationAnalysisOutputSchema },
     prompt: `You are an expert English pronunciation coach. Your task is to evaluate a student's spoken English based on their audio recording and the corresponding transcript. Provide all feedback in Korean.
 
-- Student's Audio Recording: {{media url=studentRecordingDataUri contentType='audio/webm;codecs=opus'}}
+- Student's Audio Recording: {{media url=studentRecordingUrl}}
 - AI-generated Transcript: {{{studentTranscript}}}
 
 Please perform the following steps:
@@ -104,7 +104,7 @@ const generateMonologueAnalysisFlow = ai.defineFlow(
   async (input) => {
     
     // Step 1: Transcribe the audio.
-    const transcriptionResult = await transcriptionPrompt({ audioDataUri: input.studentRecordingDataUri });
+    const transcriptionResult = await transcriptionPrompt({ studentRecordingUrl: input.studentRecordingUrl });
     const studentTranscript = transcriptionResult.text;
 
     if (!studentTranscript || studentTranscript.trim() === "" || studentTranscript.includes('기록되지 않았습니다') || studentTranscript.includes('인식하지 못했습니다')) {
@@ -129,7 +129,7 @@ const generateMonologueAnalysisFlow = ai.defineFlow(
         assessmentTitle: input.assessmentTitle,
       }),
       pronunciationAnalysisPrompt({
-        studentRecordingDataUri: input.studentRecordingDataUri,
+        studentRecordingUrl: input.studentRecordingUrl,
         studentTranscript,
       })
     ]);

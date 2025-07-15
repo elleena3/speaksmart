@@ -63,8 +63,8 @@ export const CombinedAnalysisOutputSchema = z.object({
 
 // Schemas for the MONOLOGUE analysis flow
 export const GenerateMonologueAnalysisInputSchema = z.object({
-  studentRecordingDataUri: z.string().describe(
-    "The student's voice recording as a data URI. Expected format: 'data:<mimetype>;base64,<encoded_data>'"
+  studentRecordingUrl: z.string().describe(
+    "A direct download URL to the student's voice recording."
   ),
   activityPrompt: z.string().describe('The prompt or instructions for the speaking activity.'),
   expectedFormat: z.string().describe('The expected format or key points of the response for grading.'),
@@ -76,7 +76,7 @@ export type GenerateMonologueAnalysisInput = z.infer<typeof GenerateMonologueAna
 
 // Schemas for the DIALOGUE analysis flow
 export const GenerateDialogueAnalysisInputSchema = z.object({
-  studentRecordingDataUri: z.string().describe("The student's combined voice recording as a data URI."),
+  studentRecordingUrl: z.string().describe("A direct download URL to the student's combined voice recording."),
   studentTranscript: z.string().describe("The transcript of only the student's speech, used for pronunciation analysis."),
   fullConversationTranscript: z.string().describe("The full transcript of the conversation between the student and AI."),
   activityPrompt: z.string().describe('The prompt or instructions for the speaking activity.'),

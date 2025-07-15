@@ -65,13 +65,13 @@ const pronunciationAnalysisPrompt = ai.definePrompt({
     name: 'dialoguePronunciationAnalysisPrompt',
     model: googleAI.model('gemini-2.5-flash'),
     input: { schema: z.object({
-        studentRecordingDataUri: z.string(),
+        studentRecordingUrl: z.string(),
         studentTranscript: z.string(), // Note: This is only the student's part of the transcript
     }) },
     output: { schema: PronunciationAnalysisOutputSchema },
     prompt: `You are an expert English pronunciation coach. Your task is to evaluate a student's spoken English based on their combined audio recording from a conversation and the corresponding transcript of ONLY their speech. Provide all feedback in Korean.
 
-    - Student's Combined Audio Recording: {{media url=studentRecordingDataUri contentType='audio/webm;codecs=opus'}}
+    - Student's Combined Audio Recording: {{media url=studentRecordingUrl}}
     - Transcript of Student's Speech Only: {{{studentTranscript}}}
 
     Please perform the following steps:
@@ -92,7 +92,7 @@ const generateDialogueAnalysisFlow = ai.defineFlow(
   },
   async (input) => {
     
-    // In this flow, transcription is already done. We receive the transcript and audio URI.
+    // In this flow, transcription is already done. We receive the transcript and audio URL.
     if (!input.studentTranscript || !input.fullConversationTranscript) {
         return {
             studentTranscript: input.fullConversationTranscript || '전체 대화 기록이 없습니다.',
@@ -115,7 +115,7 @@ const generateDialogueAnalysisFlow = ai.defineFlow(
         assessmentTitle: input.assessmentTitle,
       }),
       pronunciationAnalysisPrompt({
-        studentRecordingDataUri: input.studentRecordingDataUri,
+        studentRecordingUrl: input.studentRecordingUrl,
         studentTranscript: input.studentTranscript, // Use student-only transcript for pronunciation
       })
     ]);

@@ -8,9 +8,8 @@ import { type StudentResult, type ResultStatus, type TeacherAssessment } from "@
 import { useAuth } from "@/context/auth-context";
 import { Loader2, AlertTriangle, CheckCircle2, UploadCloud, AudioLines, FileScan, Sparkles } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { db, storage } from "@/lib/firebase";
-import { collection, query, where, onSnapshot, doc, setDoc, updateDoc, getDocs } from "firebase/firestore";
-import { ref, uploadString, getDownloadURL } from "firebase/storage";
+import { db } from "@/lib/firebase";
+import { collection, query, where, onSnapshot, doc, setDoc, updateDoc, getDocs, serverTimestamp } from "firebase/firestore";
 import { generateMonologueAnalysis } from "@/ai/flows/generate-monologue-analysis-flow";
 import { useToast } from "@/hooks/use-toast";
 
@@ -83,10 +82,10 @@ export default function AssessmentResultsPage() {
   const { toast } = useToast();
 
   const processMonologueSubmission = useCallback(async () => {
-    const newSubmissionRaw = sessionStorage.getItem(SESSION_STORAGE_KEY);
-    if (!newSubmissionRaw || !user) return;
+    const sessionDataRaw = sessionStorage.getItem(SESSION_STORAGE_KEY);
+    if (!sessionDataRaw || !user) return;
     
-    const { assessmentId, studentRecordingDataUri, assessmentDetails } = JSON.parse(newSubmissionRaw) as { assessmentId: string, studentRecordingDataUri: string, assessmentDetails: TeacherAssessment };
+    const { assessmentId, studentRecordingUrl, assessmentDetails } = JSON.parse(sessionDataRaw) as { assessmentId: string, studentRecordingUrl: string, assessmentDetails: TeacherAssessment };
     
     if (assessmentId !== id) {
         sessionStorage.removeItem(SESSION_STORAGE_KEY);
@@ -96,7 +95,7 @@ export default function AssessmentResultsPage() {
     let newResultRef = doc(collection(db, "results"));
     
     try {
-        setAnalysisStep("upload");
+        setAnalysisStep("upload"); // This is now a logical step, file is already uploaded
         const initialData: Partial<StudentResult> = {
             studentId: user.uid,
             assessmentId: assessmentDetails.id,
@@ -106,19 +105,15 @@ export default function AssessmentResultsPage() {
             avatarUrl: user.photoURL || '',
             createdAt: Date.now(),
             date: new Date().toISOString(),
-            status: "파일 업로드 중...",
+            status: "텍스트 변환 중",
+            studentRecordingUrl: studentRecordingUrl,
         };
         await setDoc(newResultRef, initialData, { merge: true });
 
-        const storageRef = ref(storage, `recordings/${user.uid}_${assessmentDetails.id}_${Date.now()}.webm`);
-        await uploadString(storageRef, studentRecordingDataUri, 'data_url');
-        const downloadURL = await getDownloadURL(storageRef);
-
-        await updateDoc(newResultRef, { status: "텍스트 변환 중" });
         setAnalysisStep("transcribe");
         
         const analysisResult = await generateMonologueAnalysis({
-            studentRecordingDataUri: studentRecordingDataUri,
+            studentRecordingUrl: studentRecordingUrl,
             activityPrompt: assessmentDetails.prompt,
             expectedFormat: assessmentDetails.expectedFormat || "",
             studentName: user.displayName || "Student",
@@ -134,7 +129,6 @@ export default function AssessmentResultsPage() {
         const finalResultData: Partial<StudentResult> = {
             ...analysisResult,
             score: analysisResult.contentScore,
-            studentRecordingDataUri: downloadURL,
             status: '채점 완료',
         };
         await updateDoc(newResultRef, finalResultData);
@@ -170,7 +164,7 @@ export default function AssessmentResultsPage() {
   useEffect(() => {
     if (authLoading || !user || !id) return;
     
-    const mockData = sessionStorage.getItem(SESSION_STORAGE_KEY);
+    const sessionData = sessionStorage.getItem(SESSION_STORAGE_KEY);
     
     const q = query(
         collection(db, "results"),
@@ -180,6 +174,7 @@ export default function AssessmentResultsPage() {
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
         if (!snapshot.empty) {
+            // Find the most recent result for this assessment
             const docToProcess = snapshot.docs.sort((a,b) => (b.data().createdAt || 0) - (a.data().createdAt || 0))[0];
             const data = { id: docToProcess.id, ...docToProcess.data() } as StudentResult;
             
@@ -189,12 +184,15 @@ export default function AssessmentResultsPage() {
             if (data.status === '채점 완료' || data.status === '오류') {
                 setIsLoading(false);
             } else {
+                // If it's still processing, keep showing the progress
                 setIsLoading(true); 
             }
-        } else if (mockData) {
+        } else if (sessionData) {
+            // If no result exists in DB but we have session data, it's a new submission
             setIsLoading(true); 
             processMonologueSubmission();
         } else {
+            // No result and no session data, so nothing to show
             setIsLoading(false);
         }
     }, (err) => {

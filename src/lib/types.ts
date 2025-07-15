@@ -74,7 +74,7 @@ export type StudentResult = {
   studentFeedbackSummary: string;
   teacherGuidance: string;
   studentTranscript?: string;
-  studentRecordingDataUri?: string;
+  studentRecordingUrl?: string; // Changed from DataUri to URL
   pronunciationScore?: number;
   pronunciationFeedback?: string;
   teacherUid: string; // To query results by teacher

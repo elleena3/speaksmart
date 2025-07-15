@@ -9,13 +9,17 @@ import { useToast } from "@/hooks/use-toast"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { converseWithStudent } from "@/ai/flows/text-to-speech"
 import { type ConversationTurn } from "@/lib/types/ai-schemas";
-import { type Scenario, type TeacherAssessment } from "@/lib/types";
+import { type TeacherAssessment } from "@/lib/types";
+import { storage } from "@/lib/firebase"
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
+import { useAuth } from "@/context/auth-context"
 
 const SESSION_STORAGE_KEY = 'freeTalkSessionData';
 const mimeType = 'audio/webm;codecs=opus';
 
-export function FreeTalkView({ scenario, scenarioPrompt, assessment }: { scenario: Scenario, scenarioPrompt?: string, assessment: TeacherAssessment }) {
-  const [sessionState, setSessionState] = useState<"idle" | "initializing" | "recording" | "processing" | "speaking" | "waiting_for_user">("idle");
+export function FreeTalkView({ assessment }: { assessment: TeacherAssessment }) {
+  const { user } = useAuth();
+  const [sessionState, setSessionState] = useState<"idle" | "initializing" | "recording" | "processing" | "speaking" | "waiting_for_user" | "submitting">("idle");
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
   const [interimTranscript, setInterimTranscript] = useState<string | null>(null);
   
@@ -74,8 +78,8 @@ export function FreeTalkView({ scenario, scenarioPrompt, assessment }: { scenari
       const { aiResponseText, aiResponseAudioDataUri } = await converseWithStudent({
         studentRecordingDataUri: null,
         conversationHistory: [],
-        scenario: scenario,
-        scenarioPrompt: scenarioPrompt,
+        scenario: assessment.scenario,
+        scenarioPrompt: assessment.prompt,
       });
 
       const initialTurn: ConversationTurn = { role: 'model', text: aiResponseText };
@@ -181,8 +185,8 @@ export function FreeTalkView({ scenario, scenarioPrompt, assessment }: { scenari
       const { studentTranscript, aiResponseText, aiResponseAudioDataUri } = await converseWithStudent({
         studentRecordingDataUri,
         conversationHistory: conversation,
-        scenario: scenario,
-        scenarioPrompt: scenarioPrompt,
+        scenario: assessment.scenario,
+        scenarioPrompt: assessment.prompt,
       });
       
       setInterimTranscript(null);
@@ -211,30 +215,34 @@ export function FreeTalkView({ scenario, scenarioPrompt, assessment }: { scenari
     }
   };
 
-  const handleFinishSession = () => {
-    // Combine all student audio blobs into one blob
-    if (studentAudioBlobsRef.current.length === 0) {
-        toast({
-            title: "저장할 음성 없음",
-            description: "대화를 먼저 진행해주세요.",
-            variant: "destructive"
-        });
+  const handleFinishSession = async () => {
+    if (studentAudioBlobsRef.current.length === 0 || !user) {
+        toast({ title: "저장할 음성 없음", description: "대화를 먼저 진행해주세요.", variant: "destructive"});
         return;
     }
-    const combinedBlob = new Blob(studentAudioBlobsRef.current, { type: mimeType });
-    const reader = new FileReader();
-    reader.readAsDataURL(combinedBlob);
-    reader.onloadend = () => {
-        const studentRecordingDataUri = reader.result as string;
+    setSessionState("submitting");
+    
+    try {
+        const combinedBlob = new Blob(studentAudioBlobsRef.current, { type: mimeType });
         
-        sessionStorage.setItem('freeTalkSessionData', JSON.stringify({ 
-            studentRecordingDataUri: studentRecordingDataUri,
+        toast({ title: "대화 내용 업로드 중...", description: "결과 분석을 위해 파일을 업로드하고 있습니다." });
+        
+        const storageRef = ref(storage, `recordings/${user.uid}_${assessment.id}_${Date.now()}.webm`);
+        const snapshot = await uploadBytes(storageRef, combinedBlob);
+        const downloadURL = await getDownloadURL(snapshot.ref);
+
+        sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({ 
+            studentRecordingUrl: downloadURL,
             conversationHistory: conversation,
             assessment: assessment,
         }));
         
         router.push(`/student/assessment/free-talk/results`);
-    };
+    } catch (error) {
+        console.error("Error finalizing session:", error);
+        toast({ title: "종료 오류", description: "대화를 종료하고 저장하는 중 오류가 발생했습니다.", variant: "destructive"});
+        setSessionState("waiting_for_user");
+    }
   }
 
   const getButtonState = () => {
@@ -247,10 +255,11 @@ export function FreeTalkView({ scenario, scenarioPrompt, assessment }: { scenari
           </Button>
         );
       case "initializing":
+      case "submitting":
         return (
           <Button size="lg" disabled className="w-full">
             <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-            AI 준비 중...
+            {sessionState === "initializing" ? "AI 준비 중..." : "제출 중..."}
           </Button>
         );
       case "recording":
@@ -285,7 +294,7 @@ export function FreeTalkView({ scenario, scenarioPrompt, assessment }: { scenari
   };
 
   const getFooterButtonState = () => {
-    const isBusy = ["recording", "processing", "initializing", "speaking"].includes(sessionState);
+    const isBusy = ["recording", "processing", "initializing", "speaking", "submitting"].includes(sessionState);
     switch(sessionState) {
         case "idle":
             return (
@@ -315,10 +324,12 @@ export function FreeTalkView({ scenario, scenarioPrompt, assessment }: { scenari
                   <p className="text-sm">준비가 되면 아래 '대화 시작' 버튼을 눌러주세요.</p>
               </div>
             )}
-            {sessionState === "initializing" && (
+            {["initializing", "submitting"].includes(sessionState) && (
               <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground pt-12">
                   <Loader2 className="h-12 w-12 mb-4 animate-spin"/>
-                  <p className="font-semibold">AI 대화 파트너 "Alex"를 연결하는 중입니다...</p>
+                  <p className="font-semibold">
+                    {sessionState === 'initializing' ? 'AI 대화 파트너 "Alex"를 연결하는 중입니다...' : '대화 내용을 저장하고 분석 페이지로 이동합니다...'}
+                  </p>
                   <p className="text-sm">잠시만 기다려주세요.</p>
               </div>
             )}
@@ -359,7 +370,7 @@ export function FreeTalkView({ scenario, scenarioPrompt, assessment }: { scenari
             </div>
             {getFooterButtonState()}
         </div>
-        {sessionState !== 'idle' && sessionState !== 'initializing' && (
+        {sessionState !== 'idle' && sessionState !== 'initializing' && sessionState !== 'submitting' && (
             <p className="text-xs text-center text-muted-foreground">
                 AI의 응답이 끝나면 <strong className="text-foreground">[응답하기]</strong> 버튼을 누르고 말씀하세요. 발언이 끝나면 <strong className="text-foreground">[말하기 중지]</strong> 버튼을 누릅니다.
                  <br/>

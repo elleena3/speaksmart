@@ -6,28 +6,25 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Loader2, AlertTriangle, UploadCloud, AudioLines, FileScan, Sparkles, CheckCircle2 } from "lucide-react";
 import { generateDialogueAnalysis } from "@/ai/flows/generate-dialogue-analysis-flow";
-import { type StudentResult, type TeacherAssessment, type ConversationTurn } from "@/lib/types";
+import { type StudentResult, type TeacherAssessment, type ConversationTurn, type ResultStatus } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { FeedbackView } from "../../../assessment/[id]/results/feedback-view";
 import { useAuth } from "@/context/auth-context";
-import { db, storage } from "@/lib/firebase";
+import { db } from "@/lib/firebase";
 import { collection, doc, query, where, getDocs, setDoc, updateDoc } from "firebase/firestore";
-import { ref, uploadString, getDownloadURL } from "firebase/storage";
 import { Card, CardHeader, CardContent, CardDescription, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 
 const SESSION_STORAGE_KEY = 'freeTalkSessionData';
 
 type StoredSessionData = {
-    studentRecordingDataUri: string;
+    studentRecordingUrl: string;
     conversationHistory: ConversationTurn[];
     assessment: TeacherAssessment;
 }
 
-type AnalysisStep = "upload" | "transcribe" | "analyze" | "report";
+type AnalysisStep = "upload" | "analyze" | "report";
 const analysisSteps: { key: AnalysisStep, text: string, icon: React.FC<any> }[] = [
-    { key: "upload", text: "음성 파일 업로드", icon: UploadCloud },
-    { key: "transcribe", text: "대화 내용 변환 및 정리", icon: AudioLines },
+    { key: "upload", text: "대화 내용 업로드", icon: UploadCloud },
     { key: "analyze", text: "내용 및 발음 분석", icon: FileScan },
     { key: "report", text: "피드백 리포트 생성", icon: Sparkles },
 ];
@@ -92,7 +89,16 @@ export function FreeTalkFeedbackView() {
         let newResultRef: any; 
 
         try {
-            const { assessment, studentRecordingDataUri, conversationHistory } = sessionData;
+            const { assessment, studentRecordingUrl, conversationHistory } = sessionData;
+            
+            // For practice sessions, we don't save to DB.
+            if (assessment.id === 'free-talk-practice') {
+                toast({ title: "연습 모드에서는 결과가 저장되지 않습니다." });
+                // We could show a temporary result here if needed, then route away.
+                // For now, let's just route to dashboard.
+                router.push('/student/dashboard');
+                return;
+            }
 
             const resultsQuery = query(collection(db, "results"), where("assessmentId", "==", assessment.id), where("studentId", "==", user.uid));
             const existingDocs = await getDocs(resultsQuery);
@@ -100,7 +106,8 @@ export function FreeTalkFeedbackView() {
             newResultRef = !existingDocs.empty 
                 ? existingDocs.docs.sort((a,b) => (b.data().createdAt || 0) - (a.data().createdAt || 0))[0].ref
                 : doc(collection(db, "results"));
-
+            
+            setAnalysisStep("upload"); // Logical step
             const initialData: Partial<StudentResult> = {
                 studentId: user.uid,
                 assessmentId: assessment.id,
@@ -111,16 +118,10 @@ export function FreeTalkFeedbackView() {
                 createdAt: Date.now(),
                 date: new Date().toISOString(),
                 status: "분석 중",
+                studentRecordingUrl: studentRecordingUrl,
             };
             await setDoc(newResultRef, initialData, { merge: true });
-
-            setAnalysisStep("upload");
-            const audioFileName = `recordings/${user.uid}_${assessment.id}_${Date.now()}.weba`;
-            const storageRef = ref(storage, audioFileName);
-            await uploadString(storageRef, studentRecordingDataUri, 'data_url');
-            const downloadURL = await getDownloadURL(storageRef);
             
-            setAnalysisStep("transcribe");
             const fullConversationTranscript = conversationHistory
                 .map(turn => `${turn.role === 'user' ? '학생' : 'AI'}: ${turn.text}`)
                 .join('\n');
@@ -131,7 +132,7 @@ export function FreeTalkFeedbackView() {
 
             setAnalysisStep("analyze");
             const analysisResult = await generateDialogueAnalysis({
-                studentRecordingDataUri: studentRecordingDataUri,
+                studentRecordingUrl: studentRecordingUrl,
                 studentTranscript: studentOnlyTranscript,
                 fullConversationTranscript: fullConversationTranscript,
                 activityPrompt: assessment.prompt,
@@ -145,7 +146,6 @@ export function FreeTalkFeedbackView() {
                 ...analysisResult,
                 studentTranscript: fullConversationTranscript,
                 score: analysisResult.contentScore,
-                studentRecordingDataUri: downloadURL,
                 status: "채점 완료",
                 studentFeedbackSummary: "학생이 평가에 대해 남긴 피드백이 없습니다.",
             };
@@ -153,15 +153,13 @@ export function FreeTalkFeedbackView() {
             setResult({ id: newResultRef.id, ...initialData, ...finalResultData } as StudentResult);
             setStatus("채점 완료");
             
-            if(assessment.id !== 'free-talk-practice') {
-              const assessmentRef = doc(db, "assessments", assessment.id);
-              const allResultsQuery = query(collection(db, "results"), where("assessmentId", "==", assessment.id), where("status", "==", "채점 완료"));
-              const querySnapshot = await getDocs(allResultsQuery);
-              const scores = querySnapshot.docs.map(d => (d.data() as StudentResult).score || 0);
-              const newSubmissionCount = scores.length;
-              const newAverage = newSubmissionCount > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / newSubmissionCount) : 0;
-              await updateDoc(assessmentRef, { submissionCount: newSubmissionCount, averageScore: newAverage });
-            }
+            const assessmentRef = doc(db, "assessments", assessment.id);
+            const allResultsQuery = query(collection(db, "results"), where("assessmentId", "==", assessment.id), where("status", "==", "채점 완료"));
+            const querySnapshot = await getDocs(allResultsQuery);
+            const scores = querySnapshot.docs.map(d => (d.data() as StudentResult).score || 0);
+            const newSubmissionCount = scores.length;
+            const newAverage = newSubmissionCount > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / newSubmissionCount) : 0;
+            await updateDoc(assessmentRef, { submissionCount: newSubmissionCount, averageScore: newAverage });
 
         } catch (e: any) {
             console.error("Error generating feedback:", e);
@@ -175,7 +173,7 @@ export function FreeTalkFeedbackView() {
             setIsLoading(false);
             sessionStorage.removeItem(SESSION_STORAGE_KEY);
         }
-    }, [user, toast]);
+    }, [user, toast, router]);
 
     useEffect(() => {
         if(authLoading) return;

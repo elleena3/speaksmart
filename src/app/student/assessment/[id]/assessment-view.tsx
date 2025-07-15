@@ -9,6 +9,8 @@ import { useToast } from "@/hooks/use-toast"
 import { type TeacherAssessment } from "@/lib/types"
 import { useAuth } from "@/context/auth-context"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { storage } from "@/lib/firebase"
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
 
 type RecordingState = "idle" | "countdown" | "recording" | "recorded" | "submitting";
 
@@ -180,24 +182,25 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
 
     try {
         toast({
-            title: "제출 중...",
-            description: "답변을 서버로 전송하고 AI 분석을 시작합니다.",
+            title: "답변 업로드 중...",
+            description: "파일을 업로드하고 분석 페이지로 이동합니다.",
         });
 
-        const reader = new FileReader();
-        reader.readAsDataURL(audioBlob);
-        reader.onloadend = () => {
-            sessionStorage.setItem('monologueSessionData', JSON.stringify({
-                assessmentId: assessmentDetails.id,
-                studentRecordingDataUri: reader.result as string,
-                assessmentDetails: assessmentDetails, 
-            }));
-            router.push(`/student/assessment/${assessmentDetails.id}/results`);
-        };
+        const storageRef = ref(storage, `recordings/${user.uid}_${assessmentDetails.id}_${Date.now()}.webm`);
+        const snapshot = await uploadBytes(storageRef, audioBlob);
+        const downloadURL = await getDownloadURL(snapshot.ref);
+
+        sessionStorage.setItem('monologueSessionData', JSON.stringify({
+            assessmentId: assessmentDetails.id,
+            studentRecordingUrl: downloadURL,
+            assessmentDetails: assessmentDetails, 
+        }));
+
+        router.push(`/student/assessment/${assessmentDetails.id}/results`);
 
     } catch (error) {
-        console.error("Error preparing for submission:", error);
-        toast({ title: "제출 준비 오류", description: "답변을 제출하는 중 오류가 발생했습니다.", variant: "destructive" });
+        console.error("Error submitting audio:", error);
+        toast({ title: "제출 오류", description: "답변을 업로드하는 중 오류가 발생했습니다.", variant: "destructive" });
         setRecordingState("recorded"); // Allow user to try again
     }
   }
@@ -331,7 +334,7 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
         <div className="w-full max-w-xs">
             <Button size="lg" disabled className="w-full">
                 <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                제출 중...
+                업로드 중...
             </Button>
         </div>
         <p className="text-sm text-muted-foreground">답변을 서버로 전송하고 있습니다.</p>
