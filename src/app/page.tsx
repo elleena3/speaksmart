@@ -3,18 +3,20 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Globe, GraduationCap, User, Loader2, Upload, FileText, Link as LinkIcon, Download } from "lucide-react";
+import { Globe, GraduationCap, User, Loader2, Upload, FileText, Link as LinkIcon, Download, Target, Mic } from "lucide-react";
 import { Logo } from "@/components/icons";
 import { useLanguage } from "@/context/language-context";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { transcribeFile } from "@/ai/flows/transcribe-file";
+import { analyzePronunciation, type PronunciationAnalysisOutput } from "@/ai/flows/analyze-pronunciation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Progress } from "@/components/ui/progress";
 
 
 function FileTranscriber() {
@@ -180,6 +182,94 @@ function UrlTranscriber() {
   );
 }
 
+function PronunciationAnalyzer() {
+  const [file, setFile] = useState<File | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<PronunciationAnalysisOutput | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
+  const { toast } = useToast();
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = event.target.files?.[0];
+    if (selectedFile) {
+      if (selectedFile.type.startsWith('audio/webm') || selectedFile.name.endsWith('.webm')) {
+        setFile(selectedFile);
+        setAnalysisResult(null);
+      } else {
+        toast({
+          title: "잘못된 파일 형식",
+          description: ".webm 파일만 업로드할 수 있습니다.",
+          variant: "destructive",
+        });
+      }
+    }
+  };
+
+  const handleAnalyze = async () => {
+    if (!file) {
+      toast({ title: "파일 없음", description: "먼저 webm 파일을 선택해주세요.", variant: "destructive" });
+      return;
+    }
+
+    setIsAnalyzing(true);
+    setAnalysisResult(null);
+
+    try {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onloadend = async () => {
+        const base64Audio = reader.result as string;
+        const result = await analyzePronunciation(base64Audio);
+        setAnalysisResult(result);
+      };
+      reader.onerror = (error) => {
+        console.error("File reading error:", error);
+        toast({ title: "파일 읽기 오류", description: "파일을 읽는 중 문제가 발생했습니다.", variant: "destructive" });
+      }
+    } catch (error: any) {
+      console.error("Pronunciation analysis error:", error);
+      toast({ title: "발음 분석 오류", description: error.message || "AI 분석 중 오류가 발생했습니다.", variant: "destructive" });
+      setAnalysisResult({
+        pronunciationScore: 0,
+        pronunciationFeedback: `오류가 발생했습니다: ${error.message}`
+      });
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  return (
+    <CardContent className="space-y-4 pt-6">
+      <div className="grid gap-2">
+        <label htmlFor="pronunciation-file-upload" className="text-sm font-medium">오디오 파일</label>
+        <Input id="pronunciation-file-upload" type="file" accept="audio/webm" onChange={handleFileChange} />
+        {file && <p className="text-sm text-muted-foreground">선택된 파일: {file.name}</p>}
+      </div>
+      <Button onClick={handleAnalyze} disabled={isAnalyzing || !file} className="w-full">
+        {isAnalyzing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mic className="mr-2 h-4 w-4" />}
+        {isAnalyzing ? "분석 중..." : "발음 분석"}
+      </Button>
+      {analysisResult && (
+        <div className="space-y-4">
+          <div className="grid gap-2">
+            <label className="text-sm font-medium">분석 결과</label>
+            <div className="w-full">
+              <div className="flex justify-between mb-1">
+                <span className="text-base font-medium text-primary">발음 점수</span>
+                <span className="text-sm font-medium text-primary">{analysisResult.pronunciationScore}%</span>
+              </div>
+              <Progress value={analysisResult.pronunciationScore} className="h-2" />
+            </div>
+          </div>
+          <div className="grid gap-2">
+            <label htmlFor="pronunciation-feedback" className="text-sm font-medium">상세 피드백</label>
+            <Textarea id="pronunciation-feedback" readOnly value={analysisResult.pronunciationFeedback} rows={6} />
+          </div>
+        </div>
+      )}
+    </CardContent>
+  );
+}
+
 
 export default function Home() {
   const { language, setLanguage, t } = useLanguage();
@@ -272,10 +362,10 @@ export default function Home() {
         </Button>
       </div>
 
-      <div className="w-full max-w-xl pt-8">
+      <div className="w-full max-w-xl pt-8 grid grid-cols-1 gap-8">
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2"><FileText className="h-6 w-6"/> WebM 파일 분석 도구</CardTitle>
+            <CardTitle className="flex items-center gap-2"><FileText className="h-6 w-6"/> WebM 음성-텍스트 변환 도구</CardTitle>
             <CardDescription>
               로컬 WebM 오디오 파일을 업로드하거나 파일 URL을 입력하여 음성-텍스트 변환(STT) 결과를 테스트합니다.
             </CardDescription>
@@ -299,6 +389,16 @@ export default function Home() {
             </TabsContent>
           </Tabs>
         </Card>
+
+        <Card>
+          <CardHeader>
+              <CardTitle className="flex items-center gap-2"><Target className="h-6 w-6"/> 영어 발음 분석 도구</CardTitle>
+              <CardDescription>
+                WebM 오디오 파일을 업로드하여 발음, 억양, 유창성에 대한 AI 피드백과 점수를 받아보세요.
+              </CardDescription>
+          </CardHeader>
+          <PronunciationAnalyzer />
+        </Card>
       </div>
       
       <footer className="mt-8 text-center text-muted-foreground text-sm">
@@ -307,5 +407,3 @@ export default function Home() {
     </main>
   );
 }
-
-    
