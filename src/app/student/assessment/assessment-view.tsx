@@ -6,10 +6,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Mic, StopCircle, Loader2, Timer, Send, RefreshCw } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { collection, doc, runTransaction, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
-import { ref, uploadString, getDownloadURL } from "firebase/storage";
-import { db, storage } from "@/lib/firebase";
-import { type TeacherAssessment, type StudentResult } from "@/lib/types"
+import { type TeacherAssessment } from "@/lib/types"
 import { useAuth } from "@/context/auth-context"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
@@ -153,31 +150,14 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
     try {
         toast({
             title: "제출 중...",
-            description: "답변을 서버로 전송하고 있습니다.",
+            description: "답변을 서버로 전송하고 AI 분석을 시작합니다.",
         });
         
-        // This is a local mock submission for now.
-        // It saves the data to session storage for the results page to pick up.
-        // In a real implementation, we would upload to a server.
+        // The results page will now handle the AI flow processing.
+        // We just pass the necessary data via session storage.
         const reader = new FileReader();
         reader.readAsDataURL(audioBlob);
         reader.onloadend = async () => {
-            // Increment submission count in a transaction
-            const assessmentRef = doc(db, "assessments", assessmentDetails.id);
-            try {
-                await runTransaction(db, async (transaction) => {
-                    const assessmentDoc = await transaction.get(assessmentRef);
-                    if (!assessmentDoc.exists()) {
-                        throw "Assessment does not exist!";
-                    }
-                    const newCount = (assessmentDoc.data().submissionCount || 0) + 1;
-                    transaction.update(assessmentRef, { submissionCount: newCount });
-                });
-            } catch (e) {
-                console.error("Transaction failed: ", e);
-                // Continue even if transaction fails, as it's not critical for submission
-            }
-
             sessionStorage.setItem('mockResult', JSON.stringify({
                 assessmentId: assessmentDetails.id,
                 studentRecordingDataUri: reader.result as string,
@@ -244,7 +224,7 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
   const renderIdleState = () => (
     <>
         <div className="relative flex items-center justify-center w-32 h-32 rounded-full bg-background">
-            <Mic className={`h-16 w-16 text-primary transition-all`} />
+            <Mic className={'h-16 w-16 text-primary transition-all'} />
         </div>
         <div className="w-full max-w-xs">
             <Button size="lg" onClick={handleStartRecording} className="w-full">
@@ -259,7 +239,7 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
   const renderRecordingState = () => (
     <>
         <div className="relative flex items-center justify-center w-32 h-32 rounded-full bg-background">
-            <Mic className={`h-16 w-16 text-primary transition-all scale-110`} />
+            <Mic className={'h-16 w-16 text-primary transition-all scale-110'} />
             <div className="absolute inset-0 rounded-full bg-destructive/20 animate-pulse"></div>
         </div>
         <div className="w-full max-w-xs">
@@ -301,7 +281,7 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
   const renderSubmittingState = () => (
     <>
         <div className="relative flex items-center justify-center w-32 h-32 rounded-full bg-background">
-            <Loader2 className={`h-16 w-16 text-primary transition-all animate-spin`} />
+            <Loader2 className={'h-16 w-16 text-primary transition-all animate-spin'} />
         </div>
         <div className="w-full max-w-xs">
             <Button size="lg" disabled className="w-full">

@@ -15,31 +15,8 @@ import { useToast } from "@/hooks/use-toast";
 
 const MOCK_SESSION_KEY = 'mockResult';
 
-
-// Server-side action cannot be here, needs to be callable from client.
-// This function updates the assessment's average score.
-async function updateAssessmentAverage(assessmentId: string, newScore: number) {
-    if (!assessmentId) return;
-    const assessmentRef = doc(db, "assessments", assessmentId);
-    try {
-        await runTransaction(db, async (transaction) => {
-            const assessmentDoc = await transaction.get(assessmentRef);
-            if (!assessmentDoc.exists()) {
-                throw new Error("Assessment does not exist!");
-            }
-            const data = assessmentDoc.data();
-            const currentTotalScore = (data.averageScore || 0) * (data.submissionCount -1);
-            const newAverage = (currentTotalScore + newScore) / data.submissionCount;
-            
-            transaction.update(assessmentRef, { averageScore: Math.round(newAverage) });
-        });
-    } catch (e) {
-        console.error("Failed to update average score:", e);
-        // This is a non-critical error, so we don't need to show it to the user.
-    }
-}
-
-
+// This function now only runs on the client to listen for existing results.
+// Result creation is handled entirely by the server-side flow.
 export default function AssessmentResultsPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -52,12 +29,14 @@ export default function AssessmentResultsPage() {
   const [progress, setProgress] = useState(10);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [newResultId, setNewResultId] = useState<string | null>(null);
 
   const handleProgressUpdate = useCallback((status: string, progress: number) => {
     setStatus(status as ResultStatus);
     setProgress(progress);
   }, []);
 
+  // This function now just triggers the AI flow and gets the new result ID back.
   const generateResultFromSubmission = useCallback(async () => {
     const newSubmissionRaw = sessionStorage.getItem(MOCK_SESSION_KEY);
     if (!newSubmissionRaw || !user) return;
@@ -70,74 +49,65 @@ export default function AssessmentResultsPage() {
     }
     
     try {
-        const analysisResult = await generateSpeakingAnalysis({
+        const { resultId } = await generateSpeakingAnalysis({
             studentRecordingDataUri,
             activityPrompt: assessmentDetails.prompt,
             expectedFormat: assessmentDetails.expectedFormat || "",
             studentName: user.displayName || "Student",
             assessmentTitle: assessmentDetails.title,
+            studentId: user.uid,
+            teacherUid: assessmentDetails.uid,
+            avatarUrl: user.photoURL || '',
         }, handleProgressUpdate);
         
-        const resultsCollectionRef = collection(db, "results");
-
-        const newResultData: Omit<StudentResult, 'id'> = {
-          ...analysisResult,
-          studentId: user.uid,
-          assessmentId: assessmentId,
-          assessmentTitle: assessmentDetails.title,
-          name: user.displayName || 'Student',
-          avatarUrl: user.photoURL || '',
-          status: '채점 완료' as ResultStatus,
-          score: analysisResult.contentScore,
-          date: new Date().toISOString(),
-          createdAt: Date.now(),
-          studentFeedbackSummary: "학생이 평가에 대해 남긴 피드백이 없습니다.",
-          teacherUid: assessmentDetails.uid,
-          studentRecordingDataUri,
-        };
-
-        const resultDocRef = await addDoc(resultsCollectionRef, newResultData);
-
-        // Update the assessment average score
-        await updateAssessmentAverage(assessmentId, newResultData.score);
+        // The flow returns the ID of the new document.
+        // We'll use this ID to listen for the result.
+        setNewResultId(resultId);
         
-        setResult({ ...newResultData, id: resultDocRef.id });
-        setStatus("채점 완료");
-        setProgress(100);
-
     } catch (e) {
       console.error("Error generating analysis:", e);
       setError("AI 분석 중 오류가 발생했습니다.");
       setStatus("오류");
+      setIsLoading(false);
     } finally {
+        // Clear session storage immediately after starting the flow.
         sessionStorage.removeItem(MOCK_SESSION_KEY);
-        setIsLoading(false);
     }
   }, [id, user, handleProgressUpdate]);
 
   useEffect(() => {
     if (authLoading || !user || !id) return;
     
-    if(id === 'free-talk') {
-        router.push('/student/assessment/free-talk/results');
-        return;
-    }
-
     if (sessionStorage.getItem(MOCK_SESSION_KEY)) {
         generateResultFromSubmission();
-        return;
+        return; // Wait for the newResultId to be set.
     }
 
-    const q = query(
-        collection(db, "results"),
-        where("assessmentId", "==", id),
-        where("studentId", "==", user.uid)
-    );
+    // Determine which result to listen to.
+    const resultQueryId = newResultId || (user ? id : null);
+    if (!resultQueryId) {
+        setIsLoading(false);
+        return;
+    }
+    
+    const q = newResultId 
+        ? doc(db, "results", newResultId)
+        : query(
+            collection(db, "results"),
+            where("assessmentId", "==", id),
+            where("studentId", "==", user.uid)
+        );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-        if (!snapshot.empty) {
-            const doc = snapshot.docs[0];
-            const data = { id: doc.id, ...doc.data() } as StudentResult;
+    const unsubscribe = onSnapshot(q as any, (snapshot) => {
+        let docToProcess: any = null;
+        if(newResultId) {
+            docToProcess = snapshot;
+        } else if (!snapshot.empty) {
+            docToProcess = snapshot.docs[0];
+        }
+
+        if (docToProcess && docToProcess.exists()) {
+            const data = { id: docToProcess.id, ...docToProcess.data() } as StudentResult;
             setResult(data);
             setStatus(data.status);
             setProgress(data.progress || 100);
@@ -145,7 +115,8 @@ export default function AssessmentResultsPage() {
             if(data.status === '채점 완료' || data.status === '오류'){
                 setIsLoading(false);
             }
-        } else {
+        } else if (!newResultId) {
+            // Only set to not loading if we are not waiting for a new result.
             setIsLoading(false); 
         }
     }, (err) => {
@@ -155,7 +126,7 @@ export default function AssessmentResultsPage() {
     });
 
     return () => unsubscribe();
-  }, [id, user, authLoading, router, generateResultFromSubmission]);
+  }, [id, user, authLoading, router, generateResultFromSubmission, newResultId]);
   
   if (isLoading || authLoading) {
     return (

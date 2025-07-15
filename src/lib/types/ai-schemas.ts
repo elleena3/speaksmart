@@ -41,6 +41,11 @@ export const GenerateSpeakingAnalysisInputSchema = z.object({
   expectedFormat: z.string().describe('The expected format or key points of the response for grading.'),
   studentName: z.string().describe('The name of the student.'),
   assessmentTitle: z.string().describe('The title of the assessment.'),
+  // Add fields needed to create the result document
+  studentId: z.string(),
+  assessmentId: z.string(),
+  teacherUid: z.string(),
+  avatarUrl: z.string(),
 });
 export type GenerateSpeakingAnalysisInput = z.infer<typeof GenerateSpeakingAnalysisInputSchema>;
 
@@ -52,6 +57,7 @@ export const GenerateSpeakingAnalysisOutputSchema = z.object({
   contentScore: z.number().int().min(0).max(100).describe('A score from 0-100 for the performance content.'),
   pronunciationScore: z.number().int().min(0).max(100).describe('A score from 0-100 for pronunciation.'),
   pronunciationFeedback: z.string().describe('Specific feedback on the student\'s pronunciation in Korean.'),
+  resultId: z.string().describe('The ID of the created Firestore result document.'),
 });
 export type GenerateSpeakingAnalysisOutput = z.infer<typeof GenerateSpeakingAnalysisOutputSchema>;
 
