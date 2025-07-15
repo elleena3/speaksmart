@@ -31,7 +31,7 @@ export async function analyzePronunciation(audioDataUri: string): Promise<Pronun
 
 const pronunciationAnalysisPrompt = ai.definePrompt({
   name: 'standalonePronunciationAnalysisPrompt',
-  model: googleAI.model('gemini-2.0-flash-latest'),
+  model: googleAI.model('gemini-2.0-flash'),
   input: { schema: PronunciationAnalysisInputSchema },
   output: { schema: PronunciationAnalysisOutputSchema },
   prompt: `You are an expert English pronunciation coach. Your task is to evaluate a user's spoken English based on an audio recording. Provide all feedback in Korean.
