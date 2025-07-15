@@ -3,22 +3,10 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Assessments can be read by any authenticated user,
-    // but only created/updated/deleted by the teacher who owns them.
-    match /assessments/{assessmentId} {
-      allow read: if request.auth != null;
-      allow create, update, delete: if request.auth != null && request.resource.data.uid == request.auth.uid;
-    }
-
-    // Results can be created by any authenticated student.
-    // They can only be read by the student who submitted it or the teacher who owns the assessment.
-    // Teachers can update results (e.g., save curricular remarks), but students cannot.
-    match /results/{resultId} {
-      allow create: if request.auth != null && request.resource.data.studentId == request.auth.uid;
-      allow read, update: if request.auth != null && (request.resource.data.studentId == request.auth.uid || request.resource.data.teacherUid == request.auth.uid);
-      // Students cannot delete their results. This might be a teacher-only action if needed.
-      allow delete: if false; 
+    // Allow read and write access to all documents for development purposes.
+    // WARNING: This is insecure for production.
+    match /{document=**} {
+      allow read, write: if true;
     }
   }
 }
