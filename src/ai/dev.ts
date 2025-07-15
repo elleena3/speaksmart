@@ -11,6 +11,7 @@ config();
 import '@/ai/flows/draft-curricular-remarks.ts';
 import '@/ai/flows/summarize-student-feedback.ts';
 import '@/ai/flows/text-to-speech.ts';
+import '@/ai/flows/transcribe-file.ts';
 
 // New, separated flows for monologue and dialogue analysis
 import '@/ai/flows/generate-monologue-analysis-flow';

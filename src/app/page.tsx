@@ -3,12 +3,110 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Globe, GraduationCap, User, Loader2 } from "lucide-react";
+import { Globe, GraduationCap, User, Loader2, Upload, FileText } from "lucide-react";
 import { Logo } from "@/components/icons";
 import { useLanguage } from "@/context/language-context";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
+import { transcribeFile } from "@/ai/flows/transcribe-file";
+
+function FileTranscriber() {
+  const [file, setFile] = useState<File | null>(null);
+  const [transcript, setTranscript] = useState<string>("");
+  const [isTranscribing, setIsTranscribing] = useState<boolean>(false);
+  const { toast } = useToast();
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = event.target.files?.[0];
+    if (selectedFile) {
+      if (selectedFile.type === 'audio/webm' || selectedFile.name.endsWith('.webm')) {
+        setFile(selectedFile);
+        setTranscript("");
+      } else {
+        toast({
+          title: "잘못된 파일 형식",
+          description: ".webm 파일만 업로드할 수 있습니다.",
+          variant: "destructive",
+        });
+      }
+    }
+  };
+
+  const handleTranscribe = async () => {
+    if (!file) {
+      toast({
+        title: "파일 없음",
+        description: "먼저 webm 파일을 선택해주세요.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsTranscribing(true);
+    setTranscript("텍스트 변환 중...");
+
+    try {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onloadend = async () => {
+        const base64Audio = reader.result as string;
+        const result = await transcribeFile(base64Audio);
+        setTranscript(result || "변환된 텍스트가 없습니다.");
+      };
+      reader.onerror = (error) => {
+        console.error("File reading error:", error);
+        toast({
+          title: "파일 읽기 오류",
+          description: "파일을 읽는 중 문제가 발생했습니다.",
+          variant: "destructive"
+        });
+        setTranscript("오류: 파일을 읽을 수 없습니다.");
+      }
+    } catch (error: any) {
+      console.error("Transcription error:", error);
+      toast({
+        title: "텍스트 변환 오류",
+        description: error.message || "AI 분석 중 오류가 발생했습니다.",
+        variant: "destructive"
+      });
+      setTranscript(`오류: ${error.message}`);
+    } finally {
+      setIsTranscribing(false);
+    }
+  };
+
+  return (
+    <Card className="w-full max-w-xl">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2"><Upload className="h-6 w-6"/> WebM 파일 분석 도구</CardTitle>
+        <CardDescription>
+          로컬 WebM 오디오 파일을 업로드하여 음성-텍스트 변환(STT) 결과를 테스트합니다.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid gap-2">
+          <label htmlFor="file-upload" className="text-sm font-medium">오디오 파일</label>
+          <Input id="file-upload" type="file" accept="audio/webm" onChange={handleFileChange} />
+          {file && <p className="text-sm text-muted-foreground">선택된 파일: {file.name}</p>}
+        </div>
+        <Button onClick={handleTranscribe} disabled={isTranscribing || !file} className="w-full">
+          {isTranscribing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
+          {isTranscribing ? "분석 중..." : "텍스트로 변환"}
+        </Button>
+        <div className="grid gap-2">
+          <label htmlFor="transcript-output" className="text-sm font-medium">변환 결과</label>
+          <Textarea id="transcript-output" readOnly value={transcript} placeholder="이곳에 변환된 텍스트가 표시됩니다." rows={5} />
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
 
 export default function Home() {
   const { language, setLanguage, t } = useLanguage();
@@ -99,6 +197,10 @@ export default function Home() {
           )}
           {content[language].teacherLogin}
         </Button>
+      </div>
+
+      <div className="w-full max-w-xl pt-8">
+        <FileTranscriber />
       </div>
       
       <footer className="mt-8 text-center text-muted-foreground text-sm">
