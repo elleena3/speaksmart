@@ -7,7 +7,7 @@ import { getStorage } from "firebase/storage";
 
 // 환경 변수에서 Firebase 설정 값들을 가져옵니다.
 // NEXT_PUBLIC_ 접두사가 붙은 변수는 클라이언트(브라우저)에서 접근 가능합니다.
-const firebaseConfig = {
+export const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
   projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
