@@ -1,3 +1,4 @@
+
 // src/lib/firebase-admin.ts
 import * as admin from 'firebase-admin';
 
@@ -6,15 +7,14 @@ import * as admin from 'firebase-admin';
 // 브라우저(클라이언트) 코드에서는 이 파일을 절대 import해서는 안 됩니다.
 // ====================================================================
 
-// 서비스 계정 키를 환경 변수에서 읽어옵니다.
-// VITE_FIREBASE_SERVICE_ACCOUNT_KEY는 JSON 문자열 형태여야 합니다.
-function initializeFirebaseAdmin() {
-  if (admin.apps.length > 0) {
-    return;
-  }
+let db: admin.firestore.Firestore;
+let storage: admin.storage.Storage;
+let auth: admin.auth.Auth;
 
+if (!admin.apps.length) {
   const serviceAccountString = process.env.VITE_FIREBASE_SERVICE_ACCOUNT_KEY;
   let serviceAccount;
+
   if (serviceAccountString) {
     try {
       serviceAccount = JSON.parse(serviceAccountString);
@@ -42,11 +42,8 @@ function initializeFirebaseAdmin() {
   }
 }
 
-// Ensure initialization is called when the module is loaded.
-initializeFirebaseAdmin();
-
-const db = admin.firestore();
-const storage = admin.storage();
-const auth = admin.auth();
+db = admin.firestore();
+storage = admin.storage();
+auth = admin.auth();
 
 export { db, storage, auth, admin };
