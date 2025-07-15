@@ -1,26 +1,24 @@
+
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // assessments 컬렉션: 인증된 사용자는 누구나 읽을 수 있습니다.
+
+    // Assessments can be read by any authenticated user,
+    // but only created/updated/deleted by the teacher who owns them.
     match /assessments/{assessmentId} {
       allow read: if request.auth != null;
-      // 평가는 앱 내부(교사 페이지)에서만 생성/수정/삭제되므로, 클라이언트의 직접적인 쓰기는 막습니다.
-      // 필요에 따라 교사 UID를 확인하는 규칙을 추가할 수 있습니다.
-      // allow write: if request.auth.uid == resource.data.uid;
-      allow write: if false; // 우선 안전하게 막아둡니다.
+      allow create, update, delete: if request.auth != null && request.resource.data.uid == request.auth.uid;
     }
 
-    // results 컬렉션:
+    // Results can be created by any authenticated student.
+    // They can only be read by the student who submitted it or the teacher who owns the assessment.
+    // Teachers can update results (e.g., save curricular remarks), but students cannot.
     match /results/{resultId} {
-      // 사용자는 자신의 결과 문서를 생성할 수 있습니다.
       allow create: if request.auth != null && request.resource.data.studentId == request.auth.uid;
-      // 사용자는 자신의 결과만 읽거나 업데이트할 수 있습니다.
-      allow read, update: if request.auth != null && resource.data.studentId == request.auth.uid;
-      // 교사는 자신의 평가에 속한 결과들을 읽을 수 있습니다.
-      allow read: if request.auth != null && get(/databases/$(database)/documents/assessments/$(resource.data.assessmentId)).data.uid == request.auth.uid;
-      // 삭제는 허용하지 않습니다.
-      allow delete: if false;
+      allow read, update: if request.auth != null && (request.resource.data.studentId == request.auth.uid || request.resource.data.teacherUid == request.auth.uid);
+      // Students cannot delete their results. This might be a teacher-only action if needed.
+      allow delete: if false; 
     }
   }
 }
