@@ -8,9 +8,9 @@ import { type StudentResult, type ResultStatus, type TeacherAssessment } from "@
 import { useAuth } from "@/context/auth-context";
 import { Loader2, AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { db, storage, firebaseConfig } from "@/lib/firebase";
+import { db, storage } from "@/lib/firebase";
 import { collection, query, where, onSnapshot, doc, setDoc, updateDoc, getDocs } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { ref, uploadString, getDownloadURL } from "firebase/storage";
 import { generateMonologueAnalysis } from "@/ai/flows/generate-monologue-analysis-flow";
 import { useToast } from "@/hooks/use-toast";
 import { Progress } from "@/components/ui/progress";
@@ -64,26 +64,23 @@ export default function AssessmentResultsPage() {
         };
         await setDoc(newResultRef, initialData, { merge: true });
 
-        // Step 2: Upload audio to Firebase Storage
+        // Step 2: Upload audio to Firebase Storage (from data URI)
         setStatus("파일 업로드 중...");
         await updateDoc(newResultRef, { status: "파일 업로드 중...", progress: 25 });
-        const fetchRes = await fetch(studentRecordingDataUri);
-        const audioBlob = await fetchRes.blob();
-        const audioFileName = `recordings/${user.uid}_${assessmentDetails.id}_${Date.now()}.webm`;
+        const audioFileName = `recordings/${user.uid}_${assessmentDetails.id}_${Date.now()}.weba`;
         const storageRef = ref(storage, audioFileName);
-        await uploadBytes(storageRef, audioBlob);
+        // Upload the base64 string directly
+        await uploadString(storageRef, studentRecordingDataUri, 'data_url');
         const downloadURL = await getDownloadURL(storageRef);
-        const bucket = firebaseConfig.storageBucket?.replace(".appspot.com", "");
-        const gcsUri = `gs://${bucket}/${storageRef.fullPath}`;
 
-        // Step 3: Call the AI flow with the GCS URI
+        // Step 3: Call the AI flow with the Data URI
         setStatus("AI 분석 중");
         setProgress(50);
         await updateDoc(newResultRef, { status: "AI 분석 중", progress: 50 });
         
-        // Use the new monologue-specific flow
+        // Use the new monologue-specific flow with the data URI
         const analysisResult = await generateMonologueAnalysis({
-            studentRecordingGcsUri: gcsUri,
+            studentRecordingDataUri: studentRecordingDataUri,
             activityPrompt: assessmentDetails.prompt,
             expectedFormat: assessmentDetails.expectedFormat || "",
             studentName: user.displayName || "Student",

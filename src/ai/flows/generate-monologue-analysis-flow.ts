@@ -35,18 +35,18 @@ export async function generateMonologueAnalysis(
 const transcribeAudioFlow = ai.defineFlow(
   {
     name: 'transcribeAudioFlow',
-    inputSchema: z.string(), // gs:// URI
+    inputSchema: z.string(), // data URI
     outputSchema: z.string(), // transcript
   },
-  async (audioGcsUri) => {
-    if (!audioGcsUri) {
+  async (audioDataUri) => {
+    if (!audioDataUri) {
         return "(학생 답변이 기록되지 않았습니다.)";
     }
     const sttResponse = await ai.generate({
       model: googleAI.model('gemini-2.0-flash'),
       prompt: [
         { text: 'Transcribe this English audio.' },
-        { media: { url: audioGcsUri, contentType: 'video/webm' } },
+        { media: { url: audioDataUri } }, // No contentType needed, it's in the data URI
       ],
     });
     return sttResponse.text || "(학생 답변을 인식하지 못했습니다.)";
@@ -88,13 +88,13 @@ const pronunciationAnalysisPrompt = ai.definePrompt({
     name: 'monologuePronunciationAnalysisPrompt',
     model: googleAI.model('gemini-2.0-flash'),
     input: { schema: z.object({
-        studentRecordingGcsUri: z.string(),
+        studentRecordingDataUri: z.string(),
         studentTranscript: z.string(),
     }) },
     output: { schema: PronunciationAnalysisOutputSchema },
     prompt: `You are an expert English pronunciation coach. Your task is to evaluate a student's spoken English based on their audio recording and the corresponding transcript. Provide all feedback in Korean.
 
-    - Student's Audio Recording: {{media url=studentRecordingGcsUri contentType='video/webm'}}
+    - Student's Audio Recording: {{media url=studentRecordingDataUri}}
     - AI-generated Transcript: {{{studentTranscript}}}
 
     Please perform the following steps:
@@ -116,7 +116,7 @@ const generateMonologueAnalysisFlow = ai.defineFlow(
   async (input) => {
     
     // Step 1: Transcribe the audio.
-    const studentTranscript = await transcribeAudioFlow(input.studentRecordingGcsUri);
+    const studentTranscript = await transcribeAudioFlow(input.studentRecordingDataUri);
 
     if (!studentTranscript || studentTranscript.includes('기록되지 않았습니다') || studentTranscript.includes('인식하지 못했습니다')) {
         return {
@@ -140,7 +140,7 @@ const generateMonologueAnalysisFlow = ai.defineFlow(
         assessmentTitle: input.assessmentTitle,
       }),
       pronunciationAnalysisPrompt({
-        studentRecordingGcsUri: input.studentRecordingGcsUri,
+        studentRecordingDataUri: input.studentRecordingDataUri,
         studentTranscript,
       })
     ]);

@@ -10,9 +10,9 @@ import { type StudentResult, type TeacherAssessment, type ConversationTurn } fro
 import { useToast } from "@/hooks/use-toast";
 import { FeedbackView } from "../../../assessment/[id]/results/feedback-view";
 import { useAuth } from "@/context/auth-context";
-import { db, storage, firebaseConfig } from "@/lib/firebase";
+import { db, storage } from "@/lib/firebase";
 import { collection, doc, query, where, getDocs, setDoc, updateDoc } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { ref, uploadString, getDownloadURL } from "firebase/storage";
 import { Card, CardHeader, CardContent, CardDescription, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 
@@ -76,14 +76,10 @@ export function FreeTalkFeedbackView() {
             setStatus("음성 파일 업로드 중...");
             setProgress(25);
             await updateDoc(newResultRef, { status: "음성 파일 업로드 중...", progress: 25 });
-            const fetchRes = await fetch(studentRecordingDataUri);
-            const audioBlob = await fetchRes.blob();
-            const audioFileName = `recordings/${user.uid}_${assessment.id}_${Date.now()}.webm`;
+            const audioFileName = `recordings/${user.uid}_${assessment.id}_${Date.now()}.weba`;
             const storageRef = ref(storage, audioFileName);
-            await uploadBytes(storageRef, audioBlob);
+            await uploadString(storageRef, studentRecordingDataUri, 'data_url');
             const downloadURL = await getDownloadURL(storageRef);
-            const bucket = firebaseConfig.storageBucket?.replace(".appspot.com", "");
-            const gcsUri = `gs://${bucket}/${storageRef.fullPath}`;
             
             const fullConversationTranscript = conversationHistory
                 .map(turn => `${turn.role === 'user' ? '학생' : 'AI'}: ${turn.text}`)
@@ -101,7 +97,7 @@ export function FreeTalkFeedbackView() {
             await updateDoc(newResultRef, { status: "AI 분석 중...", progress: 50 });
             
             const analysisResult = await generateDialogueAnalysis({
-                studentRecordingGcsUri: gcsUri,
+                studentRecordingDataUri: studentRecordingDataUri, // Pass data URI
                 studentTranscript: studentOnlyTranscript,
                 fullConversationTranscript: fullConversationTranscript,
                 activityPrompt: assessment.prompt,
