@@ -49,19 +49,19 @@ export async function generateSpeakingAnalysis(
 const transcribeAudioFlow = ai.defineFlow(
   {
     name: 'transcribeAudioFlow',
-    inputSchema: z.string(), // gs:// URI or data URI
+    inputSchema: z.string(), // gs:// URI
     outputSchema: z.string(), // transcript
   },
-  async (audioUri) => {
+  async (audioGcsUri) => {
     // A simple check for empty or invalid URI
-    if (!audioUri) {
+    if (!audioGcsUri) {
         return "(학생 답변이 기록되지 않았습니다.)";
     }
     const sttResponse = await ai.generate({
       model: googleAI.model('gemini-2.0-flash'),
       prompt: [
         { text: 'Transcribe this English audio.' },
-        { media: { url: audioUri } },
+        { media: { url: audioGcsUri, contentType: 'audio/webm' } },
       ],
     });
     return sttResponse.text || "(학생 답변을 인식하지 못했습니다.)";
@@ -100,7 +100,7 @@ const pronunciationAnalysisPrompt = ai.definePrompt({
     output: { schema: PronunciationAnalysisOutputSchema },
     prompt: `You are an expert English pronunciation coach. Your task is to evaluate a student's spoken English based on their audio recording and the corresponding transcript. Provide all feedback in Korean.
 
-    - Student's Audio Recording: {{media url=studentRecordingGcsUri}}
+    - Student's Audio Recording: {{media url=studentRecordingGcsUri contentType='audio/webm'}}
     - AI-generated Transcript: {{{studentTranscript}}}
 
     Please perform the following steps:
