@@ -16,8 +16,8 @@ const TranscribeFileInputSchema = z.string().describe(
 );
 
 export async function transcribeFile(audioDataUri: string): Promise<string> {
-  const transcriptionResult = await transcriptionPrompt(audioDataUri);
-  return transcriptionResult.text;
+  const result = await transcribeFileFlow(audioDataUri);
+  return result;
 }
 
 const transcriptionPrompt = ai.definePrompt({
