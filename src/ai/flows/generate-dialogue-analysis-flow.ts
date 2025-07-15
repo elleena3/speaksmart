@@ -65,13 +65,13 @@ const pronunciationAnalysisPrompt = ai.definePrompt({
     name: 'dialoguePronunciationAnalysisPrompt',
     model: googleAI.model('gemini-2.0-flash'),
     input: { schema: z.object({
-        studentRecordingDataUri: z.string(), // Changed from GcsUri
+        studentRecordingDataUri: z.string(),
         studentTranscript: z.string(), // Note: This is only the student's part of the transcript
     }) },
     output: { schema: PronunciationAnalysisOutputSchema },
     prompt: `You are an expert English pronunciation coach. Your task is to evaluate a student's spoken English based on their combined audio recording from a conversation and the corresponding transcript of ONLY their speech. Provide all feedback in Korean.
 
-    - Student's Combined Audio Recording: {{media url=studentRecordingDataUri}}
+    - Student's Combined Audio Recording: {{media url=studentRecordingDataUri contentType='audio/webm;codecs=opus'}}
     - Transcript of Student's Speech Only: {{{studentTranscript}}}
 
     Please perform the following steps:

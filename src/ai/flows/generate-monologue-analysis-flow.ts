@@ -37,7 +37,7 @@ const transcriptionPrompt = ai.definePrompt({
     model: googleAI.model('gemini-2.0-flash'),
     input: { schema: z.string() }, // Expect a raw string (the data URI)
     prompt: `Transcribe this English audio.
-Audio: {{media url=prompt contentType='video/webm'}}
+Audio: {{media url=prompt contentType='audio/webm;codecs=opus'}}
 `,
 });
 
@@ -82,7 +82,7 @@ const pronunciationAnalysisPrompt = ai.definePrompt({
     output: { schema: PronunciationAnalysisOutputSchema },
     prompt: `You are an expert English pronunciation coach. Your task is to evaluate a student's spoken English based on their audio recording and the corresponding transcript. Provide all feedback in Korean.
 
-- Student's Audio Recording: {{media url=studentRecordingDataUri contentType='video/webm'}}
+- Student's Audio Recording: {{media url=studentRecordingDataUri contentType='audio/webm;codecs=opus'}}
 - AI-generated Transcript: {{{studentTranscript}}}
 
 Please perform the following steps:

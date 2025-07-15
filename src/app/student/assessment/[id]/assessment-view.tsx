@@ -12,6 +12,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 
 type RecordingState = "idle" | "recording" | "recorded" | "submitting";
 
+const mimeType = 'audio/webm;codecs=opus';
+
 export function AssessmentView({ assessmentDetails }: { assessmentDetails: TeacherAssessment }) {
   const { user } = useAuth();
   const [recordingState, setRecordingState] = useState<RecordingState>("idle");
@@ -71,7 +73,7 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioStreamRef.current = stream;
       mediaRecorderRef.current = new MediaRecorder(stream, { 
-        mimeType: 'video/webm',
+        mimeType: mimeType,
       });
       
       mediaRecorderRef.current.ondataavailable = (event) => {
@@ -94,7 +96,7 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
             return;
         }
 
-        const newAudioBlob = new Blob(audioChunksRef.current, { type: 'video/webm' });
+        const newAudioBlob = new Blob(audioChunksRef.current, { type: mimeType });
         setAudioBlob(newAudioBlob);
         setAudioUrl(URL.createObjectURL(newAudioBlob));
         setAudioSize(newAudioBlob.size);

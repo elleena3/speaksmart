@@ -12,6 +12,7 @@ import { type ConversationTurn } from "@/lib/types/ai-schemas";
 import { type Scenario, type TeacherAssessment } from "@/lib/types";
 
 const SESSION_STORAGE_KEY = 'freeTalkSessionData';
+const mimeType = 'audio/webm;codecs=opus';
 
 export function FreeTalkView({ scenario, scenarioPrompt, assessment }: { scenario: Scenario, scenarioPrompt?: string, assessment: TeacherAssessment }) {
   const [sessionState, setSessionState] = useState<"idle" | "initializing" | "recording" | "processing" | "speaking" | "waiting_for_user">("idle");
@@ -108,7 +109,7 @@ export function FreeTalkView({ scenario, scenarioPrompt, assessment }: { scenari
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioStreamRef.current = stream;
       mediaRecorderRef.current = new MediaRecorder(stream, { 
-        mimeType: 'video/webm',
+        mimeType: mimeType,
       });
 
       mediaRecorderRef.current.ondataavailable = (event) => {
@@ -130,7 +131,7 @@ export function FreeTalkView({ scenario, scenarioPrompt, assessment }: { scenari
             cleanupRecorder();
             return;
         }
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'video/webm' });
+        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
         studentAudioBlobsRef.current.push(audioBlob); // Collect the student's audio chunk
         const reader = new FileReader();
         reader.readAsDataURL(audioBlob);
@@ -220,7 +221,7 @@ export function FreeTalkView({ scenario, scenarioPrompt, assessment }: { scenari
         });
         return;
     }
-    const combinedBlob = new Blob(studentAudioBlobsRef.current, { type: 'video/webm' });
+    const combinedBlob = new Blob(studentAudioBlobsRef.current, { type: mimeType });
     const reader = new FileReader();
     reader.readAsDataURL(combinedBlob);
     reader.onloadend = () => {
