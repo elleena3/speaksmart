@@ -1,32 +1,26 @@
 
 // src/lib/firebase.ts
-
-// ====================================================================
-// 중요: 새로 만드신 Firebase 프로젝트의 설정 정보를 여기에 붙여넣어 주세요.
-//
-// 1. Firebase 콘솔(https://console.firebase.google.com/)로 이동합니다.
-// 2. 새로 만드신 프로젝트를 선택합니다.
-// 3. 왼쪽 메뉴에서 톱니바퀴 아이콘(⚙️) > '프로젝트 설정'을 클릭합니다.
-// 4. '내 앱' 섹션에서 웹 앱(</>)을 선택합니다. (없다면 새로 생성)
-// 5. 'SDK 설정 및 구성'에서 '구성(Config)' 옵션을 선택합니다.
-// 6. 아래 `firebaseConfig` 객체 전체를 복사한 코드로 교체해 주세요.
-// ====================================================================
-
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
+// 환경 변수에서 Firebase 설정 값들을 가져옵니다.
+// NEXT_PUBLIC_ 접두사가 붙은 변수는 클라이언트(브라우저)에서 접근 가능합니다.
 const firebaseConfig = {
-  apiKey: "AIzaSyAieUKTGnuh0f9zWJYjgYM77j4mEshxWCg",
-  authDomain: "speaksmart-evaluator2.firebaseapp.com",
-  projectId: "speaksmart-evaluator2",
-  storageBucket: "speaksmart-evaluator2.firebasestorage.app",
-  messagingSenderId: "60227542963",
-  appId: "1:60227542963:web:f5d6c51046eb572a9c35c6",
-  measurementId: "G-M20FDF494Y"
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
+// 모든 환경 변수가 설정되었는지 확인합니다.
+if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
+  throw new Error("Firebase 설정이 .env 파일에 올바르게 구성되지 않았습니다. API 키와 프로젝트 ID를 확인해주세요.");
+}
 
 // Firebase 앱 초기화
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();

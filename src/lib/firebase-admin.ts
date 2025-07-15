@@ -13,29 +13,29 @@ function initializeFirebaseAdmin() {
     return admin.app();
   }
 
-  const serviceAccountString = process.env.VITE_FIREBASE_SERVICE_ACCOUNT_KEY;
+  // Next.js 환경에서는 'VITE_' 접두사를 사용하지 않습니다.
+  const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
   let serviceAccount;
 
   if (serviceAccountString) {
     try {
-      serviceAccount = JSON.parse(serviceAccountString);
+      // 환경 변수에서 JSON 문자열을 파싱합니다.
+      serviceAccount = JSON.parse(Buffer.from(serviceAccountString, 'base64').toString('utf-8'));
     } catch (error) {
-      console.error('Error parsing Firebase service account key JSON:', error);
+      console.error('Error parsing Firebase service account key JSON from environment variable:', error);
+      throw new Error('Could not parse FIREBASE_SERVICE_ACCOUNT_KEY. Make sure it is a valid Base64 encoded JSON.');
     }
   } else {
-    console.warn('VITE_FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set. Admin SDK will try to use default credentials.');
+    // 환경 변수가 없을 경우, 기본 자격 증명을 사용하려고 시도합니다. (예: Google Cloud 환경)
+    console.warn('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set. Admin SDK will try to use default credentials.');
+    return admin.initializeApp();
   }
-
-  const firebaseConfig = {
-    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  };
   
   try {
     return admin.initializeApp({
-      credential: serviceAccount ? admin.credential.cert(serviceAccount) : admin.credential.applicationDefault(),
-      projectId: firebaseConfig.projectId,
-      storageBucket: firebaseConfig.storageBucket,
+      credential: admin.credential.cert(serviceAccount),
+      projectId: serviceAccount.project_id,
+      storageBucket: `${serviceAccount.project_id}.appspot.com`,
     });
   } catch (error: any) {
     console.error('Firebase Admin SDK initialization error:', error.stack);
