@@ -154,7 +154,7 @@ export function FreeTalkView({ scenario, scenarioPrompt, assessment }: { scenari
           cleanupRecorder();
       };
 
-      mediaRecorderRef.current.start(100); // Use timeslice to get data chunks immediately
+      mediaRecorderRef.current.start(100);
 
     } catch (error) {
       console.error("Error accessing microphone:", error);
@@ -362,6 +362,8 @@ export function FreeTalkView({ scenario, scenarioPrompt, assessment }: { scenari
         {sessionState !== 'idle' && sessionState !== 'initializing' && (
             <p className="text-xs text-center text-muted-foreground">
                 AI의 응답이 끝나면 <strong className="text-foreground">[응답하기]</strong> 버튼을 누르고 말씀하세요. 발언이 끝나면 <strong className="text-foreground">[말하기 중지]</strong> 버튼을 누릅니다.
+                 <br/>
+                <span className="font-semibold">팁: 버튼을 누르고 약 1-2초 뒤에 말씀하시면 더 정확하게 인식됩니다.</span>
             </p>
         )}
       </div>

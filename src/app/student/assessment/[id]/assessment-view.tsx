@@ -10,7 +10,7 @@ import { type TeacherAssessment } from "@/lib/types"
 import { useAuth } from "@/context/auth-context"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
-type RecordingState = "idle" | "recording" | "recorded" | "submitting";
+type RecordingState = "idle" | "countdown" | "recording" | "recorded" | "submitting";
 
 const mimeType = 'audio/webm;codecs=opus';
 
@@ -18,6 +18,7 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
   const { user } = useAuth();
   const [recordingState, setRecordingState] = useState<RecordingState>("idle");
   const [remainingTime, setRemainingTime] = useState<number | null>(null);
+  const [countdown, setCountdown] = useState<number>(3);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [audioSize, setAudioSize] = useState<number | null>(null);
@@ -29,6 +30,7 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
   const audioChunksRef = useRef<Blob[]>([]);
   const audioStreamRef = useRef<MediaStream | null>(null);
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const timeLimit = assessmentDetails.recordingTimeLimit && assessmentDetails.recordingTimeLimit > 0 
     ? assessmentDetails.recordingTimeLimit * 60 
@@ -49,6 +51,10 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
       clearInterval(timerIntervalRef.current);
       timerIntervalRef.current = null;
     }
+     if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current);
+      countdownIntervalRef.current = null;
+    }
     audioChunksRef.current = [];
     if (audioUrl) {
       URL.revokeObjectURL(audioUrl);
@@ -58,14 +64,7 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
   }, [audioUrl]);
 
 
-  const handleStartRecording = async () => {
-    setAudioBlob(null);
-    setAudioUrl(null);
-    setAudioSize(null);
-    if(recordingState !== 'idle') {
-      cleanupRecorder();
-    }
-    
+  const startActualRecording = async () => {
     setRecordingState("recording");
     if(timeLimit) setRemainingTime(timeLimit);
 
@@ -116,7 +115,7 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
         cleanupRecorder();
       }
 
-      mediaRecorderRef.current.start(100); // Use timeslice to get data chunks immediately
+      mediaRecorderRef.current.start(100); 
       startTimer();
       toast({
         title: "녹음 시작됨",
@@ -132,6 +131,29 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
       });
       setRecordingState("idle");
     }
+  }
+
+  const handleStartRecording = () => {
+    setAudioBlob(null);
+    setAudioUrl(null);
+    setAudioSize(null);
+    if(recordingState !== 'idle') {
+      cleanupRecorder();
+    }
+    
+    setRecordingState("countdown");
+    setCountdown(3);
+
+    countdownIntervalRef.current = setInterval(() => {
+        setCountdown(prev => {
+            if (prev <= 1) {
+                if(countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+                startActualRecording();
+                return 0;
+            }
+            return prev - 1;
+        });
+    }, 1000);
   }
 
   const handleStopRecording = useCallback(() => {
@@ -154,14 +176,13 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
             description: "답변을 서버로 전송하고 AI 분석을 시작합니다.",
         });
 
-        // Pass all necessary data via session storage for the results page to handle.
         const reader = new FileReader();
         reader.readAsDataURL(audioBlob);
         reader.onloadend = () => {
             sessionStorage.setItem('monologueResult', JSON.stringify({
                 assessmentId: assessmentDetails.id,
                 studentRecordingDataUri: reader.result as string,
-                assessmentDetails: assessmentDetails, // Pass full details
+                assessmentDetails: assessmentDetails, 
             }));
             router.push(`/student/assessment/${assessmentDetails.id}/results`);
         };
@@ -236,6 +257,22 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
     </>
   );
 
+  const renderCountdownState = () => (
+    <>
+        <div className="relative flex items-center justify-center w-32 h-32 rounded-full bg-background">
+            <span className="text-7xl font-bold text-primary animate-ping-short">{countdown}</span>
+        </div>
+        <div className="w-full max-w-xs">
+            <Button size="lg" disabled className="w-full">
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                준비 중...
+            </Button>
+        </div>
+        <p className="text-sm text-muted-foreground">카운트다운 후 녹음이 시작됩니다.</p>
+    </>
+  );
+
+
   const renderRecordingState = () => (
     <>
         <div className="relative flex items-center justify-center w-32 h-32 rounded-full bg-background">
@@ -295,6 +332,7 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
 
   const renderContent = () => {
     switch (recordingState) {
+        case "countdown": return renderCountdownState();
         case "recording": return renderRecordingState();
         case "recorded": return renderRecordedState();
         case "submitting": return renderSubmittingState();
@@ -306,7 +344,7 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
 
   return (
     <div className="flex flex-col items-center gap-6 p-8 border rounded-lg bg-muted/50 min-h-[350px] justify-center">
-      {timeLimit && recordingState !== 'submitting' && (
+      {timeLimit && recordingState !== 'submitting' && recordingState !== 'countdown' && (
         <div className={`flex items-center gap-2 text-lg font-semibold text-muted-foreground ${recordingState === 'recorded' ? 'mb-4' : ''}`}>
           <Timer className="h-6 w-6" />
           <span>{recordingState === 'recording' ? timerDisplay : formatTime(timeLimit)}</span>
