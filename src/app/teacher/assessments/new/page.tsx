@@ -123,9 +123,14 @@ export default function NewAssessmentPage() {
 
         if (values.startDate) {
             docData.startDate = values.startDate.toISOString();
+        } else {
+            delete docData.startDate;
         }
+
         if (values.endDate) {
             docData.endDate = values.endDate.toISOString();
+        } else {
+            delete docData.endDate;
         }
 
         await addDoc(collection(db, "assessments"), docData);

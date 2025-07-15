@@ -152,13 +152,13 @@ export default function EditAssessmentPage() {
         if (values.startDate) {
             updateData.startDate = values.startDate.toISOString();
         } else {
-            updateData.startDate = undefined;
+            delete (updateData as any).startDate;
         }
         
         if (values.endDate) {
             updateData.endDate = values.endDate.toISOString();
         } else {
-            updateData.endDate = undefined;
+            delete (updateData as any).endDate;
         }
 
 
