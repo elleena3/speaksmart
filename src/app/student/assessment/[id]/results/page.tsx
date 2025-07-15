@@ -162,7 +162,7 @@ export default function AssessmentResultsPage() {
             <CardHeader>
                 <AlertTriangle className="h-12 w-12 text-destructive mx-auto mb-4" />
                 <CardTitle className="text-destructive">분석 오류</CardTitle>
-                <CardDescription className="text-destructive-foreground">{error || "AI가 답변을 분석하는 데 실패했습니다. 다시 시도해주세요."}</CardDescription>
+                <CardDescription className="text-destructive-foreground">{error || result?.aiFeedback || "AI가 답변을 분석하는 데 실패했습니다. 다시 시도해주세요."}</CardDescription>
             </CardHeader>
         </Card>
     );

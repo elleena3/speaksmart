@@ -110,7 +110,7 @@ export default function StudentResultPage() {
                 ['평가명', assessment.title],
                 ['유형', isDialogue ? 'AI와 대화하기' : '혼자 말하기'],
                 ['제출일', studentResult.date],
-                ['내용 점수', `${studentResult.score}%`],
+                ['내용 점수', `${studentResult.score ?? 0}%`],
                 ['발음 점수', `${studentResult.pronunciationScore ?? 0}%`],
             ],
             theme: 'grid',
@@ -291,12 +291,19 @@ export default function StudentResultPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Target className="h-5 w-5 text-primary"/> 
-                  발음 분석 결과
+                  성능 분석 결과
                 </CardTitle>
-                <CardDescription>학생의 발음 정확도와 AI의 상세 피드백입니다.</CardDescription>
+                <CardDescription>학생의 내용 및 발음 정확도와 AI의 상세 피드백입니다.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                  <div className="flex items-center gap-4">
+                  <div className="space-y-2">
+                      <div className="w-full">
+                          <div className="flex justify-between mb-1">
+                              <span className="text-base font-medium text-primary">내용 점수</span>
+                              <span className="text-sm font-medium text-primary">{studentResult.score ?? 0}%</span>
+                          </div>
+                          <Progress value={studentResult.score} className="h-2" />
+                      </div>
                       <div className="w-full">
                           <div className="flex justify-between mb-1">
                               <span className="text-base font-medium text-primary">발음 점수</span>

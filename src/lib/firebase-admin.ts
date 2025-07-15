@@ -6,22 +6,32 @@ import * as admin from 'firebase-admin';
 // 브라우저(클라이언트) 코드에서는 이 파일을 절대 import해서는 안 됩니다.
 // ====================================================================
 
+// 서비스 계정 키를 환경 변수에서 읽어옵니다.
+// VITE_FIREBASE_SERVICE_ACCOUNT_KEY는 JSON 문자열 형태여야 합니다.
+const serviceAccountString = process.env.VITE_FIREBASE_SERVICE_ACCOUNT_KEY;
+
+let serviceAccount;
+if (serviceAccountString) {
+  try {
+    serviceAccount = JSON.parse(serviceAccountString);
+  } catch (error) {
+    console.error('Error parsing Firebase service account key JSON:', error);
+  }
+}
+
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
   projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
   storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
 
 if (!admin.apps.length) {
   try {
+    // 서비스 계정 키가 있으면 해당 키로 초기화하고, 없으면 기본 방식을 시도합니다.
     admin.initializeApp({
-      credential: admin.credential.applicationDefault(),
+      credential: serviceAccount ? admin.credential.cert(serviceAccount) : admin.credential.applicationDefault(),
       projectId: firebaseConfig.projectId,
-      storageBucket: firebaseConfig.storageBucket
+      storageBucket: firebaseConfig.storageBucket,
     });
     console.log('Firebase Admin SDK initialized successfully.');
   } catch (error: any) {

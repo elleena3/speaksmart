@@ -99,7 +99,7 @@ const pronunciationAnalysisPrompt = ai.definePrompt({
     1.  Listen carefully to the audio and compare it with the transcript.
     2.  Evaluate accuracy, clarity, intonation, and fluency.
     3.  **Assign a Pronunciation Score:** Give a score from 0 to 100 (100 is native-like, 0 is unintelligible).
-    4.  **Provide Pronunciation Feedback:** Write specific, constructive feedback in Korean. Point out specific words or sounds that were pronounced well and those that need improvement. Provide tips for correction. If the transcript is empty or indicates no speech, provide a score of 0 and state that no speech was detected.
+    4.  **Provide Pronunciation Feedback:** Write specific, constructive feedback in Korean. Point out specific words or sounds that were pronounced well and those that need improvement. If the transcript is empty or indicates no speech, provide a score of 0 and state that no speech was detected.
     `,
 });
 
