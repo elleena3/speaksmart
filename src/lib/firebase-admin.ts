@@ -17,6 +17,8 @@ if (serviceAccountString) {
   } catch (error) {
     console.error('Error parsing Firebase service account key JSON:', error);
   }
+} else {
+    console.warn('VITE_FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set. Admin SDK will try to use default credentials.');
 }
 
 const firebaseConfig = {
