@@ -33,7 +33,7 @@ export async function generateDialogueAnalysis(
 // 1. Content Analysis Prompt for Dialogue
 const contentAnalysisPrompt = ai.definePrompt({
   name: 'dialogueContentAnalysisPrompt',
-  model: googleAI.model('gemini-2.0-flash'),
+  model: googleAI.model('gemini-2.5-flash'),
   input: { schema: z.object({
     fullConversationTranscript: z.string(),
     activityPrompt: z.string(),
@@ -63,7 +63,7 @@ Based on the FULL CONVERSATION, perform the following tasks:
 // 2. Pronunciation Analysis Prompt for Dialogue
 const pronunciationAnalysisPrompt = ai.definePrompt({
     name: 'dialoguePronunciationAnalysisPrompt',
-    model: googleAI.model('gemini-2.0-flash'),
+    model: googleAI.model('gemini-2.5-flash'),
     input: { schema: z.object({
         studentRecordingDataUri: z.string(),
         studentTranscript: z.string(), // Note: This is only the student's part of the transcript
