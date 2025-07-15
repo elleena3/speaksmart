@@ -11,7 +11,7 @@ import { converseWithStudent } from "@/ai/flows/text-to-speech"
 import { type ConversationTurn } from "@/lib/types/ai-schemas";
 import { type Scenario, type TeacherAssessment } from "@/lib/types";
 
-const SESSION_STORAGE_KEY = 'freeTalkConversationHistory';
+const SESSION_STORAGE_KEY = 'freeTalkSessionData';
 
 export function FreeTalkView({ scenario, scenarioPrompt, assessment }: { scenario: Scenario, scenarioPrompt?: string, assessment: TeacherAssessment }) {
   const [sessionState, setSessionState] = useState<"idle" | "initializing" | "recording" | "processing" | "speaking" | "waiting_for_user">("idle");
@@ -20,7 +20,7 @@ export function FreeTalkView({ scenario, scenarioPrompt, assessment }: { scenari
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioStreamRef = useRef<MediaStream | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
-  const studentAudioChunksRef = useRef<Blob[]>([]); // To collect all student audio blobs
+  const studentAudioBlobsRef = useRef<Blob[]>([]); // To collect all student audio blobs
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
   const scrollAreaRef = useRef<HTMLDivElement | null>(null);
   const router = useRouter();
@@ -129,7 +129,7 @@ export function FreeTalkView({ scenario, scenarioPrompt, assessment }: { scenari
             return;
         }
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        studentAudioChunksRef.current.push(audioBlob); // Collect the student's audio chunk
+        studentAudioBlobsRef.current.push(audioBlob); // Collect the student's audio chunk
         const reader = new FileReader();
         reader.readAsDataURL(audioBlob);
         reader.onloadend = async () => {
@@ -209,8 +209,8 @@ export function FreeTalkView({ scenario, scenarioPrompt, assessment }: { scenari
   };
 
   const handleFinishSession = () => {
-    // Combine all student audio chunks into one blob
-    if (studentAudioChunksRef.current.length === 0) {
+    // Combine all student audio blobs into one blob
+    if (studentAudioBlobsRef.current.length === 0) {
         toast({
             title: "저장할 음성 없음",
             description: "대화를 먼저 진행해주세요.",
@@ -218,14 +218,18 @@ export function FreeTalkView({ scenario, scenarioPrompt, assessment }: { scenari
         });
         return;
     }
-    const combinedBlob = new Blob(studentAudioChunksRef.current, { type: 'audio/webm' });
+    const combinedBlob = new Blob(studentAudioBlobsRef.current, { type: 'audio/webm' });
     const reader = new FileReader();
     reader.readAsDataURL(combinedBlob);
     reader.onloadend = () => {
         const studentRecordingDataUri = reader.result as string;
+        const studentTranscript = conversation
+            .filter(turn => turn.role === 'user')
+            .map(turn => turn.text)
+            .join(' ');
         
         sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({ 
-            history: conversation,
+            studentTranscript: studentTranscript,
             studentRecordingDataUri: studentRecordingDataUri,
             assessment: assessment, // Pass the full assessment object
         }));
@@ -293,7 +297,7 @@ export function FreeTalkView({ scenario, scenarioPrompt, assessment }: { scenari
             );
         default:
             return (
-                <Button onClick={handleFinishSession} variant="secondary" disabled={isBusy || studentAudioChunksRef.current.length === 0}>
+                <Button onClick={handleFinishSession} variant="secondary" disabled={isBusy || studentAudioBlobsRef.current.length === 0}>
                     <CornerDownLeft className="mr-2 h-5 w-5"/>
                     대화 종료
                 </Button>

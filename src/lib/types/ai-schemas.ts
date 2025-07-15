@@ -37,6 +37,9 @@ export const GenerateSpeakingAnalysisInputSchema = z.object({
   studentRecordingGcsUri: z.string().describe(
     "The student's voice recording as a Google Cloud Storage URI. Expected format: 'gs://<bucket-name>/<file-path>'"
   ),
+  studentTranscript: z.string().optional().describe(
+    "Optional pre-generated transcript. If provided, the transcription step will be skipped."
+  ),
   activityPrompt: z.string().describe('The prompt or instructions for the speaking activity.'),
   expectedFormat: z.string().describe('The expected format or key points of the response for grading.'),
   studentName: z.string().describe('The name of the student.'),
