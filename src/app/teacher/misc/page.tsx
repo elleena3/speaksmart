@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { transcribeFile } from "@/ai/flows/transcribe-file";
-import { analyzePronunciation, type PronunciationAnalysisOutput } from "@/ai/flows/analyze-pronunciation";
+import { analyzePronunciation, type PronunciationAnalysisResult } from "@/ai/flows/analyze-pronunciation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 
@@ -179,7 +179,7 @@ function UrlTranscriber() {
 
 function PronunciationAnalyzer() {
   const [file, setFile] = useState<File | null>(null);
-  const [analysisResult, setAnalysisResult] = useState<PronunciationAnalysisOutput | null>(null);
+  const [analysisResults, setAnalysisResults] = useState<PronunciationAnalysisResult[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
   const { toast } = useToast();
 
@@ -188,7 +188,7 @@ function PronunciationAnalyzer() {
     if (selectedFile) {
       if (selectedFile.type.startsWith('audio/webm') || selectedFile.name.endsWith('.webm')) {
         setFile(selectedFile);
-        setAnalysisResult(null);
+        setAnalysisResults([]);
       } else {
         toast({
           title: "잘못된 파일 형식",
@@ -206,29 +206,30 @@ function PronunciationAnalyzer() {
     }
 
     setIsAnalyzing(true);
-    setAnalysisResult(null);
+    setAnalysisResults([]);
+    toast({ title: "분석 시작", description: "3개 모델의 분석을 병렬로 시작합니다." });
 
     try {
       const reader = new FileReader();
       reader.readAsDataURL(file);
       reader.onloadend = async () => {
         const base64Audio = reader.result as string;
-        const result = await analyzePronunciation(base64Audio);
-        setAnalysisResult(result);
+        const results = await analyzePronunciation(base64Audio);
+        setAnalysisResults(results);
+        toast({ title: "분석 완료", description: "모든 모델의 분석이 완료되었습니다." });
       };
       reader.onerror = (error) => {
         console.error("File reading error:", error);
         toast({ title: "파일 읽기 오류", description: "파일을 읽는 중 문제가 발생했습니다.", variant: "destructive" });
+        setIsAnalyzing(false);
       }
     } catch (error: any) {
       console.error("Pronunciation analysis error:", error);
       toast({ title: "발음 분석 오류", description: error.message || "AI 분석 중 오류가 발생했습니다.", variant: "destructive" });
-      setAnalysisResult({
-        pronunciationScore: 0,
-        pronunciationFeedback: `오류가 발생했습니다: ${error.message}`
-      });
-    } finally {
       setIsAnalyzing(false);
+    } finally {
+      // The `isAnalyzing` state is now set to false inside onloadend/onerror or in catch block
+      // to handle the async nature of FileReader. The flow itself will set the final state.
     }
   };
 
@@ -241,24 +242,41 @@ function PronunciationAnalyzer() {
       </div>
       <Button onClick={handleAnalyze} disabled={isAnalyzing || !file} className="w-full">
         {isAnalyzing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mic className="mr-2 h-4 w-4" />}
-        {isAnalyzing ? "분석 중..." : "발음 분석"}
+        {isAnalyzing ? "분석 중..." : "모델별 발음 분석"}
       </Button>
-      {analysisResult && (
-        <div className="space-y-4">
-          <div className="grid gap-2">
-            <label className="text-sm font-medium">분석 결과</label>
-            <div className="w-full">
-              <div className="flex justify-between mb-1">
-                <span className="text-base font-medium text-primary">발음 점수</span>
-                <span className="text-sm font-medium text-primary">{analysisResult.pronunciationScore}%</span>
-              </div>
-              <Progress value={analysisResult.pronunciationScore} className="h-2" />
-            </div>
-          </div>
-          <div className="grid gap-2">
-            <label htmlFor="pronunciation-feedback" className="text-sm font-medium">상세 피드백</label>
-            <Textarea id="pronunciation-feedback" readOnly value={analysisResult.pronunciationFeedback} rows={6} />
-          </div>
+
+      {isAnalyzing && analysisResults.length === 0 && (
+        <div className="text-center p-4">
+            <Loader2 className="h-6 w-6 animate-spin mx-auto" />
+            <p className="mt-2 text-sm text-muted-foreground">AI 모델들이 병렬로 분석 중입니다...</p>
+        </div>
+      )}
+
+      {analysisResults.length > 0 && (
+        <div className="grid grid-cols-1 gap-4">
+          <h3 className="text-lg font-semibold border-b pb-2">모델별 분석 결과</h3>
+          {analysisResults.map((result, index) => (
+            <Card key={index}>
+              <CardHeader>
+                <CardTitle className="text-base font-mono">{result.model}</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                 <div className="w-full">
+                    <div className="flex justify-between mb-1">
+                        <span className="text-sm font-medium text-primary">발음 점수</span>
+                        <span className="text-sm font-medium text-primary">{result.pronunciationScore}%</span>
+                    </div>
+                    <Progress value={result.pronunciationScore} className="h-2" />
+                 </div>
+                 <Textarea 
+                    readOnly 
+                    value={result.pronunciationFeedback} 
+                    rows={6}
+                    className="text-sm bg-muted/50"
+                 />
+              </CardContent>
+            </Card>
+          ))}
         </div>
       )}
     </CardContent>
@@ -305,7 +323,7 @@ export default function MiscPage() {
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2"><Target className="h-6 w-6"/> 영어 발음 분석 도구</CardTitle>
                         <CardDescription>
-                            WebM 오디오 파일을 업로드하여 발음, 억양, 유창성에 대한 AI 피드백과 점수를 받아보세요.
+                            WebM 오디오 파일을 업로드하여 여러 AI 모델의 발음, 억양, 유창성에 대한 피드백과 점수를 비교해보세요.
                         </CardDescription>
                     </CardHeader>
                     <PronunciationAnalyzer />

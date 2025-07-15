@@ -2,9 +2,9 @@
 'use server';
 
 /**
- * @fileOverview A simple flow to analyze the pronunciation of a spoken English audio file.
+ * @fileOverview A flow to analyze the pronunciation of a spoken English audio file using multiple models for comparison.
  *
- * - analyzePronunciation - A function that takes an audio data URI and returns pronunciation feedback.
+ * - analyzePronunciation - A function that takes an audio data URI and returns pronunciation feedback from multiple models.
  */
 
 import { ai } from '@/ai/genkit';
@@ -22,19 +22,30 @@ const PronunciationAnalysisOutputSchema = z.object({
   pronunciationFeedback: z.string().describe('Specific, constructive feedback on the student\'s pronunciation in Korean.'),
 });
 
-export type PronunciationAnalysisOutput = z.infer<typeof PronunciationAnalysisOutputSchema>;
+const PronunciationAnalysisResultSchema = PronunciationAnalysisOutputSchema.extend({
+  model: z.string().describe('The name of the model that generated this analysis.'),
+});
 
-export async function analyzePronunciation(audioDataUri: string): Promise<PronunciationAnalysisOutput> {
+export type PronunciationAnalysisResult = z.infer<typeof PronunciationAnalysisResultSchema>;
+
+export async function analyzePronunciation(audioDataUri: string): Promise<PronunciationAnalysisResult[]> {
   const result = await analyzePronunciationFlow({ audioDataUri });
   return result;
 }
 
-const pronunciationAnalysisPrompt = ai.definePrompt({
-  name: 'standalonePronunciationAnalysisPrompt',
-  model: googleAI.model('gemini-2.5-flash-lite-preview-06-17'),
-  input: { schema: PronunciationAnalysisInputSchema },
-  output: { schema: PronunciationAnalysisOutputSchema },
-  prompt: `You are an expert English pronunciation coach. Your task is to evaluate a user's spoken English based on an audio recording. Provide all feedback in Korean.
+const modelsToCompare = [
+    'gemini-2.5-flash-lite-preview-06-17',
+    'gemini-2.5-flash-preview',
+    'gemini-2.0-flash',
+];
+
+const createPronunciationPrompt = (modelName: string) => {
+    return ai.definePrompt({
+        name: `pronunciationAnalysisPrompt_${modelName.replace(/-/g, '_')}`,
+        model: googleAI.model(modelName as any), // Use 'as any' to allow dynamic model names
+        input: { schema: PronunciationAnalysisInputSchema },
+        output: { schema: PronunciationAnalysisOutputSchema },
+        prompt: `You are an expert English pronunciation coach. Your task is to evaluate a user's spoken English based on an audio recording. Provide all feedback in Korean.
 
 - User's Audio Recording: {{media url=audioDataUri contentType='audio/webm;codecs=opus'}}
 
@@ -44,19 +55,38 @@ Please perform the following steps:
 3.  **Assign a Pronunciation Score:** Give a score from 0 to 100 (100 is native-like, 0 is unintelligible).
 4.  **Provide Pronunciation Feedback:** Write specific, constructive feedback in Korean. Point out general patterns or specific words/sounds that were pronounced well and those that need improvement. If the audio is silent or contains no discernible speech, provide a score of 0 and state that no speech was detected.
 `,
-});
+    });
+}
 
 const analyzePronunciationFlow = ai.defineFlow(
   {
     name: 'analyzePronunciationFlow',
     inputSchema: PronunciationAnalysisInputSchema,
-    outputSchema: PronunciationAnalysisOutputSchema,
+    outputSchema: z.array(PronunciationAnalysisResultSchema),
   },
   async (input) => {
-    const { output } = await pronunciationAnalysisPrompt(input);
-    if (!output) {
-      throw new Error("Failed to get a valid response from the pronunciation analysis model.");
-    }
-    return output;
+    
+    const analysisPromises = modelsToCompare.map(async (modelName) => {
+        try {
+            const prompt = createPronunciationPrompt(modelName);
+            const { output } = await prompt(input);
+            if (!output) {
+              throw new Error(`Model ${modelName} returned no output.`);
+            }
+            return { ...output, model: modelName };
+        } catch (error: any) {
+            console.error(`Error analyzing with model ${modelName}:`, error);
+            // Return a specific error object for this model on failure
+            return {
+                model: modelName,
+                pronunciationScore: 0,
+                pronunciationFeedback: `[오류] 모델 분석에 실패했습니다: ${error.message}`
+            }
+        }
+    });
+
+    const results = await Promise.all(analysisPromises);
+    
+    return results;
   }
 );
