@@ -17,12 +17,14 @@ export function FreeTalkView({ scenario, scenarioPrompt, assessment }: { scenari
   const [sessionState, setSessionState] = useState<"idle" | "initializing" | "recording" | "processing" | "speaking" | "waiting_for_user">("idle");
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
   const [interimTranscript, setInterimTranscript] = useState<string | null>(null);
+  
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioStreamRef = useRef<MediaStream | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const studentAudioBlobsRef = useRef<Blob[]>([]); // To collect all student audio blobs
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
   const scrollAreaRef = useRef<HTMLDivElement | null>(null);
+  
   const router = useRouter();
   const { toast } = useToast();
 
@@ -224,10 +226,10 @@ export function FreeTalkView({ scenario, scenarioPrompt, assessment }: { scenari
     reader.onloadend = () => {
         const studentRecordingDataUri = reader.result as string;
         
-        sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({ 
+        sessionStorage.setItem('freeTalkSessionData', JSON.stringify({ 
             studentRecordingDataUri: studentRecordingDataUri,
             conversationHistory: conversation,
-            assessment: assessment, // Pass the full assessment object
+            assessment: assessment,
         }));
         
         router.push(`/student/assessment/free-talk/results`);

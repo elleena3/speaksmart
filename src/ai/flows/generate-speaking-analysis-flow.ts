@@ -121,9 +121,9 @@ const generateSpeakingAnalysisFlow = ai.defineFlow(
   },
   async (input) => {
     
-    // Step 1: Transcribe the audio if a GCS URI is provided. 
-    // If transcript is provided directly (from Dialogue), use that.
-    const studentTranscript = input.studentTranscript ?? await transcribeAudioFlow(input.studentRecordingGcsUri);
+    // Step 1: Transcribe the audio ONLY if a transcript is NOT provided.
+    // This is for Monologue assessments. Dialogue assessments will pass the transcript directly.
+    const studentTranscript = input.studentTranscript ? input.studentTranscript : await transcribeAudioFlow(input.studentRecordingGcsUri);
 
     if (!studentTranscript || studentTranscript.includes('기록되지 않았습니다') || studentTranscript.includes('인식하지 못했습니다')) {
         return {

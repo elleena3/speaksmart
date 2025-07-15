@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState, useEffect, useCallback } from "react";
@@ -10,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { FeedbackView } from "../../../assessment/[id]/results/feedback-view";
 import { useAuth } from "@/context/auth-context";
 import { db, storage, firebaseConfig } from "@/lib/firebase";
-import { collection, doc, query, where, getDocs, writeBatch, setDoc, addDoc, updateDoc } from "firebase/firestore";
+import { collection, doc, query, where, getDocs, setDoc, updateDoc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { Card, CardHeader, CardContent, CardDescription, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -37,7 +38,7 @@ export function FreeTalkFeedbackView() {
     const generateFeedback = useCallback(async (sessionData: StoredSessionData) => {
         if (!user) return;
         setIsLoading(true);
-        let newResultRef: any; // Can be a new or existing doc ref
+        let newResultRef: any; 
 
         try {
             const { assessment, studentRecordingDataUri, conversationHistory } = sessionData;
@@ -84,19 +85,25 @@ export function FreeTalkFeedbackView() {
             const bucket = firebaseConfig.storageBucket?.replace(".firebasestorage.app", "");
             const gcsUri = `gs://${bucket}/${storageRef.fullPath}`;
 
-            const studentTranscript = conversationHistory
+            const fullConversationTranscript = conversationHistory
+                .map(turn => `${turn.role === 'user' ? '학생' : 'AI'}: ${turn.text}`)
+                .join('\n');
+                
+            const studentOnlyTranscript = conversationHistory
                 .filter(turn => turn.role === 'user')
                 .map(turn => turn.text)
-                .join('\n');
+                .join(' ');
+
 
             // 3. Generate all feedback using the analysis flow with the GCS URI.
             setStatus("AI 분석 중...");
             setProgress(50);
             await updateDoc(newResultRef, { status: "AI 분석 중...", progress: 50 });
+            
             const analysisResult = await generateSpeakingAnalysis({
                 studentRecordingGcsUri: gcsUri,
-                studentTranscript: studentTranscript, // Pass the pre-compiled transcript from conversation history
-                activityPrompt: assessment.prompt,
+                studentTranscript: studentOnlyTranscript, // Pass only the student's transcript for pronunciation analysis
+                activityPrompt: `${assessment.prompt}\n\n--- 전체 대화 기록 ---\n${fullConversationTranscript}`, // Provide full context for content analysis
                 expectedFormat: assessment.expectedFormat || "AI와의 자연스러운 대화 능력을 평가합니다.",
                 studentName: user.displayName || "Student",
                 assessmentTitle: assessment.title,
@@ -106,12 +113,9 @@ export function FreeTalkFeedbackView() {
             setStatus("리포트 생성 중...");
             setProgress(90);
             
-            // Re-compile the full transcript for saving
-            const fullTranscript = conversationHistory.map(turn => `${turn.role === 'user' ? '학생' : 'AI'}: ${turn.text}`).join('\n');
-
             const finalResultData: Partial<StudentResult> = {
                 ...analysisResult,
-                studentTranscript: fullTranscript, // Save the full conversation
+                studentTranscript: fullConversationTranscript, // Save the full conversation for review
                 score: analysisResult.contentScore,
                 studentRecordingDataUri: downloadURL,
                 status: "채점 완료",
@@ -167,9 +171,6 @@ export function FreeTalkFeedbackView() {
 
         const storedDataString = sessionStorage.getItem(SESSION_STORAGE_KEY);
         if (!storedDataString) {
-            // This can happen on a page refresh, check if a result already exists in Firestore for this user/assessment.
-            // This part is complex and might be better handled by navigating back to dashboard.
-            // For now, we show an error and navigate back.
             toast({
                 title: "오류",
                 description: "분석할 대화 기록을 찾을 수 없습니다. 대시보드로 돌아갑니다.",
