@@ -31,27 +31,14 @@ export async function generateMonologueAnalysis(
 
 // Internal Sub-flows and Prompts
 
-// 1. Transcription Flow
-const transcribeAudioFlow = ai.defineFlow(
-  {
-    name: 'transcribeAudioFlow',
-    inputSchema: z.string(), // data URI
-    outputSchema: z.string(), // transcript
-  },
-  async (audioDataUri) => {
-    if (!audioDataUri) {
-        return "(학생 답변이 기록되지 않았습니다.)";
-    }
-    const sttResponse = await ai.generate({
-      model: googleAI.model('gemini-2.0-flash'),
-      prompt: [
-        { text: 'Transcribe this English audio.' },
-        { media: { url: audioDataUri } },
-      ],
-    });
-    return sttResponse.text || "(학생 답변을 인식하지 못했습니다.)";
-  }
-);
+// 1. Transcription Flow - This is no longer a separate flow, but a prompt call.
+const transcriptionPrompt = ai.definePrompt({
+    name: 'transcribeAudioPrompt',
+    input: { schema: z.object({ audioDataUri: z.string() }) },
+    prompt: `Transcribe this English audio.
+    Audio: {{media url=audioDataUri}}
+    `,
+});
 
 
 // 2. Content Analysis Prompt
@@ -116,7 +103,8 @@ const generateMonologueAnalysisFlow = ai.defineFlow(
   async (input) => {
     
     // Step 1: Transcribe the audio.
-    const studentTranscript = await transcribeAudioFlow(input.studentRecordingDataUri);
+    const transcriptionResult = await transcriptionPrompt({ audioDataUri: input.studentRecordingDataUri });
+    const studentTranscript = transcriptionResult.text;
 
     if (!studentTranscript || studentTranscript.includes('기록되지 않았습니다') || studentTranscript.includes('인식하지 못했습니다')) {
         return {
