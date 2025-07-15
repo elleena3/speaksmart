@@ -2,6 +2,7 @@
 // src/lib/firebase-admin.ts
 import * as admin from 'firebase-admin';
 import type { App } from 'firebase-admin/app';
+import { firebaseConfig } from './firebase'; // 클라이언트 설정을 가져옵니다.
 
 // ====================================================================
 // 중요: 이 파일은 서버 환경에서만 사용됩니다 (예: Genkit Flows).
@@ -12,37 +13,24 @@ let app: App;
 
 // Firebase Admin SDK를 한 번만 초기화하도록 보장하는 함수
 function initializeFirebaseAdmin(): App {
+  // 이미 앱이 초기화되었다면, 기존 앱을 반환합니다.
   if (admin.apps.length > 0) {
     return admin.app();
   }
 
-  const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-
-  // 서비스 계정 키 환경 변수가 있으면 해당 키를 사용하여 초기화합니다.
-  if (serviceAccountString) {
-    let serviceAccount;
-    try {
-      // 환경 변수에서 Base64로 인코딩된 JSON 문자열을 디코딩하고 파싱합니다.
-      serviceAccount = JSON.parse(Buffer.from(serviceAccountString, 'base64').toString('utf-8'));
-    } catch (error) {
-      console.error('Could not parse FIREBASE_SERVICE_ACCOUNT_KEY. Make sure it is a valid Base64 encoded JSON string.', error);
-      throw new Error('Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY.');
-    }
-    
-    try {
-      return admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
-        projectId: serviceAccount.project_id,
-        storageBucket: `${serviceAccount.project_id}.appspot.com`,
-      });
-    } catch (error: any) {
-      console.error('Firebase Admin SDK initialization error with service account:', error.stack);
-      throw new Error('Failed to initialize Firebase Admin SDK with service account.');
-    }
-  } else {
-    // 환경 변수가 없을 경우, 기본 자격 증명을 사용하려고 시도합니다. (예: Google Cloud 환경)
-    console.warn('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set. Admin SDK will try to use default credentials.');
-    return admin.initializeApp();
+  // 환경 변수 대신, 클라이언트 설정에서 프로젝트 ID와 스토리지 버킷을 사용합니다.
+  // 이 방식은 Firebase Hosting이나 Cloud Functions 같은 Google 환경에서
+  // 자동으로 인증 정보를 찾아 초기화합니다.
+  try {
+    return admin.initializeApp({
+      projectId: firebaseConfig.projectId,
+      storageBucket: firebaseConfig.storageBucket,
+      // 이 환경에서는 credential을 명시적으로 제공할 필요가 없습니다.
+      // App Hosting 환경이 자동으로 서비스 계정을 찾아 사용합니다.
+    });
+  } catch (error: any) {
+    console.error('Firebase Admin SDK initialization error:', error.stack);
+    throw new Error('Failed to initialize Firebase Admin SDK. Please check project configurations.');
   }
 }
 
