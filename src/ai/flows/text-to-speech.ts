@@ -28,7 +28,7 @@ export async function converseWithStudent(
 // 1. Define the prompt for generating the conversational text response
 const conversationalPrompt = ai.definePrompt({
   name: 'conversationalPrompt',
-  model: googleAI.model('gemini-2.0-flash'),
+  model: googleAI.model('gemini-2.5-flash'),
   input: {
     schema: ConverseWithStudentInputSchema.pick({
       studentTranscript: true,
