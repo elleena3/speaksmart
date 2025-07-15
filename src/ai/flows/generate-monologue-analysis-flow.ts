@@ -31,13 +31,13 @@ export async function generateMonologueAnalysis(
 
 // Internal Sub-flows and Prompts
 
-// 1. Transcription Flow - This is no longer a separate flow, but a prompt call.
+// 1. Transcription Prompt - No longer a separate flow, but a prompt call.
 const transcriptionPrompt = ai.definePrompt({
     name: 'transcribeAudioPrompt',
     input: { schema: z.object({ audioDataUri: z.string() }) },
     prompt: `Transcribe this English audio.
-    Audio: {{media url=audioDataUri}}
-    `,
+Audio: {{media url=audioDataUri}}
+`,
 });
 
 
@@ -81,15 +81,15 @@ const pronunciationAnalysisPrompt = ai.definePrompt({
     output: { schema: PronunciationAnalysisOutputSchema },
     prompt: `You are an expert English pronunciation coach. Your task is to evaluate a student's spoken English based on their audio recording and the corresponding transcript. Provide all feedback in Korean.
 
-    - Student's Audio Recording: {{media url=studentRecordingDataUri}}
-    - AI-generated Transcript: {{{studentTranscript}}}
+- Student's Audio Recording: {{media url=studentRecordingDataUri}}
+- AI-generated Transcript: {{{studentTranscript}}}
 
-    Please perform the following steps:
-    1.  Listen carefully to the audio and compare it with the transcript.
-    2.  Evaluate accuracy, clarity, intonation, and fluency.
-    3.  **Assign a Pronunciation Score:** Give a score from 0 to 100 (100 is native-like, 0 is unintelligible).
-    4.  **Provide Pronunciation Feedback:** Write specific, constructive feedback in Korean. Point out specific words or sounds that were pronounced well and those that need improvement. If the transcript is empty or indicates no speech, provide a score of 0 and state that no speech was detected.
-    `,
+Please perform the following steps:
+1.  Listen carefully to the audio and compare it with the transcript.
+2.  Evaluate accuracy, clarity, intonation, and fluency.
+3.  **Assign a Pronunciation Score:** Give a score from 0 to 100 (100 is native-like, 0 is unintelligible).
+4.  **Provide Pronunciation Feedback:** Write specific, constructive feedback in Korean. Point out specific words or sounds that were pronounced well and those that need improvement. If the transcript is empty or indicates no speech, provide a score of 0 and state that no speech was detected.
+`,
 });
 
 
@@ -106,7 +106,7 @@ const generateMonologueAnalysisFlow = ai.defineFlow(
     const transcriptionResult = await transcriptionPrompt({ audioDataUri: input.studentRecordingDataUri });
     const studentTranscript = transcriptionResult.text;
 
-    if (!studentTranscript || studentTranscript.includes('기록되지 않았습니다') || studentTranscript.includes('인식하지 못했습니다')) {
+    if (!studentTranscript || studentTranscript.trim() === "" || studentTranscript.includes('기록되지 않았습니다') || studentTranscript.includes('인식하지 못했습니다')) {
         return {
             studentTranscript: studentTranscript || '학생 답변을 인식하지 못했습니다.',
             aiFeedback: '학생의 답변을 인식하지 못했습니다. 마이크 상태를 확인하고 다시 시도해주세요.',
