@@ -18,4 +18,7 @@ import '@/ai/flows/analyze-pronunciation.ts'; // New flow for the main page tool
 import '@/ai/flows/generate-monologue-analysis-flow';
 import '@/ai/flows/generate-dialogue-analysis-flow';
 
+// New flow for the Misc page's real-time conversation tool
+import '@/ai/flows/create-native-teacher-flow';
+
     

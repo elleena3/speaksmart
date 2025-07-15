@@ -3,7 +3,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Loader2, Upload, FileText, Link as LinkIcon, Download, Target, Mic } from "lucide-react";
+import { Loader2, Upload, FileText, Link as LinkIcon, Download, Target, Mic, Bot } from "lucide-react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,6 +12,7 @@ import { transcribeFile, type TranscriptionResult } from "@/ai/flows/transcribe-
 import { analyzePronunciation, type PronunciationAnalysisResult } from "@/ai/flows/analyze-pronunciation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
+import { RealtimeConversationTool } from "./realtime-conversation-tool";
 
 
 function FileTranscriber() {
@@ -362,6 +363,18 @@ export default function MiscPage() {
                         </CardDescription>
                     </CardHeader>
                     <PronunciationAnalyzer />
+                </Card>
+
+                <Card className="lg:col-span-2">
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2"><Bot className="h-6 w-6"/> AI 원어민 선생님과 대화하기</CardTitle>
+                        <CardDescription>
+                            실시간으로 AI와 영어 회화를 연습하고, 어떤 주제로든 질문해보세요. AI가 당신의 영어 수준에 맞춰 대화해 줄 것입니다.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                       <RealtimeConversationTool />
+                    </CardContent>
                 </Card>
             </div>
         </div>
