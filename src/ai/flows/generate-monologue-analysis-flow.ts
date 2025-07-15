@@ -46,7 +46,7 @@ const transcribeAudioFlow = ai.defineFlow(
       model: googleAI.model('gemini-2.0-flash'),
       prompt: [
         { text: 'Transcribe this English audio.' },
-        { media: { url: audioDataUri } }, // No contentType needed, it's in the data URI
+        { media: { url: audioDataUri } },
       ],
     });
     return sttResponse.text || "(학생 답변을 인식하지 못했습니다.)";
