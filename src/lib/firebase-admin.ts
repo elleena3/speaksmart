@@ -2,7 +2,6 @@
 // src/lib/firebase-admin.ts
 import * as admin from 'firebase-admin';
 import type { App } from 'firebase-admin/app';
-import { firebaseConfig } from './firebase'; // 클라이언트 설정을 가져옵니다.
 
 // ====================================================================
 // 중요: 이 파일은 서버 환경에서만 사용됩니다 (예: Genkit Flows).
@@ -18,19 +17,14 @@ function initializeFirebaseAdmin(): App {
     return admin.app();
   }
 
-  // 환경 변수 대신, 클라이언트 설정에서 프로젝트 ID와 스토리지 버킷을 사용합니다.
-  // 이 방식은 Firebase Hosting이나 Cloud Functions 같은 Google 환경에서
-  // 자동으로 인증 정보를 찾아 초기화합니다.
+  // App Hosting 환경에서는 자동으로 서비스 계정을 찾아 사용합니다.
+  // 추가 설정 없이 initializeApp()을 호출하는 것이 가장 안정적입니다.
   try {
-    return admin.initializeApp({
-      projectId: firebaseConfig.projectId,
-      storageBucket: firebaseConfig.storageBucket,
-      // 이 환경에서는 credential을 명시적으로 제공할 필요가 없습니다.
-      // App Hosting 환경이 자동으로 서비스 계정을 찾아 사용합니다.
-    });
+    return admin.initializeApp();
   } catch (error: any) {
     console.error('Firebase Admin SDK initialization error:', error.stack);
-    throw new Error('Failed to initialize Firebase Admin SDK. Please check project configurations.');
+    // 초기화 실패 시 더 구체적인 오류를 던져서 디버깅을 돕습니다.
+    throw new Error('Failed to initialize Firebase Admin SDK. Please ensure the App Hosting environment is correctly set up with service account permissions.');
   }
 }
 
