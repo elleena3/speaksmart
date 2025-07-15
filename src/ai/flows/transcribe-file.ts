@@ -22,9 +22,10 @@ export async function transcribeFile(audioDataUri: string): Promise<string> {
 
 const transcriptionPrompt = ai.definePrompt({
   name: 'transcribeFilePrompt',
-  model: googleAI.model('gemini-2.0-flash'),
+  // Use a more powerful model specifically for this public-facing tool.
+  model: googleAI.model('gemini-1.5-flash-latest'),
   input: { schema: TranscribeFileInputSchema },
-  prompt: `Transcribe this English audio.
+  prompt: `Transcribe this English audio. If the audio is silent or contains no discernible speech, return an empty string.
 Audio: {{media url=prompt contentType='audio/webm;codecs=opus'}}
 `,
 });
