@@ -6,8 +6,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Mic, StopCircle, Loader2, Timer, Send, RefreshCw } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { generateSpeakingAnalysis } from "@/ai/flows/generate-speaking-analysis-flow"
-import { type TeacherAssessment, type StudentResult } from "@/lib/types"
+import { type TeacherAssessment } from "@/lib/types"
 import { useAuth } from "@/context/auth-context"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
@@ -28,7 +27,6 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
   const audioChunksRef = useRef<Blob[]>([]);
   const audioStreamRef = useRef<MediaStream | null>(null);
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const audioPlayerRef = useRef<HTMLAudioElement>(null);
 
   const timeLimit = assessmentDetails.recordingTimeLimit && assessmentDetails.recordingTimeLimit > 0 
     ? assessmentDetails.recordingTimeLimit * 60 
@@ -148,22 +146,29 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
     }
     setRecordingState("submitting");
 
-    // 로컬 목업 모드에서는 AI 호출 없이 바로 결과 페이지로 이동합니다.
-    toast({
-        title: "제출 시작됨 (목업)",
-        description: "답변이 제출되었습니다. 로컬 목업 결과 페이지로 이동합니다.",
-    });
+    try {
+        toast({
+            title: "제출 중...",
+            description: "답변을 서버로 전송하고 AI 분석을 시작합니다.",
+        });
 
-    // Save mock result data to session storage to be picked up by results page
-    const reader = new FileReader();
-    reader.readAsDataURL(audioBlob);
-    reader.onloadend = () => {
-        sessionStorage.setItem('mockResult', JSON.stringify({
-            assessmentId: assessmentDetails.id,
-            studentRecordingDataUri: reader.result as string,
-        }));
-        router.push(`/student/assessment/${assessmentDetails.id}/results`);
-    };
+        // Pass all necessary data via session storage for the results page to handle.
+        const reader = new FileReader();
+        reader.readAsDataURL(audioBlob);
+        reader.onloadend = () => {
+            sessionStorage.setItem('mockResult', JSON.stringify({
+                assessmentId: assessmentDetails.id,
+                studentRecordingDataUri: reader.result as string,
+                assessmentDetails: assessmentDetails, // Pass full details
+            }));
+            router.push(`/student/assessment/${assessmentDetails.id}/results`);
+        };
+
+    } catch (error) {
+        console.error("Error preparing for submission:", error);
+        toast({ title: "제출 준비 오류", description: "답변을 제출하는 중 오류가 발생했습니다.", variant: "destructive" });
+        setRecordingState("recorded"); // Allow user to try again
+    }
   }
   
   useEffect(() => {
@@ -255,7 +260,7 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
         </CardHeader>
         <CardContent className="space-y-4">
             {audioUrl && (
-                <audio ref={audioPlayerRef} src={audioUrl} controls className="w-full" />
+                <audio src={audioUrl} controls className="w-full" />
             )}
             <div className="flex flex-col sm:flex-row gap-2">
                 <Button onClick={handleStartRecording} variant="outline" className="w-full">
