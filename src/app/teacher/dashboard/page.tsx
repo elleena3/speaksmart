@@ -16,16 +16,14 @@ import { useLanguage } from "@/context/language-context"
 import { useAuth } from '@/context/auth-context';
 import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { format } from "date-fns";
 
-type AssessmentWithCount = TeacherAssessment & {
-    submissionCount: number;
-}
 
 export default function TeacherDashboard() {
   const { t } = useLanguage();
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
-  const [assessments, setAssessments] = useState<AssessmentWithCount[]>([]);
+  const [assessments, setAssessments] = useState<TeacherAssessment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchAssessments = useCallback(async () => {
@@ -41,17 +39,7 @@ export default function TeacherDashboard() {
         );
 
         const querySnapshot = await getDocs(q);
-        const assessmentsData = await Promise.all(
-            querySnapshot.docs.map(async (doc) => {
-                const assessment = { id: doc.id, ...doc.data() } as TeacherAssessment;
-                const resultsQuery = query(collection(db, "results"), where("assessmentId", "==", assessment.id));
-                const resultsSnapshot = await getDocs(resultsQuery);
-                return {
-                    ...assessment,
-                    submissionCount: resultsSnapshot.size,
-                };
-            })
-        );
+        const assessmentsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TeacherAssessment));
         setAssessments(assessmentsData);
     } catch (error) {
         console.error("Error fetching assessments:", error);
@@ -126,8 +114,8 @@ export default function TeacherDashboard() {
                   <TableCell className="text-center">
                     <div className="flex items-center justify-center gap-1.5">
                       <Users className="h-4 w-4 text-muted-foreground" />
-                      <Badge variant={assessment.submissionCount > 0 ? "default" : "secondary"}>
-                        {assessment.submissionCount}
+                      <Badge variant={(assessment.submissionCount ?? 0) > 0 ? "default" : "secondary"}>
+                        {assessment.submissionCount ?? 0}
                       </Badge>
                     </div>
                   </TableCell>
@@ -136,7 +124,7 @@ export default function TeacherDashboard() {
                       {assessment.averageScore > 0 ? `${assessment.averageScore}%` : t.teacherDashboard.noScore}
                     </Badge>
                   </TableCell>
-                  <TableCell>{assessment.dateCreated}</TableCell>
+                  <TableCell>{assessment.createdAt ? format(new Date(assessment.createdAt), 'yyyy-MM-dd') : 'N/A'}</TableCell>
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>

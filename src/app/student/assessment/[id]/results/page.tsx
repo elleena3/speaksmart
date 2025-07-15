@@ -9,11 +9,36 @@ import { useAuth } from "@/context/auth-context";
 import { Loader2, AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { db } from "@/lib/firebase";
-import { collection, query, where, onSnapshot, getDocs } from "firebase/firestore";
+import { collection, query, where, onSnapshot, getDocs, doc, runTransaction, setDoc, addDoc } from "firebase/firestore";
 import { generateSpeakingAnalysis } from "@/ai/flows/generate-speaking-analysis-flow";
 import { useToast } from "@/hooks/use-toast";
 
 const MOCK_SESSION_KEY = 'mockResult';
+
+
+// Server-side action cannot be here, needs to be callable from client.
+// This function updates the assessment's average score.
+async function updateAssessmentAverage(assessmentId: string, newScore: number) {
+    if (!assessmentId) return;
+    const assessmentRef = doc(db, "assessments", assessmentId);
+    try {
+        await runTransaction(db, async (transaction) => {
+            const assessmentDoc = await transaction.get(assessmentRef);
+            if (!assessmentDoc.exists()) {
+                throw new Error("Assessment does not exist!");
+            }
+            const data = assessmentDoc.data();
+            const currentTotalScore = (data.averageScore || 0) * (data.submissionCount -1);
+            const newAverage = (currentTotalScore + newScore) / data.submissionCount;
+            
+            transaction.update(assessmentRef, { averageScore: Math.round(newAverage) });
+        });
+    } catch (e) {
+        console.error("Failed to update average score:", e);
+        // This is a non-critical error, so we don't need to show it to the user.
+    }
+}
+
 
 export default function AssessmentResultsPage() {
   const { user, loading: authLoading } = useAuth();
@@ -52,9 +77,10 @@ export default function AssessmentResultsPage() {
             studentName: user.displayName || "Student",
             assessmentTitle: assessmentDetails.title,
         }, handleProgressUpdate);
+        
+        const resultsCollectionRef = collection(db, "results");
 
-        const newResultData = {
-          id: `new_${Date.now()}`,
+        const newResultData: Omit<StudentResult, 'id'> = {
           ...analysisResult,
           studentId: user.uid,
           assessmentId: assessmentId,
@@ -70,7 +96,12 @@ export default function AssessmentResultsPage() {
           studentRecordingDataUri,
         };
 
-        setResult(newResultData);
+        const resultDocRef = await addDoc(resultsCollectionRef, newResultData);
+
+        // Update the assessment average score
+        await updateAssessmentAverage(assessmentId, newResultData.score);
+        
+        setResult({ ...newResultData, id: resultDocRef.id });
         setStatus("채점 완료");
         setProgress(100);
 

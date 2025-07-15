@@ -31,6 +31,7 @@ export default function AssessmentsPage() {
     if (!user) return;
     setIsLoading(true);
     try {
+        // No longer need to fetch results for each assessment, as submissionCount is now a field.
         const q = query(collection(db, "assessments"), where("uid", "==", user.uid), orderBy("createdAt", "desc"));
         const querySnapshot = await getDocs(q);
         const assessmentsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TeacherAssessment));
@@ -59,7 +60,7 @@ export default function AssessmentsPage() {
     if (!assessmentToCopy) return;
 
     try {
-      const { id, submissionCount, averageScore, ...copyData } = assessmentToCopy;
+      const { id, ...copyData } = assessmentToCopy;
       
       await addDoc(collection(db, "assessments"), {
         ...copyData,
@@ -67,6 +68,7 @@ export default function AssessmentsPage() {
         createdAt: Date.now(),
         dateCreated: new Date().toISOString().split('T')[0],
         submissionCount: 0,
+        averageScore: 0,
       });
 
       toast({

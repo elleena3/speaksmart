@@ -33,9 +33,9 @@ export default function NewAssessmentPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const formSchema = useMemo(() => z.object({
-    title: z.string(),
-    topic: z.string(),
-    prompt: z.string(),
+    title: z.string().optional(),
+    topic: z.string().optional(),
+    prompt: z.string().optional(),
     expectedFormat: z.string().optional(),
     startDate: z.date().optional(),
     endDate: z.date().optional(),
@@ -113,32 +113,24 @@ export default function NewAssessmentPage() {
             submissionValues.expectedFormat = "발음, 문법, 단어, 문장 등을 평가 주제에 맞게 종합적으로 판단.";
         }
         
-        const docData: Omit<TeacherAssessment, "id"> = {
+        const docData: Partial<Omit<TeacherAssessment, "id">> = {
             ...submissionValues,
             uid: user.uid,
             averageScore: 0,
             dateCreated: new Date().toISOString().split('T')[0],
             createdAt: Date.now(),
-            submissionCount: 0, // Add submissionCount field on creation
+            submissionCount: 0,
         };
-
+        
         if (values.startDate) {
             docData.startDate = values.startDate.toISOString();
-        } else {
-            delete (docData as any).startDate;
         }
-
         if (values.endDate) {
             docData.endDate = values.endDate.toISOString();
-        } else {
-            delete (docData as any).endDate;
         }
-        
-        // Remove undefined fields before sending to Firestore
-        if (docData.recordingTimeLimit === undefined) delete docData.recordingTimeLimit;
-        if (docData.scenario === undefined) delete docData.scenario;
-        if (docData.expectedFormat === undefined) delete docData.expectedFormat;
 
+        // Remove undefined fields before sending to Firestore
+        Object.keys(docData).forEach(key => docData[key as keyof typeof docData] === undefined && delete docData[key as keyof typeof docData]);
 
         await addDoc(collection(db, "assessments"), docData);
 
@@ -315,7 +307,7 @@ export default function NewAssessmentPage() {
                         type="number"
                         placeholder={t.teacherAssessmentForm.timeLimitPlaceholder}
                         {...field}
-                        onChange={event => field.onChange(parseInt(event.target.value, 10) || 0)}
+                        onChange={event => field.onChange(parseInt(event.target.value, 10) || undefined)}
                       />
                     </FormControl>
                     <FormDescription>{t.teacherAssessmentForm.timeLimitDescription}</FormDescription>

@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Mic, StopCircle, Loader2, Timer, Send, RefreshCw } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { addDoc, collection, doc, serverTimestamp, setDoc } from "firebase/firestore";
+import { collection, doc, runTransaction, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
 import { ref, uploadString, getDownloadURL } from "firebase/storage";
 import { db, storage } from "@/lib/firebase";
 import { type TeacherAssessment, type StudentResult } from "@/lib/types"
@@ -155,27 +155,29 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
             title: "제출 중...",
             description: "답변을 서버로 전송하고 있습니다.",
         });
-
-        // 1. Create a placeholder document in Firestore
-        const resultDocRef = doc(collection(db, "results"));
-        const resultData: Partial<StudentResult> = {
-            studentId: user.uid,
-            assessmentId: assessmentDetails.id,
-            assessmentTitle: assessmentDetails.title,
-            name: user.displayName || 'Unknown Student',
-            avatarUrl: user.photoURL || '',
-            status: "업로드 중",
-            score: 0,
-            date: new Date().toISOString(),
-            createdAt: Date.now(),
-            teacherUid: assessmentDetails.uid,
-        };
-        await setDoc(resultDocRef, resultData);
         
-        // Use a different key for real submissions vs. mock submissions
+        // This is a local mock submission for now.
+        // It saves the data to session storage for the results page to pick up.
+        // In a real implementation, we would upload to a server.
         const reader = new FileReader();
         reader.readAsDataURL(audioBlob);
-        reader.onloadend = () => {
+        reader.onloadend = async () => {
+            // Increment submission count in a transaction
+            const assessmentRef = doc(db, "assessments", assessmentDetails.id);
+            try {
+                await runTransaction(db, async (transaction) => {
+                    const assessmentDoc = await transaction.get(assessmentRef);
+                    if (!assessmentDoc.exists()) {
+                        throw "Assessment does not exist!";
+                    }
+                    const newCount = (assessmentDoc.data().submissionCount || 0) + 1;
+                    transaction.update(assessmentRef, { submissionCount: newCount });
+                });
+            } catch (e) {
+                console.error("Transaction failed: ", e);
+                // Continue even if transaction fails, as it's not critical for submission
+            }
+
             sessionStorage.setItem('mockResult', JSON.stringify({
                 assessmentId: assessmentDetails.id,
                 studentRecordingDataUri: reader.result as string,
