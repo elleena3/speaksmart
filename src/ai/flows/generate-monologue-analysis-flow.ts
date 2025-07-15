@@ -34,9 +34,9 @@ export async function generateMonologueAnalysis(
 // 1. Transcription Prompt - Uses handlebars to pass the data URI
 const transcriptionPrompt = ai.definePrompt({
     name: 'transcribeAudioPrompt',
-    input: { schema: z.object({ audioDataUri: z.string() }) },
+    input: { schema: z.string() }, // Expect a raw string (the data URI)
     prompt: `Transcribe this English audio.
-Audio: {{media url=audioDataUri}}
+Audio: {{media url=prompt contentType='video/webm'}}
 `,
 });
 
@@ -81,7 +81,7 @@ const pronunciationAnalysisPrompt = ai.definePrompt({
     output: { schema: PronunciationAnalysisOutputSchema },
     prompt: `You are an expert English pronunciation coach. Your task is to evaluate a student's spoken English based on their audio recording and the corresponding transcript. Provide all feedback in Korean.
 
-- Student's Audio Recording: {{media url=studentRecordingDataUri}}
+- Student's Audio Recording: {{media url=studentRecordingDataUri contentType='video/webm'}}
 - AI-generated Transcript: {{{studentTranscript}}}
 
 Please perform the following steps:
@@ -103,7 +103,7 @@ const generateMonologueAnalysisFlow = ai.defineFlow(
   async (input) => {
     
     // Step 1: Transcribe the audio.
-    const transcriptionResult = await transcriptionPrompt({ audioDataUri: input.studentRecordingDataUri });
+    const transcriptionResult = await transcriptionPrompt(input.studentRecordingDataUri);
     const studentTranscript = transcriptionResult.text;
 
     if (!studentTranscript || studentTranscript.trim() === "" || studentTranscript.includes('기록되지 않았습니다') || studentTranscript.includes('인식하지 못했습니다')) {
