@@ -65,7 +65,7 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
 
 
   const startActualRecording = async () => {
-    setRecordingState("recording");
+    // This function now only handles the recording logic, not state transitions that happen before it.
     if(timeLimit) setRemainingTime(timeLimit);
 
     try {
@@ -117,11 +117,8 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
 
       mediaRecorderRef.current.start(100); 
       startTimer();
-      toast({
-        title: "녹음 시작됨",
-        description: "말씀을 마치신 후 녹음 중지 버튼을 눌러주세요.",
-      });
-
+      // Toast message moved to handleStartRecording to appear before countdown
+      
     } catch (error) {
       console.error("Error accessing microphone:", error)
       toast({
@@ -137,18 +134,28 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
     setAudioBlob(null);
     setAudioUrl(null);
     setAudioSize(null);
-    if(recordingState !== 'idle') {
+    if (recordingState !== 'idle') {
       cleanupRecorder();
     }
     
+    // Set UI state to countdown
     setRecordingState("countdown");
     setCountdown(3);
 
+    // Start actual recording immediately in the background
+    startActualRecording();
+
+    // Start UI countdown
     countdownIntervalRef.current = setInterval(() => {
         setCountdown(prev => {
             if (prev <= 1) {
                 if(countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
-                startActualRecording();
+                // When countdown ends, just change the UI state to recording
+                setRecordingState("recording");
+                toast({
+                    title: "녹음 시작됨",
+                    description: "말씀을 마치신 후 녹음 중지 버튼을 눌러주세요.",
+                });
                 return 0;
             }
             return prev - 1;
@@ -157,10 +164,11 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
   }
 
   const handleStopRecording = useCallback(() => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+    if (mediaRecorderRef.current && (mediaRecorderRef.current.state === "recording" || mediaRecorderRef.current.state === "paused")) {
       mediaRecorderRef.current.stop();
       if(timerIntervalRef.current) clearInterval(timerIntervalRef.current);
     }
+    setRecordingState('recorded'); // Ensure UI moves to recorded state immediately
   }, []);
 
   const handleSubmit = async () => {
@@ -263,12 +271,12 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
             <span className="text-7xl font-bold text-primary animate-ping-short">{countdown}</span>
         </div>
         <div className="w-full max-w-xs">
-            <Button size="lg" disabled className="w-full">
-                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                준비 중...
+            <Button size="lg" disabled className="w-full" variant="destructive">
+                <StopCircle className="mr-2 h-5 w-5" />
+                녹음 중지
             </Button>
         </div>
-        <p className="text-sm text-muted-foreground">카운트다운 후 녹음이 시작됩니다.</p>
+        <p className="text-sm text-muted-foreground">카운트다운 후 바로 말씀하세요!</p>
     </>
   );
 
@@ -344,10 +352,10 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
 
   return (
     <div className="flex flex-col items-center gap-6 p-8 border rounded-lg bg-muted/50 min-h-[350px] justify-center">
-      {timeLimit && recordingState !== 'submitting' && recordingState !== 'countdown' && (
+      {timeLimit && recordingState !== 'submitting' && (
         <div className={`flex items-center gap-2 text-lg font-semibold text-muted-foreground ${recordingState === 'recorded' ? 'mb-4' : ''}`}>
           <Timer className="h-6 w-6" />
-          <span>{recordingState === 'recording' ? timerDisplay : formatTime(timeLimit)}</span>
+          <span>{['recording', 'countdown'].includes(recordingState) ? timerDisplay : formatTime(timeLimit)}</span>
         </div>
       )}
       {renderContent()}
