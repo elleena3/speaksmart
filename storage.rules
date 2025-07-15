@@ -1,14 +1,16 @@
+
 rules_version = '2';
 
+// 1. Service: Cloud Storage for Firebase
 service firebase.storage {
+  // 2. Buckets: Which storage bucket do these rules apply to?
   match /b/{bucket}/o {
-    // Allow authenticated users to write to the recordings folder
-    match /recordings/{allPaths=**} {
-      allow read, write: if request.auth != null;
-    }
     
-    // Allow authenticated users to write to the test-uploads folder for diagnostics
-    match /test-uploads/{allPaths=**} {
+    // 3. Rules: Allow read and write access only to authenticated users.
+    // This rule allows any logged-in user to upload and read files.
+    // For a more secure application, you might restrict this further,
+    // for example, ensuring users can only read/write their own files.
+    match /{allPaths=**} {
       allow read, write: if request.auth != null;
     }
   }
