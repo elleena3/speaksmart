@@ -71,7 +71,7 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioStreamRef.current = stream;
       mediaRecorderRef.current = new MediaRecorder(stream, { 
-        mimeType: 'audio/weba',
+        mimeType: 'video/webm',
       });
       
       mediaRecorderRef.current.ondataavailable = (event) => {
@@ -94,7 +94,7 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
             return;
         }
 
-        const newAudioBlob = new Blob(audioChunksRef.current, { type: 'audio/weba' });
+        const newAudioBlob = new Blob(audioChunksRef.current, { type: 'video/webm' });
         setAudioBlob(newAudioBlob);
         setAudioUrl(URL.createObjectURL(newAudioBlob));
         setAudioSize(newAudioBlob.size);

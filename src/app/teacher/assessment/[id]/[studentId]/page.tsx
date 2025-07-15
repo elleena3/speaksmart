@@ -254,7 +254,7 @@ export default function StudentResultPage() {
                     <audio controls src={studentResult.studentRecordingDataUri} className="w-full">
                       Your browser does not support the audio element.
                     </audio>
-                     <a href={studentResult.studentRecordingDataUri} target="_blank" rel="noopener noreferrer" download={`${studentResult.name}_${assessment.title}_녹음.weba`} className="w-full">
+                     <a href={studentResult.studentRecordingDataUri} target="_blank" rel="noopener noreferrer" download={`${studentResult.name}_${assessment.title}_녹음.webm`} className="w-full">
                         <Button variant="secondary" className="w-full">
                             <Mic className="mr-2 h-4 w-4" />
                             음성 파일 다운로드
