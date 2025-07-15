@@ -35,7 +35,6 @@ export async function analyzePronunciation(audioDataUri: string): Promise<Pronun
 
 const modelsToCompare = [
     'gemini-2.5-flash-lite-preview-06-17',
-    'gemini-2.5-flash-preview',
     'gemini-2.0-flash',
 ];
 
