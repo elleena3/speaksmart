@@ -2,7 +2,7 @@
 "use client";
 
 import { FeedbackView } from "./feedback-view"
-import { useParams, useRouter, notFound } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState, useCallback } from "react";
 import { type StudentResult, type ResultStatus, type TeacherAssessment } from "@/lib/types";
 import { useAuth } from "@/context/auth-context";
@@ -15,7 +15,7 @@ import { generateSpeakingAnalysis } from "@/ai/flows/generate-speaking-analysis-
 import { useToast } from "@/hooks/use-toast";
 import { Progress } from "@/components/ui/progress";
 
-const MOCK_SESSION_KEY = 'mockResult';
+const SESSION_STORAGE_KEY = 'monologueResult';
 
 // This component now handles the entire result creation and feedback display process.
 export default function AssessmentResultsPage() {
@@ -32,14 +32,14 @@ export default function AssessmentResultsPage() {
   const { toast } = useToast();
 
   const generateResultFromSubmission = useCallback(async () => {
-    const newSubmissionRaw = sessionStorage.getItem(MOCK_SESSION_KEY);
+    const newSubmissionRaw = sessionStorage.getItem(SESSION_STORAGE_KEY);
     if (!newSubmissionRaw || !user) return;
     
     const { assessmentId, studentRecordingDataUri, assessmentDetails } = JSON.parse(newSubmissionRaw) as { assessmentId: string, studentRecordingDataUri: string, assessmentDetails: TeacherAssessment };
     
     // Ensure this submission is for the current assessment page
     if (assessmentId !== id) {
-        sessionStorage.removeItem(MOCK_SESSION_KEY);
+        sessionStorage.removeItem(SESSION_STORAGE_KEY);
         return;
     }
     
@@ -127,7 +127,7 @@ export default function AssessmentResultsPage() {
           aiFeedback: `AI 분석 중 오류가 발생했습니다: ${e.message}` 
       });
     } finally {
-        sessionStorage.removeItem(MOCK_SESSION_KEY);
+        sessionStorage.removeItem(SESSION_STORAGE_KEY);
         // The listener will pick up the final changes
     }
   }, [id, user, toast]);
@@ -135,7 +135,7 @@ export default function AssessmentResultsPage() {
   useEffect(() => {
     if (authLoading || !user || !id) return;
     
-    const mockData = sessionStorage.getItem(MOCK_SESSION_KEY);
+    const mockData = sessionStorage.getItem(SESSION_STORAGE_KEY);
     
     // Set up a real-time listener for results for this user and assessment.
     // This will show existing results OR the result being created by generateResultFromSubmission.

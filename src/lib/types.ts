@@ -42,7 +42,8 @@ export type TeacherAssessment = {
   createdAt: number;
 };
 
-// Add conversation history type to be stored in localStorage/sessionStorage
+export type { ConversationTurn };
+
 export type ConversationHistory = {
   history: ConversationTurn[];
   studentRecordingDataUri?: string;
@@ -52,8 +53,9 @@ export type ResultStatus =
   | "채점 완료" 
   | "오류" 
   | "업로드 중"
+  | "파일 업로드 중..."
   | "텍스트 변환 중"
-  | "분석 중"
+  | "AI 분석 중"
   | "리포트 생성 중";
 
 

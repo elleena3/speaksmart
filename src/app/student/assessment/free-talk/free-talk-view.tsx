@@ -223,14 +223,10 @@ export function FreeTalkView({ scenario, scenarioPrompt, assessment }: { scenari
     reader.readAsDataURL(combinedBlob);
     reader.onloadend = () => {
         const studentRecordingDataUri = reader.result as string;
-        const studentTranscript = conversation
-            .filter(turn => turn.role === 'user')
-            .map(turn => turn.text)
-            .join(' ');
         
         sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({ 
-            studentTranscript: studentTranscript,
             studentRecordingDataUri: studentRecordingDataUri,
+            conversationHistory: conversation,
             assessment: assessment, // Pass the full assessment object
         }));
         

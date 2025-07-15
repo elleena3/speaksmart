@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Loader2, AlertTriangle } from "lucide-react";
 import { generateSpeakingAnalysis } from "@/ai/flows/generate-speaking-analysis-flow";
-import { type StudentResult, type TeacherAssessment } from "@/lib/types";
+import { type StudentResult, type TeacherAssessment, type ConversationTurn } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { FeedbackView } from "../../../assessment/[id]/results/feedback-view";
 import { useAuth } from "@/context/auth-context";
@@ -19,8 +19,8 @@ import { Progress } from "@/components/ui/progress";
 const SESSION_STORAGE_KEY = 'freeTalkSessionData';
 
 type StoredSessionData = {
-    studentTranscript: string;
-    studentRecordingDataUri: string; // This is the base64 URI
+    studentRecordingDataUri: string;
+    conversationHistory: ConversationTurn[];
     assessment: TeacherAssessment;
 }
 
@@ -41,7 +41,7 @@ export function FreeTalkFeedbackView() {
         let newResultRef: any; // Can be a new or existing doc ref
 
         try {
-            const { assessment, studentTranscript, studentRecordingDataUri } = sessionData;
+            const { assessment, studentRecordingDataUri, conversationHistory } = sessionData;
 
             // Find if a result for this free-talk already exists to avoid duplicates
             const resultsQuery = query(collection(db, "results"), where("assessmentId", "==", assessment.id), where("studentId", "==", user.uid));
@@ -84,13 +84,18 @@ export function FreeTalkFeedbackView() {
             const downloadURL = await getDownloadURL(storageRef);
             const gcsUri = `gs://${storageRef.bucket}/${storageRef.fullPath}`;
 
+            const studentTranscript = conversationHistory
+                .filter(turn => turn.role === 'user')
+                .map(turn => turn.text)
+                .join('\n');
+
             // 3. Generate all feedback using the analysis flow with the GCS URI.
             setStatus("AI 분석 중...");
             setProgress(50);
             await updateDoc(newResultRef, { status: "AI 분석 중...", progress: 50 });
             const analysisResult = await generateSpeakingAnalysis({
                 studentRecordingGcsUri: gcsUri,
-                studentTranscript: studentTranscript, // Pass the pre-compiled transcript
+                studentTranscript: studentTranscript, // Pass the pre-compiled transcript from conversation history
                 activityPrompt: assessment.prompt,
                 expectedFormat: assessment.expectedFormat || "AI와의 자연스러운 대화 능력을 평가합니다.",
                 studentName: user.displayName || "Student",
@@ -100,8 +105,13 @@ export function FreeTalkFeedbackView() {
             // 4. Prepare and save the final result data.
             setStatus("리포트 생성 중...");
             setProgress(90);
+            
+            // Re-compile the full transcript for saving
+            const fullTranscript = conversationHistory.map(turn => `${turn.role === 'user' ? '학생' : 'AI'}: ${turn.text}`).join('\n');
+
             const finalResultData: Partial<StudentResult> = {
                 ...analysisResult,
+                studentTranscript: fullTranscript, // Save the full conversation
                 score: analysisResult.contentScore,
                 studentRecordingDataUri: downloadURL,
                 status: "채점 완료",
@@ -157,6 +167,9 @@ export function FreeTalkFeedbackView() {
 
         const storedDataString = sessionStorage.getItem(SESSION_STORAGE_KEY);
         if (!storedDataString) {
+            // This can happen on a page refresh, check if a result already exists in Firestore for this user/assessment.
+            // This part is complex and might be better handled by navigating back to dashboard.
+            // For now, we show an error and navigate back.
             toast({
                 title: "오류",
                 description: "분석할 대화 기록을 찾을 수 없습니다. 대시보드로 돌아갑니다.",
