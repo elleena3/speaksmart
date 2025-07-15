@@ -36,11 +36,12 @@ export async function analyzePronunciation(audioDataUri: string): Promise<Pronun
 const modelsToCompare = [
     'gemini-2.5-flash-lite-preview-06-17',
     'gemini-2.0-flash',
+    'gemini-2.5-flash',
 ];
 
 const createPronunciationPrompt = (modelName: string) => {
     return ai.definePrompt({
-        name: `pronunciationAnalysisPrompt_${modelName.replace(/-/g, '_')}`,
+        name: `pronunciationAnalysisPrompt_${modelName.replace(/[-.]/g, '_')}`, // Allow dots in names
         model: googleAI.model(modelName as any), // Use 'as any' to allow dynamic model names
         input: { schema: PronunciationAnalysisInputSchema },
         output: { schema: PronunciationAnalysisOutputSchema },
