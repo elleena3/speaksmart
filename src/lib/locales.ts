@@ -10,6 +10,7 @@ export const translations = {
       profile: "프로필",
       assessments: "평가 관리",
       settings: "설정",
+      misc: "기타",
       logout: "로그아웃",
     },
     titles: {
@@ -200,6 +201,7 @@ export const translations = {
       profile: "Profile",
       assessments: "Assessments",
       settings: "Settings",
+      misc: "Misc",
       logout: "Logout",
     },
     titles: {
