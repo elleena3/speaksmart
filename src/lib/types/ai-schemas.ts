@@ -1,3 +1,4 @@
+
 import { z } from 'genkit';
 import { scenarios } from '@/lib/types';
 
@@ -32,36 +33,11 @@ export const ConverseWithStudentOutputSchema = z.object({
 export type ConverseWithStudentOutput = z.infer<typeof ConverseWithStudentOutputSchema>;
 
 
-// Schemas for the comprehensive speaking analysis flow
-export const GenerateSpeakingAnalysisInputSchema = z.object({
-  studentRecordingGcsUri: z.string().describe(
-    "The student's voice recording as a Google Cloud Storage URI. Expected format: 'gs://<bucket-name>/<file-path>'"
-  ),
-  studentTranscript: z.string().optional().describe(
-    "Optional pre-generated transcript. If provided, the transcription step will be skipped."
-  ),
-  activityPrompt: z.string().describe('The prompt or instructions for the speaking activity.'),
-  expectedFormat: z.string().describe('The expected format or key points of the response for grading.'),
-  studentName: z.string().describe('The name of the student.'),
-  assessmentTitle: z.string().describe('The title of the assessment.'),
-});
-export type GenerateSpeakingAnalysisInput = z.infer<typeof GenerateSpeakingAnalysisInputSchema>;
+// ##############################################################
+// ##                SCHEMAS FOR ANALYSIS FLOWS                ##
+// ##############################################################
 
-export const GenerateSpeakingAnalysisOutputSchema = z.object({
-  resultId: z.string().describe('The ID of the created Firestore result document.'),
-});
-export type GenerateSpeakingAnalysisOutput = z.infer<typeof GenerateSpeakingAnalysisOutputSchema>;
-
-
-// Internal schemas for sub-prompts within the main analysis flow
-export const ContentAnalysisInputSchema = z.object({
-    studentTranscript: z.string(),
-    activityPrompt: z.string(),
-    expectedFormat: z.string(),
-    studentName: z.string(),
-    assessmentTitle: z.string(),
-});
-
+// Internal schemas for sub-prompts, used by both flows
 export const ContentAnalysisOutputSchema = z.object({
     aiFeedback: z.string().describe('The generated feedback for the student in Korean.'),
     teacherGuidance: z.string().describe('Actionable guidance for the teacher based on the performance in Korean.'),
@@ -69,12 +45,45 @@ export const ContentAnalysisOutputSchema = z.object({
     contentScore: z.number().int().min(0).max(100).describe('A score from 0-100 for the performance content.'),
 });
 
-export const PronunciationAnalysisInputSchema = z.object({
-    studentRecordingGcsUri: z.string(),
-    studentTranscript: z.string(),
-});
-
 export const PronunciationAnalysisOutputSchema = z.object({
     pronunciationScore: z.number().int().min(0).max(100).describe('A score from 0-100 for pronunciation.'),
     pronunciationFeedback: z.string().describe('Specific, constructive feedback on the student\'s pronunciation in Korean.'),
 });
+
+export const CombinedAnalysisOutputSchema = z.object({
+    studentTranscript: z.string(),
+    contentScore: z.number(),
+    aiFeedback: z.string(),
+    teacherGuidance: z.string(),
+    curricularRemarks: z.string(),
+    pronunciationScore: z.number(),
+    pronunciationFeedback: z.string(),
+});
+
+
+// Schemas for the MONOLOGUE analysis flow
+export const GenerateMonologueAnalysisInputSchema = z.object({
+  studentRecordingGcsUri: z.string().describe(
+    "The student's voice recording as a Google Cloud Storage URI. Expected format: 'gs://<bucket-name>/<file-path>'"
+  ),
+  activityPrompt: z.string().describe('The prompt or instructions for the speaking activity.'),
+  expectedFormat: z.string().describe('The expected format or key points of the response for grading.'),
+  studentName: z.string().describe('The name of the student.'),
+  assessmentTitle: z.string().describe('The title of the assessment.'),
+});
+export type GenerateMonologueAnalysisInput = z.infer<typeof GenerateMonologueAnalysisInputSchema>;
+
+
+// Schemas for the DIALOGUE analysis flow
+export const GenerateDialogueAnalysisInputSchema = z.object({
+  studentRecordingGcsUri: z.string().describe("The student's combined voice recording as a GCS URI."),
+  studentTranscript: z.string().describe("The transcript of only the student's speech, used for pronunciation analysis."),
+  fullConversationTranscript: z.string().describe("The full transcript of the conversation between the student and AI."),
+  activityPrompt: z.string().describe('The prompt or instructions for the speaking activity.'),
+  expectedFormat: z.string().describe('The expected format or key points of the response for grading.'),
+  studentName: z.string().describe('The name of the student.'),
+  assessmentTitle: z.string().describe('The title of the assessment.'),
+});
+export type GenerateDialogueAnalysisInput = z.infer<typeof GenerateDialogueAnalysisInputSchema>;
+
+    

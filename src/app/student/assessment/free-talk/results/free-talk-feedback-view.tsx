@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Loader2, AlertTriangle } from "lucide-react";
-import { generateSpeakingAnalysis } from "@/ai/flows/generate-speaking-analysis-flow";
+import { generateDialogueAnalysis } from "@/ai/flows/generate-dialogue-analysis-flow";
 import { type StudentResult, type TeacherAssessment, type ConversationTurn } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { FeedbackView } from "../../../assessment/[id]/results/feedback-view";
@@ -84,7 +84,7 @@ export function FreeTalkFeedbackView() {
             const downloadURL = await getDownloadURL(storageRef);
             const bucket = firebaseConfig.storageBucket?.replace(".firebasestorage.app", "");
             const gcsUri = `gs://${bucket}/${storageRef.fullPath}`;
-
+            
             const fullConversationTranscript = conversationHistory
                 .map(turn => `${turn.role === 'user' ? '학생' : 'AI'}: ${turn.text}`)
                 .join('\n');
@@ -95,15 +95,16 @@ export function FreeTalkFeedbackView() {
                 .join(' ');
 
 
-            // 3. Generate all feedback using the analysis flow with the GCS URI.
+            // 3. Generate all feedback using the new dialogue-specific analysis flow.
             setStatus("AI 분석 중...");
             setProgress(50);
             await updateDoc(newResultRef, { status: "AI 분석 중...", progress: 50 });
             
-            const analysisResult = await generateSpeakingAnalysis({
+            const analysisResult = await generateDialogueAnalysis({
                 studentRecordingGcsUri: gcsUri,
-                studentTranscript: studentOnlyTranscript, // Pass only the student's transcript for pronunciation analysis
-                activityPrompt: `${assessment.prompt}\n\n--- 전체 대화 기록 ---\n${fullConversationTranscript}`, // Provide full context for content analysis
+                studentTranscript: studentOnlyTranscript,
+                fullConversationTranscript: fullConversationTranscript,
+                activityPrompt: assessment.prompt,
                 expectedFormat: assessment.expectedFormat || "AI와의 자연스러운 대화 능력을 평가합니다.",
                 studentName: user.displayName || "Student",
                 assessmentTitle: assessment.title,
@@ -229,3 +230,5 @@ export function FreeTalkFeedbackView() {
         </div>
     );
 }
+
+    

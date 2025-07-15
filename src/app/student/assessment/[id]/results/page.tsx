@@ -1,3 +1,4 @@
+
 "use client";
 
 import { FeedbackView } from "./feedback-view"
@@ -10,7 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { db, storage, firebaseConfig } from "@/lib/firebase";
 import { collection, query, where, onSnapshot, doc, setDoc, updateDoc, getDocs } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { generateSpeakingAnalysis } from "@/ai/flows/generate-speaking-analysis-flow";
+import { generateMonologueAnalysis } from "@/ai/flows/generate-monologue-analysis-flow";
 import { useToast } from "@/hooks/use-toast";
 import { Progress } from "@/components/ui/progress";
 
@@ -80,7 +81,8 @@ export default function AssessmentResultsPage() {
         setProgress(50);
         await updateDoc(newResultRef, { status: "AI 분석 중", progress: 50 });
         
-        const analysisResult = await generateSpeakingAnalysis({
+        // Use the new monologue-specific flow
+        const analysisResult = await generateMonologueAnalysis({
             studentRecordingGcsUri: gcsUri,
             activityPrompt: assessmentDetails.prompt,
             expectedFormat: assessmentDetails.expectedFormat || "",
@@ -218,3 +220,5 @@ export default function AssessmentResultsPage() {
     <FeedbackView result={result} />
   )
 }
+
+    
