@@ -34,6 +34,7 @@ export async function generateMonologueAnalysis(
 // 1. Transcription Prompt - Uses handlebars to pass the data URI
 const transcriptionPrompt = ai.definePrompt({
     name: 'transcribeAudioPrompt',
+    model: googleAI.model('gemini-2.0-flash'),
     input: { schema: z.string() }, // Expect a raw string (the data URI)
     prompt: `Transcribe this English audio.
 Audio: {{media url=prompt contentType='video/webm'}}
