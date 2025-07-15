@@ -9,9 +9,10 @@ import { useAuth } from "@/context/auth-context";
 import { Loader2, AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { db } from "@/lib/firebase";
-import { collection, query, where, onSnapshot, doc, getDoc, setDoc, updateDoc, writeBatch } from "firebase/firestore";
+import { collection, query, where, onSnapshot, doc, getDoc, setDoc, updateDoc, getDocs } from "firebase/firestore";
 import { generateSpeakingAnalysis } from "@/ai/flows/generate-speaking-analysis-flow";
 import { useToast } from "@/hooks/use-toast";
+import { Progress } from "@/components/ui/progress";
 
 const MOCK_SESSION_KEY = 'mockResult';
 
@@ -72,10 +73,6 @@ export default function AssessmentResultsPage() {
             expectedFormat: assessmentDetails.expectedFormat || "",
             studentName: user.displayName || "Student",
             assessmentTitle: assessmentDetails.title,
-            studentId: user.uid, // These are passed but not used for DB ops in flow anymore
-            teacherUid: assessmentDetails.uid,
-            avatarUrl: user.photoURL || '',
-            assessmentId: assessmentDetails.id
         });
         
         // Step 3: Update the document with the full analysis results
