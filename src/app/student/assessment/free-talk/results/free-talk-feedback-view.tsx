@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Loader2, AlertTriangle } from "lucide-react";
+import { Loader2, AlertTriangle, UploadCloud, AudioLines, FileScan, Sparkles, CheckCircle2 } from "lucide-react";
 import { generateDialogueAnalysis } from "@/ai/flows/generate-dialogue-analysis-flow";
 import { type StudentResult, type TeacherAssessment, type ConversationTurn } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
@@ -24,12 +24,63 @@ type StoredSessionData = {
     assessment: TeacherAssessment;
 }
 
+type AnalysisStep = "upload" | "transcribe" | "analyze" | "report";
+const analysisSteps: { key: AnalysisStep, text: string, icon: React.FC<any> }[] = [
+    { key: "upload", text: "음성 파일 업로드", icon: UploadCloud },
+    { key: "transcribe", text: "대화 내용 변환 및 정리", icon: AudioLines },
+    { key: "analyze", text: "내용 및 발음 분석", icon: FileScan },
+    { key: "report", text: "피드백 리포트 생성", icon: Sparkles },
+];
+
+
+function AnalysisProgressView({ currentStep }: { currentStep: AnalysisStep | null }) {
+    const getCurrentStepIndex = () => {
+        if (!currentStep) return -1;
+        return analysisSteps.findIndex(step => step.key === currentStep);
+    }
+    const currentStepIndex = getCurrentStepIndex();
+
+    return (
+        <Card className="w-full max-w-lg">
+            <CardHeader>
+                <CardTitle>AI 분석 진행 중</CardTitle>
+                <CardDescription>대화 내용을 분석하고 있습니다. 이 과정은 최대 1-2분 소요될 수 있습니다.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <ul className="space-y-4">
+                    {analysisSteps.map((step, index) => {
+                        const isCompleted = index < currentStepIndex;
+                        const isCurrent = index === currentStepIndex;
+                        
+                        return (
+                            <li key={step.key} className="flex items-center gap-4">
+                                <div className="flex-shrink-0">
+                                    {isCompleted ? (
+                                        <CheckCircle2 className="h-6 w-6 text-green-500" />
+                                    ) : isCurrent ? (
+                                        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                                    ) : (
+                                        <step.icon className="h-6 w-6 text-muted-foreground" />
+                                    )}
+                                </div>
+                                <span className={`font-medium ${isCompleted ? 'text-green-600' : isCurrent ? 'text-primary' : 'text-muted-foreground'}`}>
+                                    {step.text}
+                                </span>
+                            </li>
+                        );
+                    })}
+                </ul>
+            </CardContent>
+        </Card>
+    );
+}
+
 export function FreeTalkFeedbackView() {
     const { user, loading: authLoading } = useAuth();
     const [isLoading, setIsLoading] = useState(true);
     const [result, setResult] = useState<StudentResult | null>(null);
-    const [status, setStatus] = useState<string>("준비 중...");
-    const [progress, setProgress] = useState(0);
+    const [status, setStatus] = useState<ResultStatus>("분석 중");
+    const [analysisStep, setAnalysisStep] = useState<AnalysisStep | null>(null);
     const [error, setError] = useState<string | null>(null);
 
     const router = useRouter();
@@ -43,21 +94,13 @@ export function FreeTalkFeedbackView() {
         try {
             const { assessment, studentRecordingDataUri, conversationHistory } = sessionData;
 
-            // Find if a result for this free-talk already exists to avoid duplicates
             const resultsQuery = query(collection(db, "results"), where("assessmentId", "==", assessment.id), where("studentId", "==", user.uid));
             const existingDocs = await getDocs(resultsQuery);
 
-            if (!existingDocs.empty) {
-                // If a result exists, update it. Take the most recent one.
-                newResultRef = existingDocs.docs.sort((a,b) => (b.data().createdAt || 0) - (a.data().createdAt || 0))[0].ref;
-            } else {
-                // Otherwise, create a new one.
-                newResultRef = doc(collection(db, "results"));
-            }
+            newResultRef = !existingDocs.empty 
+                ? existingDocs.docs.sort((a,b) => (b.data().createdAt || 0) - (a.data().createdAt || 0))[0].ref
+                : doc(collection(db, "results"));
 
-            // 1. Create/update initial 'in-progress' document in Firestore
-            setStatus("업로드 중");
-            setProgress(10);
             const initialData: Partial<StudentResult> = {
                 studentId: user.uid,
                 assessmentId: assessment.id,
@@ -67,37 +110,28 @@ export function FreeTalkFeedbackView() {
                 avatarUrl: user.photoURL || '',
                 createdAt: Date.now(),
                 date: new Date().toISOString(),
-                status: "업로드 중",
-                progress: 10,
+                status: "분석 중",
             };
             await setDoc(newResultRef, initialData, { merge: true });
 
-            // 2. Upload the combined student audio to Firebase Storage.
-            setStatus("음성 파일 업로드 중...");
-            setProgress(25);
-            await updateDoc(newResultRef, { status: "음성 파일 업로드 중...", progress: 25 });
+            setAnalysisStep("upload");
             const audioFileName = `recordings/${user.uid}_${assessment.id}_${Date.now()}.weba`;
             const storageRef = ref(storage, audioFileName);
             await uploadString(storageRef, studentRecordingDataUri, 'data_url');
             const downloadURL = await getDownloadURL(storageRef);
             
+            setAnalysisStep("transcribe");
             const fullConversationTranscript = conversationHistory
                 .map(turn => `${turn.role === 'user' ? '학생' : 'AI'}: ${turn.text}`)
                 .join('\n');
-                
             const studentOnlyTranscript = conversationHistory
                 .filter(turn => turn.role === 'user')
                 .map(turn => turn.text)
                 .join(' ');
 
-
-            // 3. Generate all feedback using the new dialogue-specific analysis flow.
-            setStatus("AI 분석 중...");
-            setProgress(50);
-            await updateDoc(newResultRef, { status: "AI 분석 중...", progress: 50 });
-            
+            setAnalysisStep("analyze");
             const analysisResult = await generateDialogueAnalysis({
-                studentRecordingDataUri: studentRecordingDataUri, // Pass data URI
+                studentRecordingDataUri: studentRecordingDataUri,
                 studentTranscript: studentOnlyTranscript,
                 fullConversationTranscript: fullConversationTranscript,
                 activityPrompt: assessment.prompt,
@@ -106,24 +140,19 @@ export function FreeTalkFeedbackView() {
                 assessmentTitle: assessment.title,
             });
 
-            // 4. Prepare and save the final result data.
-            setStatus("리포트 생성 중...");
-            setProgress(90);
-            
+            setAnalysisStep("report");
             const finalResultData: Partial<StudentResult> = {
                 ...analysisResult,
-                studentTranscript: fullConversationTranscript, // Save the full conversation for review
+                studentTranscript: fullConversationTranscript,
                 score: analysisResult.contentScore,
                 studentRecordingDataUri: downloadURL,
                 status: "채점 완료",
-                progress: 100,
-                studentFeedbackSummary: "학생이 평가에 대해 남긴 피드백이 없습니다.", // Default value
+                studentFeedbackSummary: "학생이 평가에 대해 남긴 피드백이 없습니다.",
             };
-
             await updateDoc(newResultRef, finalResultData);
             setResult({ id: newResultRef.id, ...initialData, ...finalResultData } as StudentResult);
+            setStatus("채점 완료");
             
-            // 5. Update assessment aggregates
             if(assessment.id !== 'free-talk-practice') {
               const assessmentRef = doc(db, "assessments", assessment.id);
               const allResultsQuery = query(collection(db, "results"), where("assessmentId", "==", assessment.id), where("status", "==", "채점 완료"));
@@ -131,28 +160,16 @@ export function FreeTalkFeedbackView() {
               const scores = querySnapshot.docs.map(d => (d.data() as StudentResult).score || 0);
               const newSubmissionCount = scores.length;
               const newAverage = newSubmissionCount > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / newSubmissionCount) : 0;
-              
-              await updateDoc(assessmentRef, {
-                  submissionCount: newSubmissionCount,
-                  averageScore: newAverage
-              });
+              await updateDoc(assessmentRef, { submissionCount: newSubmissionCount, averageScore: newAverage });
             }
 
         } catch (e: any) {
             console.error("Error generating feedback:", e);
             setError("AI 분석 중 오류가 발생했습니다: " + e.message);
             setStatus("오류");
-            toast({
-                title: "피드백 생성 오류",
-                description: "피드백을 생성하는 중 오류가 발생했습니다.",
-                variant: "destructive"
-            });
+            toast({ title: "피드백 생성 오류", description: "피드백을 생성하는 중 오류가 발생했습니다.", variant: "destructive" });
             if (newResultRef) {
-                await updateDoc(newResultRef, { 
-                    status: '오류', 
-                    progress: 100, 
-                    aiFeedback: `AI 분석 중 오류가 발생했습니다: ${e.message}` 
-                });
+                await updateDoc(newResultRef, { status: '오류', aiFeedback: `AI 분석 중 오류가 발생했습니다: ${e.message}` });
             }
         } finally {
             setIsLoading(false);
@@ -186,17 +203,9 @@ export function FreeTalkFeedbackView() {
 
     if (isLoading || authLoading) {
         return (
-            <Card className="flex flex-col items-center justify-center text-center p-8 h-96">
-                <CardHeader>
-                    <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
-                    <CardTitle>AI 분석 진행 중: {status}</CardTitle>
-                    <CardDescription>대화 내용을 분석하고 있습니다. 이 과정은 최대 1-2분 소요될 수 있습니다.</CardDescription>
-                </CardHeader>
-                <CardContent className="w-full max-w-sm">
-                    <Progress value={progress} className="w-full" />
-                    <p className="text-sm text-muted-foreground mt-2">{progress}% 완료</p>
-                </CardContent>
-            </Card>
+            <div className="flex flex-col items-center justify-center text-center p-8 h-96">
+                <AnalysisProgressView currentStep={analysisStep} />
+            </div>
         );
     }
   

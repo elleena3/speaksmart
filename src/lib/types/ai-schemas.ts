@@ -85,3 +85,23 @@ export const GenerateDialogueAnalysisInputSchema = z.object({
   assessmentTitle: z.string().describe('The title of the assessment.'),
 });
 export type GenerateDialogueAnalysisInput = z.infer<typeof GenerateDialogueAnalysisInputSchema>;
+
+
+// ##############################################################
+// ##         OBSOLETE SCHEMAS - TO BE DELETED LATER           ##
+// ##############################################################
+
+// These schemas were part of the old, combined `generateSpeakingAnalysis` flow.
+// They are kept for reference but are no longer used by the new, separated flows.
+export const PronunciationAnalysisInputSchema = z.object({
+    studentRecordingGcsUri: z.string(),
+    studentTranscript: z.string(),
+});
+
+export const ContentAnalysisInputSchema = z.object({
+    studentTranscript: z.string(),
+    activityPrompt: z.string(),
+    expectedFormat: z.string(),
+    studentName: z.string(),
+    assessmentTitle: z.string(),
+});
