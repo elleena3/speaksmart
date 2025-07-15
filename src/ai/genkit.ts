@@ -8,7 +8,7 @@ import {googleAI} from '@genkit-ai/googleai';
 // 2. '+ 새 API 키 만들기'를 클릭하여 키를 생성하고 복사합니다.
 // 3. 아래 "여기에..." 부분을 복사한 키로 교체해 주세요.
 // ====================================================================
-const GOOGLE_API_KEY = "여기에 Google AI Studio에서 발급받은 API 키를 붙여넣으세요";
+const GOOGLE_API_KEY = "AIzaSyAX4QXJaFvRGm0pLLk8n6PdFW5bY_QkJNg";
 
 export const ai = genkit({
   plugins: [

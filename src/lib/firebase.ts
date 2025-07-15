@@ -18,13 +18,13 @@ import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
-  authDomain: "your-project-id.firebaseapp.com",
-  projectId: "your-project-id",
-  storageBucket: "your-project-id.appspot.com",
-  messagingSenderId: "123456789012",
-  appId: "1:123456789012:web:a1b2c3d4e5f6g7h8i9j0",
-  measurementId: "G-XXXXXXXXXX"
+  apiKey: "AIzaSyAieUKTGnuh0f9zWJYjgYM77j4mEshxWCg",
+  authDomain: "speaksmart-evaluator2.firebaseapp.com",
+  projectId: "speaksmart-evaluator2",
+  storageBucket: "speaksmart-evaluator2.firebasestorage.app",
+  messagingSenderId: "60227542963",
+  appId: "1:60227542963:web:f5d6c51046eb572a9c35c6",
+  measurementId: "G-M20FDF494Y"
 };
 
 

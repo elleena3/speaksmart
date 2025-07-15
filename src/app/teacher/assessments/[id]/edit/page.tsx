@@ -144,11 +144,25 @@ export default function EditAssessmentPage() {
         }
 
         const docRef = doc(db, "assessments", assessmentId);
-        await updateDoc(docRef, {
+        
+        const updateData: Partial<TeacherAssessment> = {
             ...submissionValues,
-            startDate: values.startDate ? values.startDate.toISOString() : undefined,
-            endDate: values.endDate ? values.endDate.toISOString() : undefined,
-        });
+        };
+
+        if (values.startDate) {
+            updateData.startDate = values.startDate.toISOString();
+        } else {
+            updateData.startDate = undefined;
+        }
+        
+        if (values.endDate) {
+            updateData.endDate = values.endDate.toISOString();
+        } else {
+            updateData.endDate = undefined;
+        }
+
+
+        await updateDoc(docRef, updateData);
 
         toast({
             title: t.teacherAssessmentForm.editSuccessToast.title,

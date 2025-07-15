@@ -119,9 +119,14 @@ export default function NewAssessmentPage() {
             averageScore: 0,
             dateCreated: new Date().toISOString().split('T')[0],
             createdAt: Date.now(),
-            startDate: values.startDate ? values.startDate.toISOString() : undefined,
-            endDate: values.endDate ? values.endDate.toISOString() : undefined,
         };
+
+        if (values.startDate) {
+            docData.startDate = values.startDate.toISOString();
+        }
+        if (values.endDate) {
+            docData.endDate = values.endDate.toISOString();
+        }
 
         await addDoc(collection(db, "assessments"), docData);
 
