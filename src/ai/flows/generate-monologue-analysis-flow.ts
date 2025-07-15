@@ -31,7 +31,7 @@ export async function generateMonologueAnalysis(
 
 // Internal Sub-flows and Prompts
 
-// 1. Transcription Prompt - No longer a separate flow, but a prompt call.
+// 1. Transcription Prompt - Uses handlebars to pass the data URI
 const transcriptionPrompt = ai.definePrompt({
     name: 'transcribeAudioPrompt',
     input: { schema: z.object({ audioDataUri: z.string() }) },

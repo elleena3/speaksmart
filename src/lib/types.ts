@@ -52,10 +52,10 @@ export type ConversationHistory = {
 export type ResultStatus = 
   | "채점 완료" 
   | "오류" 
-  | "업로드 중"
+  | "분석 중"
   | "파일 업로드 중..."
   | "텍스트 변환 중"
-  | "AI 분석 중"
+  | "내용 및 발음 분석 중..."
   | "리포트 생성 중";
 
 
@@ -67,7 +67,6 @@ export type StudentResult = {
   name: string; // Student's display name
   avatarUrl: string;
   status: ResultStatus;
-  progress?: number; // Progress percentage (0-100)
   score: number;
   date: string;
   aiFeedback: string;
