@@ -127,18 +127,19 @@ export function FreeTalkFeedbackView() {
             setResult({ id: newResultRef.id, ...initialData, ...finalResultData } as StudentResult);
             
             // 5. Update assessment aggregates
-            const assessmentRef = doc(db, "assessments", assessment.id);
-            const allResultsQuery = query(collection(db, "results"), where("assessmentId", "==", assessment.id), where("status", "==", "채점 완료"));
-            const querySnapshot = await getDocs(allResultsQuery);
-            const scores = querySnapshot.docs.map(d => (d.data() as StudentResult).score || 0);
-            const newSubmissionCount = scores.length;
-            const newAverage = newSubmissionCount > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / newSubmissionCount) : 0;
-            
-            await updateDoc(assessmentRef, {
-                submissionCount: newSubmissionCount,
-                averageScore: newAverage
-            });
-
+            if(assessment.id !== 'free-talk-practice') {
+              const assessmentRef = doc(db, "assessments", assessment.id);
+              const allResultsQuery = query(collection(db, "results"), where("assessmentId", "==", assessment.id), where("status", "==", "채점 완료"));
+              const querySnapshot = await getDocs(allResultsQuery);
+              const scores = querySnapshot.docs.map(d => (d.data() as StudentResult).score || 0);
+              const newSubmissionCount = scores.length;
+              const newAverage = newSubmissionCount > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / newSubmissionCount) : 0;
+              
+              await updateDoc(assessmentRef, {
+                  submissionCount: newSubmissionCount,
+                  averageScore: newAverage
+              });
+            }
 
         } catch (e: any) {
             console.error("Error generating feedback:", e);
