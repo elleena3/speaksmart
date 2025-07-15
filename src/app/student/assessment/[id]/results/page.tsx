@@ -1,4 +1,3 @@
-
 "use client";
 
 import { FeedbackView } from "./feedback-view"
@@ -73,7 +72,8 @@ export default function AssessmentResultsPage() {
         const storageRef = ref(storage, audioFileName);
         await uploadBytes(storageRef, audioBlob);
         const downloadURL = await getDownloadURL(storageRef);
-        const gcsUri = `gs://${firebaseConfig.storageBucket}/${storageRef.fullPath}`;
+        const bucket = firebaseConfig.storageBucket?.replace(".firebasestorage.app", "");
+        const gcsUri = `gs://${bucket}/${storageRef.fullPath}`;
 
         // Step 3: Call the AI flow with the GCS URI
         setStatus("AI 분석 중");

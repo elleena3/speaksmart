@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, useEffect, useCallback } from "react";
@@ -82,7 +81,8 @@ export function FreeTalkFeedbackView() {
             const storageRef = ref(storage, audioFileName);
             await uploadBytes(storageRef, audioBlob);
             const downloadURL = await getDownloadURL(storageRef);
-            const gcsUri = `gs://${firebaseConfig.storageBucket}/${storageRef.fullPath}`;
+            const bucket = firebaseConfig.storageBucket?.replace(".firebasestorage.app", "");
+            const gcsUri = `gs://${bucket}/${storageRef.fullPath}`;
 
             const studentTranscript = conversationHistory
                 .filter(turn => turn.role === 'user')
