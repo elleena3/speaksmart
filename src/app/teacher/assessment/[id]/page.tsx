@@ -48,7 +48,8 @@ export default function AssessmentSubmissionsPage() {
         
         const resultsQuery = query(
             collection(db, "results"), 
-            where("assessmentId", "==", assessmentId), 
+            where("assessmentId", "==", assessmentId),
+            orderBy("assessmentId"), // Match the where clause field first
             orderBy("createdAt", "desc")
         );
         const resultsSnapshot = await getDocs(resultsQuery);
