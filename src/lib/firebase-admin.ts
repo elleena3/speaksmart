@@ -8,28 +8,29 @@ import * as admin from 'firebase-admin';
 
 // 서비스 계정 키를 환경 변수에서 읽어옵니다.
 // VITE_FIREBASE_SERVICE_ACCOUNT_KEY는 JSON 문자열 형태여야 합니다.
-const serviceAccountString = process.env.VITE_FIREBASE_SERVICE_ACCOUNT_KEY;
-
-let serviceAccount;
-if (serviceAccountString) {
-  try {
-    serviceAccount = JSON.parse(serviceAccountString);
-  } catch (error) {
-    console.error('Error parsing Firebase service account key JSON:', error);
+function initializeFirebaseAdmin() {
+  if (admin.apps.length > 0) {
+    return;
   }
-} else {
+
+  const serviceAccountString = process.env.VITE_FIREBASE_SERVICE_ACCOUNT_KEY;
+  let serviceAccount;
+  if (serviceAccountString) {
+    try {
+      serviceAccount = JSON.parse(serviceAccountString);
+    } catch (error) {
+      console.error('Error parsing Firebase service account key JSON:', error);
+    }
+  } else {
     console.warn('VITE_FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set. Admin SDK will try to use default credentials.');
-}
+  }
 
-const firebaseConfig = {
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-};
+  const firebaseConfig = {
+    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  };
 
-
-if (!admin.apps.length) {
   try {
-    // 서비스 계정 키가 있으면 해당 키로 초기화하고, 없으면 기본 방식을 시도합니다.
     admin.initializeApp({
       credential: serviceAccount ? admin.credential.cert(serviceAccount) : admin.credential.applicationDefault(),
       projectId: firebaseConfig.projectId,
@@ -41,6 +42,8 @@ if (!admin.apps.length) {
   }
 }
 
+// Ensure initialization is called when the module is loaded.
+initializeFirebaseAdmin();
 
 const db = admin.firestore();
 const storage = admin.storage();
