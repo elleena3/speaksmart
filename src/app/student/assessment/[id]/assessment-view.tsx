@@ -187,7 +187,7 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
         const reader = new FileReader();
         reader.readAsDataURL(audioBlob);
         reader.onloadend = () => {
-            sessionStorage.setItem('monologueResult', JSON.stringify({
+            sessionStorage.setItem('monologueSessionData', JSON.stringify({
                 assessmentId: assessmentDetails.id,
                 studentRecordingDataUri: reader.result as string,
                 assessmentDetails: assessmentDetails, 

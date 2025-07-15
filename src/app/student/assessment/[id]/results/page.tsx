@@ -14,7 +14,7 @@ import { ref, uploadString, getDownloadURL } from "firebase/storage";
 import { generateMonologueAnalysis } from "@/ai/flows/generate-monologue-analysis-flow";
 import { useToast } from "@/hooks/use-toast";
 
-const SESSION_STORAGE_KEY = 'monologueResult';
+const SESSION_STORAGE_KEY = 'monologueSessionData';
 
 type AnalysisStep = "upload" | "transcribe" | "analyze" | "report";
 
@@ -82,7 +82,7 @@ export default function AssessmentResultsPage() {
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const generateResultFromSubmission = useCallback(async () => {
+  const processMonologueSubmission = useCallback(async () => {
     const newSubmissionRaw = sessionStorage.getItem(SESSION_STORAGE_KEY);
     if (!newSubmissionRaw || !user) return;
     
@@ -114,8 +114,8 @@ export default function AssessmentResultsPage() {
         await uploadString(storageRef, studentRecordingDataUri, 'data_url');
         const downloadURL = await getDownloadURL(storageRef);
 
-        setAnalysisStep("transcribe");
         await updateDoc(newResultRef, { status: "텍스트 변환 중" });
+        setAnalysisStep("transcribe");
         
         const analysisResult = await generateMonologueAnalysis({
             studentRecordingDataUri: studentRecordingDataUri,
@@ -125,13 +125,11 @@ export default function AssessmentResultsPage() {
             assessmentTitle: assessmentDetails.title,
         });
 
-        // The AI flow internally handles transcription, content, and pronunciation.
-        // So we can jump the status forward.
-        setAnalysisStep("analyze");
         await updateDoc(newResultRef, { status: "내용 및 발음 분석 중..." });
+        setAnalysisStep("analyze");
         
-        setAnalysisStep("report");
         await updateDoc(newResultRef, { status: "리포트 생성 중" });
+        setAnalysisStep("report");
 
         const finalResultData: Partial<StudentResult> = {
             ...analysisResult,
@@ -141,6 +139,7 @@ export default function AssessmentResultsPage() {
         };
         await updateDoc(newResultRef, finalResultData);
         
+        // Update assessment aggregates
         const assessmentRef = doc(db, "assessments", assessmentDetails.id);
         const resultsCollection = collection(db, "results");
         const q = query(resultsCollection, where("assessmentId", "==", assessmentDetails.id), where("status", "==", "채점 완료"));
@@ -194,7 +193,7 @@ export default function AssessmentResultsPage() {
             }
         } else if (mockData) {
             setIsLoading(true); 
-            generateResultFromSubmission();
+            processMonologueSubmission();
         } else {
             setIsLoading(false);
         }
@@ -205,7 +204,7 @@ export default function AssessmentResultsPage() {
     });
     
     return () => unsubscribe();
-  }, [id, user, authLoading, router, generateResultFromSubmission]);
+  }, [id, user, authLoading, router, processMonologueSubmission]);
   
   if (isLoading || authLoading) {
     return (
