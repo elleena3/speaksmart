@@ -17,7 +17,7 @@ import { useLanguage } from '@/context/language-context';
 import { useAuth } from '@/context/auth-context';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, doc, deleteDoc, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, deleteDoc, addDoc, serverTimestamp, orderBy } from 'firebase/firestore';
 
 export default function AssessmentsPage() {
   const { user, loading: authLoading } = useAuth();
@@ -31,11 +31,10 @@ export default function AssessmentsPage() {
     if (!user) return;
     setIsLoading(true);
     try {
-        // No longer need to fetch results for each assessment, as submissionCount is now a field.
-        const q = query(collection(db, "assessments"), where("uid", "==", user.uid));
+        const q = query(collection(db, "assessments"), where("uid", "==", user.uid), orderBy("createdAt", "desc"));
         const querySnapshot = await getDocs(q);
         const assessmentsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TeacherAssessment));
-        setAssessments(assessmentsData.sort((a, b) => b.createdAt - a.createdAt)); // Sort manually after fetching
+        setAssessments(assessmentsData);
     } catch (error) {
         console.error("Error fetching assessments: ", error);
         toast({ title: "오류", description: "평가 목록을 불러오는 데 실패했습니다.", variant: "destructive" });

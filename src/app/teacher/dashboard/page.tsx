@@ -14,7 +14,7 @@ import { OverviewChart } from "./overview-chart"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { useLanguage } from "@/context/language-context"
 import { useAuth } from '@/context/auth-context';
-import { collection, query, where, getDocs, limit } from 'firebase/firestore';
+import { collection, query, where, getDocs, limit, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { format } from "date-fns";
 
@@ -34,12 +34,13 @@ export default function TeacherDashboard() {
         const q = query(
             collection(db, "assessments"), 
             where("uid", "==", user.uid), 
+            orderBy("createdAt", "desc"),
             limit(5)
         );
 
         const querySnapshot = await getDocs(q);
         const assessmentsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TeacherAssessment));
-        setAssessments(assessmentsData.sort((a, b) => b.createdAt - a.createdAt)); // Sort manually after fetching
+        setAssessments(assessmentsData);
     } catch (error) {
         console.error("Error fetching assessments:", error);
     } finally {
