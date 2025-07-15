@@ -72,6 +72,7 @@ const transcribeAudioFlow = ai.defineFlow(
 // 2b. Content Analysis Prompt
 const contentAnalysisPrompt = ai.definePrompt({
   name: 'contentAnalysisPrompt',
+  model: googleAI.model('gemini-2.0-flash'),
   input: { schema: ContentAnalysisInputSchema },
   output: { schema: ContentAnalysisOutputSchema },
   prompt: `You are an AI English Teacher evaluating a student's performance based on a transcript. Your persona is that of an expert English teacher providing constructive feedback for skill improvement. Your entire response must be in the specified JSON format, and all text feedback must be in Korean.
@@ -94,6 +95,7 @@ Based on all the information provided, perform the following tasks:
 // 2c. Pronunciation Analysis Prompt
 const pronunciationAnalysisPrompt = ai.definePrompt({
     name: 'pronunciationAnalysisPrompt',
+    model: googleAI.model('gemini-2.0-flash'),
     input: { schema: PronunciationAnalysisInputSchema },
     output: { schema: PronunciationAnalysisOutputSchema },
     prompt: `You are an expert English pronunciation coach. Your task is to evaluate a student's spoken English based on their audio recording and the corresponding transcript. Provide all feedback in Korean.
