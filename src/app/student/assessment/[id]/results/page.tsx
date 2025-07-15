@@ -8,8 +8,9 @@ import { type StudentResult, type ResultStatus, type TeacherAssessment } from "@
 import { useAuth } from "@/context/auth-context";
 import { Loader2, AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { db } from "@/lib/firebase";
+import { db, storage } from "@/lib/firebase";
 import { collection, query, where, onSnapshot, doc, getDoc, setDoc, updateDoc, getDocs } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { generateSpeakingAnalysis } from "@/ai/flows/generate-speaking-analysis-flow";
 import { useToast } from "@/hooks/use-toast";
 import { Progress } from "@/components/ui/progress";
@@ -46,7 +47,7 @@ export default function AssessmentResultsPage() {
     
     try {
         // Step 1: Create an initial 'in-progress' document in Firestore
-        setStatus("텍스트 변환 중");
+        setStatus("업로드 중");
         setProgress(10);
         
         const initialData: Partial<StudentResult> = {
@@ -58,10 +59,19 @@ export default function AssessmentResultsPage() {
             avatarUrl: user.photoURL || '',
             createdAt: Date.now(),
             date: new Date().toISOString(),
-            status: "텍스트 변환 중",
+            status: "업로드 중",
             progress: 10,
         };
         await setDoc(newResultRef, initialData, { merge: true });
+
+        // Step 1.5: Upload audio to Firebase Storage
+        const fetchRes = await fetch(studentRecordingDataUri);
+        const audioBlob = await fetchRes.blob();
+        const audioFileName = `recordings/${user.uid}_${assessmentDetails.id}_${Date.now()}.webm`;
+        const storageRef = ref(storage, audioFileName);
+        await uploadBytes(storageRef, audioBlob);
+        const downloadURL = await getDownloadURL(storageRef);
+        await updateDoc(newResultRef, { status: "텍스트 변환 중", progress: 25 });
 
         // Step 2: Call the AI flow to get analysis data
         setStatus("분석 중");
@@ -73,7 +83,6 @@ export default function AssessmentResultsPage() {
             expectedFormat: assessmentDetails.expectedFormat || "",
             studentName: user.displayName || "Student",
             assessmentTitle: assessmentDetails.title,
-            // Pass required fields for creating the result document
             studentId: user.uid,
             assessmentId: assessmentDetails.id,
             teacherUid: assessmentDetails.uid,
@@ -87,7 +96,7 @@ export default function AssessmentResultsPage() {
         const finalResultData: Partial<StudentResult> = {
             ...analysisResult,
             score: analysisResult.contentScore,
-            studentRecordingDataUri: studentRecordingDataUri, // Persist for playback
+            studentRecordingDataUri: downloadURL, // Persist Storage URL for playback
             status: '채점 완료',
             progress: 100
         };
@@ -122,7 +131,7 @@ export default function AssessmentResultsPage() {
         sessionStorage.removeItem(MOCK_SESSION_KEY);
         // The listener will pick up the final changes
     }
-  }, [id, user]);
+  }, [id, user, toast]);
 
   useEffect(() => {
     if (authLoading || !user || !id) return;
