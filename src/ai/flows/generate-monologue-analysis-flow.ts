@@ -31,13 +31,13 @@ export async function generateMonologueAnalysis(
 
 // Internal Sub-flows and Prompts
 
-// 1. Transcription Prompt - Uses handlebars to pass the data URI
+// 1. Transcription Prompt - Uses a structured object for input
 const transcriptionPrompt = ai.definePrompt({
     name: 'transcribeAudioPrompt',
     model: googleAI.model('gemini-2.0-flash'),
-    input: { schema: z.string() }, // Expect a raw string (the data URI)
+    input: { schema: z.object({ audioDataUri: z.string() }) },
     prompt: `Transcribe this English audio.
-Audio: {{media url=prompt contentType='audio/webm;codecs=opus'}}
+Audio: {{media url=audioDataUri contentType='audio/webm;codecs=opus'}}
 `,
 });
 
@@ -104,7 +104,7 @@ const generateMonologueAnalysisFlow = ai.defineFlow(
   async (input) => {
     
     // Step 1: Transcribe the audio.
-    const transcriptionResult = await transcriptionPrompt(input.studentRecordingDataUri);
+    const transcriptionResult = await transcriptionPrompt({ audioDataUri: input.studentRecordingDataUri });
     const studentTranscript = transcriptionResult.text;
 
     if (!studentTranscript || studentTranscript.trim() === "" || studentTranscript.includes('기록되지 않았습니다') || studentTranscript.includes('인식하지 못했습니다')) {
