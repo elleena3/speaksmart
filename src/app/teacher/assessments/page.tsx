@@ -17,7 +17,7 @@ import { useLanguage } from '@/context/language-context';
 import { useAuth } from '@/context/auth-context';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, doc, deleteDoc, addDoc, serverTimestamp, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, deleteDoc, addDoc } from 'firebase/firestore';
 
 export default function AssessmentsPage() {
   const { user, loading: authLoading } = useAuth();
@@ -31,9 +31,11 @@ export default function AssessmentsPage() {
     if (!user) return;
     setIsLoading(true);
     try {
-        const q = query(collection(db, "assessments"), where("uid", "==", user.uid), orderBy("createdAt", "desc"));
+        const q = query(collection(db, "assessments"), where("uid", "==", user.uid));
         const querySnapshot = await getDocs(q);
         const assessmentsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TeacherAssessment));
+        // Sort manually after fetching
+        assessmentsData.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
         setAssessments(assessmentsData);
     } catch (error) {
         console.error("Error fetching assessments: ", error);
