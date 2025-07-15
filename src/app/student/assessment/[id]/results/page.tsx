@@ -9,9 +9,8 @@ import { useAuth } from "@/context/auth-context";
 import { Loader2, AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { db } from "@/lib/firebase";
-import { collection, query, where, onSnapshot, getDocs, doc, runTransaction, setDoc, addDoc } from "firebase/firestore";
+import { collection, query, where, onSnapshot, doc } from "firebase/firestore";
 import { generateSpeakingAnalysis } from "@/ai/flows/generate-speaking-analysis-flow";
-import { useToast } from "@/hooks/use-toast";
 
 const MOCK_SESSION_KEY = 'mockResult';
 
@@ -22,7 +21,6 @@ export default function AssessmentResultsPage() {
   const router = useRouter();
   const params = useParams();
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
-  const { toast } = useToast();
   
   const [result, setResult] = useState<StudentResult | null>(null);
   const [status, setStatus] = useState<ResultStatus>("분석 중");
@@ -30,11 +28,6 @@ export default function AssessmentResultsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [newResultId, setNewResultId] = useState<string | null>(null);
-
-  const handleProgressUpdate = useCallback((status: string, progress: number) => {
-    setStatus(status as ResultStatus);
-    setProgress(progress);
-  }, []);
 
   // This function now just triggers the AI flow and gets the new result ID back.
   const generateResultFromSubmission = useCallback(async () => {
@@ -58,7 +51,8 @@ export default function AssessmentResultsPage() {
             studentId: user.uid,
             teacherUid: assessmentDetails.uid,
             avatarUrl: user.photoURL || '',
-        }, handleProgressUpdate);
+            assessmentId: assessmentDetails.id
+        });
         
         // The flow returns the ID of the new document.
         // We'll use this ID to listen for the result.
@@ -73,59 +67,70 @@ export default function AssessmentResultsPage() {
         // Clear session storage immediately after starting the flow.
         sessionStorage.removeItem(MOCK_SESSION_KEY);
     }
-  }, [id, user, handleProgressUpdate]);
+  }, [id, user]);
 
   useEffect(() => {
     if (authLoading || !user || !id) return;
     
-    if (sessionStorage.getItem(MOCK_SESSION_KEY)) {
+    const mockData = sessionStorage.getItem(MOCK_SESSION_KEY);
+    if (mockData) {
         generateResultFromSubmission();
-        return; // Wait for the newResultId to be set.
-    }
-
-    // Determine which result to listen to.
-    const resultQueryId = newResultId || (user ? id : null);
-    if (!resultQueryId) {
-        setIsLoading(false);
+        // Return here and let the next effect run when newResultId is set
         return;
     }
-    
-    const q = newResultId 
-        ? doc(db, "results", newResultId)
-        : query(
+
+    // If we have a newResultId, we should listen to that specific document.
+    // Otherwise, query for an existing result for this user/assessment.
+    const resultDocId = newResultId;
+
+    if (resultDocId) {
+        const docRef = doc(db, "results", resultDocId);
+        const unsubscribe = onSnapshot(docRef, (docSnap) => {
+            if (docSnap.exists()) {
+                const data = { id: docSnap.id, ...docSnap.data() } as StudentResult;
+                setResult(data);
+                setStatus(data.status);
+                setProgress(data.progress || 100);
+
+                if (data.status === '채점 완료' || data.status === '오류') {
+                    setIsLoading(false);
+                }
+            }
+        }, (err) => {
+            console.error("Error listening to new result:", err);
+            setError("결과를 실시간으로 업데이트하는 중 오류가 발생했습니다.");
+            setIsLoading(false);
+        });
+        return () => unsubscribe();
+    } else {
+        // Query for existing result if no new one is being generated
+        const q = query(
             collection(db, "results"),
             where("assessmentId", "==", id),
             where("studentId", "==", user.uid)
         );
 
-    const unsubscribe = onSnapshot(q as any, (snapshot) => {
-        let docToProcess: any = null;
-        if(newResultId) {
-            docToProcess = snapshot;
-        } else if (!snapshot.empty) {
-            docToProcess = snapshot.docs[0];
-        }
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            if (!snapshot.empty) {
+                const docToProcess = snapshot.docs[0];
+                const data = { id: docToProcess.id, ...docToProcess.data() } as StudentResult;
+                setResult(data);
+                setStatus(data.status);
+                setProgress(data.progress || 100);
 
-        if (docToProcess && docToProcess.exists()) {
-            const data = { id: docToProcess.id, ...docToProcess.data() } as StudentResult;
-            setResult(data);
-            setStatus(data.status);
-            setProgress(data.progress || 100);
-
-            if(data.status === '채점 완료' || data.status === '오류'){
-                setIsLoading(false);
+                if (data.status === '채점 완료' || data.status === '오류') {
+                    setIsLoading(false);
+                }
+            } else {
+                setIsLoading(false); 
             }
-        } else if (!newResultId) {
-            // Only set to not loading if we are not waiting for a new result.
-            setIsLoading(false); 
-        }
-    }, (err) => {
-        console.error("Error fetching result:", err);
-        setError("결과를 불러오는 중 오류가 발생했습니다.");
-        setIsLoading(false);
-    });
-
-    return () => unsubscribe();
+        }, (err) => {
+            console.error("Error fetching result:", err);
+            setError("결과를 불러오는 중 오류가 발생했습니다.");
+            setIsLoading(false);
+        });
+        return () => unsubscribe();
+    }
   }, [id, user, authLoading, router, generateResultFromSubmission, newResultId]);
   
   if (isLoading || authLoading) {
@@ -140,7 +145,7 @@ export default function AssessmentResultsPage() {
     );
   }
 
-  if (status !== '채점 완료' && status !== '오류') {
+  if (status !== '채점 완료' && status !== '오류' && newResultId) {
      return (
         <Card className="flex flex-col items-center justify-center text-center p-8 h-96">
             <CardHeader>

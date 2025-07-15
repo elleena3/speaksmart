@@ -14,13 +14,11 @@ import { z } from 'zod';
 import { db as adminDb } from '@/lib/firebase-admin'; // Use Admin SDK for server-side operations
 import {
   GenerateSpeakingAnalysisInputSchema,
-  GenerateSpeakingAnalysisOutputSchema,
   ContentAnalysisInputSchema,
   ContentAnalysisOutputSchema,
   PronunciationAnalysisInputSchema,
   PronunciationAnalysisOutputSchema,
   type GenerateSpeakingAnalysisInput,
-  type GenerateSpeakingAnalysisOutput,
 } from '@/lib/types/ai-schemas';
 import { type StudentResult } from '@/lib/types';
 
@@ -30,10 +28,9 @@ import { type StudentResult } from '@/lib/types';
  * It orchestrates the entire analysis process.
  */
 export async function generateSpeakingAnalysis(
-    input: GenerateSpeakingAnalysisInput,
-    onProgressUpdate?: (status: string, progress: number) => void
+    input: GenerateSpeakingAnalysisInput
 ): Promise<{ resultId: string }> { // Returns the ID of the created result document
-  return generateSpeakingAnalysisFlow(input, onProgressUpdate);
+  return generateSpeakingAnalysisFlow(input);
 }
 
 
@@ -111,7 +108,7 @@ const generateSpeakingAnalysisFlow = ai.defineFlow(
     inputSchema: GenerateSpeakingAnalysisInputSchema,
     outputSchema: z.object({ resultId: z.string() }),
   },
-  async (input, onProgressUpdate) => {
+  async (input) => {
     
     // Create a new result document in Firestore with 'in-progress' status
     const resultsCollectionRef = adminDb.collection("results");
@@ -120,7 +117,6 @@ const generateSpeakingAnalysisFlow = ai.defineFlow(
     // This function will be called to update the document's status
     const updateResultStatus = async (status: string, progress: number) => {
         await newResultRef.update({ status, progress });
-        onProgressUpdate?.(status, progress);
     };
 
     try {
@@ -136,8 +132,6 @@ const generateSpeakingAnalysisFlow = ai.defineFlow(
             status: "텍스트 변환 중",
             progress: 10,
         });
-
-        onProgressUpdate?.("텍스트 변환 중", 33);
         
         // Step 1: Transcribe the audio.
         const studentTranscript = await transcribeAudioFlow(input.studentRecordingDataUri);
@@ -148,6 +142,7 @@ const generateSpeakingAnalysisFlow = ai.defineFlow(
                 aiFeedback: '학생의 답변을 인식하지 못했습니다. 마이크 상태를 확인하고 다시 시도해주세요.',
                 teacherGuidance: '학생의 답변을 인식할 수 없어 조언을 생성할 수 없습니다.',
                 curricularRemarks: '학생의 답변이 없어 비고 작성이 불가능합니다.',
+                score: 0,
                 contentScore: 0,
                 pronunciationScore: 0,
                 pronunciationFeedback: '학생의 음성이 없어 발음 분석을 할 수 없습니다.',
@@ -157,7 +152,7 @@ const generateSpeakingAnalysisFlow = ai.defineFlow(
             return { resultId: newResultRef.id };
         }
         
-        await updateResultStatus("분석 중", 66);
+        await updateResultStatus("분석 중", 50);
 
         // Step 2: Run content and pronunciation analysis in PARALLEL.
         const [contentResult, pronunciationResult] = await Promise.all([

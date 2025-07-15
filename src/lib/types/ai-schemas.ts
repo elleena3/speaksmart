@@ -50,13 +50,6 @@ export const GenerateSpeakingAnalysisInputSchema = z.object({
 export type GenerateSpeakingAnalysisInput = z.infer<typeof GenerateSpeakingAnalysisInputSchema>;
 
 export const GenerateSpeakingAnalysisOutputSchema = z.object({
-  studentTranscript: z.string().describe("The transcript of the student's speech."),
-  aiFeedback: z.string().describe('The generated feedback for the student in Korean.'),
-  teacherGuidance: z.string().describe('Actionable guidance for the teacher based on the performance in Korean.'),
-  curricularRemarks: z.string().describe('A draft of curricular remarks for the student’s academic record in Korean.'),
-  contentScore: z.number().int().min(0).max(100).describe('A score from 0-100 for the performance content.'),
-  pronunciationScore: z.number().int().min(0).max(100).describe('A score from 0-100 for pronunciation.'),
-  pronunciationFeedback: z.string().describe('Specific feedback on the student\'s pronunciation in Korean.'),
   resultId: z.string().describe('The ID of the created Firestore result document.'),
 });
 export type GenerateSpeakingAnalysisOutput = z.infer<typeof GenerateSpeakingAnalysisOutputSchema>;
