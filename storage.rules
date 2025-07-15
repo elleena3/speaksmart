@@ -1,9 +1,10 @@
+
 rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-    // 개발 및 테스트를 위해 모든 파일에 대한 읽기 및 쓰기를 허용합니다.
-    // 주의: 실제 프로덕션 환경에서는 인증된 사용자만 접근할 수 있도록 규칙을 강화해야 합니다.
+    // This rule allows anyone to read and write to any file in your storage.
+    // This is useful for development, but must be secured before production.
     match /{allPaths=**} {
       allow read, write: if true;
     }
