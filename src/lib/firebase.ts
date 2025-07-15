@@ -19,7 +19,7 @@ export const firebaseConfig = {
 
 // 모든 환경 변수가 설정되었는지 확인합니다.
 if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
-  throw new Error("Firebase 설정이 .env 파일에 올바르게 구성되지 않았습니다. API 키와 프로젝트 ID를 확인해주세요.");
+  console.warn("Firebase 설정이 .env 파일에 올바르게 구성되지 않았습니다. API 키와 프로젝트 ID를 확인해주세요.");
 }
 
 // Firebase 앱 초기화
