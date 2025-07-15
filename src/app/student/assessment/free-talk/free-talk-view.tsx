@@ -154,7 +154,7 @@ export function FreeTalkView({ scenario, scenarioPrompt, assessment }: { scenari
           cleanupRecorder();
       };
 
-      mediaRecorderRef.current.start();
+      mediaRecorderRef.current.start(100); // Use timeslice to get data chunks immediately
 
     } catch (error) {
       console.error("Error accessing microphone:", error);

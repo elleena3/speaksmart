@@ -116,7 +116,7 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
         cleanupRecorder();
       }
 
-      mediaRecorderRef.current.start();
+      mediaRecorderRef.current.start(100); // Use timeslice to get data chunks immediately
       startTimer();
       toast({
         title: "녹음 시작됨",
