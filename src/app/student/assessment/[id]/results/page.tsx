@@ -8,7 +8,7 @@ import { type StudentResult, type ResultStatus, type TeacherAssessment } from "@
 import { useAuth } from "@/context/auth-context";
 import { Loader2, AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { db, storage } from "@/lib/firebase";
+import { db, storage, firebaseConfig } from "@/lib/firebase";
 import { collection, query, where, onSnapshot, doc, setDoc, updateDoc, getDocs } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { generateSpeakingAnalysis } from "@/ai/flows/generate-speaking-analysis-flow";
@@ -73,7 +73,7 @@ export default function AssessmentResultsPage() {
         const storageRef = ref(storage, audioFileName);
         await uploadBytes(storageRef, audioBlob);
         const downloadURL = await getDownloadURL(storageRef);
-        const gcsUri = `gs://${storageRef.bucket}/${storageRef.fullPath}`;
+        const gcsUri = `gs://${firebaseConfig.storageBucket}/${storageRef.fullPath}`;
 
         // Step 3: Call the AI flow with the GCS URI
         setStatus("AI 분석 중");

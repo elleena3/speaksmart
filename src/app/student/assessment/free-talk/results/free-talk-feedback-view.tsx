@@ -10,7 +10,7 @@ import { type StudentResult, type TeacherAssessment, type ConversationTurn } fro
 import { useToast } from "@/hooks/use-toast";
 import { FeedbackView } from "../../../assessment/[id]/results/feedback-view";
 import { useAuth } from "@/context/auth-context";
-import { db, storage } from "@/lib/firebase";
+import { db, storage, firebaseConfig } from "@/lib/firebase";
 import { collection, doc, query, where, getDocs, writeBatch, setDoc, addDoc, updateDoc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { Card, CardHeader, CardContent, CardDescription, CardTitle } from "@/components/ui/card";
@@ -82,7 +82,7 @@ export function FreeTalkFeedbackView() {
             const storageRef = ref(storage, audioFileName);
             await uploadBytes(storageRef, audioBlob);
             const downloadURL = await getDownloadURL(storageRef);
-            const gcsUri = `gs://${storageRef.bucket}/${storageRef.fullPath}`;
+            const gcsUri = `gs://${firebaseConfig.storageBucket}/${storageRef.fullPath}`;
 
             const studentTranscript = conversationHistory
                 .filter(turn => turn.role === 'user')
