@@ -19,14 +19,10 @@ import { useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, doc, deleteDoc, addDoc, serverTimestamp, orderBy } from 'firebase/firestore';
 
-type AssessmentWithCount = TeacherAssessment & {
-    submissionCount: number;
-}
-
 export default function AssessmentsPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
-  const [assessments, setAssessments] = useState<AssessmentWithCount[]>([]);
+  const [assessments, setAssessments] = useState<TeacherAssessment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
   const { t } = useLanguage();
@@ -37,22 +33,7 @@ export default function AssessmentsPage() {
     try {
         const q = query(collection(db, "assessments"), where("uid", "==", user.uid), orderBy("createdAt", "desc"));
         const querySnapshot = await getDocs(q);
-
-        const assessmentsData = await Promise.all(
-          querySnapshot.docs.map(async (docSnapshot) => {
-            const assessment = { id: docSnapshot.id, ...docSnapshot.data() } as TeacherAssessment;
-            
-            const resultsQuery = query(collection(db, "results"), where("assessmentId", "==", assessment.id));
-            const resultsSnapshot = await getDocs(resultsQuery);
-            const submissionCount = resultsSnapshot.size;
-            
-            return {
-              ...assessment,
-              submissionCount: submissionCount
-            };
-          })
-        );
-        
+        const assessmentsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TeacherAssessment));
         setAssessments(assessmentsData);
     } catch (error) {
         console.error("Error fetching assessments: ", error);
@@ -85,6 +66,7 @@ export default function AssessmentsPage() {
         title: `${copyData.title}${t.teacherAssessments.copySuffix}`,
         createdAt: Date.now(),
         dateCreated: new Date().toISOString().split('T')[0],
+        submissionCount: 0,
       });
 
       toast({
@@ -183,8 +165,8 @@ export default function AssessmentsPage() {
                    <TableCell className="text-center">
                       <div className="flex items-center justify-center gap-1.5">
                         <Users className="h-4 w-4 text-muted-foreground" />
-                        <Badge variant={assessment.submissionCount > 0 ? "default" : "secondary"}>
-                          {assessment.submissionCount}
+                        <Badge variant={(assessment.submissionCount ?? 0) > 0 ? "default" : "secondary"}>
+                          {assessment.submissionCount ?? 0}
                         </Badge>
                       </div>
                    </TableCell>

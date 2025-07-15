@@ -30,6 +30,7 @@ export type TeacherAssessment = {
   topic: string;
   prompt: string;
   averageScore: number;
+  submissionCount: number;
   dateCreated: string;
   startDate?: string;
   endDate?: string;

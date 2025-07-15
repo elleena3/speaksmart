@@ -119,19 +119,26 @@ export default function NewAssessmentPage() {
             averageScore: 0,
             dateCreated: new Date().toISOString().split('T')[0],
             createdAt: Date.now(),
+            submissionCount: 0, // Add submissionCount field on creation
         };
 
         if (values.startDate) {
             docData.startDate = values.startDate.toISOString();
         } else {
-            delete docData.startDate;
+            delete (docData as any).startDate;
         }
 
         if (values.endDate) {
             docData.endDate = values.endDate.toISOString();
         } else {
-            delete docData.endDate;
+            delete (docData as any).endDate;
         }
+        
+        // Remove undefined fields before sending to Firestore
+        if (docData.recordingTimeLimit === undefined) delete docData.recordingTimeLimit;
+        if (docData.scenario === undefined) delete docData.scenario;
+        if (docData.expectedFormat === undefined) delete docData.expectedFormat;
+
 
         await addDoc(collection(db, "assessments"), docData);
 
