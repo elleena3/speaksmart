@@ -73,6 +73,11 @@ export default function AssessmentResultsPage() {
             expectedFormat: assessmentDetails.expectedFormat || "",
             studentName: user.displayName || "Student",
             assessmentTitle: assessmentDetails.title,
+            // Pass required fields for creating the result document
+            studentId: user.uid,
+            assessmentId: assessmentDetails.id,
+            teacherUid: assessmentDetails.uid,
+            avatarUrl: user.photoURL || '',
         });
         
         // Step 3: Update the document with the full analysis results
