@@ -49,19 +49,19 @@ export async function generateSpeakingAnalysis(
 const transcribeAudioFlow = ai.defineFlow(
   {
     name: 'transcribeAudioFlow',
-    inputSchema: z.string(), // data URI
+    inputSchema: z.string(), // gs:// URI or data URI
     outputSchema: z.string(), // transcript
   },
-  async (audioDataUri) => {
-    // A simple check for empty or invalid data URI
-    if (!audioDataUri || !audioDataUri.includes(',')) {
+  async (audioUri) => {
+    // A simple check for empty or invalid URI
+    if (!audioUri) {
         return "(학생 답변이 기록되지 않았습니다.)";
     }
     const sttResponse = await ai.generate({
       model: googleAI.model('gemini-2.0-flash'),
       prompt: [
         { text: 'Transcribe this English audio.' },
-        { media: { url: audioDataUri } },
+        { media: { url: audioUri } },
       ],
     });
     return sttResponse.text || "(학생 답변을 인식하지 못했습니다.)";
@@ -100,7 +100,7 @@ const pronunciationAnalysisPrompt = ai.definePrompt({
     output: { schema: PronunciationAnalysisOutputSchema },
     prompt: `You are an expert English pronunciation coach. Your task is to evaluate a student's spoken English based on their audio recording and the corresponding transcript. Provide all feedback in Korean.
 
-    - Student's Audio Recording: {{media url=studentRecordingDataUri}}
+    - Student's Audio Recording: {{media url=studentRecordingGcsUri}}
     - AI-generated Transcript: {{{studentTranscript}}}
 
     Please perform the following steps:
@@ -121,8 +121,8 @@ const generateSpeakingAnalysisFlow = ai.defineFlow(
   },
   async (input) => {
     
-    // Step 1: Transcribe the audio.
-    const studentTranscript = await transcribeAudioFlow(input.studentRecordingDataUri);
+    // Step 1: Transcribe the audio using the GCS URI.
+    const studentTranscript = await transcribeAudioFlow(input.studentRecordingGcsUri);
 
     if (!studentTranscript || studentTranscript.includes('기록되지 않았습니다') || studentTranscript.includes('인식하지 못했습니다')) {
         return {
@@ -146,7 +146,7 @@ const generateSpeakingAnalysisFlow = ai.defineFlow(
         assessmentTitle: input.assessmentTitle,
       }),
       pronunciationAnalysisPrompt({
-        studentRecordingDataUri: input.studentRecordingDataUri,
+        studentRecordingGcsUri: input.studentRecordingGcsUri,
         studentTranscript,
       })
     ]);

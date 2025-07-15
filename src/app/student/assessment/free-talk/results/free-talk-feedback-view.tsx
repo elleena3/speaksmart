@@ -8,7 +8,7 @@ import { Loader2 } from "lucide-react";
 import { generateSpeakingAnalysis } from "@/ai/flows/generate-speaking-analysis-flow";
 import { type StudentResult, type TeacherAssessment } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
-import { FeedbackView } from "../../[id]/results/feedback-view";
+import { FeedbackView } from "../../../assessment/[id]/results/feedback-view";
 import { useAuth } from "@/context/auth-context";
 import { db, storage } from "@/lib/firebase";
 import { collection, doc, query, where, getDocs, writeBatch } from "firebase/firestore";
@@ -63,23 +63,25 @@ export function FreeTalkFeedbackView() {
                 .map(turn => `${turn.role === 'user' ? '학생' : 'AI'}: ${turn.text}`)
                 .join('\n');
             
-            // 1. Upload audio to Firebase Storage
+            // 1. Upload audio to Firebase Storage first.
             const fetchRes = await fetch(studentRecordingDataUri);
             const audioBlob = await fetchRes.blob();
             const audioFileName = `recordings/${user.uid}_${assessment.id}_${Date.now()}.webm`;
             const storageRef = ref(storage, audioFileName);
             await uploadBytes(storageRef, audioBlob);
             const downloadURL = await getDownloadURL(storageRef);
+            const gcsUri = `gs://${storageRef.bucket}/${storageRef.fullPath}`;
 
-            // 2. Generate all feedback using the new optimized flow
+            // 2. Generate all feedback using the analysis flow with the GCS URI.
             const analysisResult = await generateSpeakingAnalysis({
                 activityPrompt: `${assessment.prompt}\n\n--- 대화 기록 ---\n${fullTranscript}`,
                 expectedFormat: assessment.expectedFormat || "AI와의 자연스러운 대화 능력을 평가합니다.",
-                studentRecordingDataUri: studentRecordingDataUri, 
+                studentRecordingGcsUri: gcsUri,
                 studentName: user.displayName || "Student", 
                 assessmentTitle: assessment.title.replace(/ - 복사본(\s\d+)?$/, ''),
             });
 
+            // 3. Prepare the final result data.
             const resultData: Omit<StudentResult, 'id'> = {
                 studentId: user.uid,
                 assessmentId: assessment.id,
@@ -87,6 +89,7 @@ export function FreeTalkFeedbackView() {
                 name: user.displayName || "Student",
                 avatarUrl: user.photoURL || `https://placehold.co/40x40.png?text=${user.displayName?.charAt(0)}`,
                 status: "채점 완료",
+                progress: 100,
                 score: analysisResult.contentScore,
                 date: new Date().toISOString().split('T')[0],
                 createdAt: Date.now(),
@@ -95,7 +98,7 @@ export function FreeTalkFeedbackView() {
                 studentFeedbackSummary: "학생이 평가에 대해 남긴 피드백이 없습니다.",
                 teacherGuidance: analysisResult.teacherGuidance,
                 studentTranscript: analysisResult.studentTranscript,
-                studentRecordingDataUri: downloadURL,
+                studentRecordingDataUri: downloadURL, // Use the Storage URL
                 pronunciationScore: analysisResult.pronunciationScore,
                 pronunciationFeedback: analysisResult.pronunciationFeedback,
                 teacherUid: assessment.uid,

@@ -64,32 +64,30 @@ export default function AssessmentResultsPage() {
         };
         await setDoc(newResultRef, initialData, { merge: true });
 
-        // Step 1.5: Upload audio to Firebase Storage
+        // Step 2: Upload audio to Firebase Storage
+        setStatus("텍스트 변환 중");
+        await updateDoc(newResultRef, { status: "텍스트 변환 중", progress: 25 });
         const fetchRes = await fetch(studentRecordingDataUri);
         const audioBlob = await fetchRes.blob();
         const audioFileName = `recordings/${user.uid}_${assessmentDetails.id}_${Date.now()}.webm`;
         const storageRef = ref(storage, audioFileName);
         await uploadBytes(storageRef, audioBlob);
         const downloadURL = await getDownloadURL(storageRef);
-        await updateDoc(newResultRef, { status: "텍스트 변환 중", progress: 25 });
+        const gcsUri = `gs://${storageRef.bucket}/${storageRef.fullPath}`;
 
-        // Step 2: Call the AI flow to get analysis data
+        // Step 3: Call the AI flow with the GCS URI
         setStatus("분석 중");
         setProgress(50);
         
         const analysisResult = await generateSpeakingAnalysis({
-            studentRecordingDataUri,
+            studentRecordingGcsUri: gcsUri,
             activityPrompt: assessmentDetails.prompt,
             expectedFormat: assessmentDetails.expectedFormat || "",
             studentName: user.displayName || "Student",
             assessmentTitle: assessmentDetails.title,
-            studentId: user.uid,
-            assessmentId: assessmentDetails.id,
-            teacherUid: assessmentDetails.uid,
-            avatarUrl: user.photoURL || '',
         });
         
-        // Step 3: Update the document with the full analysis results
+        // Step 4: Update the document with the full analysis results
         setStatus("리포트 생성 중");
         setProgress(90);
 
@@ -102,7 +100,7 @@ export default function AssessmentResultsPage() {
         };
         await updateDoc(newResultRef, finalResultData);
         
-        // Step 4: Update the assessment's average score in a transaction
+        // Step 5: Update the assessment's average score in a transaction
         const assessmentRef = doc(db, "assessments", assessmentDetails.id);
         const resultsCollection = collection(db, "results");
         const q = query(resultsCollection, where("assessmentId", "==", assessmentDetails.id), where("status", "==", "채점 완료"));

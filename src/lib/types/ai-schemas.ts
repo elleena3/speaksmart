@@ -34,18 +34,13 @@ export type ConverseWithStudentOutput = z.infer<typeof ConverseWithStudentOutput
 
 // Schemas for the comprehensive speaking analysis flow
 export const GenerateSpeakingAnalysisInputSchema = z.object({
-  studentRecordingDataUri: z.string().describe(
-    "The student's voice recording as a data URI. Expected format: 'data:<mimetype>;base64,<encoded_data>'"
+  studentRecordingGcsUri: z.string().describe(
+    "The student's voice recording as a Google Cloud Storage URI. Expected format: 'gs://<bucket-name>/<file-path>'"
   ),
   activityPrompt: z.string().describe('The prompt or instructions for the speaking activity.'),
   expectedFormat: z.string().describe('The expected format or key points of the response for grading.'),
   studentName: z.string().describe('The name of the student.'),
   assessmentTitle: z.string().describe('The title of the assessment.'),
-  // Add fields needed to create the result document
-  studentId: z.string(),
-  assessmentId: z.string(),
-  teacherUid: z.string(),
-  avatarUrl: z.string(),
 });
 export type GenerateSpeakingAnalysisInput = z.infer<typeof GenerateSpeakingAnalysisInputSchema>;
 
@@ -72,7 +67,7 @@ export const ContentAnalysisOutputSchema = z.object({
 });
 
 export const PronunciationAnalysisInputSchema = z.object({
-    studentRecordingDataUri: z.string(),
+    studentRecordingGcsUri: z.string(),
     studentTranscript: z.string(),
 });
 
