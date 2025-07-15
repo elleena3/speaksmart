@@ -22,14 +22,14 @@ export default function Home() {
       subtitle: "AI 기반 영어 말하기 평가 플랫폼",
       studentLogin: "학생으로 시작하기",
       teacherLogin: "교사로 시작하기",
-      footer: `© ${new Date().getFullYear()} SpeakSmart 평가도구. 모든 권리 보유.`
+      footer: `© ${new Date().getFullYear()} SpeakSmart 평가도구. 요망진 AI 모든 권리 보유.`
     },
     en: {
       title: "SpeakSmart Assessment Tool",
       subtitle: "AI-Powered English Speaking Assessment Platform",
       studentLogin: "Start as a Student",
       teacherLogin: "Start as a Teacher",
-      footer: `© ${new Date().getFullYear()} SpeakSmart Assessment Tool. All rights reserved.`
+      footer: `© ${new Date().getFullYear()} SpeakSmart Assessment Tool. Yomangjin AI All rights reserved.`
     }
   };
 
