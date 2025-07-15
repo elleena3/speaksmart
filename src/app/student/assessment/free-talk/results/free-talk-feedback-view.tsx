@@ -78,11 +78,11 @@ export function FreeTalkFeedbackView() {
             await updateDoc(newResultRef, { status: "음성 파일 업로드 중...", progress: 25 });
             const fetchRes = await fetch(studentRecordingDataUri);
             const audioBlob = await fetchRes.blob();
-            const audioFileName = `recordings/${user.uid}_${assessment.id}_${Date.now()}.webm`;
+            const audioFileName = `recordings/${user.uid}_${assessment.id}_${Date.now()}.weba`;
             const storageRef = ref(storage, audioFileName);
             await uploadBytes(storageRef, audioBlob);
             const downloadURL = await getDownloadURL(storageRef);
-            const bucket = firebaseConfig.storageBucket?.replace(".firebasestorage.app", "");
+            const bucket = firebaseConfig.storageBucket?.replace(".appspot.com", "");
             const gcsUri = `gs://${bucket}/${storageRef.fullPath}`;
             
             const fullConversationTranscript = conversationHistory
@@ -230,5 +230,3 @@ export function FreeTalkFeedbackView() {
         </div>
     );
 }
-
-    

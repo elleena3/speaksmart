@@ -108,7 +108,7 @@ export function FreeTalkView({ scenario, scenarioPrompt, assessment }: { scenari
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioStreamRef.current = stream;
       mediaRecorderRef.current = new MediaRecorder(stream, { 
-        mimeType: 'audio/webm',
+        mimeType: 'audio/weba',
       });
 
       mediaRecorderRef.current.ondataavailable = (event) => {
@@ -130,7 +130,7 @@ export function FreeTalkView({ scenario, scenarioPrompt, assessment }: { scenari
             cleanupRecorder();
             return;
         }
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/weba' });
         studentAudioBlobsRef.current.push(audioBlob); // Collect the student's audio chunk
         const reader = new FileReader();
         reader.readAsDataURL(audioBlob);
@@ -220,7 +220,7 @@ export function FreeTalkView({ scenario, scenarioPrompt, assessment }: { scenari
         });
         return;
     }
-    const combinedBlob = new Blob(studentAudioBlobsRef.current, { type: 'audio/webm' });
+    const combinedBlob = new Blob(studentAudioBlobsRef.current, { type: 'audio/weba' });
     const reader = new FileReader();
     reader.readAsDataURL(combinedBlob);
     reader.onloadend = () => {

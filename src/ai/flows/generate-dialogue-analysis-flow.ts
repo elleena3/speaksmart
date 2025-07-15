@@ -71,7 +71,7 @@ const pronunciationAnalysisPrompt = ai.definePrompt({
     output: { schema: PronunciationAnalysisOutputSchema },
     prompt: `You are an expert English pronunciation coach. Your task is to evaluate a student's spoken English based on their combined audio recording from a conversation and the corresponding transcript of ONLY their speech. Provide all feedback in Korean.
 
-    - Student's Combined Audio Recording: {{media url=studentRecordingGcsUri contentType='audio/webm'}}
+    - Student's Combined Audio Recording: {{media url=studentRecordingGcsUri contentType='audio/weba'}}
     - Transcript of Student's Speech Only: {{{studentTranscript}}}
 
     Please perform the following steps:
@@ -140,5 +140,3 @@ const generateDialogueAnalysisFlow = ai.defineFlow(
     };
   }
 );
-
-    
