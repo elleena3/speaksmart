@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { transcribeFile } from "@/ai/flows/transcribe-file";
+import { transcribeFile, type TranscriptionResult } from "@/ai/flows/transcribe-file";
 import { analyzePronunciation, type PronunciationAnalysisResult } from "@/ai/flows/analyze-pronunciation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
@@ -16,7 +16,7 @@ import { Progress } from "@/components/ui/progress";
 
 function FileTranscriber() {
   const [file, setFile] = useState<File | null>(null);
-  const [transcript, setTranscript] = useState<string>("");
+  const [transcripts, setTranscripts] = useState<TranscriptionResult[]>([]);
   const [isTranscribing, setIsTranscribing] = useState<boolean>(false);
   const { toast } = useToast();
 
@@ -25,7 +25,7 @@ function FileTranscriber() {
     if (selectedFile) {
       if (selectedFile.type.startsWith('audio/webm') || selectedFile.type.startsWith('video/webm') || selectedFile.name.endsWith('.webm')) {
         setFile(selectedFile);
-        setTranscript("");
+        setTranscripts([]);
       } else {
         toast({
           title: "잘못된 파일 형식",
@@ -47,15 +47,18 @@ function FileTranscriber() {
     }
 
     setIsTranscribing(true);
-    setTranscript("텍스트 변환 중...");
+    setTranscripts([]);
+    toast({ title: "변환 시작", description: "3개 모델의 텍스트 변환을 시작합니다." });
 
     try {
       const reader = new FileReader();
       reader.readAsDataURL(file);
       reader.onloadend = async () => {
         const base64Audio = reader.result as string;
-        const result = await transcribeFile(base64Audio);
-        setTranscript(result || "변환된 텍스트가 없습니다.");
+        const results = await transcribeFile(base64Audio);
+        setTranscripts(results);
+        toast({ title: "변환 완료", description: "모든 모델의 변환이 완료되었습니다." });
+        setIsTranscribing(false);
       };
       reader.onerror = (error) => {
         console.error("File reading error:", error);
@@ -64,7 +67,7 @@ function FileTranscriber() {
           description: "파일을 읽는 중 문제가 발생했습니다.",
           variant: "destructive"
         });
-        setTranscript("오류: 파일을 읽을 수 없습니다.");
+        setIsTranscribing(false);
       }
     } catch (error: any) {
       console.error("Transcription error:", error);
@@ -73,8 +76,6 @@ function FileTranscriber() {
         description: error.message || "AI 분석 중 오류가 발생했습니다.",
         variant: "destructive"
       });
-      setTranscript(`오류: ${error.message}`);
-    } finally {
       setIsTranscribing(false);
     }
   };
@@ -88,11 +89,26 @@ function FileTranscriber() {
       </div>
       <Button onClick={handleTranscribe} disabled={isTranscribing || !file} className="w-full">
         {isTranscribing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
-        {isTranscribing ? "분석 중..." : "텍스트로 변환"}
+        {isTranscribing ? "변환 중..." : "모델별 텍스트로 변환"}
       </Button>
-      <div className="grid gap-2">
-        <label htmlFor="transcript-output-file" className="text-sm font-medium">변환 결과</label>
-        <Textarea id="transcript-output-file" readOnly value={transcript} placeholder="이곳에 변환된 텍스트가 표시됩니다." rows={5} />
+      <div className="space-y-4">
+        {isTranscribing && transcripts.length === 0 && (
+            <div className="text-center p-4">
+                <Loader2 className="h-6 w-6 animate-spin mx-auto" />
+                <p className="mt-2 text-sm text-muted-foreground">모델들이 병렬로 변환 중입니다...</p>
+            </div>
+        )}
+        {transcripts.length > 0 && (
+            <div className="grid grid-cols-1 gap-4">
+              <h3 className="text-lg font-semibold border-b pb-2">모델별 변환 결과</h3>
+              {transcripts.map((result, index) => (
+                <div key={index} className="grid gap-2">
+                  <label htmlFor={`transcript-output-file-${index}`} className="text-sm font-medium font-mono">{result.model}</label>
+                  <Textarea id={`transcript-output-file-${index}`} readOnly value={result.transcript} className="text-sm bg-muted/50" rows={3} />
+                </div>
+              ))}
+            </div>
+        )}
       </div>
     </CardContent>
   );
@@ -100,7 +116,7 @@ function FileTranscriber() {
 
 function UrlTranscriber() {
   const [url, setUrl] = useState<string>("");
-  const [transcript, setTranscript] = useState<string>("");
+  const [transcripts, setTranscripts] = useState<TranscriptionResult[]>([]);
   const [isTranscribing, setIsTranscribing] = useState<boolean>(false);
   const { toast } = useToast();
 
@@ -114,7 +130,6 @@ function UrlTranscriber() {
       return;
     }
 
-    // A simple check for a valid URL ending with .webm
     if (!url.startsWith('http') || !url.endsWith('.webm')) {
         toast({
             title: "잘못된 URL",
@@ -125,7 +140,8 @@ function UrlTranscriber() {
     }
 
     setIsTranscribing(true);
-    setTranscript("파일 다운로드 및 변환 중...");
+    setTranscripts([]);
+    toast({ title: "변환 시작", description: "URL에서 파일을 가져와 변환을 시작합니다." });
 
     try {
       const response = await fetch(url);
@@ -138,13 +154,15 @@ function UrlTranscriber() {
       reader.readAsDataURL(blob);
       reader.onloadend = async () => {
         const base64Audio = reader.result as string;
-        const result = await transcribeFile(base64Audio);
-        setTranscript(result || "변환된 텍스트가 없습니다.");
+        const results = await transcribeFile(base64Audio);
+        setTranscripts(results);
+        toast({ title: "변환 완료", description: "모든 모델의 변환이 완료되었습니다." });
+        setIsTranscribing(false);
       };
       reader.onerror = (error) => {
         console.error("File reading error:", error);
         toast({ title: "파일 변환 오류", description: "가져온 파일을 처리하는 중 문제가 발생했습니다.", variant: "destructive"});
-        setTranscript("오류: 파일을 변환할 수 없습니다.");
+        setIsTranscribing(false);
       }
     } catch (error: any) {
       console.error("Transcription error:", error);
@@ -153,8 +171,6 @@ function UrlTranscriber() {
         description: error.message || "AI 분석 중 오류가 발생했습니다.",
         variant: "destructive"
       });
-      setTranscript(`오류: ${error.message}`);
-    } finally {
       setIsTranscribing(false);
     }
   };
@@ -167,11 +183,26 @@ function UrlTranscriber() {
       </div>
       <Button onClick={handleTranscribe} disabled={isTranscribing} className="w-full">
         {isTranscribing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-        {isTranscribing ? "분석 중..." : "URL에서 변환"}
+        {isTranscribing ? "변환 중..." : "URL에서 모델별로 변환"}
       </Button>
-      <div className="grid gap-2">
-        <label htmlFor="transcript-output-url" className="text-sm font-medium">변환 결과</label>
-        <Textarea id="transcript-output-url" readOnly value={transcript} placeholder="이곳에 변환된 텍스트가 표시됩니다." rows={5} />
+       <div className="space-y-4">
+        {isTranscribing && transcripts.length === 0 && (
+            <div className="text-center p-4">
+                <Loader2 className="h-6 w-6 animate-spin mx-auto" />
+                <p className="mt-2 text-sm text-muted-foreground">모델들이 병렬로 변환 중입니다...</p>
+            </div>
+        )}
+        {transcripts.length > 0 && (
+            <div className="grid grid-cols-1 gap-4">
+              <h3 className="text-lg font-semibold border-b pb-2">모델별 변환 결과</h3>
+              {transcripts.map((result, index) => (
+                <div key={index} className="grid gap-2">
+                  <label htmlFor={`transcript-output-url-${index}`} className="text-sm font-medium font-mono">{result.model}</label>
+                  <Textarea id={`transcript-output-url-${index}`} readOnly value={result.transcript} className="text-sm bg-muted/50" rows={3} />
+                </div>
+              ))}
+            </div>
+        )}
       </div>
     </CardContent>
   );
@@ -207,16 +238,23 @@ function PronunciationAnalyzer() {
 
     setIsAnalyzing(true);
     setAnalysisResults([]);
-    toast({ title: "분석 시작", description: "3개 모델의 분석을 병렬로 시작합니다." });
+    toast({ title: "분석 시작", description: "모델별 분석을 병렬로 시작합니다." });
 
     try {
       const reader = new FileReader();
       reader.readAsDataURL(file);
       reader.onloadend = async () => {
         const base64Audio = reader.result as string;
-        const results = await analyzePronunciation(base64Audio);
-        setAnalysisResults(results);
-        toast({ title: "분석 완료", description: "모든 모델의 분석이 완료되었습니다." });
+        try {
+            const results = await analyzePronunciation(base64Audio);
+            setAnalysisResults(results);
+            toast({ title: "분석 완료", description: "모든 모델의 분석이 완료되었습니다." });
+        } catch (e) {
+             console.error("Pronunciation analysis error:", e);
+             toast({ title: "발음 분석 오류", description: (e as Error).message || "AI 분석 중 오류가 발생했습니다.", variant: "destructive" });
+        } finally {
+            setIsAnalyzing(false);
+        }
       };
       reader.onerror = (error) => {
         console.error("File reading error:", error);
@@ -224,12 +262,9 @@ function PronunciationAnalyzer() {
         setIsAnalyzing(false);
       }
     } catch (error: any) {
-      console.error("Pronunciation analysis error:", error);
-      toast({ title: "발음 분석 오류", description: error.message || "AI 분석 중 오류가 발생했습니다.", variant: "destructive" });
-      setIsAnalyzing(false);
-    } finally {
-      // The `isAnalyzing` state is now set to false inside onloadend/onerror or in catch block
-      // to handle the async nature of FileReader. The flow itself will set the final state.
+        console.error("Pronunciation analysis error:", error);
+        toast({ title: "발음 분석 오류", description: error.message || "AI 분석 중 오류가 발생했습니다.", variant: "destructive" });
+        setIsAnalyzing(false);
     }
   };
 
@@ -296,7 +331,7 @@ export default function MiscPage() {
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2"><FileText className="h-6 w-6"/> WebM 음성-텍스트 변환 도구</CardTitle>
                         <CardDescription>
-                        로컬 WebM 오디오 파일을 업로드하거나 파일 URL을 입력하여 음성-텍스트 변환(STT) 결과를 테스트합니다.
+                        로컬 WebM 오디오 파일을 업로드하거나 파일 URL을 입력하여 여러 모델의 음성-텍스트 변환(STT) 결과를 비교 테스트합니다.
                         </CardDescription>
                     </CardHeader>
                     <Tabs defaultValue="upload" className="w-full">
