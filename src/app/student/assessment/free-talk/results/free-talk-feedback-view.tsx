@@ -59,10 +59,6 @@ export function FreeTalkFeedbackView() {
         try {
             const { assessment, history, studentRecordingDataUri } = conversationData;
             
-            const fullTranscript = history
-                .map(turn => `${turn.role === 'user' ? '학생' : 'AI'}: ${turn.text}`)
-                .join('\n');
-            
             // 1. Upload audio to Firebase Storage first.
             const fetchRes = await fetch(studentRecordingDataUri);
             const audioBlob = await fetchRes.blob();
@@ -74,9 +70,9 @@ export function FreeTalkFeedbackView() {
 
             // 2. Generate all feedback using the analysis flow with the GCS URI.
             const analysisResult = await generateSpeakingAnalysis({
-                activityPrompt: `${assessment.prompt}\n\n--- 대화 기록 ---\n${fullTranscript}`,
-                expectedFormat: assessment.expectedFormat || "AI와의 자연스러운 대화 능력을 평가합니다.",
                 studentRecordingGcsUri: gcsUri,
+                activityPrompt: assessment.prompt,
+                expectedFormat: assessment.expectedFormat || "AI와의 자연스러운 대화 능력을 평가합니다.",
                 studentName: user.displayName || "Student", 
                 assessmentTitle: assessment.title.replace(/ - 복사본(\s\d+)?$/, ''),
             });

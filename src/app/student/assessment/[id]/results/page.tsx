@@ -9,7 +9,7 @@ import { useAuth } from "@/context/auth-context";
 import { Loader2, AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { db, storage } from "@/lib/firebase";
-import { collection, query, where, onSnapshot, doc, getDoc, setDoc, updateDoc, getDocs } from "firebase/firestore";
+import { collection, query, where, onSnapshot, doc, setDoc, updateDoc, getDocs } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { generateSpeakingAnalysis } from "@/ai/flows/generate-speaking-analysis-flow";
 import { useToast } from "@/hooks/use-toast";
@@ -65,8 +65,8 @@ export default function AssessmentResultsPage() {
         await setDoc(newResultRef, initialData, { merge: true });
 
         // Step 2: Upload audio to Firebase Storage
-        setStatus("텍스트 변환 중");
-        await updateDoc(newResultRef, { status: "텍스트 변환 중", progress: 25 });
+        setStatus("파일 업로드 중...");
+        await updateDoc(newResultRef, { status: "파일 업로드 중...", progress: 25 });
         const fetchRes = await fetch(studentRecordingDataUri);
         const audioBlob = await fetchRes.blob();
         const audioFileName = `recordings/${user.uid}_${assessmentDetails.id}_${Date.now()}.webm`;
@@ -76,8 +76,9 @@ export default function AssessmentResultsPage() {
         const gcsUri = `gs://${storageRef.bucket}/${storageRef.fullPath}`;
 
         // Step 3: Call the AI flow with the GCS URI
-        setStatus("분석 중");
+        setStatus("AI 분석 중");
         setProgress(50);
+        await updateDoc(newResultRef, { status: "AI 분석 중", progress: 50 });
         
         const analysisResult = await generateSpeakingAnalysis({
             studentRecordingGcsUri: gcsUri,
@@ -100,7 +101,7 @@ export default function AssessmentResultsPage() {
         };
         await updateDoc(newResultRef, finalResultData);
         
-        // Step 5: Update the assessment's average score in a transaction
+        // Step 5: Update the assessment's average score
         const assessmentRef = doc(db, "assessments", assessmentDetails.id);
         const resultsCollection = collection(db, "results");
         const q = query(resultsCollection, where("assessmentId", "==", assessmentDetails.id), where("status", "==", "채점 완료"));
@@ -135,11 +136,7 @@ export default function AssessmentResultsPage() {
     if (authLoading || !user || !id) return;
     
     const mockData = sessionStorage.getItem(MOCK_SESSION_KEY);
-    if (mockData) {
-        setIsLoading(true); // Show loading state while processing
-        generateResultFromSubmission();
-    }
-
+    
     // Set up a real-time listener for results for this user and assessment.
     // This will show existing results OR the result being created by generateResultFromSubmission.
     const q = query(
@@ -163,9 +160,13 @@ export default function AssessmentResultsPage() {
             } else {
                 setIsLoading(true); // Keep loading if still processing
             }
-        } else if (!mockData) {
+        } else if (mockData) {
+            // Only generate if there are no existing results AND there is new data
+            setIsLoading(true); // Show loading state while processing
+            generateResultFromSubmission();
+        } else {
             // If no results found and none are being generated, stop loading.
-            setIsLoading(false); 
+            setIsLoading(false);
         }
     }, (err) => {
         console.error("Error listening to result:", err);
