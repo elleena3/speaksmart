@@ -32,26 +32,37 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
   const audioStreamRef = useRef<MediaStream | null>(null);
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
+
 
   const timeLimit = assessmentDetails.recordingTimeLimit && assessmentDetails.recordingTimeLimit > 0 
     ? assessmentDetails.recordingTimeLimit * 60 
     : null;
 
-  // Effect to handle state changes when audioBlob is set (i.e., recording has finished)
+  // Effect to show toast ONLY when recording state becomes 'recorded'
+  useEffect(() => {
+    if (recordingState === 'recorded') {
+        toast({ title: "녹음 완료", description: "아래에서 녹음을 확인하고 제출해주세요." });
+    }
+  }, [recordingState, toast]);
+
+  // Effect to handle blob creation and URL generation
   useEffect(() => {
     if (audioBlob) {
-      setRecordingState("recorded");
       setAudioUrl(URL.createObjectURL(audioBlob));
       setAudioSize(audioBlob.size);
-      toast({ title: "녹음 완료", description: "아래에서 녹음을 확인하고 제출해주세요." });
     } else {
-      // Clean up the URL when the blob is cleared
       if (audioUrl) {
         URL.revokeObjectURL(audioUrl);
         setAudioUrl(null);
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Cleanup URL on unmount or when blob is cleared
+    return () => {
+        if (audioUrl) {
+            URL.revokeObjectURL(audioUrl);
+        }
+    };
   }, [audioBlob]);
 
   const cleanupRecorder = useCallback(() => {
@@ -60,21 +71,23 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
       audioStreamRef.current = null;
     }
     if (mediaRecorderRef.current) {
-      mediaRecorderRef.current.onstop = null; // Important: remove the handler to prevent memory leaks
+      mediaRecorderRef.current.onstop = null;
       mediaRecorderRef.current = null;
     }
     if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
     if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+    recordedChunksRef.current = [];
   }, []);
 
   const onRecordingStop = useCallback(() => {
-    const recordedChunks = (mediaRecorderRef.current as any)?.__chunks || [];
-    if (recordedChunks.length === 0) {
+    if (recordedChunksRef.current.length === 0) {
         console.warn("No audio data recorded.");
+        setAudioBlob(null);
         setRecordingState("idle");
     } else {
-        const newAudioBlob = new Blob(recordedChunks, { type: mimeType });
+        const newAudioBlob = new Blob(recordedChunksRef.current, { type: mimeType });
         setAudioBlob(newAudioBlob);
+        setRecordingState("recorded");
     }
     cleanupRecorder();
   }, [cleanupRecorder]);
@@ -94,10 +107,10 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
       const recorder = new MediaRecorder(stream, { mimeType });
       mediaRecorderRef.current = recorder;
       
-      (recorder as any).__chunks = []; // Store chunks directly on the recorder instance
+      recordedChunksRef.current = [];
       recorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
-            (recorder as any).__chunks.push(event.data);
+            recordedChunksRef.current.push(event.data);
         }
       };
 
