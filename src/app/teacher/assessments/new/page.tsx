@@ -20,8 +20,9 @@ import { format } from "date-fns";
 import { useLanguage } from "@/context/language-context";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { scenarios, type TeacherAssessment } from "@/lib/types";
-import { useAuth } from "@/context/auth-context";
+import { useAuth, mockStudents } from "@/context/auth-context";
 import { addDoc, collection } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
@@ -40,6 +41,8 @@ export default function NewAssessmentPage() {
     startDate: z.date().optional(),
     endDate: z.date().optional(),
     assessmentType: z.enum(["monologue", "dialogue"]),
+    targetType: z.enum(["all", "specific"]).default("all"),
+    targetStudentIds: z.array(z.string()).optional(),
     scenario: z.enum(scenarios).optional(),
     recordingTimeLimit: z.coerce.number().int().min(0).optional(),
   }).superRefine((data, ctx) => {
@@ -61,6 +64,10 @@ export default function NewAssessmentPage() {
         ctx.addIssue({ code: z.ZodIssueCode.custom, message: t.teacherAssessmentForm.errors.expectedFormatRequired, path: ['expectedFormat'] });
     }
 
+    if (data.targetType === 'specific' && (!data.targetStudentIds || data.targetStudentIds.length === 0)) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: t.teacherAssessmentForm.errors.studentRequired, path: ['targetStudentIds']});
+    }
+
     if (data.startDate && data.endDate && data.endDate < data.startDate) {
       ctx.addIssue({ message: t.teacherAssessmentForm.errors.endDate, path: ["endDate"] });
     }
@@ -74,12 +81,15 @@ export default function NewAssessmentPage() {
       prompt: "",
       expectedFormat: "",
       assessmentType: "monologue",
+      targetType: "all",
+      targetStudentIds: [],
       scenario: "free-talk",
       recordingTimeLimit: 0,
     },
   });
 
   const assessmentType = form.watch("assessmentType");
+  const targetType = form.watch("targetType");
   const scenario = form.watch("scenario");
   const isFreeTalkDialogue = assessmentType === 'dialogue' && scenario === 'free-talk';
 
@@ -115,6 +125,7 @@ export default function NewAssessmentPage() {
         
         const docData: Partial<Omit<TeacherAssessment, "id">> = {
             ...submissionValues,
+            targetStudentIds: values.targetType === 'all' ? 'all' : values.targetStudentIds,
             uid: user.uid,
             averageScore: 0,
             dateCreated: new Date().toISOString().split('T')[0],
@@ -122,6 +133,8 @@ export default function NewAssessmentPage() {
             submissionCount: 0,
         };
         
+        delete (docData as any).targetType;
+
         if (values.startDate) {
             docData.startDate = values.startDate.toISOString();
         }
@@ -196,6 +209,92 @@ export default function NewAssessmentPage() {
                 </FormItem>
               )}
             />
+
+            <FormField
+              control={form.control}
+              name="targetType"
+              render={({ field }) => (
+                <FormItem className="space-y-3">
+                  <FormLabel>{t.teacherAssessmentForm.targetLabel}</FormLabel>
+                  <FormControl>
+                    <RadioGroup
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                      className="flex flex-col space-y-1"
+                    >
+                      <FormItem className="flex items-center space-x-3 space-y-0">
+                        <FormControl>
+                          <RadioGroupItem value="all" />
+                        </FormControl>
+                        <FormLabel className="font-normal">
+                           {t.teacherAssessmentForm.targetAll}
+                        </FormLabel>
+                      </FormItem>
+                      <FormItem className="flex items-center space-x-3 space-y-0">
+                        <FormControl>
+                          <RadioGroupItem value="specific" />
+                        </FormControl>
+                        <FormLabel className="font-normal">
+                          {t.teacherAssessmentForm.targetSpecific}
+                        </FormLabel>
+                      </FormItem>
+                    </RadioGroup>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {targetType === 'specific' && (
+              <FormField
+                control={form.control}
+                name="targetStudentIds"
+                render={() => (
+                  <FormItem>
+                    <div className="mb-4">
+                      <FormLabel className="text-base">{t.teacherAssessmentForm.selectStudentsLabel}</FormLabel>
+                      <FormDescription>
+                        {t.teacherAssessmentForm.selectStudentsDescription}
+                      </FormDescription>
+                    </div>
+                    {mockStudents.map((item) => (
+                      <FormField
+                        key={item.uid}
+                        control={form.control}
+                        name="targetStudentIds"
+                        render={({ field }) => {
+                          return (
+                            <FormItem
+                              key={item.uid}
+                              className="flex flex-row items-start space-x-3 space-y-0"
+                            >
+                              <FormControl>
+                                <Checkbox
+                                  checked={field.value?.includes(item.uid)}
+                                  onCheckedChange={(checked) => {
+                                    return checked
+                                      ? field.onChange([...(field.value || []), item.uid])
+                                      : field.onChange(
+                                          field.value?.filter(
+                                            (value) => value !== item.uid
+                                          )
+                                        )
+                                  }}
+                                />
+                              </FormControl>
+                              <FormLabel className="font-normal">
+                                {item.displayName} ({item.email})
+                              </FormLabel>
+                            </FormItem>
+                          )
+                        }}
+                      />
+                    ))}
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             {assessmentType === 'dialogue' && (
                <FormField

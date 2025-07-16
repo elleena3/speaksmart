@@ -117,6 +117,9 @@ const mockStudent3: User = {
     toJSON: () => ({}),
 };
 
+// Export mock students for use in other components like the assessment form
+export const mockStudents = [mockStudent1, mockStudent2, mockStudent3];
+
 
 interface AuthContextType {
   user: User | null;

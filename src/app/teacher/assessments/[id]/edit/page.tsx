@@ -19,9 +19,10 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { useLanguage } from "@/context/language-context";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { scenarios, type TeacherAssessment } from "@/lib/types";
-import { useAuth } from "@/context/auth-context";
+import { useAuth, mockStudents } from "@/context/auth-context";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
@@ -37,13 +38,15 @@ export default function EditAssessmentPage() {
   const assessmentId = Array.isArray(params.id) ? params.id[0] : params.id;
   
   const formSchema = useMemo(() => z.object({
-    title: z.string(),
-    topic: z.string(),
-    prompt: z.string(),
+    title: z.string().optional(),
+    topic: z.string().optional(),
+    prompt: z.string().optional(),
     expectedFormat: z.string().optional(),
     startDate: z.date().optional(),
     endDate: z.date().optional(),
     assessmentType: z.enum(["monologue", "dialogue"]),
+    targetType: z.enum(["all", "specific"]).default("all"),
+    targetStudentIds: z.union([z.literal('all'), z.array(z.string())]),
     scenario: z.enum(scenarios).optional(),
     recordingTimeLimit: z.coerce.number().int().min(0).optional(),
   }).superRefine((data, ctx) => {
@@ -65,6 +68,10 @@ export default function EditAssessmentPage() {
         ctx.addIssue({ code: z.ZodIssueCode.custom, message: t.teacherAssessmentForm.errors.expectedFormatRequired, path: ['expectedFormat'] });
     }
 
+    if (data.targetType === 'specific' && (data.targetStudentIds === 'all' || data.targetStudentIds.length === 0)) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: t.teacherAssessmentForm.errors.studentRequired, path: ['targetStudentIds']});
+    }
+
     if (data.startDate && data.endDate && data.endDate < data.startDate) {
       ctx.addIssue({ message: t.teacherAssessmentForm.errors.endDate, path: ["endDate"] });
     }
@@ -78,12 +85,15 @@ export default function EditAssessmentPage() {
       prompt: "",
       expectedFormat: "",
       assessmentType: "monologue",
+      targetType: "all",
+      targetStudentIds: "all",
       scenario: "free-talk",
       recordingTimeLimit: 0,
     },
   });
 
   const assessmentType = form.watch("assessmentType");
+  const targetType = form.watch("targetType");
   const scenario = form.watch("scenario");
   const isFreeTalkDialogue = assessmentType === 'dialogue' && scenario === 'free-talk';
 
@@ -99,6 +109,7 @@ export default function EditAssessmentPage() {
               ...data,
               startDate: data.startDate ? new Date(data.startDate) : undefined,
               endDate: data.endDate ? new Date(data.endDate) : undefined,
+              targetType: Array.isArray(data.targetStudentIds) ? 'specific' : 'all',
             });
         } else {
             toast({ title: "오류", description: "평가를 찾을 수 없거나 수정할 권한이 없습니다.", variant: "destructive" });
@@ -147,7 +158,9 @@ export default function EditAssessmentPage() {
         
         const updateData: Partial<TeacherAssessment> = {
             ...submissionValues,
+            targetStudentIds: values.targetType === 'all' ? 'all' : (values.targetStudentIds as string[]),
         };
+        delete (updateData as any).targetType;
 
         if (values.startDate) {
             updateData.startDate = values.startDate.toISOString();
@@ -162,7 +175,7 @@ export default function EditAssessmentPage() {
         }
 
 
-        await updateDoc(docRef, updateData);
+        await updateDoc(docRef, updateData as any);
 
         toast({
             title: t.teacherAssessmentForm.editSuccessToast.title,
@@ -229,6 +242,101 @@ export default function EditAssessmentPage() {
                 </FormItem>
               )}
             />
+
+            <FormField
+              control={form.control}
+              name="targetType"
+              render={({ field }) => (
+                <FormItem className="space-y-3">
+                  <FormLabel>{t.teacherAssessmentForm.targetLabel}</FormLabel>
+                  <FormControl>
+                    <RadioGroup
+                      onValueChange={(value) => {
+                          field.onChange(value);
+                          if (value === 'all') {
+                              form.setValue('targetStudentIds', 'all');
+                          } else {
+                              form.setValue('targetStudentIds', []);
+                          }
+                      }}
+                      value={field.value}
+                      className="flex flex-col space-y-1"
+                    >
+                      <FormItem className="flex items-center space-x-3 space-y-0">
+                        <FormControl>
+                          <RadioGroupItem value="all" />
+                        </FormControl>
+                        <FormLabel className="font-normal">
+                           {t.teacherAssessmentForm.targetAll}
+                        </FormLabel>
+                      </FormItem>
+                      <FormItem className="flex items-center space-x-3 space-y-0">
+                        <FormControl>
+                          <RadioGroupItem value="specific" />
+                        </FormControl>
+                        <FormLabel className="font-normal">
+                          {t.teacherAssessmentForm.targetSpecific}
+                        </FormLabel>
+                      </FormItem>
+                    </RadioGroup>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {targetType === 'specific' && (
+              <FormField
+                control={form.control}
+                name="targetStudentIds"
+                render={() => (
+                  <FormItem>
+                    <div className="mb-4">
+                      <FormLabel className="text-base">{t.teacherAssessmentForm.selectStudentsLabel}</FormLabel>
+                      <FormDescription>
+                        {t.teacherAssessmentForm.selectStudentsDescription}
+                      </FormDescription>
+                    </div>
+                    {mockStudents.map((item) => (
+                      <FormField
+                        key={item.uid}
+                        control={form.control}
+                        name="targetStudentIds"
+                        render={({ field }) => {
+                          const studentIds = Array.isArray(field.value) ? field.value : [];
+                          return (
+                            <FormItem
+                              key={item.uid}
+                              className="flex flex-row items-start space-x-3 space-y-0"
+                            >
+                              <FormControl>
+                                <Checkbox
+                                  checked={studentIds.includes(item.uid)}
+                                  onCheckedChange={(checked) => {
+                                    return checked
+                                      ? field.onChange([...studentIds, item.uid])
+                                      : field.onChange(
+                                          studentIds.filter(
+                                            (value) => value !== item.uid
+                                          )
+                                        )
+                                  }}
+                                />
+                              </FormControl>
+                              <FormLabel className="font-normal">
+                                {item.displayName} ({item.email})
+                              </FormLabel>
+                            </FormItem>
+                          )
+                        }}
+                      />
+                    ))}
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
 
             {assessmentType === 'dialogue' && (
                <FormField

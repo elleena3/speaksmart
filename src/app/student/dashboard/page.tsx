@@ -113,7 +113,7 @@ export default function StudentDashboard() {
             studentResultsMap.set(resultData.assessmentId, { status: resultData.status, id: doc.id });
         });
         
-        const combined = assessmentsSnapshot.docs.map(doc => {
+        const allAssessments = assessmentsSnapshot.docs.map(doc => {
             const assessment = { id: doc.id, ...doc.data() } as TeacherAssessment;
             const resultInfo = studentResultsMap.get(assessment.id);
             return {
@@ -122,8 +122,23 @@ export default function StudentDashboard() {
                 resultId: resultInfo ? resultInfo.id : undefined,
             };
         });
+
+        // Filter assessments for the current student
+        const filteredAssessments = allAssessments.filter(assessment => {
+            // Existing assessments without the new field should be visible to all
+            if (!assessment.targetStudentIds) {
+                return true;
+            }
+            if (assessment.targetStudentIds === 'all') {
+                return true;
+            }
+            if (Array.isArray(assessment.targetStudentIds) && assessment.targetStudentIds.includes(user.uid)) {
+                return true;
+            }
+            return false;
+        });
         
-        setAssessments(combined);
+        setAssessments(filteredAssessments);
     } catch (error) {
         console.error("Error fetching assessments:", error);
         toast({

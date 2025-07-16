@@ -38,6 +38,7 @@ export type TeacherAssessment = {
   scenario?: Scenario;
   expectedFormat?: string;
   recordingTimeLimit?: number; // Optional recording time limit in minutes
+  targetStudentIds: string[] | 'all'; // 'all' or array of student UIDs
   // For Firestore timestamp
   createdAt: number;
 };
