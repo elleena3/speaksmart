@@ -14,7 +14,7 @@ import { ai } from '@/ai/genkit';
 import { googleAI } from '@genkit-ai/googleai';
 import { z } from 'zod';
 
-export const AnalyzeReadAloudInputSchema = z.object({
+const AnalyzeReadAloudInputSchema = z.object({
   audioDataUri: z.string().describe(
     "An audio file of the user reading the text, as a data URI."
   ),
@@ -22,7 +22,7 @@ export const AnalyzeReadAloudInputSchema = z.object({
 });
 export type AnalyzeReadAloudInput = z.infer<typeof AnalyzeReadAloudInputSchema>;
 
-export const AnalyzeReadAloudOutputSchema = z.object({
+const AnalyzeReadAloudOutputSchema = z.object({
   accuracy: z.number().int().min(0).max(100).describe('A score from 0-100 representing how accurately the user read the text (word-for-word match).'),
   fluency: z.number().int().min(0).max(100).describe('A score from 0-100 for the fluency of the reading (flow, pace, and rhythm).'),
   completionRate: z.number().int().min(0).max(100).describe('The percentage of the text that the user actually read.'),
