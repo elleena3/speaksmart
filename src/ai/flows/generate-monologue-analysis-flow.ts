@@ -34,7 +34,7 @@ export async function generateMonologueAnalysis(
 // 1. Transcription Prompt - Uses a structured object for input
 const transcriptionPrompt = ai.definePrompt({
     name: 'transcribeAudioPrompt',
-    model: googleAI.model('gemini-2.0-flash'),
+    model: googleAI.model('gemini-2.5-flash'),
     input: { schema: z.object({ studentRecordingUrl: z.string() }) },
     prompt: `Transcribe this English audio.
 Audio: {{media url=studentRecordingUrl}}
@@ -45,7 +45,7 @@ Audio: {{media url=studentRecordingUrl}}
 // 2. Content Analysis Prompt
 const contentAnalysisPrompt = ai.definePrompt({
   name: 'monologueContentAnalysisPrompt',
-  model: googleAI.model('gemini-2.0-flash'),
+  model: googleAI.model('gemini-2.5-flash'),
   input: { schema: z.object({
     studentTranscript: z.string(),
     activityPrompt: z.string(),
@@ -74,7 +74,7 @@ Based on all the information provided, perform the following tasks:
 // 3. Pronunciation Analysis Prompt
 const pronunciationAnalysisPrompt = ai.definePrompt({
     name: 'monologuePronunciationAnalysisPrompt',
-    model: googleAI.model('gemini-2.0-flash'),
+    model: googleAI.model('gemini-2.5-flash'),
     input: { schema: z.object({
         studentRecordingUrl: z.string(),
         studentTranscript: z.string(),
