@@ -46,8 +46,7 @@ export const translations = {
     },
     teacherDashboard: {
       dashboard: "대시보드",
-      createAssessment: "평가 만들기",
-      performanceOverview: "수업 성과 개요",
+      performanceOverview: "수업 성과 개요(예시)",
       avgScoreDescription: "최근 평가의 평균 점수입니다.",
       recentAssessments: "최근 평가",
       recentAssessmentsDescription: "가장 최근에 생성된 말하기 평가 5개입니다.",
@@ -243,8 +242,7 @@ export const translations = {
     },
     teacherDashboard: {
         dashboard: "Dashboard",
-        createAssessment: "Create Assessment",
-        performanceOverview: "Class Performance Overview",
+        performanceOverview: "Class Performance Overview (Example)",
         avgScoreDescription: "Average scores from recent assessments.",
         recentAssessments: "Recent Assessments",
         recentAssessmentsDescription: "Your 5 most recently created speaking assessments.",
