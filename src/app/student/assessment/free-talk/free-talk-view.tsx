@@ -153,12 +153,14 @@ export function FreeTalkView({ assessment }: { assessment: TeacherAssessment }) 
       };
 
       mediaRecorderRef.current.start(100);
+      return true;
 
     } catch (error) {
       console.error("Error accessing microphone:", error);
       toast({ title: "마이크 접근 오류", description: "마이크 접근을 허용해주세요.", variant: "destructive" });
       setSessionState("waiting_for_user");
       setInterimTranscript(null);
+      return false;
     }
   }, [cleanupRecorder, toast]);
 
@@ -166,12 +168,15 @@ export function FreeTalkView({ assessment }: { assessment: TeacherAssessment }) 
   const handleStartRecording = async () => {
     if (sessionState !== 'waiting_for_user') return;
     
-    cleanupRecorder();
     setInterimTranscript(null);
     setSessionState("countdown");
     setCountdown(3);
 
-    await startActualRecording();
+    const recordingStarted = await startActualRecording();
+    if (!recordingStarted) {
+        setSessionState("waiting_for_user");
+        return;
+    }
 
     countdownIntervalRef.current = setInterval(() => {
         setCountdown(prev => {
@@ -260,7 +265,7 @@ export function FreeTalkView({ assessment }: { assessment: TeacherAssessment }) 
 
   const renderCountdownState = () => (
     <>
-        <div className="flex justify-center my-4">
+        <div className="flex justify-center my-4 h-11 items-center">
              <span className="text-7xl font-bold text-primary animate-ping-short">{countdown}</span>
         </div>
         <Button size="lg" disabled className="w-full" variant="destructive">
@@ -420,5 +425,3 @@ export function FreeTalkView({ assessment }: { assessment: TeacherAssessment }) 
     </div>
   );
 }
-
-    

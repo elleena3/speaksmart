@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { FeedbackView } from "../../../assessment/[id]/results/feedback-view";
 import { useAuth } from "@/context/auth-context";
 import { db } from "@/lib/firebase";
-import { collection, doc, query, where, getDocs, setDoc, updateDoc } from "firebase/firestore";
+import { collection, doc, query, where, getDocs, setDoc, updateDoc, serverTimestamp, writeBatch } from "firebase/firestore";
 import { Card, CardHeader, CardContent, CardDescription, CardTitle } from "@/components/ui/card";
 
 const SESSION_STORAGE_KEY = 'freeTalkSessionData';
@@ -99,15 +99,17 @@ export function FreeTalkFeedbackView() {
                 router.push('/student/dashboard');
                 return;
             }
-
-            const resultsQuery = query(collection(db, "results"), where("assessmentId", "==", assessment.id), where("studentId", "==", user.uid));
-            const existingDocs = await getDocs(resultsQuery);
-
-            newResultRef = !existingDocs.empty 
-                ? existingDocs.docs.sort((a,b) => (b.data().createdAt || 0) - (a.data().createdAt || 0))[0].ref
-                : doc(collection(db, "results"));
             
             setAnalysisStep("upload"); // Logical step
+            
+            const fullConversationTranscript = conversationHistory
+                .map(turn => `${turn.role === 'user' ? '학생' : 'AI'}: ${turn.text}`)
+                .join('\n');
+            const studentOnlyTranscript = conversationHistory
+                .filter(turn => turn.role === 'user')
+                .map(turn => turn.text)
+                .join(' ');
+            
             const initialData: Partial<StudentResult> = {
                 studentId: user.uid,
                 assessmentId: assessment.id,
@@ -119,16 +121,21 @@ export function FreeTalkFeedbackView() {
                 date: new Date().toISOString(),
                 status: "분석 중",
                 studentRecordingUrl: studentRecordingUrl,
+                studentTranscript: fullConversationTranscript, // Save full transcript initially
             };
-            await setDoc(newResultRef, initialData, { merge: true });
             
-            const fullConversationTranscript = conversationHistory
-                .map(turn => `${turn.role === 'user' ? '학생' : 'AI'}: ${turn.text}`)
-                .join('\n');
-            const studentOnlyTranscript = conversationHistory
-                .filter(turn => turn.role === 'user')
-                .map(turn => turn.text)
-                .join(' ');
+            // Check for existing result and create/update accordingly
+            const resultsQuery = query(collection(db, "results"), where("assessmentId", "==", assessment.id), where("studentId", "==", user.uid));
+            const existingDocs = await getDocs(resultsQuery);
+
+            const batch = writeBatch(db);
+            if (!existingDocs.empty) {
+                // Delete old results for this assessment by this student
+                existingDocs.forEach(doc => batch.delete(doc.ref));
+            }
+            newResultRef = doc(collection(db, "results"));
+            batch.set(newResultRef, initialData);
+            await batch.commit();
 
             setAnalysisStep("analyze");
             const analysisResult = await generateDialogueAnalysis({
