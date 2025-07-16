@@ -33,15 +33,19 @@ export default function HistoryPage() {
     const fetchHistory = async () => {
         setIsLoading(true);
         try {
+            // Simplify the query to avoid complex indexes.
             const q = query(
                 collection(db, "results"),
                 where("studentId", "==", user.uid),
-                where("status", "==", "채점 완료"),
                 orderBy("createdAt", "desc")
             );
             const querySnapshot = await getDocs(q);
-            const results = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as StudentResult));
-            setCompletedAssessments(results);
+            const allResults = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as StudentResult));
+            
+            // Filter by status on the client side.
+            const completedResults = allResults.filter(result => result.status === "채점 완료");
+            
+            setCompletedAssessments(completedResults);
         } catch (error) {
             console.error("Error fetching history: ", error);
         } finally {
