@@ -209,12 +209,11 @@ export function FreeTalkView({ assessment }: { assessment: TeacherAssessment }) 
       
       setInterimTranscript(null);
 
-      const newConversation: ConversationTurn[] = [
-        ...conversation,
-        { role: 'user', text: studentTranscript },
-        { role: 'model', text: aiResponseText },
-      ];
-      setConversation(newConversation);
+      const userTurn: ConversationTurn = { role: 'user', text: studentTranscript };
+      const modelTurn: ConversationTurn = { role: 'model', text: aiResponseText };
+      
+      setConversation(prev => [...prev, userTurn, modelTurn]);
+
 
       if (audioPlayerRef.current) {
         audioPlayerRef.current.src = aiResponseAudioDataUri;
