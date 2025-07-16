@@ -34,6 +34,7 @@ const conversationalPrompt = ai.definePrompt({
       studentTranscript: true,
       scenario: true,
       scenarioPrompt: true, 
+      conversationHistory: true,
     }).extend({
         history: z.array(ConversationTurnSchema.extend({ isUser: z.boolean() })),
     })
@@ -104,14 +105,14 @@ async function toWav(
 }
 
 // Function to convert text to speech
-async function textToSpeech(text: string): Promise<string> {
+async function textToSpeech(text: string, voiceName: string = 'Alpheratz'): Promise<string> {
     const ttsResponse = await ai.generate({
         model: googleAI.model('gemini-2.5-flash-preview-tts'),
         config: {
             responseModalities: ['AUDIO'],
             speechConfig: {
                 voiceConfig: {
-                    prebuiltVoiceConfig: { voiceName: 'Algenib' }, 
+                    prebuiltVoiceConfig: { voiceName: voiceName as any }, 
                 },
             },
         },
@@ -138,7 +139,7 @@ const converseWithStudentFlow = ai.defineFlow(
     inputSchema: ConverseWithStudentInputSchema,
     outputSchema: ConverseWithStudentOutputSchema,
   },
-  async ({ studentRecordingDataUri, conversationHistory, scenario, scenarioPrompt }) => {
+  async ({ studentRecordingDataUri, conversationHistory, scenario, scenarioPrompt, aiVoice }) => {
     let studentTranscript = "";
     let aiResponseText = "";
 
@@ -170,6 +171,7 @@ const converseWithStudentFlow = ai.defineFlow(
       studentTranscript: studentTranscript || undefined, 
       scenario: scenario || 'free-talk',
       scenarioPrompt: scenarioPrompt,
+      conversationHistory: conversationHistory
     });
 
     aiResponseText = output?.aiResponseText || "";
@@ -181,7 +183,7 @@ const converseWithStudentFlow = ai.defineFlow(
     }
 
     // Step 3: Convert AI's text response to speech (TTS)
-    const aiResponseAudioDataUri = await textToSpeech(aiResponseText);
+    const aiResponseAudioDataUri = await textToSpeech(aiResponseText, aiVoice);
 
     // Step 4: Return all the generated data
     return {
@@ -191,3 +193,5 @@ const converseWithStudentFlow = ai.defineFlow(
     };
   }
 );
+
+    

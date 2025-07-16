@@ -20,11 +20,13 @@ import { format } from "date-fns";
 import { useLanguage } from "@/context/language-context";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { scenarios, type TeacherAssessment } from "@/lib/types";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from "@/components/ui/select";
+import { scenarios, type TeacherAssessment, femaleVoices, maleVoices } from "@/lib/types";
 import { useAuth, mockStudents } from "@/context/auth-context";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+
+const allVoices = [...femaleVoices, ...maleVoices] as const;
 
 export default function EditAssessmentPage() {
   const router = useRouter();
@@ -49,6 +51,7 @@ export default function EditAssessmentPage() {
     targetStudentIds: z.union([z.literal('all'), z.array(z.string())]),
     scenario: z.enum(scenarios).optional(),
     recordingTimeLimit: z.coerce.number().int().min(0).optional(),
+    aiVoice: z.enum(allVoices).optional().default('Alpheratz'),
   }).superRefine((data, ctx) => {
     const isFreeTalk = data.assessmentType === 'dialogue' && data.scenario === 'free-talk';
 
@@ -89,6 +92,7 @@ export default function EditAssessmentPage() {
       targetStudentIds: "all",
       scenario: "free-talk",
       recordingTimeLimit: 0,
+      aiVoice: 'Alpheratz',
     },
   });
 
@@ -110,6 +114,7 @@ export default function EditAssessmentPage() {
               startDate: data.startDate ? new Date(data.startDate) : undefined,
               endDate: data.endDate ? new Date(data.endDate) : undefined,
               targetType: Array.isArray(data.targetStudentIds) ? 'specific' : 'all',
+              aiVoice: data.aiVoice || 'Alpheratz',
             });
         } else {
             toast({ title: "오류", description: "평가를 찾을 수 없거나 수정할 권한이 없습니다.", variant: "destructive" });
@@ -174,6 +179,11 @@ export default function EditAssessmentPage() {
             delete (updateData as any).endDate;
         }
 
+        if (values.assessmentType === 'monologue') {
+            delete (updateData as any).aiVoice;
+            delete (updateData as any).scenario;
+        }
+
 
         await updateDoc(docRef, updateData as any);
 
@@ -208,82 +218,120 @@ export default function EditAssessmentPage() {
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <FormField
-              control={form.control}
-              name="assessmentType"
-              render={({ field }) => (
-                <FormItem className="space-y-3">
-                  <FormLabel>{t.teacherAssessmentForm.typeLabel}</FormLabel>
-                  <FormControl>
-                    <RadioGroup
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                      className="flex flex-col space-y-1"
-                    >
-                      <FormItem className="flex items-center space-x-3 space-y-0">
-                        <FormControl>
-                          <RadioGroupItem value="monologue" />
-                        </FormControl>
-                        <FormLabel className="font-normal">
-                          {t.teacherAssessmentForm.typeMonologue}
-                        </FormLabel>
-                      </FormItem>
-                      <FormItem className="flex items-center space-x-3 space-y-0">
-                        <FormControl>
-                          <RadioGroupItem value="dialogue" />
-                        </FormControl>
-                        <FormLabel className="font-normal">
-                          {t.teacherAssessmentForm.typeDialogue}
-                        </FormLabel>
-                      </FormItem>
-                    </RadioGroup>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <FormField
+                control={form.control}
+                name="assessmentType"
+                render={({ field }) => (
+                  <FormItem className="space-y-3">
+                    <FormLabel>{t.teacherAssessmentForm.typeLabel}</FormLabel>
+                    <FormControl>
+                      <RadioGroup
+                        onValueChange={field.onChange}
+                        value={field.value}
+                        className="flex flex-col space-y-1"
+                      >
+                        <FormItem className="flex items-center space-x-3 space-y-0">
+                          <FormControl>
+                            <RadioGroupItem value="monologue" />
+                          </FormControl>
+                          <FormLabel className="font-normal">
+                            {t.teacherAssessmentForm.typeMonologue}
+                          </FormLabel>
+                        </FormItem>
+                        <FormItem className="flex items-center space-x-3 space-y-0">
+                          <FormControl>
+                            <RadioGroupItem value="dialogue" />
+                          </FormControl>
+                          <FormLabel className="font-normal">
+                            {t.teacherAssessmentForm.typeDialogue}
+                          </FormLabel>
+                        </FormItem>
+                      </RadioGroup>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            <FormField
-              control={form.control}
-              name="targetType"
-              render={({ field }) => (
-                <FormItem className="space-y-3">
-                  <FormLabel>{t.teacherAssessmentForm.targetLabel}</FormLabel>
-                  <FormControl>
-                    <RadioGroup
-                      onValueChange={(value) => {
-                          field.onChange(value);
-                          if (value === 'all') {
-                              form.setValue('targetStudentIds', 'all');
-                          } else {
-                              form.setValue('targetStudentIds', []);
-                          }
-                      }}
-                      value={field.value}
-                      className="flex flex-col space-y-1"
-                    >
-                      <FormItem className="flex items-center space-x-3 space-y-0">
-                        <FormControl>
-                          <RadioGroupItem value="all" />
-                        </FormControl>
-                        <FormLabel className="font-normal">
-                           {t.teacherAssessmentForm.targetAll}
-                        </FormLabel>
-                      </FormItem>
-                      <FormItem className="flex items-center space-x-3 space-y-0">
-                        <FormControl>
-                          <RadioGroupItem value="specific" />
-                        </FormControl>
-                        <FormLabel className="font-normal">
-                          {t.teacherAssessmentForm.targetSpecific}
-                        </FormLabel>
-                      </FormItem>
-                    </RadioGroup>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+              <FormField
+                control={form.control}
+                name="targetType"
+                render={({ field }) => (
+                  <FormItem className="space-y-3">
+                    <FormLabel>{t.teacherAssessmentForm.targetLabel}</FormLabel>
+                    <FormControl>
+                      <RadioGroup
+                        onValueChange={(value) => {
+                            field.onChange(value);
+                            if (value === 'all') {
+                                form.setValue('targetStudentIds', 'all');
+                            } else {
+                                form.setValue('targetStudentIds', []);
+                            }
+                        }}
+                        value={field.value}
+                        className="flex flex-col space-y-1"
+                      >
+                        <FormItem className="flex items-center space-x-3 space-y-0">
+                          <FormControl>
+                            <RadioGroupItem value="all" />
+                          </FormControl>
+                          <FormLabel className="font-normal">
+                            {t.teacherAssessmentForm.targetAll}
+                          </FormLabel>
+                        </FormItem>
+                        <FormItem className="flex items-center space-x-3 space-y-0">
+                          <FormControl>
+                            <RadioGroupItem value="specific" />
+                          </FormControl>
+                          <FormLabel className="font-normal">
+                            {t.teacherAssessmentForm.targetSpecific}
+                          </FormLabel>
+                        </FormItem>
+                      </RadioGroup>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            
+            {assessmentType === 'dialogue' && (
+              <FormField
+                control={form.control}
+                name="aiVoice"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t.teacherAssessmentForm.voiceLabel}</FormLabel>
+                     <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                           <SelectValue placeholder={t.teacherAssessmentForm.voicePlaceholder} />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectGroup>
+                          <SelectLabel>{t.teacherAssessmentForm.voices.female}</SelectLabel>
+                          {femaleVoices.map(voice => (
+                            <SelectItem key={voice} value={voice}>{voice}</SelectItem>
+                          ))}
+                        </SelectGroup>
+                        <SelectGroup>
+                          <SelectLabel>{t.teacherAssessmentForm.voices.male}</SelectLabel>
+                           {maleVoices.map(voice => (
+                            <SelectItem key={voice} value={voice}>{voice}</SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>{t.teacherAssessmentForm.voiceDescription}</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
 
             {targetType === 'specific' && (
               <FormField
@@ -345,7 +393,7 @@ export default function EditAssessmentPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>{t.teacherAssessmentForm.scenarioLabel}</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder={t.teacherAssessmentForm.scenarioPlaceholder} />
@@ -560,3 +608,5 @@ export default function EditAssessmentPage() {
     </Card>
   );
 }
+
+    

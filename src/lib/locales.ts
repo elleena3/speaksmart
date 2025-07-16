@@ -130,6 +130,13 @@ export const translations = {
       targetSpecific: "학생 선택",
       selectStudentsLabel: "학생 선택",
       selectStudentsDescription: "이 평가를 받을 학생들을 선택해주세요.",
+      voiceLabel: "AI 목소리 선택",
+      voicePlaceholder: "목소리를 선택하세요...",
+      voiceDescription: "'AI와 대화하기' 유형에서 사용할 AI의 목소리를 선택합니다.",
+      voices: {
+        female: "여성 목소리",
+        male: "남성 목소리"
+      },
       scenarioLabel: "대화 시나리오",
       scenarioPlaceholder: "시나리오를 선택하세요...",
       scenarioDescription: "'AI와 대화하기' 유형에 대한 역할극 상황을 선택합니다.",
@@ -332,6 +339,13 @@ export const translations = {
       targetSpecific: "Select Students",
       selectStudentsLabel: "Select Students",
       selectStudentsDescription: "Select the students who will receive this assessment.",
+      voiceLabel: "AI Voice Selection",
+      voicePlaceholder: "Select a voice...",
+      voiceDescription: "Select the AI's voice for the 'Dialogue with AI' type.",
+      voices: {
+        female: "Female Voices",
+        male: "Male Voices"
+      },
       scenarioLabel: "Dialogue Scenario",
       scenarioPlaceholder: "Select a scenario...",
       scenarioDescription: "Choose a role-playing situation for the Dialogue with AI type.",
@@ -407,3 +421,5 @@ export const translations = {
 };
 
 export type Translation = typeof translations.ko;
+
+    

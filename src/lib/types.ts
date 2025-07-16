@@ -4,6 +4,12 @@ import { type ConversationTurn } from "@/lib/types/ai-schemas";
 export const scenarios = ["free-talk", "ordering-food", "airport-check-in", "shopping"] as const;
 export type Scenario = (typeof scenarios)[number];
 
+export const femaleVoices = ["Alpheratz", "Achernar", "Vega", "Capella", "Procyon", "Sirius"] as const;
+export const maleVoices = ["Algenib", "Polaris", "Antares", "Arcturus", "Spica", "Regulus"] as const;
+export const allVoices = [...femaleVoices, ...maleVoices];
+export type AiVoice = (typeof allVoices)[number];
+
+
 export type Assessment = {
   id: string;
   title: string;
@@ -37,6 +43,7 @@ export type TeacherAssessment = {
   endDate?: string;
   assessmentType: 'monologue' | 'dialogue';
   scenario?: Scenario;
+  aiVoice?: AiVoice;
   expectedFormat?: string;
   recordingTimeLimit?: number; // Optional recording time limit in minutes
   targetStudentIds: string[] | 'all'; // 'all' or array of student UIDs
@@ -82,3 +89,5 @@ export type StudentResult = {
   teacherUid: string; // To query results by teacher
   createdAt: number;
 }
+
+    
