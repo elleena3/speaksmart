@@ -1,3 +1,4 @@
+
 import { type ConversationTurn } from "@/lib/types/ai-schemas";
 
 export const scenarios = ["free-talk", "ordering-food", "airport-check-in", "shopping"] as const;
@@ -47,7 +48,7 @@ export type { ConversationTurn };
 
 export type ConversationHistory = {
   history: ConversationTurn[];
-  studentRecordingDataUri?: string;
+  studentRecordingUrl?: string;
 }
 
 export type ResultStatus = 
