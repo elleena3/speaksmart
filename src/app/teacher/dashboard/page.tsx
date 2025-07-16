@@ -13,7 +13,7 @@ import { type TeacherAssessment } from "@/lib/types"
 import { OverviewChart } from "./overview-chart"
 import { useLanguage } from "@/context/language-context"
 import { useAuth, mockStudents } from '@/context/auth-context';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
 export default function TeacherDashboard() {
@@ -72,6 +72,20 @@ export default function TeacherDashboard() {
     }
     return t.teacherAssessments.targetAudience.all; // Fallback
   };
+  
+  const getCompletionFraction = (assessment: TeacherAssessment) => {
+    const submissionCount = assessment.submissionCount ?? 0;
+    const { targetStudentIds } = assessment;
+    let totalStudents = 0;
+
+    if (!targetStudentIds || targetStudentIds === 'all') {
+      totalStudents = mockStudents.length;
+    } else if (Array.isArray(targetStudentIds)) {
+      totalStudents = targetStudentIds.length;
+    }
+
+    return `${submissionCount} / ${totalStudents}`;
+  }
 
 
   if (isLoading || authLoading) {
@@ -129,7 +143,7 @@ export default function TeacherDashboard() {
                     <div className="flex items-center justify-center gap-1.5">
                       <Users className="h-4 w-4 text-muted-foreground" />
                       <Badge variant={(assessment.submissionCount ?? 0) > 0 ? "default" : "secondary"}>
-                        {assessment.submissionCount ?? 0}
+                        {getCompletionFraction(assessment)}
                       </Badge>
                     </div>
                   </TableCell>
@@ -172,4 +186,3 @@ export default function TeacherDashboard() {
     </div>
   )
 }
-
