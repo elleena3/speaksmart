@@ -111,7 +111,7 @@ async function textToSpeech(text: string): Promise<string> {
             responseModalities: ['AUDIO'],
             speechConfig: {
                 voiceConfig: {
-                    prebuiltVoiceConfig: { voiceName: 'Algenib' }, // A friendly, natural voice
+                    prebuiltVoiceConfig: { voiceName: 'Alpheratz' }, // A friendly, female voice
                 },
             },
         },
