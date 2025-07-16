@@ -19,6 +19,7 @@ import { db } from "@/lib/firebase";
 type CombinedAssessment = TeacherAssessment & {
     resultStatus?: '채점 완료' | '채점 중' | '오류' | null;
     resultId?: string;
+    resultCreatedAt?: number;
 };
 
 function AssessmentCard({ assessment, t }: { assessment: CombinedAssessment, t: any }) {
@@ -99,6 +100,7 @@ export default function StudentDashboard() {
     if (!user) return;
     setIsLoading(true);
     try {
+        // Fetch all assessments and all results for the student in parallel
         const assessmentsQuery = query(collection(db, "assessments"), orderBy("createdAt", "desc"));
         const resultsQuery = query(collection(db, "results"), where("studentId", "==", user.uid));
         
@@ -107,10 +109,10 @@ export default function StudentDashboard() {
             getDocs(resultsQuery),
         ]);
 
-        const studentResultsMap = new Map<string, { status: StudentResult['status'], id: string }>();
+        const studentResultsMap = new Map<string, { status: StudentResult['status'], id: string, createdAt: number }>();
         resultsSnapshot.forEach(doc => {
             const resultData = doc.data() as StudentResult;
-            studentResultsMap.set(resultData.assessmentId, { status: resultData.status, id: doc.id });
+            studentResultsMap.set(resultData.assessmentId, { status: resultData.status, id: doc.id, createdAt: resultData.createdAt });
         });
         
         const allAssessments = assessmentsSnapshot.docs.map(doc => {
@@ -120,22 +122,43 @@ export default function StudentDashboard() {
                 ...assessment,
                 resultStatus: resultInfo ? resultInfo.status : null,
                 resultId: resultInfo ? resultInfo.id : undefined,
+                resultCreatedAt: resultInfo ? resultInfo.createdAt : undefined,
             };
         });
 
-        // Filter assessments for the current student
         const filteredAssessments = allAssessments.filter(assessment => {
-            // Existing assessments without the new field should be visible to all
-            if (!assessment.targetStudentIds) {
-                return true;
-            }
-            if (assessment.targetStudentIds === 'all') {
+            if (!assessment.targetStudentIds || assessment.targetStudentIds === 'all') {
                 return true;
             }
             if (Array.isArray(assessment.targetStudentIds) && assessment.targetStudentIds.includes(user.uid)) {
                 return true;
             }
             return false;
+        });
+
+        // Apply custom sorting logic
+        filteredAssessments.sort((a, b) => {
+            const aIsCompleted = a.resultStatus === '채점 완료';
+            const bIsCompleted = b.resultStatus === '채점 완료';
+
+            // 1. Group by completion status (uncompleted first)
+            if (aIsCompleted !== bIsCompleted) {
+                return aIsCompleted ? 1 : -1;
+            }
+
+            // 2. Sort within groups
+            if (!aIsCompleted) { // Sorting for uncompleted assessments
+                const aEndDate = a.endDate ? new Date(a.endDate).getTime() : Infinity;
+                const bEndDate = b.endDate ? new Date(b.endDate).getTime() : Infinity;
+
+                if (aEndDate !== bEndDate) {
+                    return aEndDate - bEndDate; // Sort by end date ascending (soonest first)
+                }
+                return (b.createdAt || 0) - (a.createdAt || 0); // Then by creation date descending (newest first)
+            } else { // Sorting for completed assessments
+                // Sort by completion date ascending (oldest first)
+                return (a.resultCreatedAt || 0) - (b.resultCreatedAt || 0);
+            }
         });
         
         setAssessments(filteredAssessments);
