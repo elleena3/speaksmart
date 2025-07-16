@@ -3,7 +3,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Loader2, Upload, FileText, Link as LinkIcon, Download, Target, Mic, Bot } from "lucide-react";
+import { Loader2, Upload, FileText, Link as LinkIcon, Download, Target, Mic, Bot, BookOpen } from "lucide-react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,6 +13,7 @@ import { analyzePronunciation, type PronunciationAnalysisResult } from "@/ai/flo
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { RealtimeConversationTool } from "./realtime-conversation-tool";
+import { ReadAloudTool } from "./read-aloud-tool";
 
 
 function FileTranscriber() {
@@ -374,6 +375,18 @@ export default function MiscPage() {
                     </CardHeader>
                     <CardContent>
                        <RealtimeConversationTool />
+                    </CardContent>
+                </Card>
+
+                 <Card className="lg:col-span-2">
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2"><BookOpen className="h-6 w-6"/> Read Aloud 연습 도구</CardTitle>
+                        <CardDescription>
+                            제공된 지문을 따라 읽고 AI에게 발음, 정확도, 유창성 피드백을 받아보세요. 직접 텍스트를 입력하여 테스트할 수도 있습니다.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                       <ReadAloudTool />
                     </CardContent>
                 </Card>
             </div>
