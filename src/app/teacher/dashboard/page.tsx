@@ -7,17 +7,14 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { MoreHorizontal, ArrowRight, Users, Loader2 } from "lucide-react"
+import { ArrowRight, Users, Loader2 } from "lucide-react"
 import Link from "next/link"
 import { type TeacherAssessment } from "@/lib/types"
 import { OverviewChart } from "./overview-chart"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { useLanguage } from "@/context/language-context"
-import { useAuth } from '@/context/auth-context';
-import { collection, query, where, getDocs, limit, orderBy } from 'firebase/firestore';
+import { useAuth, mockStudents } from '@/context/auth-context';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { format } from "date-fns";
-
 
 export default function TeacherDashboard() {
   const { t } = useLanguage();
@@ -59,6 +56,23 @@ export default function TeacherDashboard() {
     fetchAssessments();
 
   }, [user, authLoading, router, fetchAssessments]);
+  
+  const getTargetAudienceText = (assessment: TeacherAssessment) => {
+    const { targetStudentIds } = assessment;
+    if (!targetStudentIds || targetStudentIds === 'all') {
+      return t.teacherAssessments.targetAudience.all;
+    }
+    if (Array.isArray(targetStudentIds)) {
+      if (targetStudentIds.length === 1) {
+        return t.teacherAssessments.targetAudience.individual;
+      }
+      if (targetStudentIds.length > 1) {
+        return `${t.teacherAssessments.targetAudience.group} (${targetStudentIds.length})`;
+      }
+    }
+    return t.teacherAssessments.targetAudience.all; // Fallback
+  };
+
 
   if (isLoading || authLoading) {
     return (
@@ -94,10 +108,10 @@ export default function TeacherDashboard() {
             <TableHeader>
               <TableRow>
                 <TableHead>{t.teacherDashboard.title}</TableHead>
+                <TableHead>{t.teacherAssessments.tableHeaderTarget}</TableHead>
                 <TableHead className="text-center">{t.teacherDashboard.completed}</TableHead>
                 <TableHead className="text-center">{t.teacherDashboard.avgScore}</TableHead>
-                <TableHead>{t.teacherDashboard.dateCreated}</TableHead>
-                <TableHead><span className="sr-only">{t.teacherDashboard.actions}</span></TableHead>
+                <TableHead className="text-right">{t.teacherDashboard.actions}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -107,6 +121,9 @@ export default function TeacherDashboard() {
                     <Link href={`/teacher/assessment/${assessment.id}`} className="hover:underline text-primary">
                       {assessment.title}
                     </Link>
+                  </TableCell>
+                  <TableCell>
+                      <Badge variant="secondary">{getTargetAudienceText(assessment)}</Badge>
                   </TableCell>
                   <TableCell className="text-center">
                     <div className="flex items-center justify-center gap-1.5">
@@ -121,21 +138,16 @@ export default function TeacherDashboard() {
                       {assessment.averageScore > 0 ? `${assessment.averageScore}%` : t.teacherDashboard.noScore}
                     </Badge>
                   </TableCell>
-                  <TableCell>{assessment.createdAt ? format(new Date(assessment.createdAt), 'yyyy-MM-dd') : 'N/A'}</TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
-                          <span className="sr-only">{t.teacherDashboard.openMenu}</span>
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem asChild>
-                          <Link href={`/teacher/assessment/${assessment.id}`}>{t.teacherDashboard.viewResults}</Link>
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                  <TableCell className="text-right">
+                    {(assessment.submissionCount ?? 0) > 0 ? (
+                       <Link href={`/teacher/assessment/${assessment.id}`} passHref>
+                          <Button variant="outline" size="sm">
+                            {t.teacherDashboard.viewResults}
+                          </Button>
+                       </Link>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">결과 없음</span>
+                    )}
                   </TableCell>
                 </TableRow>
               )) : (
@@ -160,3 +172,4 @@ export default function TeacherDashboard() {
     </div>
   )
 }
+
