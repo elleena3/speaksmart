@@ -6,10 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Mic, StopCircle, CheckCircle, RefreshCw, Sparkles } from 'lucide-react';
+import { Loader2, Mic, StopCircle, RefreshCw, Sparkles, AlertTriangle } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { analyzeReadAloud, type AnalyzeReadAloudOutput } from '@/ai/flows/analyze-read-aloud-flow';
 import { sampleTexts } from '@/lib/book';
+import { cn } from '@/lib/utils';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 type RecordingState = 'idle' | 'recording' | 'recorded' | 'analyzing';
 type Difficulty = 'beginner' | 'intermediate' | 'advanced';
@@ -209,6 +211,36 @@ export function ReadAloudTool() {
                            <ScoreDisplay label="발음 점수" value={analysisResult.pronunciationScore} />
                            <ScoreDisplay label="완독률" value={analysisResult.completionRate} />
                         </div>
+                        
+                         <div>
+                            <h3 className="text-lg font-semibold mb-2">단어별 분석</h3>
+                            <TooltipProvider>
+                                <div className="p-4 bg-muted/50 rounded-lg whitespace-pre-wrap font-serif text-base leading-relaxed">
+                                {analysisResult.wordAnalysis.map((item, index) => {
+                                    const wordClass = cn({
+                                        'text-blue-600': item.status === 'correct',
+                                        'text-red-600 line-through decoration-2': item.status === 'incorrect',
+                                        'text-gray-400': item.status === 'omitted',
+                                    });
+
+                                    if (item.status === 'incorrect') {
+                                        return (
+                                        <Tooltip key={index}>
+                                            <TooltipTrigger asChild>
+                                            <span className={wordClass}>{item.word} </span>
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                            <p>이렇게 발음함: "{item.spoken}"</p>
+                                            </TooltipContent>
+                                        </Tooltip>
+                                        );
+                                    }
+                                    return <span key={index} className={wordClass}>{item.word} </span>;
+                                    })}
+                                </div>
+                            </TooltipProvider>
+                        </div>
+                        
                          <div>
                             <h3 className="text-lg font-semibold mb-2">상세 피드백</h3>
                              <div className="p-4 bg-muted/50 rounded-lg whitespace-pre-wrap font-body text-sm leading-relaxed">
@@ -216,7 +248,7 @@ export function ReadAloudTool() {
                             </div>
                         </div>
                         <div>
-                            <h3 className="text-lg font-semibold mb-2">인식된 텍스트</h3>
+                            <h3 className="text-lg font-semibold mb-2">인식된 전체 텍스트</h3>
                              <div className="p-4 bg-muted/50 rounded-lg whitespace-pre-wrap font-mono text-sm leading-relaxed italic">
                                 "{analysisResult.userTranscript}"
                             </div>
