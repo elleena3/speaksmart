@@ -84,16 +84,23 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
     setAudioUrl(URL.createObjectURL(newAudioBlob));
     setAudioSize(newAudioBlob.size);
     setRecordingState("recorded");
-    toast({ title: "녹음 완료", description: "아래에서 녹음을 확인하고 제출해주세요." });
+    // This direct toast call was causing the error. It's now handled by useEffect.
     cleanupRecorder();
   }, [timeLimit, cleanupRecorder, toast]);
+
+  useEffect(() => {
+    if (recordingState === 'recorded') {
+       toast({ title: "녹음 완료", description: "아래에서 녹음을 확인하고 제출해주세요." });
+    }
+  }, [recordingState, toast]);
+
 
   const handleStopRecording = useCallback(() => {
     if (mediaRecorderRef.current && (mediaRecorderRef.current.state === "recording" || mediaRecorderRef.current.state === "paused")) {
       mediaRecorderRef.current.stop();
       if(timerIntervalRef.current) clearInterval(timerIntervalRef.current);
     }
-    setRecordingState('recorded');
+    // setRecordingState will trigger the onstop handler
   }, []);
 
   const startActualRecording = useCallback(async () => {
