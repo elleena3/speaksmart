@@ -33,17 +33,18 @@ export default function HistoryPage() {
     const fetchHistory = async () => {
         setIsLoading(true);
         try {
-            // Simplify the query to avoid complex indexes.
+            // orderBy removed to avoid composite index requirement. Sorting will be done on the client.
             const q = query(
                 collection(db, "results"),
-                where("studentId", "==", user.uid),
-                orderBy("createdAt", "desc")
+                where("studentId", "==", user.uid)
             );
             const querySnapshot = await getDocs(q);
             const allResults = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as StudentResult));
             
-            // Filter by status on the client side.
-            const completedResults = allResults.filter(result => result.status === "채점 완료");
+            // Filter and sort on the client side
+            const completedResults = allResults
+                .filter(result => result.status === "채점 완료")
+                .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)); // Sort by newest first
             
             setCompletedAssessments(completedResults);
         } catch (error) {
