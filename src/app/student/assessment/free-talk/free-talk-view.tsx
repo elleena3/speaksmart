@@ -1,7 +1,7 @@
 
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Mic, StopCircle, Loader2, Bot, User, CornerDownLeft, BrainCircuit, Play, Volume2 } from "lucide-react"
@@ -17,11 +17,14 @@ import { useAuth } from "@/context/auth-context"
 const SESSION_STORAGE_KEY = 'freeTalkSessionData';
 const mimeType = 'audio/webm;codecs=opus';
 
+type SessionState = "idle" | "initializing" | "countdown" | "recording" | "processing" | "speaking" | "waiting_for_user" | "submitting";
+
 export function FreeTalkView({ assessment }: { assessment: TeacherAssessment }) {
   const { user } = useAuth();
-  const [sessionState, setSessionState] = useState<"idle" | "initializing" | "recording" | "processing" | "speaking" | "waiting_for_user" | "submitting">("idle");
+  const [sessionState, setSessionState] = useState<SessionState>("idle");
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
   const [interimTranscript, setInterimTranscript] = useState<string | null>(null);
+  const [countdown, setCountdown] = useState<number>(3);
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioStreamRef = useRef<MediaStream | null>(null);
@@ -29,11 +32,13 @@ export function FreeTalkView({ assessment }: { assessment: TeacherAssessment }) 
   const studentAudioBlobsRef = useRef<Blob[]>([]); // To collect all student audio blobs
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
   const scrollAreaRef = useRef<HTMLDivElement | null>(null);
+  const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
   
   const router = useRouter();
   const { toast } = useToast();
 
-  const cleanupRecorder = () => {
+  const cleanupRecorder = useCallback(() => {
     if (audioStreamRef.current) {
         audioStreamRef.current.getTracks().forEach(track => track.stop());
         audioStreamRef.current = null;
@@ -44,8 +49,12 @@ export function FreeTalkView({ assessment }: { assessment: TeacherAssessment }) 
         mediaRecorderRef.current.onerror = null;
         mediaRecorderRef.current = null;
     }
+    if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+        countdownIntervalRef.current = null;
+    }
     audioChunksRef.current = [];
-  };
+  }, []);
 
   useEffect(() => {
     // Clear history when component mounts for a clean start
@@ -58,7 +67,7 @@ export function FreeTalkView({ assessment }: { assessment: TeacherAssessment }) 
         audioPlayerRef.current.src = "";
       }
     };
-  }, []);
+  }, [cleanupRecorder]);
 
   useEffect(() => {
     // Scroll to the bottom of the conversation
@@ -101,25 +110,14 @@ export function FreeTalkView({ assessment }: { assessment: TeacherAssessment }) 
     }
   };
 
-
-  const handleStartRecording = async () => {
-    if (sessionState !== 'waiting_for_user') return;
-    
-    cleanupRecorder();
-    setSessionState("recording");
-    setInterimTranscript("듣고 있어요...");
-    
+  const startActualRecording = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioStreamRef.current = stream;
-      mediaRecorderRef.current = new MediaRecorder(stream, { 
-        mimeType: mimeType,
-      });
+      mediaRecorderRef.current = new MediaRecorder(stream, { mimeType });
 
       mediaRecorderRef.current.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-            audioChunksRef.current.push(event.data);
-        }
+        if (event.data.size > 0) audioChunksRef.current.push(event.data);
       };
 
       mediaRecorderRef.current.onstop = () => {
@@ -127,32 +125,21 @@ export function FreeTalkView({ assessment }: { assessment: TeacherAssessment }) 
             console.warn("No audio data recorded for this turn.");
             setInterimTranscript(null);
             setSessionState("waiting_for_user");
-            toast({
-                title: "목소리가 들리지 않아요",
-                description: "마이크를 확인하고 다시 말씀해주세요.",
-                variant: "destructive"
-            });
+            toast({ title: "목소리가 들리지 않아요", description: "마이크를 확인하고 다시 말씀해주세요.", variant: "destructive" });
             cleanupRecorder();
             return;
         }
         const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
-        studentAudioBlobsRef.current.push(audioBlob); // Collect the student's audio chunk
+        studentAudioBlobsRef.current.push(audioBlob);
         const reader = new FileReader();
         reader.readAsDataURL(audioBlob);
-        reader.onloadend = async () => {
-          const base64Audio = reader.result as string;
-          processAudio(base64Audio);
-        };
+        reader.onloadend = () => processAudio(reader.result as string);
         cleanupRecorder();
       };
       
       mediaRecorderRef.current.onerror = (event) => {
           console.error("MediaRecorder error:", event);
-          toast({
-              title: "녹음 오류",
-              description: "녹음 중 오류가 발생했습니다. 다시 시도해주세요.",
-              variant: "destructive",
-          });
+          toast({ title: "녹음 오류", description: "녹음 중 오류가 발생했습니다.", variant: "destructive" });
           setInterimTranscript(null);
           setSessionState("waiting_for_user");
           cleanupRecorder();
@@ -162,14 +149,34 @@ export function FreeTalkView({ assessment }: { assessment: TeacherAssessment }) 
 
     } catch (error) {
       console.error("Error accessing microphone:", error);
-      toast({
-        title: "마이크 접근 오류",
-        description: "마이크 접근을 허용해주세요.",
-        variant: "destructive",
-      });
+      toast({ title: "마이크 접근 오류", description: "마이크 접근을 허용해주세요.", variant: "destructive" });
       setSessionState("waiting_for_user");
       setInterimTranscript(null);
     }
+  }, [cleanupRecorder, toast]);
+
+
+  const handleStartRecording = async () => {
+    if (sessionState !== 'waiting_for_user') return;
+    
+    cleanupRecorder();
+    setInterimTranscript(null);
+    setSessionState("countdown");
+    setCountdown(3);
+
+    await startActualRecording();
+
+    countdownIntervalRef.current = setInterval(() => {
+        setCountdown(prev => {
+            if (prev <= 1) {
+                if(countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+                setSessionState("recording");
+                toast({ title: "녹음 시작됨", description: "말씀을 마치신 후 녹음 중지 버튼을 눌러주세요." });
+                return 0;
+            }
+            return prev - 1;
+        });
+    }, 1000);
   };
 
   const handleStopRecording = () => {
@@ -245,6 +252,18 @@ export function FreeTalkView({ assessment }: { assessment: TeacherAssessment }) 
     }
   }
 
+  const renderCountdownState = () => (
+    <>
+        <div className="flex justify-center my-4">
+             <span className="text-7xl font-bold text-primary animate-ping-short">{countdown}</span>
+        </div>
+        <Button size="lg" disabled className="w-full" variant="destructive">
+            <StopCircle className="mr-2 h-5 w-5" />
+            말하기 중지
+        </Button>
+    </>
+  );
+
   const getButtonState = () => {
     switch (sessionState) {
       case "idle":
@@ -261,6 +280,13 @@ export function FreeTalkView({ assessment }: { assessment: TeacherAssessment }) 
             <Loader2 className="mr-2 h-5 w-5 animate-spin" />
             {sessionState === "initializing" ? "AI 준비 중..." : "제출 중..."}
           </Button>
+        );
+      case "countdown":
+        return (
+            <Button size="lg" disabled className="w-full" variant="destructive">
+                <StopCircle className="mr-2 h-5 w-5" />
+                말하기 중지
+            </Button>
         );
       case "recording":
         return (
@@ -294,7 +320,7 @@ export function FreeTalkView({ assessment }: { assessment: TeacherAssessment }) 
   };
 
   const getFooterButtonState = () => {
-    const isBusy = ["recording", "processing", "initializing", "speaking", "submitting"].includes(sessionState);
+    const isBusy = ["recording", "processing", "initializing", "speaking", "submitting", "countdown"].includes(sessionState);
     switch(sessionState) {
         case "idle":
             return (
@@ -366,15 +392,20 @@ export function FreeTalkView({ assessment }: { assessment: TeacherAssessment }) 
       <div className="flex flex-col gap-2">
         <div className="flex gap-2">
             <div className="flex-grow">
-              {getButtonState()}
+              {sessionState === "countdown" ? renderCountdownState() : getButtonState()}
             </div>
             {getFooterButtonState()}
         </div>
-        {sessionState !== 'idle' && sessionState !== 'initializing' && sessionState !== 'submitting' && (
+        {sessionState !== 'idle' && sessionState !== 'initializing' && sessionState !== 'submitting' && sessionState !== 'countdown' && (
             <p className="text-xs text-center text-muted-foreground">
                 AI의 응답이 끝나면 <strong className="text-foreground">[응답하기]</strong> 버튼을 누르고 말씀하세요. 발언이 끝나면 <strong className="text-foreground">[말하기 중지]</strong> 버튼을 누릅니다.
                  <br/>
                 <span className="font-semibold">팁: 버튼을 누르고 약 1-2초 뒤에 말씀하시면 더 정확하게 인식됩니다.</span>
+            </p>
+        )}
+        {sessionState === 'countdown' && (
+             <p className="text-xs text-center text-muted-foreground">
+                카운트다운 후 바로 말씀하세요!
             </p>
         )}
       </div>
