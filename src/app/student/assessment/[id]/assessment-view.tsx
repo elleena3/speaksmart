@@ -39,10 +39,12 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
     ? assessmentDetails.recordingTimeLimit * 60 
     : null;
 
-  // Effect to show toast ONLY when recording state becomes 'recorded'
+  // Effect to show toasts based on recording state changes
   useEffect(() => {
     if (recordingState === 'recorded') {
         toast({ title: "녹음 완료", description: "아래에서 녹음을 확인하고 제출해주세요." });
+    } else if (recordingState === 'recording') {
+        toast({ title: "녹음 시작됨", description: "말씀을 마치신 후 녹음 중지 버튼을 눌러주세요." });
     }
   }, [recordingState, toast]);
 
@@ -152,7 +154,6 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
             if (prev <= 1) {
                 clearInterval(countdownIntervalRef.current!);
                 setRecordingState("recording");
-                toast({ title: "녹음 시작됨", description: "말씀을 마치신 후 녹음 중지 버튼을 눌러주세요." });
                 return 0;
             }
             return prev - 1;
