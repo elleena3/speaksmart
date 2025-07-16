@@ -3,7 +3,7 @@
 
 import { useState, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { Loader2, Upload, FileText, Download, Target, Mic, Bot, BookOpen, StopCircle, Sparkles } from "lucide-react";
+import { Loader2, Upload, FileText, Download, Target, Mic, Bot, BookOpen, StopCircle, Sparkles, ScanText } from "lucide-react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,6 +13,7 @@ import { analyzePronunciation, type PronunciationAnalysisResult } from "@/ai/flo
 import { Progress } from "@/components/ui/progress";
 import { RealtimeConversationTool } from "./realtime-conversation-tool";
 import { ReadAloudTool } from "./read-aloud-tool";
+import { HandwritingAnalyzerTool } from "./handwriting-analyzer-tool";
 
 const mimeType = 'audio/webm;codecs=opus';
 
@@ -280,6 +281,19 @@ export default function MiscPage() {
                     </CardHeader>
                     <CardContent>
                        <ReadAloudTool />
+                    </CardContent>
+                </Card>
+
+                <Card className="lg:col-span-2">
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2"><ScanText className="h-6 w-6"/> AI 자필 분석 도구</CardTitle>
+                        <CardDescription>
+                            학생의 자필 영어 사진을 업로드하여 AI에게 글씨체 교정 피드백을 받아보세요. 
+                            <span className="block text-xs mt-1 text-blue-500">참고: 이미지 위에 직접 피드백을 오버레이하는 더 정밀한 기능은 Google Cloud Vision API를 통해 구현할 수 있습니다.</span>
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <HandwritingAnalyzerTool />
                     </CardContent>
                 </Card>
             </div>

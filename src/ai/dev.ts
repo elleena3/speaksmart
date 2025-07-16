@@ -23,5 +23,8 @@ import '@/ai/flows/create-native-teacher-flow';
 
 // New flow for the Misc page's read-aloud tool
 import '@/ai/flows/analyze-read-aloud-flow';
+
+// New flow for the Misc page's handwriting analysis tool
+import '@/ai/flows/analyze-handwriting-flow';
     
 
