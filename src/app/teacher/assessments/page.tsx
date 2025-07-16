@@ -14,7 +14,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useToast } from '@/hooks/use-toast';
 import { format } from "date-fns";
 import { useLanguage } from '@/context/language-context';
-import { useAuth } from '@/context/auth-context';
+import { useAuth, mockStudents } from '@/context/auth-context';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, doc, deleteDoc, addDoc, orderBy } from 'firebase/firestore';
@@ -118,6 +118,24 @@ export default function AssessmentsPage() {
     }
     return t.teacherAssessments.assessmentTypes.monologue;
   }
+  
+  const getTargetAudienceText = (assessment: TeacherAssessment) => {
+    const { targetStudentIds } = assessment;
+    if (!targetStudentIds || targetStudentIds === 'all') {
+      return t.teacherAssessments.targetAudience.all;
+    }
+    if (Array.isArray(targetStudentIds)) {
+      if (targetStudentIds.length === 1) {
+        return t.teacherAssessments.targetAudience.individual;
+      }
+      if (targetStudentIds.length > 1) {
+        const studentNames = targetStudentIds.map(id => mockStudents.find(s => s.uid === id)?.displayName || 'Unknown').join(', ');
+        return `${t.teacherAssessments.targetAudience.group} (${targetStudentIds.length})`;
+      }
+    }
+    return t.teacherAssessments.targetAudience.all; // Fallback
+  };
+
 
   return (
     <div className="space-y-6">
@@ -144,6 +162,7 @@ export default function AssessmentsPage() {
                <TableRow>
                  <TableHead>{t.teacherAssessments.tableHeaderTitle}</TableHead>
                  <TableHead>{t.teacherAssessments.tableHeaderType}</TableHead>
+                 <TableHead>{t.teacherAssessments.tableHeaderTarget}</TableHead>
                  <TableHead>{t.teacherAssessments.tableHeaderPeriod}</TableHead>
                  <TableHead className="text-center">{t.teacherAssessments.tableHeaderCompleted}</TableHead>
                  <TableHead className="text-center">{t.teacherAssessments.tableHeaderAvgScore}</TableHead>
@@ -160,6 +179,9 @@ export default function AssessmentsPage() {
                    </TableCell>
                    <TableCell>
                       <Badge variant="outline">{getAssessmentTypeText(assessment)}</Badge>
+                   </TableCell>
+                   <TableCell>
+                      <Badge variant="secondary">{getTargetAudienceText(assessment)}</Badge>
                    </TableCell>
                    <TableCell className="text-sm text-muted-foreground">
                       {formatDateRange(assessment.startDate, assessment.endDate)}

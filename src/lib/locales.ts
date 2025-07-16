@@ -70,6 +70,7 @@ export const translations = {
       listDescription: "생성된 모든 평가 목록입니다.",
       tableHeaderTitle: "제목",
       tableHeaderType: "유형",
+      tableHeaderTarget: "대상",
       tableHeaderPeriod: "평가 기간",
       tableHeaderCompleted: "완료",
       tableHeaderAvgScore: "평균 점수",
@@ -77,6 +78,11 @@ export const translations = {
       assessmentTypes: {
         monologue: "혼자 말하기",
         dialogue: "AI와 대화하기"
+      },
+      targetAudience: {
+        all: "전체",
+        group: "그룹",
+        individual: "개인",
       },
       periodAlways: "상시",
       periodFrom: "{date}부터",
@@ -266,6 +272,7 @@ export const translations = {
       listDescription: "A list of all created assessments.",
       tableHeaderTitle: "Title",
       tableHeaderType: "Type",
+      tableHeaderTarget: "Target",
       tableHeaderPeriod: "Assessment Period",
       tableHeaderCompleted: "Completed",
       tableHeaderAvgScore: "Avg. Score",
@@ -273,6 +280,11 @@ export const translations = {
       assessmentTypes: {
         monologue: "Monologue",
         dialogue: "Dialogue with AI"
+      },
+      targetAudience: {
+        all: "All",
+        group: "Group",
+        individual: "Individual",
       },
       periodAlways: "Always available",
       periodFrom: "From {date}",
