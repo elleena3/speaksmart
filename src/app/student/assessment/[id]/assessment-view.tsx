@@ -29,7 +29,6 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
   const { toast } = useToast()
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
   const audioStreamRef = useRef<MediaStream | null>(null);
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -38,131 +37,109 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
     ? assessmentDetails.recordingTimeLimit * 60 
     : null;
 
+  // Effect to handle state changes when audioBlob is set (i.e., recording has finished)
+  useEffect(() => {
+    if (audioBlob) {
+      setRecordingState("recorded");
+      setAudioUrl(URL.createObjectURL(audioBlob));
+      setAudioSize(audioBlob.size);
+      toast({ title: "녹음 완료", description: "아래에서 녹음을 확인하고 제출해주세요." });
+    } else {
+      // Clean up the URL when the blob is cleared
+      if (audioUrl) {
+        URL.revokeObjectURL(audioUrl);
+        setAudioUrl(null);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [audioBlob]);
+
   const cleanupRecorder = useCallback(() => {
     if (audioStreamRef.current) {
       audioStreamRef.current.getTracks().forEach(track => track.stop());
       audioStreamRef.current = null;
     }
     if (mediaRecorderRef.current) {
-      mediaRecorderRef.current.ondataavailable = null;
-      mediaRecorderRef.current.onstop = null;
-      mediaRecorderRef.current.onerror = null;
+      mediaRecorderRef.current.onstop = null; // Important: remove the handler to prevent memory leaks
       mediaRecorderRef.current = null;
     }
-    if (timerIntervalRef.current) {
-      clearInterval(timerIntervalRef.current);
-      timerIntervalRef.current = null;
-    }
-     if (countdownIntervalRef.current) {
-      clearInterval(countdownIntervalRef.current);
-      countdownIntervalRef.current = null;
-    }
-    audioChunksRef.current = [];
-    if (audioUrl) {
-      URL.revokeObjectURL(audioUrl);
-      setAudioUrl(null);
-    }
-    setAudioSize(null);
-  }, [audioUrl]);
+    if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+    if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+  }, []);
 
   const onRecordingStop = useCallback(() => {
-    if (audioChunksRef.current.length === 0) {
+    const recordedChunks = (mediaRecorderRef.current as any)?.__chunks || [];
+    if (recordedChunks.length === 0) {
         console.warn("No audio data recorded.");
         setRecordingState("idle");
-        if (timeLimit) setRemainingTime(timeLimit);
-        cleanupRecorder();
-        return;
+    } else {
+        const newAudioBlob = new Blob(recordedChunks, { type: mimeType });
+        setAudioBlob(newAudioBlob);
     }
-
-    const newAudioBlob = new Blob(audioChunksRef.current, { type: mimeType });
-    setAudioBlob(newAudioBlob);
-    setAudioUrl(URL.createObjectURL(newAudioBlob));
-    setAudioSize(newAudioBlob.size);
-    setRecordingState("recorded");
     cleanupRecorder();
-  }, [timeLimit, cleanupRecorder]);
-
-  useEffect(() => {
-    if (recordingState === 'recorded') {
-       toast({ title: "녹음 완료", description: "아래에서 녹음을 확인하고 제출해주세요." });
-    } else if (recordingState === 'idle' && audioChunksRef.current.length === 0 && !audioBlob) {
-        // This handles the case where recording stops with no data.
-    }
-  }, [recordingState, toast, audioBlob]);
+  }, [cleanupRecorder]);
 
 
   const handleStopRecording = useCallback(() => {
     if (mediaRecorderRef.current && (mediaRecorderRef.current.state === "recording" || mediaRecorderRef.current.state === "paused")) {
-      mediaRecorderRef.current.stop();
-      if(timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+      mediaRecorderRef.current.stop(); // This will trigger the onstop event
     }
   }, []);
 
   const startActualRecording = useCallback(async () => {
-    if(timeLimit) setRemainingTime(timeLimit);
-
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioStreamRef.current = stream;
-      mediaRecorderRef.current = new MediaRecorder(stream, { 
-        mimeType: mimeType,
-      });
       
-      mediaRecorderRef.current.ondataavailable = (event) => {
+      const recorder = new MediaRecorder(stream, { mimeType });
+      mediaRecorderRef.current = recorder;
+      
+      (recorder as any).__chunks = []; // Store chunks directly on the recorder instance
+      recorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
-            audioChunksRef.current.push(event.data);
+            (recorder as any).__chunks.push(event.data);
         }
       };
 
-      mediaRecorderRef.current.onstop = onRecordingStop;
-
-      mediaRecorderRef.current.onerror = (event) => {
+      recorder.onstop = onRecordingStop;
+      
+      recorder.onerror = (event) => {
         console.error("MediaRecorder error:", event);
-        toast({
-            title: "녹음 오류",
-            description: "녹음 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
-            variant: "destructive"
-        });
+        toast({ title: "녹음 오류", description: "녹음 중 오류가 발생했습니다.", variant: "destructive" });
         setRecordingState("idle");
         cleanupRecorder();
-      }
+      };
 
-      mediaRecorderRef.current.start(100); 
-      startTimer();
-      
+      recorder.start(100);
+      return true;
+
     } catch (error) {
-      console.error("Error accessing microphone:", error)
-      toast({
-        title: "마이크 접근 오류",
-        description: "마이크 접근 권한을 허용해주세요.",
-        variant: "destructive"
-      });
+      console.error("Error accessing microphone:", error);
+      toast({ title: "마이크 접근 오류", description: "마이크 접근 권한을 허용해주세요.", variant: "destructive" });
       setRecordingState("idle");
+      return false;
     }
-  }, [timeLimit, onRecordingStop, cleanupRecorder, toast]);
+  }, [onRecordingStop, cleanupRecorder, toast]);
 
-  const handleStartRecording = () => {
-    setAudioBlob(null);
-    setAudioUrl(null);
-    setAudioSize(null);
-    if (recordingState !== 'idle') {
-      cleanupRecorder();
-    }
-    
+  const handleStartRecording = async () => {
+    setAudioBlob(null); // Clear previous recording
     setRecordingState("countdown");
     setCountdown(3);
 
-    startActualRecording();
+    const recordingStarted = await startActualRecording();
+    if (!recordingStarted) {
+        setRecordingState("idle");
+        return;
+    }
+
+    if (timeLimit) startTimer();
 
     countdownIntervalRef.current = setInterval(() => {
         setCountdown(prev => {
             if (prev <= 1) {
-                if(countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+                clearInterval(countdownIntervalRef.current!);
                 setRecordingState("recording");
-                toast({
-                    title: "녹음 시작됨",
-                    description: "말씀을 마치신 후 녹음 중지 버튼을 눌러주세요.",
-                });
+                toast({ title: "녹음 시작됨", description: "말씀을 마치신 후 녹음 중지 버튼을 눌러주세요." });
                 return 0;
             }
             return prev - 1;
@@ -178,10 +155,7 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
     setRecordingState("submitting");
 
     try {
-        toast({
-            title: "답변 업로드 중...",
-            description: "파일을 업로드하고 분석 페이지로 이동합니다.",
-        });
+        toast({ title: "답변 업로드 중...", description: "파일을 업로드하고 분석 페이지로 이동합니다." });
 
         const storageRef = ref(storage, `recordings/${user.uid}_${assessmentDetails.id}_${Date.now()}.webm`);
         const snapshot = await uploadBytes(storageRef, audioBlob);
@@ -203,7 +177,7 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
   }
   
   useEffect(() => {
-    if (remainingTime === 0) {
+    if (remainingTime === 0 && mediaRecorderRef.current?.state === "recording") {
       handleStopRecording();
     }
   }, [remainingTime, handleStopRecording]);
@@ -214,7 +188,7 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
       timerIntervalRef.current = setInterval(() => {
         setRemainingTime(prevTime => {
           if (prevTime === null || prevTime <= 1) {
-            if(timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+            clearInterval(timerIntervalRef.current!);
             return 0;
           }
           return prevTime - 1;
@@ -224,12 +198,8 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
   };
   
   useEffect(() => {
-    if (timeLimit) {
-      setRemainingTime(timeLimit);
-    }
-    return () => {
-      cleanupRecorder();
-    };
+    if (timeLimit) setRemainingTime(timeLimit);
+    return () => cleanupRecorder();
   }, [timeLimit, cleanupRecorder]);
 
   const formatTime = (seconds: number | null) => {
@@ -362,5 +332,3 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
     </div>
   )
 }
-
-    
