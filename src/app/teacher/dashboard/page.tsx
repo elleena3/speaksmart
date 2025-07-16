@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { PlusCircle, MoreHorizontal, ArrowRight, Users, Loader2 } from "lucide-react"
+import { MoreHorizontal, ArrowRight, Users, Loader2 } from "lucide-react"
 import Link from "next/link"
 import { type TeacherAssessment } from "@/lib/types"
 import { OverviewChart } from "./overview-chart"
@@ -72,11 +72,6 @@ export default function TeacherDashboard() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-3xl font-bold tracking-tight">{t.teacherDashboard.dashboard}</h2>
-        <Link href="/teacher/assessments/new" passHref>
-          <Button>
-            <PlusCircle className="mr-2 h-4 w-4" /> {t.teacherDashboard.createAssessment}
-          </Button>
-        </Link>
       </div>
 
       <Card>
