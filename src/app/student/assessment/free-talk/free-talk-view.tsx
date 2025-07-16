@@ -69,6 +69,13 @@ export function FreeTalkView({ assessment }: { assessment: TeacherAssessment }) 
     };
   }, [cleanupRecorder]);
 
+  // Effect to show toast on recording start to avoid render errors
+  useEffect(() => {
+    if (sessionState === 'recording') {
+        toast({ title: "녹음 시작됨", description: "말씀을 마치신 후 녹음 중지 버튼을 눌러주세요." });
+    }
+  }, [sessionState, toast]);
+
   useEffect(() => {
     // Scroll to the bottom of the conversation
     if (scrollAreaRef.current) {
@@ -171,7 +178,6 @@ export function FreeTalkView({ assessment }: { assessment: TeacherAssessment }) 
             if (prev <= 1) {
                 if(countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
                 setSessionState("recording");
-                toast({ title: "녹음 시작됨", description: "말씀을 마치신 후 녹음 중지 버튼을 눌러주세요." });
                 return 0;
             }
             return prev - 1;
@@ -414,3 +420,5 @@ export function FreeTalkView({ assessment }: { assessment: TeacherAssessment }) 
     </div>
   );
 }
+
+    
