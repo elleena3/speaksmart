@@ -38,6 +38,14 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
     ? assessmentDetails.recordingTimeLimit * 60 
     : null;
 
+  const handleStopRecording = useCallback(() => {
+    if (mediaRecorderRef.current && (mediaRecorderRef.current.state === "recording" || mediaRecorderRef.current.state === "paused")) {
+      mediaRecorderRef.current.stop();
+      if(timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+    }
+    setRecordingState('recorded'); // Ensure UI moves to recorded state immediately
+  }, []);
+
   const cleanupRecorder = useCallback(() => {
     if (audioStreamRef.current) {
       audioStreamRef.current.getTracks().forEach(track => track.stop());
@@ -67,7 +75,6 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
 
 
   const startActualRecording = async () => {
-    // This function now only handles the recording logic, not state transitions that happen before it.
     if(timeLimit) setRemainingTime(timeLimit);
 
     try {
@@ -119,7 +126,6 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
 
       mediaRecorderRef.current.start(100); 
       startTimer();
-      // Toast message moved to handleStartRecording to appear before countdown
       
     } catch (error) {
       console.error("Error accessing microphone:", error)
@@ -140,19 +146,15 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
       cleanupRecorder();
     }
     
-    // Set UI state to countdown
     setRecordingState("countdown");
     setCountdown(3);
 
-    // Start actual recording immediately in the background
     startActualRecording();
 
-    // Start UI countdown
     countdownIntervalRef.current = setInterval(() => {
         setCountdown(prev => {
             if (prev <= 1) {
                 if(countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
-                // When countdown ends, just change the UI state to recording
                 setRecordingState("recording");
                 toast({
                     title: "녹음 시작됨",
@@ -164,14 +166,6 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
         });
     }, 1000);
   }
-
-  const handleStopRecording = useCallback(() => {
-    if (mediaRecorderRef.current && (mediaRecorderRef.current.state === "recording" || mediaRecorderRef.current.state === "paused")) {
-      mediaRecorderRef.current.stop();
-      if(timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-    }
-    setRecordingState('recorded'); // Ensure UI moves to recorded state immediately
-  }, []);
 
   const handleSubmit = async () => {
     if (!audioBlob || !user) {
