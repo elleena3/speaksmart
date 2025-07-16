@@ -121,8 +121,8 @@ export default function TeacherDashboard() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>{t.teacherDashboard.title}</TableHead>
-                <TableHead>{t.teacherAssessments.tableHeaderTarget}</TableHead>
+                <TableHead className="text-center">{t.teacherDashboard.title}</TableHead>
+                <TableHead className="text-center">{t.teacherAssessments.tableHeaderTarget}</TableHead>
                 <TableHead className="text-center">{t.teacherDashboard.completed}</TableHead>
                 <TableHead className="text-center">{t.teacherDashboard.avgScore}</TableHead>
                 <TableHead className="text-right">{t.teacherDashboard.actions}</TableHead>
@@ -131,12 +131,12 @@ export default function TeacherDashboard() {
             <TableBody>
               {assessments.length > 0 ? assessments.map((assessment) => (
                 <TableRow key={assessment.id}>
-                  <TableCell className="font-medium">
+                  <TableCell className="font-medium text-center">
                     <Link href={`/teacher/assessment/${assessment.id}`} className="hover:underline text-primary">
                       {assessment.title}
                     </Link>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="text-center">
                       <Badge variant="secondary">{getTargetAudienceText(assessment)}</Badge>
                   </TableCell>
                   <TableCell className="text-center">
