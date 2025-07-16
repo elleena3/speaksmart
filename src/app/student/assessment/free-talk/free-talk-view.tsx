@@ -263,18 +263,6 @@ export function FreeTalkView({ assessment }: { assessment: TeacherAssessment }) 
     }
   }
 
-  const renderCountdownState = () => (
-    <>
-        <div className="flex justify-center my-4 h-11 items-center">
-             <span className="text-7xl font-bold text-primary animate-ping-short">{countdown}</span>
-        </div>
-        <Button size="lg" disabled className="w-full" variant="destructive">
-            <StopCircle className="mr-2 h-5 w-5" />
-            말하기 중지
-        </Button>
-    </>
-  );
-
   const getButtonState = () => {
     switch (sessionState) {
       case "idle":
@@ -294,9 +282,9 @@ export function FreeTalkView({ assessment }: { assessment: TeacherAssessment }) 
         );
       case "countdown":
         return (
-            <Button size="lg" disabled className="w-full" variant="destructive">
-                <StopCircle className="mr-2 h-5 w-5" />
-                말하기 중지
+            <Button size="lg" disabled className="w-full">
+                <Mic className="mr-2 h-5 w-5" />
+                응답하기
             </Button>
         );
       case "recording":
@@ -352,58 +340,65 @@ export function FreeTalkView({ assessment }: { assessment: TeacherAssessment }) 
 
   return (
     <div className="flex flex-col gap-4">
-      <ScrollArea className="h-80 w-full rounded-md border p-4" ref={scrollAreaRef}>
-        <div className="space-y-4">
-            {sessionState === "idle" && (
-              <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground pt-12">
-                  <BrainCircuit className="h-12 w-12 mb-4 text-primary"/>
-                  <p className="font-semibold">AI와 자유롭게 대화하며 영어 실력을 향상시키세요.</p>
-                  <p className="text-sm">준비가 되면 아래 '대화 시작' 버튼을 눌러주세요.</p>
-              </div>
-            )}
-            {["initializing", "submitting"].includes(sessionState) && (
-              <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground pt-12">
-                  <Loader2 className="h-12 w-12 mb-4 animate-spin"/>
-                  <p className="font-semibold">
-                    {sessionState === 'initializing' ? 'AI 대화 파트너 "Alex"를 연결하는 중입니다...' : '대화 내용을 저장하고 분석 페이지로 이동합니다...'}
-                  </p>
-                  <p className="text-sm">잠시만 기다려주세요.</p>
-              </div>
-            )}
-            {conversation.map((turn, index) => (
-              <div key={index} className={`flex items-start gap-3 ${turn.role === 'user' ? 'justify-start' : 'justify-end'}`}>
-                 {turn.role === 'user' && (
-                    <div className="p-2 rounded-full bg-muted">
-                        <User className="h-5 w-5" />
-                    </div>
-                )}
-                <div className={`p-3 rounded-lg max-w-[80%] ${turn.role === 'user' ? 'bg-muted' : 'bg-primary text-primary-foreground'}`}>
-                  <p className="text-sm">{turn.text}</p>
+      <div className="relative">
+        <ScrollArea className="h-80 w-full rounded-md border p-4" ref={scrollAreaRef}>
+          <div className="space-y-4">
+              {sessionState === "idle" && (
+                <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground pt-12">
+                    <BrainCircuit className="h-12 w-12 mb-4 text-primary"/>
+                    <p className="font-semibold">AI와 자유롭게 대화하며 영어 실력을 향상시키세요.</p>
+                    <p className="text-sm">준비가 되면 아래 '대화 시작' 버튼을 눌러주세요.</p>
                 </div>
-                 {turn.role === 'model' && (
-                    <div className="p-2 rounded-full bg-primary text-primary-foreground">
-                        <Bot className="h-5 w-5" />
-                    </div>
-                )}
-              </div>
-            ))}
-            {interimTranscript && (
-                <div className="flex items-start gap-3 justify-start">
-                    <div className="p-2 rounded-full bg-muted">
-                        <User className="h-5 w-5" />
-                    </div>
-                    <div className="p-3 rounded-lg max-w-[80%] bg-muted">
-                        <p className="text-sm text-muted-foreground italic">{interimTranscript}</p>
-                    </div>
+              )}
+              {["initializing", "submitting"].includes(sessionState) && (
+                <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground pt-12">
+                    <Loader2 className="h-12 w-12 mb-4 animate-spin"/>
+                    <p className="font-semibold">
+                      {sessionState === 'initializing' ? 'AI 대화 파트너 "Alex"를 연결하는 중입니다...' : '대화 내용을 저장하고 분석 페이지로 이동합니다...'}
+                    </p>
+                    <p className="text-sm">잠시만 기다려주세요.</p>
                 </div>
-            )}
-        </div>
-      </ScrollArea>
+              )}
+              {conversation.map((turn, index) => (
+                <div key={index} className={`flex items-start gap-3 ${turn.role === 'user' ? 'justify-start' : 'justify-end'}`}>
+                   {turn.role === 'user' && (
+                      <div className="p-2 rounded-full bg-muted">
+                          <User className="h-5 w-5" />
+                      </div>
+                  )}
+                  <div className={`p-3 rounded-lg max-w-[80%] ${turn.role === 'user' ? 'bg-muted' : 'bg-primary text-primary-foreground'}`}>
+                    <p className="text-sm">{turn.text}</p>
+                  </div>
+                   {turn.role === 'model' && (
+                      <div className="p-2 rounded-full bg-primary text-primary-foreground">
+                          <Bot className="h-5 w-5" />
+                      </div>
+                  )}
+                </div>
+              ))}
+              {interimTranscript && (
+                  <div className="flex items-start gap-3 justify-start">
+                      <div className="p-2 rounded-full bg-muted">
+                          <User className="h-5 w-5" />
+                      </div>
+                      <div className="p-3 rounded-lg max-w-[80%] bg-muted">
+                          <p className="text-sm text-muted-foreground italic">{interimTranscript}</p>
+                      </div>
+                  </div>
+              )}
+          </div>
+        </ScrollArea>
+        {sessionState === 'countdown' && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-md z-10">
+                <span className="text-8xl font-bold text-white animate-ping-short">{countdown}</span>
+            </div>
+        )}
+      </div>
       
       <div className="flex flex-col gap-2">
         <div className="flex gap-2">
             <div className="flex-grow">
-              {sessionState === "countdown" ? renderCountdownState() : getButtonState()}
+              {getButtonState()}
             </div>
             {getFooterButtonState()}
         </div>
