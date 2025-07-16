@@ -15,29 +15,37 @@ export default function Home() {
   const { language, setLanguage, t } = useLanguage();
   const { loginAs } = useAuth();
   const router = useRouter();
-  const [loadingRole, setLoadingRole] = useState<"student" | "teacher" | null>(null);
+  const [loadingRole, setLoadingRole] = useState<string | null>(null);
 
   const content = {
     ko: {
       title: "SpeakSmart 평가도구",
       subtitle: "AI 기반 영어 말하기 평가 플랫폼",
-      studentLogin: "학생으로 시작하기",
+      student1Login: "학생1로 시작하기",
+      student2Login: "학생2로 시작하기",
+      student3Login: "학생3으로 시작하기",
       teacherLogin: "교사로 시작하기",
       footer: `© ${new Date().getFullYear()} SpeakSmart 평가도구. 요망진 AI 모든 권리 보유.`
     },
     en: {
       title: "SpeakSmart Assessment Tool",
       subtitle: "AI-Powered English Speaking Assessment Platform",
-      studentLogin: "Start as a Student",
+      student1Login: "Start as Student 1",
+      student2Login: "Start as Student 2",
+      student3Login: "Start as Student 3",
       teacherLogin: "Start as a Teacher",
       footer: `© ${new Date().getFullYear()} SpeakSmart Assessment Tool. Yomangjin AI All rights reserved.`
     }
   };
 
-  const handleNavigation = (role: "student" | "teacher") => {
+  const handleNavigation = (role: string) => {
     setLoadingRole(role);
-    loginAs(role); // Set the mock user based on role
-    router.push(`/${role}/dashboard`);
+    loginAs(role as any); 
+    if(role === 'teacher') {
+      router.push(`/teacher/dashboard`);
+    } else {
+      router.push(`/student/dashboard`);
+    }
   };
 
   return (
@@ -71,20 +79,48 @@ export default function Home() {
         </p>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-4 w-full max-w-md">
-        <Button
-          className="w-full"
-          size="lg"
-          onClick={() => handleNavigation("student")}
-          disabled={!!loadingRole}
-        >
-          {loadingRole === "student" ? (
-            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-          ) : (
-            <GraduationCap className="mr-2 h-5 w-5" />
-          )}
-          {content[language].studentLogin}
-        </Button>
+      <div className="flex flex-col md:flex-row gap-4 w-full max-w-lg">
+        <div className="flex flex-col gap-2 w-full">
+            <Button
+              className="w-full"
+              size="lg"
+              onClick={() => handleNavigation("student1")}
+              disabled={!!loadingRole}
+            >
+              {loadingRole === "student1" ? (
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+              ) : (
+                <GraduationCap className="mr-2 h-5 w-5" />
+              )}
+              {content[language].student1Login}
+            </Button>
+            <Button
+              className="w-full"
+              size="lg"
+              onClick={() => handleNavigation("student2")}
+              disabled={!!loadingRole}
+            >
+              {loadingRole === "student2" ? (
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+              ) : (
+                <GraduationCap className="mr-2 h-5 w-5" />
+              )}
+              {content[language].student2Login}
+            </Button>
+            <Button
+              className="w-full"
+              size="lg"
+              onClick={() => handleNavigation("student3")}
+              disabled={!!loadingRole}
+            >
+              {loadingRole === "student3" ? (
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+              ) : (
+                <GraduationCap className="mr-2 h-5 w-5" />
+              )}
+              {content[language].student3Login}
+            </Button>
+        </div>
 
         <Button
           className="w-full"

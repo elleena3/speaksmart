@@ -11,7 +11,7 @@ import { Loader2 } from 'lucide-react';
 const auth = getAuth(app);
 
 // 로컬 테스트용 목업(가짜) 사용자 객체입니다.
-const mockUser: User = {
+const mockTeacher: User = {
     uid: 'teacher-mock-uid',
     displayName: '김선생',
     email: 'teacher@example.com',
@@ -37,11 +37,65 @@ const mockUser: User = {
     toJSON: () => ({}),
 };
 
-const mockStudent: User = {
-    uid: 'student-mock-uid',
+const mockStudent1: User = {
+    uid: 'student1-mock-uid',
+    displayName: '일학생',
+    email: 'student1@example.com',
+    photoURL: `https://placehold.co/40x40.png?text=일`,
+    emailVerified: true,
+    isAnonymous: false,
+    metadata: {},
+    providerData: [],
+    providerId: 'password',
+    tenantId: null,
+    delete: async () => {},
+    getIdToken: async () => 'mock-token',
+    getIdTokenResult: async () => ({
+        token: 'mock-token',
+        expirationTime: '',
+        authTime: '',
+        issuedAtTime: '',
+        signInProvider: null,
+        signInSecondFactor: null,
+        claims: {},
+    }),
+    reload: async () => {},
+    toJSON: () => ({}),
+};
+
+
+const mockStudent2: User = {
+    uid: 'student2-mock-uid',
     displayName: '이학생',
-    email: 'student@example.com',
+    email: 'student2@example.com',
     photoURL: `https://placehold.co/40x40.png?text=이`,
+    emailVerified: true,
+    isAnonymous: false,
+    metadata: {},
+    providerData: [],
+    providerId: 'password',
+    tenantId: null,
+    delete: async () => {},
+    getIdToken: async () => 'mock-token',
+    getIdTokenResult: async () => ({
+        token: 'mock-token',
+        expirationTime: '',
+        authTime: '',
+        issuedAtTime: '',
+        signInProvider: null,
+        signInSecondFactor: null,
+        claims: {},
+    }),
+    reload: async () => {},
+    toJSON: () => ({}),
+};
+
+
+const mockStudent3: User = {
+    uid: 'student3-mock-uid',
+    displayName: '삼학생',
+    email: 'student3@example.com',
+    photoURL: `https://placehold.co/40x40.png?text=삼`,
     emailVerified: true,
     isAnonymous: false,
     metadata: {},
@@ -67,7 +121,7 @@ const mockStudent: User = {
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  loginAs: (role: 'teacher' | 'student') => void;
+  loginAs: (role: 'teacher' | 'student1' | 'student2' | 'student3') => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -92,12 +146,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const value = useMemo(() => ({
     user,
     loading,
-    loginAs: (role: 'teacher' | 'student') => {
+    loginAs: (role: 'teacher' | 'student1' | 'student2' | 'student3') => {
         setLoading(true);
         if (role === 'teacher') {
-            setUser(mockUser);
-        } else {
-            setUser(mockStudent);
+            setUser(mockTeacher);
+        } else if (role === 'student1') {
+            setUser(mockStudent1);
+        } else if (role === 'student2') {
+            setUser(mockStudent2);
+        } else if (role === 'student3') {
+            setUser(mockStudent3);
         }
         setLoading(false);
     }
