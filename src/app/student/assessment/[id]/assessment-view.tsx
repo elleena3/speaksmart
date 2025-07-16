@@ -68,12 +68,6 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
   const onRecordingStop = useCallback(() => {
     if (audioChunksRef.current.length === 0) {
         console.warn("No audio data recorded.");
-        // This toast call is safe as it happens before state change and returns.
-        toast({
-            title: "녹음된 오디오 없음",
-            description: "오디오가 녹음되지 않았습니다. 마이크를 확인하고 다시 시도해주세요.",
-            variant: "destructive"
-        });
         setRecordingState("idle");
         if (timeLimit) setRemainingTime(timeLimit);
         cleanupRecorder();
@@ -84,16 +78,17 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
     setAudioBlob(newAudioBlob);
     setAudioUrl(URL.createObjectURL(newAudioBlob));
     setAudioSize(newAudioBlob.size);
-    setRecordingState("recorded"); // This will trigger the useEffect for the toast
+    setRecordingState("recorded");
     cleanupRecorder();
-  }, [timeLimit, cleanupRecorder, toast]);
+  }, [timeLimit, cleanupRecorder]);
 
   useEffect(() => {
-    // This effect runs only when recordingState changes to 'recorded', after the render cycle.
     if (recordingState === 'recorded') {
        toast({ title: "녹음 완료", description: "아래에서 녹음을 확인하고 제출해주세요." });
+    } else if (recordingState === 'idle' && audioChunksRef.current.length === 0 && !audioBlob) {
+        // This handles the case where recording stops with no data.
     }
-  }, [recordingState, toast]);
+  }, [recordingState, toast, audioBlob]);
 
 
   const handleStopRecording = useCallback(() => {
@@ -101,7 +96,6 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
       mediaRecorderRef.current.stop();
       if(timerIntervalRef.current) clearInterval(timerIntervalRef.current);
     }
-    // setRecordingState is called within onRecordingStop, which is the onstop event handler.
   }, []);
 
   const startActualRecording = useCallback(async () => {
@@ -368,3 +362,5 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
     </div>
   )
 }
+
+    
