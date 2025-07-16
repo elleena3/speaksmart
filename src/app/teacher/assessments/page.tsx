@@ -173,30 +173,30 @@ export default function AssessmentsPage() {
              <Table>
              <TableHeader>
                <TableRow>
-                 <TableHead>{t.teacherAssessments.tableHeaderTitle}</TableHead>
-                 <TableHead>{t.teacherAssessments.tableHeaderType}</TableHead>
-                 <TableHead>{t.teacherAssessments.tableHeaderTarget}</TableHead>
-                 <TableHead>{t.teacherAssessments.tableHeaderPeriod}</TableHead>
+                 <TableHead className="text-center">{t.teacherAssessments.tableHeaderTitle}</TableHead>
+                 <TableHead className="text-center">{t.teacherAssessments.tableHeaderType}</TableHead>
+                 <TableHead className="text-center">{t.teacherAssessments.tableHeaderTarget}</TableHead>
+                 <TableHead className="text-center">{t.teacherAssessments.tableHeaderPeriod}</TableHead>
                  <TableHead className="text-center">{t.teacherAssessments.tableHeaderCompleted}</TableHead>
                  <TableHead className="text-center">{t.teacherAssessments.tableHeaderAvgScore}</TableHead>
-                 <TableHead><span className="sr-only">{t.teacherAssessments.tableHeaderActions}</span></TableHead>
+                 <TableHead className="text-center"><span className="sr-only">{t.teacherAssessments.tableHeaderActions}</span></TableHead>
                </TableRow>
              </TableHeader>
              <TableBody>
                {assessments.map((assessment) => (
                  <TableRow key={assessment.id}>
-                   <TableCell className="font-medium">
+                   <TableCell className="font-medium text-center">
                      <Link href={`/teacher/assessment/${assessment.id}`} className="hover:underline text-primary">
                        {assessment.title}
                      </Link>
                    </TableCell>
-                   <TableCell>
+                   <TableCell className="text-center">
                       <Badge variant="outline">{getAssessmentTypeText(assessment)}</Badge>
                    </TableCell>
-                   <TableCell>
+                   <TableCell className="text-center">
                       <Badge variant="secondary">{getTargetAudienceText(assessment)}</Badge>
                    </TableCell>
-                   <TableCell className="text-sm text-muted-foreground">
+                   <TableCell className="text-sm text-muted-foreground text-center">
                       {formatDateRange(assessment.startDate, assessment.endDate)}
                    </TableCell>
                    <TableCell className="text-center">
@@ -212,7 +212,7 @@ export default function AssessmentsPage() {
                        {assessment.averageScore > 0 ? `${assessment.averageScore}%` : t.teacherAssessments.scoreNotApplicable}
                      </Badge>
                    </TableCell>
-                   <TableCell>
+                   <TableCell className="text-center">
                      <AlertDialog>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
