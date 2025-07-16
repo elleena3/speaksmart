@@ -33,14 +33,16 @@ export default function TeacherDashboard() {
     try {
         const q = query(
             collection(db, "assessments"), 
-            where("uid", "==", user.uid), 
-            orderBy("createdAt", "desc"),
-            limit(5)
+            where("uid", "==", user.uid)
         );
 
         const querySnapshot = await getDocs(q);
         const assessmentsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TeacherAssessment));
-        setAssessments(assessmentsData);
+        
+        // Sort in code and take the latest 5
+        assessmentsData.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+        setAssessments(assessmentsData.slice(0, 5));
+
     } catch (error) {
         console.error("Error fetching assessments:", error);
     } finally {
