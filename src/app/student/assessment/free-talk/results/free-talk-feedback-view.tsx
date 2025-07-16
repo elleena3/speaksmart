@@ -138,7 +138,7 @@ export function FreeTalkFeedbackView() {
                 activityPrompt: assessment.prompt,
                 expectedFormat: assessment.expectedFormat || "AI와의 자연스러운 대화 능력을 평가합니다.",
                 studentName: user.displayName || "Student",
-                assessmentTitle: assessment.title,
+                assessmentTitle: assessment.title.replace(/ - 복사본(\s\d+)?$/, ''),
             });
 
             setAnalysisStep("report");
