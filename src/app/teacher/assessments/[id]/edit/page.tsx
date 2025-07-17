@@ -21,7 +21,7 @@ import { useLanguage } from "@/context/language-context";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from "@/components/ui/select";
-import { scenarios, type TeacherAssessment, femaleVoices, maleVoices, allVoices, evaluationModels } from "@/lib/types";
+import { scenarios, type TeacherAssessment, femaleVoices, maleVoices, allVoices, evaluationModels, voiceDescriptions } from "@/lib/types";
 import { useAuth, mockStudents } from "@/context/auth-context";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -315,13 +315,17 @@ export default function EditAssessmentPage() {
                         <SelectGroup>
                           <SelectLabel>{t.teacherAssessmentForm.voices.female}</SelectLabel>
                           {femaleVoices.map(voice => (
-                            <SelectItem key={voice} value={voice}>{voice}</SelectItem>
+                            <SelectItem key={voice} value={voice}>
+                              {voice} <span className="text-muted-foreground ml-2">({voiceDescriptions[voice]})</span>
+                            </SelectItem>
                           ))}
                         </SelectGroup>
                         <SelectGroup>
                           <SelectLabel>{t.teacherAssessmentForm.voices.male}</SelectLabel>
                            {maleVoices.map(voice => (
-                            <SelectItem key={voice} value={voice}>{voice}</SelectItem>
+                            <SelectItem key={voice} value={voice}>
+                              {voice} <span className="text-muted-foreground ml-2">({voiceDescriptions[voice]})</span>
+                            </SelectItem>
                           ))}
                         </SelectGroup>
                       </SelectContent>
