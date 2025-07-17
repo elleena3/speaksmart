@@ -66,12 +66,16 @@
       "queryScope": "COLLECTION",
       "fields": [
         {
+          "fieldPath": "assessmentId",
+          "order": "ASCENDING"
+        },
+        {
           "fieldPath": "studentId",
           "order": "ASCENDING"
         },
         {
           "fieldPath": "createdAt",
-          "order": "DESCENDING"
+          "order": "ASCENDING"
         }
       ]
     }
