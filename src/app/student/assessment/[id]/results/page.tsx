@@ -118,6 +118,7 @@ export default function AssessmentResultsPage() {
             expectedFormat: assessmentDetails.expectedFormat || "",
             studentName: user.displayName || "Student",
             assessmentTitle: assessmentDetails.title,
+            evaluationModel: assessmentDetails.evaluationModel,
         });
 
         await updateDoc(newResultRef, { status: "내용 및 발음 분석 중..." });

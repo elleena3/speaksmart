@@ -1,6 +1,6 @@
 
 import { z } from 'genkit';
-import { scenarios, allVoices } from '@/lib/types';
+import { scenarios, allVoices, evaluationModels } from '@/lib/types';
 
 // Define the structure for a single message in the conversation history
 export const ConversationTurnSchema = z.object({
@@ -22,6 +22,7 @@ export const ConverseWithStudentInputSchema = z.object({
   scenario: z.enum(scenarios).optional().describe('The role-playing scenario for the conversation.'),
   scenarioPrompt: z.string().optional().describe('The teacher-provided prompt for the role-playing scenario.'),
   aiVoice: z.enum(allVoices).optional().describe("The voice for the AI to use for text-to-speech."),
+  evaluationModel: z.enum(evaluationModels).optional().describe("The AI model to use for generating responses."),
 });
 export type ConverseWithStudentInput = z.infer<typeof ConverseWithStudentInputSchema>;
 
@@ -71,6 +72,7 @@ export const GenerateMonologueAnalysisInputSchema = z.object({
   expectedFormat: z.string().describe('The expected format or key points of the response for grading.'),
   studentName: z.string().describe('The name of the student.'),
   assessmentTitle: z.string().describe('The title of the assessment.'),
+  evaluationModel: z.enum(evaluationModels).optional(),
 });
 export type GenerateMonologueAnalysisInput = z.infer<typeof GenerateMonologueAnalysisInputSchema>;
 
@@ -84,6 +86,7 @@ export const GenerateDialogueAnalysisInputSchema = z.object({
   expectedFormat: z.string().describe('The expected format or key points of the response for grading.'),
   studentName: z.string().describe('The name of the student.'),
   assessmentTitle: z.string().describe('The title of the assessment.'),
+  evaluationModel: z.enum(evaluationModels).optional(),
 });
 export type GenerateDialogueAnalysisInput = z.infer<typeof GenerateDialogueAnalysisInputSchema>;
 
@@ -106,5 +109,3 @@ export const ContentAnalysisInputSchema = z.object({
     studentName: z.string(),
     assessmentTitle: z.string(),
 });
-
-    

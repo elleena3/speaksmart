@@ -18,6 +18,7 @@ import {
   CombinedAnalysisOutputSchema,
   type GenerateMonologueAnalysisInput,
 } from '@/lib/types/ai-schemas';
+import { evaluationModels } from '@/lib/types';
 
 /**
  * Main exported function to be called by the client for monologue analysis.
@@ -30,67 +31,62 @@ export async function generateMonologueAnalysis(
 
 
 // Internal Sub-flows and Prompts
-
-// 1. Transcription Prompt - Uses a structured object for input
-const transcriptionPrompt = ai.definePrompt({
-    name: 'transcribeAudioPrompt',
-    model: googleAI.model('gemini-2.5-flash'),
-    input: { schema: z.object({ studentRecordingUrl: z.string() }) },
-    prompt: `Transcribe this English audio.
-Audio: {{media url=studentRecordingUrl}}
-`,
-});
-
-
-// 2. Content Analysis Prompt
-const contentAnalysisPrompt = ai.definePrompt({
-  name: 'monologueContentAnalysisPrompt',
-  model: googleAI.model('gemini-2.5-flash'),
-  input: { schema: z.object({
-    studentTranscript: z.string(),
-    activityPrompt: z.string(),
-    expectedFormat: z.string(),
-    studentName: z.string(),
-    assessmentTitle: z.string(),
-  }) },
-  output: { schema: ContentAnalysisOutputSchema },
-  prompt: `You are an AI English Teacher evaluating a student's monologue performance based on a transcript. Your persona is that of an expert English teacher providing constructive feedback for skill improvement. Your entire response must be in the specified JSON format, and all text feedback must be in Korean.
-
-Here is the context for the evaluation:
-- Student Name: {{{studentName}}}
-- Assessment Title: {{{assessmentTitle}}}
-- Activity Prompt: {{{activityPrompt}}}
-- Expected Response Format/Grading Criteria: {{{expectedFormat}}}
-- Student's Spoken Response (Transcript): {{{studentTranscript}}}
-
-Based on all the information provided, perform the following tasks:
-1.  **Generate Feedback for the Student:** Write encouraging and constructive feedback focusing on what they did well and what they can improve regarding fluency, grammar, and vocabulary in relation to the prompt. Include specific examples from their transcript. Suggest alternative English vocabulary or sentence structures.
-2.  **Generate Guidance for the Teacher:** Provide actionable advice for the classroom teacher on how to help this student. Suggest specific English teaching activities or focus areas.
-3.  **Draft Curricular Remarks:** Write official curricular remarks in a formal, descriptive tone with sentences ending in '~함' or '~임'. The remarks must be based on the student's performance in this specific task, summarizing their performance and linking it to English competencies. Follow a 3-part structure: ① General participation, ② Specific examples from their speech, ③ Collaboration/other character traits.
-4.  **Assign a Content Score:** Give a score from 0 to 100 for the *content* of the response based on how well it aligns with the prompt and criteria.
-`,
-});
-
-// 3. Pronunciation Analysis Prompt
-const pronunciationAnalysisPrompt = ai.definePrompt({
-    name: 'monologuePronunciationAnalysisPrompt',
-    model: googleAI.model('gemini-2.5-flash'),
-    input: { schema: z.object({
-        studentRecordingUrl: z.string(),
+const createPrompt = (modelName: z.infer<typeof evaluationModels[number]>) => ({
+    transcription: ai.definePrompt({
+        name: `transcribeAudioPrompt_${modelName.replace(/[-.]/g, '_')}`,
+        model: googleAI.model(modelName),
+        input: { schema: z.object({ studentRecordingUrl: z.string() }) },
+        prompt: `Transcribe this English audio.
+    Audio: {{media url=studentRecordingUrl}}
+    `,
+    }),
+    content: ai.definePrompt({
+      name: `monologueContentAnalysisPrompt_${modelName.replace(/[-.]/g, '_')}`,
+      model: googleAI.model(modelName),
+      input: { schema: z.object({
         studentTranscript: z.string(),
-    }) },
-    output: { schema: PronunciationAnalysisOutputSchema },
-    prompt: `You are an expert English pronunciation coach. Your task is to evaluate a student's spoken English based on their audio recording and the corresponding transcript. Provide all feedback in Korean.
-
-- Student's Audio Recording: {{media url=studentRecordingUrl}}
-- AI-generated Transcript: {{{studentTranscript}}}
-
-Please perform the following steps:
-1.  Listen carefully to the audio and compare it with the transcript.
-2.  Evaluate accuracy, clarity, intonation, and fluency.
-3.  **Assign a Pronunciation Score:** Give a score from 0 to 100 (100 is native-like, 0 is unintelligible).
-4.  **Provide Pronunciation Feedback:** Write specific, constructive feedback in Korean. Point out specific words or sounds that were pronounced well and those that need improvement. If the transcript is empty or indicates no speech, provide a score of 0 and state that no speech was detected.
-`,
+        activityPrompt: z.string(),
+        expectedFormat: z.string(),
+        studentName: z.string(),
+        assessmentTitle: z.string(),
+      }) },
+      output: { schema: ContentAnalysisOutputSchema },
+      prompt: `You are an AI English Teacher evaluating a student's monologue performance based on a transcript. Your persona is that of an expert English teacher providing constructive feedback for skill improvement. Your entire response must be in the specified JSON format, and all text feedback must be in Korean.
+    
+    Here is the context for the evaluation:
+    - Student Name: {{{studentName}}}
+    - Assessment Title: {{{assessmentTitle}}}
+    - Activity Prompt: {{{activityPrompt}}}
+    - Expected Response Format/Grading Criteria: {{{expectedFormat}}}
+    - Student's Spoken Response (Transcript): {{{studentTranscript}}}
+    
+    Based on all the information provided, perform the following tasks:
+    1.  **Generate Feedback for the Student:** Write encouraging and constructive feedback focusing on what they did well and what they can improve regarding fluency, grammar, and vocabulary in relation to the prompt. Include specific examples from their transcript. Suggest alternative English vocabulary or sentence structures.
+    2.  **Generate Guidance for the Teacher:** Provide actionable advice for the classroom teacher on how to help this student. Suggest specific English teaching activities or focus areas.
+    3.  **Draft Curricular Remarks:** Write official curricular remarks in a formal, descriptive tone with sentences ending in '~함' or '~임'. The remarks must be based on the student's performance in this specific task, summarizing their performance and linking it to English competencies. Follow a 3-part structure: ① General participation, ② Specific examples from their speech, ③ Collaboration/other character traits.
+    4.  **Assign a Content Score:** Give a score from 0 to 100 for the *content* of the response based on how well it aligns with the prompt and criteria.
+    `,
+    }),
+    pronunciation: ai.definePrompt({
+        name: `monologuePronunciationAnalysisPrompt_${modelName.replace(/[-.]/g, '_')}`,
+        model: googleAI.model(modelName),
+        input: { schema: z.object({
+            studentRecordingUrl: z.string(),
+            studentTranscript: z.string(),
+        }) },
+        output: { schema: PronunciationAnalysisOutputSchema },
+        prompt: `You are an expert English pronunciation coach. Your task is to evaluate a student's spoken English based on their audio recording and the corresponding transcript. Provide all feedback in Korean.
+    
+    - Student's Audio Recording: {{media url=studentRecordingUrl}}
+    - AI-generated Transcript: {{{studentTranscript}}}
+    
+    Please perform the following steps:
+    1.  Listen carefully to the audio and compare it with the transcript.
+    2.  Evaluate accuracy, clarity, intonation, and fluency.
+    3.  **Assign a Pronunciation Score:** Give a score from 0 to 100 (100 is native-like, 0 is unintelligible).
+    4.  **Provide Pronunciation Feedback:** Write specific, constructive feedback in Korean. Point out specific words or sounds that were pronounced well and those that need improvement. If the transcript is empty or indicates no speech, provide a score of 0 and state that no speech was detected.
+    `,
+    })
 });
 
 
@@ -102,9 +98,11 @@ const generateMonologueAnalysisFlow = ai.defineFlow(
     outputSchema: CombinedAnalysisOutputSchema,
   },
   async (input) => {
-    
+    const model = input.evaluationModel || 'gemini-2.5-flash';
+    const prompts = createPrompt(model);
+
     // Step 1: Transcribe the audio.
-    const transcriptionResult = await transcriptionPrompt({ studentRecordingUrl: input.studentRecordingUrl });
+    const transcriptionResult = await prompts.transcription({ studentRecordingUrl: input.studentRecordingUrl });
     const studentTranscript = transcriptionResult.text;
 
     if (!studentTranscript || studentTranscript.trim() === "" || studentTranscript.includes('기록되지 않았습니다') || studentTranscript.includes('인식하지 못했습니다')) {
@@ -121,14 +119,14 @@ const generateMonologueAnalysisFlow = ai.defineFlow(
     
     // Step 2: Run content and pronunciation analysis in PARALLEL.
     const [contentResult, pronunciationResult] = await Promise.all([
-      contentAnalysisPrompt({
+      prompts.content({
         studentTranscript,
         activityPrompt: input.activityPrompt,
         expectedFormat: input.expectedFormat,
         studentName: input.studentName,
         assessmentTitle: input.assessmentTitle,
       }),
-      pronunciationAnalysisPrompt({
+      prompts.pronunciation({
         studentRecordingUrl: input.studentRecordingUrl,
         studentTranscript,
       })

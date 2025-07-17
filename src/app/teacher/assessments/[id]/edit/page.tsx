@@ -21,12 +21,10 @@ import { useLanguage } from "@/context/language-context";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from "@/components/ui/select";
-import { scenarios, type TeacherAssessment, femaleVoices, maleVoices } from "@/lib/types";
+import { scenarios, type TeacherAssessment, femaleVoices, maleVoices, allVoices, evaluationModels } from "@/lib/types";
 import { useAuth, mockStudents } from "@/context/auth-context";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-
-const allVoices = [...femaleVoices, ...maleVoices] as const;
 
 export default function EditAssessmentPage() {
   const router = useRouter();
@@ -52,6 +50,7 @@ export default function EditAssessmentPage() {
     scenario: z.enum(scenarios).optional(),
     recordingTimeLimit: z.coerce.number().int().min(0).optional(),
     aiVoice: z.enum(allVoices).optional().default('Alpheratz'),
+    evaluationModel: z.enum(evaluationModels).optional().default('gemini-2.5-flash-lite-preview-06-17'),
   }).superRefine((data, ctx) => {
     const isFreeTalk = data.assessmentType === 'dialogue' && data.scenario === 'free-talk';
 
@@ -93,6 +92,7 @@ export default function EditAssessmentPage() {
       scenario: "free-talk",
       recordingTimeLimit: 0,
       aiVoice: 'Alpheratz',
+      evaluationModel: 'gemini-2.5-flash-lite-preview-06-17',
     },
   });
 
@@ -115,6 +115,7 @@ export default function EditAssessmentPage() {
               endDate: data.endDate ? new Date(data.endDate) : undefined,
               targetType: Array.isArray(data.targetStudentIds) ? 'specific' : 'all',
               aiVoice: data.aiVoice || 'Alpheratz',
+              evaluationModel: data.evaluationModel || 'gemini-2.5-flash-lite-preview-06-17',
             });
         } else {
             toast({ title: "오류", description: "평가를 찾을 수 없거나 수정할 권한이 없습니다.", variant: "destructive" });
@@ -331,7 +332,30 @@ export default function EditAssessmentPage() {
                 )}
               />
             )}
-
+            
+            <FormField
+              control={form.control}
+              name="evaluationModel"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>AI 평가 모델 선택</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="평가에 사용할 AI 모델을 선택하세요..." />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {evaluationModels.map(model => (
+                        <SelectItem key={model} value={model}>{model}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormDescription>평가 분석에 사용할 AI 모델을 선택합니다. 특정 모델의 성능을 테스트하거나 목적에 맞는 모델을 사용할 수 있습니다.</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             {targetType === 'specific' && (
               <FormField
@@ -608,5 +632,3 @@ export default function EditAssessmentPage() {
     </Card>
   );
 }
-
-    

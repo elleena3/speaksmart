@@ -97,6 +97,7 @@ export function FreeTalkView({ assessment }: { assessment: TeacherAssessment }) 
         scenario: assessment.scenario,
         scenarioPrompt: assessment.prompt,
         aiVoice: assessment.aiVoice,
+        evaluationModel: assessment.evaluationModel,
       });
 
       const initialTurn: ConversationTurn = { role: 'model', text: aiResponseText };
@@ -207,6 +208,7 @@ export function FreeTalkView({ assessment }: { assessment: TeacherAssessment }) 
         scenario: assessment.scenario,
         scenarioPrompt: assessment.prompt,
         aiVoice: assessment.aiVoice,
+        evaluationModel: assessment.evaluationModel,
       });
       
       setInterimTranscript(null);
@@ -421,5 +423,3 @@ export function FreeTalkView({ assessment }: { assessment: TeacherAssessment }) 
     </div>
   );
 }
-
-    

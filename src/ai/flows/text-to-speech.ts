@@ -18,6 +18,7 @@ import {
   ConversationTurnSchema,
 } from '@/lib/types/ai-schemas';
 import wav from 'wav';
+import { evaluationModels } from '@/lib/types';
 
 export async function converseWithStudent(
   input: ConverseWithStudentInput
@@ -26,54 +27,56 @@ export async function converseWithStudent(
 }
 
 // 1. Define the prompt for generating the conversational text response
-const conversationalPrompt = ai.definePrompt({
-  name: 'conversationalPrompt',
-  model: googleAI.model('gemini-2.5-flash'),
-  input: {
-    schema: ConverseWithStudentInputSchema.pick({
-      studentTranscript: true,
-      scenario: true,
-      scenarioPrompt: true, 
-      conversationHistory: true,
-    }).extend({
-        history: z.array(ConversationTurnSchema.extend({ isUser: z.boolean() })),
-    })
-  },
-  output: { schema: ConverseWithStudentOutputSchema.pick({ aiResponseText: true }) },
-  prompt: `You are an AI English conversation partner. Your name is "Alex". You are friendly, patient, and encouraging. Your goal is to have a natural, engaging conversation with a student learning English.
+const createConversationalPrompt = (modelName: z.infer<typeof evaluationModels[number]>) => {
+    return ai.definePrompt({
+      name: `conversationalPrompt_${modelName.replace(/[-.]/g, '_')}`,
+      model: googleAI.model(modelName),
+      input: {
+        schema: ConverseWithStudentInputSchema.pick({
+          studentTranscript: true,
+          scenario: true,
+          scenarioPrompt: true, 
+          conversationHistory: true,
+        }).extend({
+            history: z.array(ConversationTurnSchema.extend({ isUser: z.boolean() })),
+        })
+      },
+      output: { schema: ConverseWithStudentOutputSchema.pick({ aiResponseText: true }) },
+      prompt: `You are an AI English conversation partner. Your name is "Alex". You are friendly, patient, and encouraging. Your goal is to have a natural, engaging conversation with a student learning English.
 
-IMPORTANT RULE: If the student's transcript is "(The user did not say anything)", you MUST respond by asking them to speak again, for example: "Sorry, I didn't catch that. Could you please say that again?" or "I couldn't hear you, can you repeat that?". Do not say "Okay, I see" or try to continue the conversation.
+    IMPORTANT RULE: If the student's transcript is "(The user did not say anything)", you MUST respond by asking them to speak again, for example: "Sorry, I didn't catch that. Could you please say that again?" or "I couldn't hear you, can you repeat that?". Do not say "Okay, I see" or try to continue the conversation.
 
-{{#if scenario}}
-You are in a role-playing scenario. Adapt your persona and responses accordingly.
-Scenario: {{{scenario}}}
-Situation: {{#if scenarioPrompt}} {{{scenarioPrompt}}} {{else}} You are just having a friendly conversation. {{/if}}
+    {{#if scenario}}
+    You are in a role-playing scenario. Adapt your persona and responses accordingly.
+    Scenario: {{{scenario}}}
+    Situation: {{#if scenarioPrompt}} {{{scenarioPrompt}}} {{else}} You are just having a friendly conversation. {{/if}}
 
-Based on the situation, start the conversation or respond to the student.
-{{else}}
-This is a free-talk session. Have a natural, friendly conversation.
-- Keep your responses relatively short and natural.
-- Ask questions to keep the conversation going.
-- If the student makes a grammatical error, don't correct them directly unless it significantly hinders understanding. The goal is conversation, not a grammar test.
-{{/if}}
+    Based on the situation, start the conversation or respond to the student.
+    {{else}}
+    This is a free-talk session. Have a natural, friendly conversation.
+    - Keep your responses relatively short and natural.
+    - Ask questions to keep the conversation going.
+    - If the student makes a grammatical error, don't correct them directly unless it significantly hinders understanding. The goal is conversation, not a grammar test.
+    {{/if}}
 
-Conversation History (if any):
-{{#each history}}
-{{#if isUser}}Student{{else}}You{{/if}}: {{{text}}}
-{{/each}}
+    Conversation History (if any):
+    {{#each history}}
+    {{#if isUser}}Student{{else}}You{{/if}}: {{{text}}}
+    {{/each}}
 
-{{#if studentTranscript}}
-The student's latest message is a transcript from their speech. Respond to it.
-Student: {{{studentTranscript}}}
-You:
-{{else}}
-You are starting the conversation. Greet the student according to your role and the situation. Keep it short and friendly.
-For example, if you are a shop assistant: "Hi, welcome to our store. Let me know if you need any help finding something."
-For a free talk, you could say: "Hi there! I'm Alex. How are you doing today?"
-You:
-{{/if}}
-`,
-});
+    {{#if studentTranscript}}
+    The student's latest message is a transcript from their speech. Respond to it.
+    Student: {{{studentTranscript}}}
+    You:
+    {{else}}
+    You are starting the conversation. Greet the student according to your role and the situation. Keep it short and friendly.
+    For example, if you are a shop assistant: "Hi, welcome to our store. Let me know if you need any help finding something."
+    For a free talk, you could say: "Hi there! I'm Alex. How are you doing today?"
+    You:
+    {{/if}}
+    `,
+    });
+}
 
 
 // Helper function to convert PCM audio buffer to WAV format
@@ -139,14 +142,18 @@ const converseWithStudentFlow = ai.defineFlow(
     inputSchema: ConverseWithStudentInputSchema,
     outputSchema: ConverseWithStudentOutputSchema,
   },
-  async ({ studentRecordingDataUri, conversationHistory, scenario, scenarioPrompt, aiVoice }) => {
+  async ({ studentRecordingDataUri, conversationHistory, scenario, scenarioPrompt, aiVoice, evaluationModel }) => {
     let studentTranscript = "";
     let aiResponseText = "";
+    
+    const model = evaluationModel || 'gemini-2.5-flash';
+    const conversationalPrompt = createConversationalPrompt(model);
+
 
     // Step 1: Transcribe student's audio if it exists.
     if (studentRecordingDataUri) {
       const sttResponse = await ai.generate({
-        model: googleAI.model('gemini-2.5-flash'),
+        model: googleAI.model(model),
         prompt: [
           { text: 'Transcribe this English audio.' },
           { media: { url: studentRecordingDataUri } },
@@ -193,5 +200,3 @@ const converseWithStudentFlow = ai.defineFlow(
     };
   }
 );
-
-    

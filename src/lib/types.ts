@@ -9,6 +9,9 @@ export const maleVoices = ["Algenib", "Polaris", "Antares", "Arcturus", "Spica",
 export const allVoices = [...femaleVoices, ...maleVoices];
 export type AiVoice = (typeof allVoices)[number];
 
+export const evaluationModels = ["gemini-2.5-flash-lite-preview-06-17", "gemini-2.5-flash", "gemini-2.0-flash"] as const;
+export type EvaluationModel = (typeof evaluationModels)[number];
+
 
 export type Assessment = {
   id: string;
@@ -44,6 +47,7 @@ export type TeacherAssessment = {
   assessmentType: 'monologue' | 'dialogue';
   scenario?: Scenario;
   aiVoice?: AiVoice;
+  evaluationModel?: EvaluationModel;
   expectedFormat?: string;
   recordingTimeLimit?: number; // Optional recording time limit in minutes
   targetStudentIds: string[] | 'all'; // 'all' or array of student UIDs
