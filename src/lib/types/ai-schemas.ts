@@ -1,6 +1,8 @@
 
 import { z } from 'genkit';
 import { scenarios, allVoices, evaluationModels } from '@/lib/types';
+import type { StudentResult } from '@/lib/types';
+
 
 // Define the structure for a single message in the conversation history
 export const ConversationTurnSchema = z.object({
@@ -89,6 +91,32 @@ export const GenerateDialogueAnalysisInputSchema = z.object({
   evaluationModel: z.enum(evaluationModels).optional(),
 });
 export type GenerateDialogueAnalysisInput = z.infer<typeof GenerateDialogueAnalysisInputSchema>;
+
+
+// ##############################################################
+// ##              SCHEMA FOR GROWTH FEEDBACK FLOW             ##
+// ##############################################################
+
+const ResultSummarySchema = z.object({
+    attemptNumber: z.number().int(),
+    contentScore: z.number().int(),
+    pronunciationScore: z.number().int(),
+    transcript: z.string(),
+    aiFeedback: z.string(),
+});
+
+export const GenerateGrowthFeedbackInputSchema = z.object({
+    previousAttempt: ResultSummarySchema.describe("The summary of the student's previous attempt."),
+    latestAttempt: ResultSummarySchema.describe("The summary of the student's most recent attempt."),
+    assessmentTitle: z.string(),
+});
+export type GenerateGrowthFeedbackInput = z.infer<typeof GenerateGrowthFeedbackInputSchema>;
+
+export const GenerateGrowthFeedbackOutputSchema = z.object({
+    growthFeedback: z.string().describe('A comprehensive analysis of the student\'s growth between the two attempts, in Korean.'),
+});
+export type GenerateGrowthFeedbackOutput = z.infer<typeof GenerateGrowthFeedbackOutputSchema>;
+
 
 
 // ##############################################################

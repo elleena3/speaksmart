@@ -2,7 +2,8 @@
 "use client";
 
 import { FeedbackView } from "./feedback-view"
-import { useParams, useRouter } from 'next/navigation';
+import { GrowthView } from "./growth-view"
+import { useParams, useRouter, notFound } from 'next/navigation';
 import { useEffect, useState, useCallback } from "react";
 import { type StudentResult, type ResultStatus, type TeacherAssessment } from "@/lib/types";
 import { useAuth } from "@/context/auth-context";
@@ -10,7 +11,7 @@ import { Loader2, AlertTriangle, CheckCircle2, UploadCloud, AudioLines, FileScan
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { db } from "@/lib/firebase";
-import { collection, query, where, onSnapshot, doc, setDoc, updateDoc, getDocs, serverTimestamp } from "firebase/firestore";
+import { collection, query, where, onSnapshot, doc, setDoc, updateDoc, getDocs, getDoc, serverTimestamp, orderBy } from "firebase/firestore";
 import { generateMonologueAnalysis } from "@/ai/flows/generate-monologue-analysis-flow";
 import { useToast } from "@/hooks/use-toast";
 
@@ -67,18 +68,16 @@ function AnalysisProgressView({ currentStep }: { currentStep: AnalysisStep | nul
     );
 }
 
-
-// This component now handles the entire result creation and feedback display process.
 export default function AssessmentResultsPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const params = useParams();
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
   
-  const [result, setResult] = useState<StudentResult | null>(null);
+  const [results, setResults] = useState<StudentResult[]>([]);
+  const [assessment, setAssessment] = useState<TeacherAssessment | null>(null);
   const [analysisStep, setAnalysisStep] = useState<AnalysisStep | null>(null);
-  const [status, setStatus] = useState<ResultStatus>("분석 중");
-  const [isLoading, setIsLoading] = useState(true);
+  const [status, setStatus] = useState<"loading" | "analyzing" | "completed" | "error">("loading");
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
@@ -86,17 +85,20 @@ export default function AssessmentResultsPage() {
     const sessionDataRaw = sessionStorage.getItem(SESSION_STORAGE_KEY);
     if (!sessionDataRaw || !user) return;
     
+    setStatus("analyzing");
     const { assessmentId, studentRecordingUrl, assessmentDetails } = JSON.parse(sessionDataRaw) as { assessmentId: string, studentRecordingUrl: string, assessmentDetails: TeacherAssessment };
     
     if (assessmentId !== id) {
         sessionStorage.removeItem(SESSION_STORAGE_KEY);
+        setStatus("error");
+        setError("세션 정보가 현재 평가와 일치하지 않습니다.");
         return;
     }
     
     let newResultRef = doc(collection(db, "results"));
     
     try {
-        setAnalysisStep("upload"); // This is now a logical step, file is already uploaded
+        setAnalysisStep("upload");
         const initialData: Partial<StudentResult> = {
             studentId: user.uid,
             assessmentId: assessmentDetails.id,
@@ -110,9 +112,10 @@ export default function AssessmentResultsPage() {
             studentRecordingUrl: studentRecordingUrl,
         };
         await setDoc(newResultRef, initialData, { merge: true });
-
-        setAnalysisStep("transcribe");
         
+        setAnalysisStep("transcribe");
+        await updateDoc(newResultRef, { status: "텍스트 변환 중" });
+
         const analysisResult = await generateMonologueAnalysis({
             studentRecordingUrl: studentRecordingUrl,
             activityPrompt: assessmentDetails.prompt,
@@ -122,34 +125,32 @@ export default function AssessmentResultsPage() {
             evaluationModel: assessmentDetails.evaluationModel,
         });
 
-        await updateDoc(newResultRef, { status: "내용 및 발음 분석 중..." });
         setAnalysisStep("analyze");
+        await updateDoc(newResultRef, { status: "내용 및 발음 분석 중..." });
         
-        await updateDoc(newResultRef, { status: "리포트 생성 중" });
         setAnalysisStep("report");
+        await updateDoc(newResultRef, { status: "리포트 생성 중" });
 
         const finalResultData: Partial<StudentResult> = {
             ...analysisResult,
-            score: analysisResult.contentScore,
             status: '채점 완료',
         };
         await updateDoc(newResultRef, finalResultData);
         
-        // Update assessment aggregates
         const assessmentRef = doc(db, "assessments", assessmentDetails.id);
         const resultsCollection = collection(db, "results");
         const q = query(resultsCollection, where("assessmentId", "==", assessmentDetails.id), where("status", "==", "채점 완료"));
 
         const querySnapshot = await getDocs(q);
-        const scores = querySnapshot.docs.map(d => (d.data() as StudentResult).score || 0);
-        const newSubmissionCount = scores.length;
+        const scores = querySnapshot.docs.map(d => (d.data() as StudentResult).contentScore || 0);
+        const newSubmissionCount = querySnapshot.docs.length;
         const newAverage = newSubmissionCount > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / newSubmissionCount) : 0;
         
         await updateDoc(assessmentRef, {
             submissionCount: newSubmissionCount,
             averageScore: newAverage
         });
-
+        
     } catch (e: any) {
       console.error("Error generating analysis:", e);
       let errorMessage = "AI 분석 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
@@ -159,7 +160,7 @@ export default function AssessmentResultsPage() {
           errorMessage = `AI 분석 중 오류가 발생했습니다: ${e.message}`;
       }
       setError(errorMessage);
-      setStatus("오류");
+      setStatus("error");
       await updateDoc(newResultRef, { 
           status: '오류', 
           aiFeedback: errorMessage
@@ -177,56 +178,67 @@ export default function AssessmentResultsPage() {
     const q = query(
         collection(db, "results"),
         where("assessmentId", "==", id),
-        where("studentId", "==", user.uid)
+        where("studentId", "==", user.uid),
+        orderBy("createdAt", "asc") // 오래된 순으로 정렬
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-        if (!snapshot.empty) {
-            // Find the most recent result for this assessment
-            const docToProcess = snapshot.docs.sort((a,b) => (b.data().createdAt || 0) - (a.data().createdAt || 0))[0];
-            const data = { id: docToProcess.id, ...docToProcess.data() } as StudentResult;
-            
-            setResult(data);
-            setStatus(data.status);
-
-            if (data.status === '채점 완료' || data.status === '오류') {
-                setIsLoading(false);
+    const unsubscribe = onSnapshot(q, async (snapshot) => {
+        const dbResults = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as StudentResult));
+        const stillProcessing = dbResults.some(r => r.status !== '채점 완료' && r.status !== '오류');
+        
+        if (dbResults.length > 0) {
+            const assessmentRef = doc(db, 'assessments', id);
+            const assessmentSnap = await getDoc(assessmentRef);
+            if (assessmentSnap.exists()) {
+                setAssessment({id: assessmentSnap.id, ...assessmentSnap.data()} as TeacherAssessment);
             } else {
-                // If it's still processing, keep showing the progress
-                setIsLoading(true); 
+                notFound();
+                return;
+            }
+            setResults(dbResults);
+            if (!stillProcessing) {
+              setStatus("completed");
+            } else {
+              setStatus("analyzing");
             }
         } else if (sessionData) {
-            // If no result exists in DB but we have session data, it's a new submission
-            setIsLoading(true); 
             processMonologueSubmission();
         } else {
-            // No result and no session data, so nothing to show
-            setIsLoading(false);
+            setStatus("completed");
         }
     }, (err) => {
         console.error("Error listening to result:", err);
         setError("결과를 실시간으로 업데이트하는 중 오류가 발생했습니다.");
-        setIsLoading(false);
+        setStatus("error");
     });
     
     return () => unsubscribe();
   }, [id, user, authLoading, router, processMonologueSubmission]);
   
-  if (isLoading || authLoading) {
+  if (status === "loading" || authLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center text-center p-8 h-96">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
+  
+  if (status === "analyzing") {
     return (
       <div className="flex flex-col items-center justify-center text-center p-8 h-96">
         <AnalysisProgressView currentStep={analysisStep} />
       </div>
     );
   }
-  
-  if (error || status === '오류') {
+
+  if (status === 'error') {
+    const latestResultIsError = results.length > 0 && results[results.length - 1].status === '오류';
     return (
         <Card className="flex flex-col items-center justify-center text-center p-8 min-h-80 bg-destructive/10 border-destructive">
             <CardHeader>
                 <AlertTriangle className="h-12 w-12 text-destructive mx-auto mb-4" />
                 <CardTitle className="text-destructive">분석 오류</CardTitle>
-                <CardDescription className="text-destructive-foreground">{error || result?.aiFeedback || "AI가 답변을 분석하는 데 실패했습니다. 다시 시도해주세요."}</CardDescription>
+                <CardDescription className="text-destructive-foreground">{error || (latestResultIsError ? results[results.length-1].aiFeedback : "AI가 답변을 분석하는 데 실패했습니다. 다시 시도해주세요.")}</CardDescription>
             </CardHeader>
             <CardContent>
                 <Button onClick={() => router.push(`/student/assessment/${id}`)}>
@@ -237,16 +249,24 @@ export default function AssessmentResultsPage() {
     );
   }
 
-  if (!result) {
-     return (
-        <div className="text-center p-8">
-            <p>이 평가에 대한 제출된 결과가 없습니다. 평가를 먼저 완료해주세요.</p>
-            <Button onClick={() => router.push(`/student/assessment/${id}`)} className="mt-4">평가 시작하기</Button>
-        </div>
-     );
+  if (status === 'completed' && assessment) {
+    if (results.length === 0) {
+      return (
+         <div className="text-center p-8">
+             <p>이 평가에 대한 제출된 결과가 없습니다. 평가를 먼저 완료해주세요.</p>
+             <Button onClick={() => router.push(`/student/assessment/${id}`)} className="mt-4">평가 시작하기</Button>
+         </div>
+      );
+    }
+    
+    if (results.length === 1) {
+      return <FeedbackView result={results[0]} assessment={assessment} isLatestAttempt={true} />;
+    }
+
+    if (results.length > 1) {
+      return <GrowthView results={results} assessment={assessment} />;
+    }
   }
 
-  return (
-    <FeedbackView result={result} />
-  )
+  return null;
 }

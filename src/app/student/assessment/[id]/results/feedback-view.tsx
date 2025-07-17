@@ -2,22 +2,25 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
-import { Send, ThumbsUp, ThumbsDown, MessageSquareQuote, Loader2, FileText, Target } from "lucide-react"
+import { Send, ThumbsUp, ThumbsDown, MessageSquareQuote, Loader2, FileText, Target, Repeat } from "lucide-react"
 import { summarizeStudentFeedback } from "@/ai/flows/summarize-student-feedback"
-import { type StudentResult } from "@/lib/types"
+import { type StudentResult, type TeacherAssessment } from "@/lib/types"
 import { Progress } from "@/components/ui/progress"
 import { db } from "@/lib/firebase"
 import { doc, updateDoc } from "firebase/firestore"
 
 type FeedbackViewProps = {
   result: StudentResult
+  assessment: TeacherAssessment
+  isLatestAttempt: boolean
 }
 
-export function FeedbackView({ result }: FeedbackViewProps) {
+export function FeedbackView({ result, assessment, isLatestAttempt }: FeedbackViewProps) {
   const [teacherFeedback, setTeacherFeedback] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [satisfaction, setSatisfaction] = useState<"good" | "bad" | null>(null);
@@ -30,7 +33,8 @@ export function FeedbackView({ result }: FeedbackViewProps) {
     studentTranscript,
     studentRecordingUrl,
     pronunciationScore,
-    pronunciationFeedback
+    pronunciationFeedback,
+    contentScore
   } = result;
 
   const handleSubmitFeedback = async () => {
@@ -72,6 +76,10 @@ export function FeedbackView({ result }: FeedbackViewProps) {
     }
   }
 
+  const retryLink = assessment.assessmentType === 'dialogue'
+    ? `/student/assessment/free-talk?id=${assessment.id}`
+    : `/student/assessment/${assessment.id}`;
+
   return (
     <div className="grid gap-6 lg:grid-cols-3">
       <div className="lg:col-span-2 space-y-6">
@@ -99,19 +107,28 @@ export function FeedbackView({ result }: FeedbackViewProps) {
             </CardContent>
         </Card>
         
-        {pronunciationScore !== undefined && pronunciationFeedback && (
+        {(pronunciationScore !== undefined && pronunciationFeedback) || contentScore !== undefined && (
           <Card>
               <CardHeader>
                 <div className="flex items-center gap-3">
                   <Target className="w-8 h-8 text-primary shrink-0" />
                   <div>
-                    <CardTitle className="text-2xl">발음 분석</CardTitle>
-                    <CardDescription>AI가 분석한 발음 정확도와 피드백입니다.</CardDescription>
+                    <CardTitle className="text-2xl">상세 분석</CardTitle>
+                    <CardDescription>AI가 분석한 내용/발음 정확도와 피드백입니다.</CardDescription>
                   </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                  <div className="flex items-center gap-4">
+                  {contentScore !== undefined && (
+                      <div className="w-full">
+                         <div className="flex justify-between mb-1">
+                            <span className="text-base font-medium text-primary">내용 점수</span>
+                            <span className="text-sm font-medium text-primary">{contentScore}%</span>
+                        </div>
+                        <Progress value={contentScore} className="h-2" />
+                      </div>
+                  )}
+                  {pronunciationScore !== undefined && (
                       <div className="w-full">
                          <div className="flex justify-between mb-1">
                             <span className="text-base font-medium text-primary">발음 점수</span>
@@ -119,10 +136,13 @@ export function FeedbackView({ result }: FeedbackViewProps) {
                         </div>
                         <Progress value={pronunciationScore} className="h-2" />
                       </div>
-                  </div>
-                  <div className="p-4 bg-muted/50 rounded-lg whitespace-pre-wrap font-body text-base leading-relaxed">
-                    {pronunciationFeedback}
-                  </div>
+                  )}
+                  {pronunciationFeedback && (
+                      <div className="p-4 bg-muted/50 rounded-lg whitespace-pre-wrap font-body text-base leading-relaxed">
+                        <h4 className="font-semibold mb-2">발음 피드백</h4>
+                        {pronunciationFeedback}
+                      </div>
+                  )}
               </CardContent>
           </Card>
         )}
@@ -132,7 +152,7 @@ export function FeedbackView({ result }: FeedbackViewProps) {
               <div className="flex items-center gap-3">
                 <MessageSquareQuote className="w-8 h-8 text-primary shrink-0" />
                 <div>
-                  <CardTitle className="text-2xl">"{assessmentTitle}"에 대한 AI 영어 회화 평가 피드백</CardTitle>
+                  <CardTitle className="text-2xl">AI 종합 피드백</CardTitle>
                   <CardDescription>AI가 생성한 성과 분석입니다.</CardDescription>
                 </div>
               </div>
@@ -156,26 +176,43 @@ export function FeedbackView({ result }: FeedbackViewProps) {
         </Card>
       </div>
       
-      <Card>
-        <CardHeader>
-          <CardTitle>교사에게 보내는 피드백</CardTitle>
-          <CardDescription>이 평가 활동에 대해 어떻게 생각하는지 교사에게 알려주세요.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Textarea 
-            placeholder="예: 주제는 흥미로웠지만 시간이 좀 짧았습니다."
-            value={teacherFeedback}
-            onChange={(e) => setTeacherFeedback(e.target.value)}
-            rows={6}
-          />
-        </CardContent>
-        <CardFooter>
-          <Button className="w-full" onClick={handleSubmitFeedback} disabled={isSubmitting}>
-            {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-            {isSubmitting ? "제출 중..." : "피드백 보내기"}
-          </Button>
-        </CardFooter>
-      </Card>
+      <div className="lg:col-span-1 space-y-6">
+        {isLatestAttempt && (
+             <Card>
+                <CardHeader>
+                  <CardTitle>다시 해보기</CardTitle>
+                  <CardDescription>이 평가에 다시 도전하여 실력을 향상시켜 보세요.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Link href={retryLink} passHref>
+                    <Button className="w-full">
+                      <Repeat className="mr-2 h-4 w-4" /> 다시 해보기
+                    </Button>
+                  </Link>
+                </CardContent>
+              </Card>
+        )}
+        <Card>
+          <CardHeader>
+            <CardTitle>교사에게 보내는 피드백</CardTitle>
+            <CardDescription>이 평가 활동에 대해 어떻게 생각하는지 교사에게 알려주세요.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Textarea 
+              placeholder="예: 주제는 흥미로웠지만 시간이 좀 짧았습니다."
+              value={teacherFeedback}
+              onChange={(e) => setTeacherFeedback(e.target.value)}
+              rows={6}
+            />
+          </CardContent>
+          <CardFooter>
+            <Button className="w-full" onClick={handleSubmitFeedback} disabled={isSubmitting}>
+              {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+              {isSubmitting ? "제출 중..." : "피드백 보내기"}
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
     </div>
   )
 }

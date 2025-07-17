@@ -1,256 +1,218 @@
 
 "use client"
 
-import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { Loader2, AlertTriangle, UploadCloud, AudioLines, FileScan, Sparkles, CheckCircle2 } from "lucide-react";
-import { generateDialogueAnalysis } from "@/ai/flows/generate-dialogue-analysis-flow";
-import { type StudentResult, type TeacherAssessment, type ConversationTurn, type ResultStatus } from "@/lib/types";
-import { useToast } from "@/hooks/use-toast";
-import { FeedbackView } from "../../../assessment/[id]/results/feedback-view";
-import { useAuth } from "@/context/auth-context";
-import { db } from "@/lib/firebase";
-import { collection, doc, query, where, getDocs, setDoc, updateDoc, serverTimestamp, writeBatch } from "firebase/firestore";
-import { Card, CardHeader, CardContent, CardDescription, CardTitle } from "@/components/ui/card";
+import { useState } from "react"
+import Link from "next/link"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Textarea } from "@/components/ui/textarea"
+import { useToast } from "@/hooks/use-toast"
+import { Send, ThumbsUp, ThumbsDown, MessageSquareQuote, Loader2, FileText, Target, Repeat } from "lucide-react"
+import { summarizeStudentFeedback } from "@/ai/flows/summarize-student-feedback"
+import { type StudentResult, type TeacherAssessment } from "@/lib/types"
+import { Progress } from "@/components/ui/progress"
+import { db } from "@/lib/firebase"
+import { doc, updateDoc } from "firebase/firestore"
 
-const SESSION_STORAGE_KEY = 'freeTalkSessionData';
-
-type StoredSessionData = {
-    studentRecordingUrl: string;
-    conversationHistory: ConversationTurn[];
-    assessment: TeacherAssessment;
+type FeedbackViewProps = {
+  result: StudentResult
+  assessment: TeacherAssessment
+  isLatestAttempt: boolean
 }
 
-type AnalysisStep = "upload" | "analyze" | "report";
-const analysisSteps: { key: AnalysisStep, text: string, icon: React.FC<any> }[] = [
-    { key: "upload", text: "대화 내용 업로드", icon: UploadCloud },
-    { key: "analyze", text: "내용 및 발음 분석", icon: FileScan },
-    { key: "report", text: "피드백 리포트 생성", icon: Sparkles },
-];
+export function FreeTalkFeedbackView({ result, assessment, isLatestAttempt }: FeedbackViewProps) {
+  const [teacherFeedback, setTeacherFeedback] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [satisfaction, setSatisfaction] = useState<"good" | "bad" | null>(null);
+  const { toast } = useToast()
 
+  const {
+    id: resultId,
+    assessmentTitle,
+    aiFeedback,
+    studentTranscript,
+    studentRecordingUrl,
+    pronunciationScore,
+    pronunciationFeedback,
+    contentScore
+  } = result;
 
-function AnalysisProgressView({ currentStep }: { currentStep: AnalysisStep | null }) {
-    const getCurrentStepIndex = () => {
-        if (!currentStep) return -1;
-        return analysisSteps.findIndex(step => step.key === currentStep);
+  const handleSubmitFeedback = async () => {
+    if (!teacherFeedback.trim()) {
+      toast({
+        title: "피드백이 비어있습니다",
+        description: "제출하기 전에 피드백을 작성해주세요.",
+        variant: "destructive"
+      })
+      return
     }
-    const currentStepIndex = getCurrentStepIndex();
+    setIsSubmitting(true)
+    toast({ title: "피드백을 요약하여 제출하는 중..." })
+    
+    try {
+      const { summary } = await summarizeStudentFeedback({ feedbackText: teacherFeedback });
 
-    return (
-        <Card className="w-full max-w-lg">
+      const resultRef = doc(db, "results", resultId);
+      await updateDoc(resultRef, {
+        studentFeedbackSummary: summary
+      });
+      
+      toast({
+        title: "피드백이 제출되었습니다!",
+        description: "개선에 도움을 주셔서 감사합니다."
+      })
+      setTeacherFeedback("");
+      // Optimistically update local state if needed, though a re-fetch would be more robust
+      result.studentFeedbackSummary = summary;
+    } catch(error) {
+        console.error("Error submitting feedback:", error);
+        toast({
+            title: "오류",
+            description: "피드백을 제출하는 중 문제가 발생했습니다.",
+            variant: "destructive"
+        })
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  const retryLink = assessment.assessmentType === 'dialogue'
+    ? `/student/assessment/free-talk?id=${assessment.id}`
+    : `/student/assessment/${assessment.id}`;
+
+  return (
+    <div className="grid gap-6 lg:grid-cols-3">
+      <div className="lg:col-span-2 space-y-6">
+        <Card>
             <CardHeader>
-                <CardTitle>AI 분석 진행 중</CardTitle>
-                <CardDescription>대화 내용을 분석하고 있습니다. 이 과정은 최대 1-2분 소요될 수 있습니다.</CardDescription>
+              <div className="flex items-center gap-3">
+                <FileText className="w-8 h-8 text-primary shrink-0" />
+                <div>
+                  <CardTitle className="text-2xl">내 답변</CardTitle>
+                  <CardDescription>음성인식으로 변환된 나의 답변과 녹음 파일입니다.</CardDescription>
+                </div>
+              </div>
             </CardHeader>
-            <CardContent>
-                <ul className="space-y-4">
-                    {analysisSteps.map((step, index) => {
-                        const isCompleted = index < currentStepIndex;
-                        const isCurrent = index === currentStepIndex;
-                        
-                        return (
-                            <li key={step.key} className="flex items-center gap-4">
-                                <div className="flex-shrink-0">
-                                    {isCompleted ? (
-                                        <CheckCircle2 className="h-6 w-6 text-green-500" />
-                                    ) : isCurrent ? (
-                                        <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                                    ) : (
-                                        <step.icon className="h-6 w-6 text-muted-foreground" />
-                                    )}
-                                </div>
-                                <span className={`font-medium ${isCompleted ? 'text-green-600' : isCurrent ? 'text-primary' : 'text-muted-foreground'}`}>
-                                    {step.text}
-                                </span>
-                            </li>
-                        );
-                    })}
-                </ul>
+            <CardContent className="space-y-4">
+                {studentRecordingUrl && (
+                    <div>
+                        <audio controls src={studentRecordingUrl} className="w-full">
+                            Your browser does not support the audio element.
+                        </audio>
+                    </div>
+                )}
+                <div className="p-4 bg-muted/50 rounded-lg whitespace-pre-wrap font-mono text-sm leading-relaxed italic max-h-60 overflow-y-auto">
+                    "{studentTranscript}"
+                </div>
             </CardContent>
         </Card>
-    );
-}
-
-export function FreeTalkFeedbackView() {
-    const { user, loading: authLoading } = useAuth();
-    const [isLoading, setIsLoading] = useState(true);
-    const [result, setResult] = useState<StudentResult | null>(null);
-    const [status, setStatus] = useState<ResultStatus>("분석 중");
-    const [analysisStep, setAnalysisStep] = useState<AnalysisStep | null>(null);
-    const [error, setError] = useState<string | null>(null);
-    const [assessmentIdOnError, setAssessmentIdOnError] = useState<string | null>(null);
-
-    const router = useRouter();
-    const { toast } = useToast();
-
-    const generateFeedback = useCallback(async (sessionData: StoredSessionData) => {
-        if (!user) return;
-        setIsLoading(true);
-        let newResultRef: any; 
-
-        try {
-            const { assessment, studentRecordingUrl, conversationHistory } = sessionData;
-            setAssessmentIdOnError(assessment.id);
-            
-            // For practice sessions, we don't save to DB.
-            if (assessment.id === 'free-talk-practice') {
-                toast({ title: "연습 모드에서는 결과가 저장되지 않습니다." });
-                // We could show a temporary result here if needed, then route away.
-                // For now, let's just route to dashboard.
-                router.push('/student/dashboard');
-                return;
-            }
-            
-            setAnalysisStep("upload"); // Logical step
-            
-            const fullConversationTranscript = conversationHistory
-                .map(turn => `${turn.role === 'user' ? '학생' : 'AI'}: ${turn.text}`)
-                .join('\n');
-            const studentOnlyTranscript = conversationHistory
-                .filter(turn => turn.role === 'user')
-                .map(turn => turn.text)
-                .join(' ');
-            
-            const initialData: Partial<StudentResult> = {
-                studentId: user.uid,
-                assessmentId: assessment.id,
-                assessmentTitle: assessment.title,
-                teacherUid: assessment.uid,
-                name: user.displayName || "Student",
-                avatarUrl: user.photoURL || '',
-                createdAt: Date.now(),
-                date: new Date().toISOString(),
-                status: "분석 중",
-                studentRecordingUrl: studentRecordingUrl,
-                studentTranscript: fullConversationTranscript, // Save full transcript initially
-            };
-            
-            // Check for existing result and create/update accordingly
-            const resultsQuery = query(collection(db, "results"), where("assessmentId", "==", assessment.id), where("studentId", "==", user.uid));
-            const existingDocs = await getDocs(resultsQuery);
-
-            const batch = writeBatch(db);
-            if (!existingDocs.empty) {
-                // Delete old results for this assessment by this student
-                existingDocs.forEach(doc => batch.delete(doc.ref));
-            }
-            newResultRef = doc(collection(db, "results"));
-            batch.set(newResultRef, initialData);
-            await batch.commit();
-
-            setAnalysisStep("analyze");
-            const analysisResult = await generateDialogueAnalysis({
-                studentRecordingUrl: studentRecordingUrl,
-                studentTranscript: studentOnlyTranscript,
-                fullConversationTranscript: fullConversationTranscript,
-                activityPrompt: assessment.prompt,
-                expectedFormat: assessment.expectedFormat || "AI와의 자연스러운 대화 능력을 평가합니다.",
-                studentName: user.displayName || "Student",
-                assessmentTitle: assessment.title.replace(/ - 복사본(\s\d+)?$/, ''),
-                evaluationModel: assessment.evaluationModel,
-            });
-
-            setAnalysisStep("report");
-            const finalResultData: Partial<StudentResult> = {
-                ...analysisResult,
-                studentTranscript: fullConversationTranscript,
-                score: analysisResult.contentScore,
-                status: "채점 완료",
-                studentFeedbackSummary: "학생이 평가에 대해 남긴 피드백이 없습니다.",
-            };
-            await updateDoc(newResultRef, finalResultData);
-            setResult({ id: newResultRef.id, ...initialData, ...finalResultData } as StudentResult);
-            setStatus("채점 완료");
-            
-            const assessmentRef = doc(db, "assessments", assessment.id);
-            const allResultsQuery = query(collection(db, "results"), where("assessmentId", "==", assessment.id), where("status", "==", "채점 완료"));
-            const querySnapshot = await getDocs(allResultsQuery);
-            const scores = querySnapshot.docs.map(d => (d.data() as StudentResult).score || 0);
-            const newSubmissionCount = scores.length;
-            const newAverage = newSubmissionCount > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / newSubmissionCount) : 0;
-            await updateDoc(assessmentRef, { submissionCount: newSubmissionCount, averageScore: newAverage });
-
-        } catch (e: any) {
-            console.error("Error generating feedback:", e);
-            let errorMessage = "AI 분석 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
-            if (e.message && e.message.includes("503") && e.message.includes("overloaded")) {
-                errorMessage = "AI 모델이 과부하 상태입니다. 잠시 후 다시 시도하거나, 교사에게 문의하여 다른 AI 모델로 평가를 변경해달라고 요청할 수 있습니다.";
-            } else {
-                errorMessage = `AI 분석 중 오류가 발생했습니다: ${e.message}`;
-            }
-            setError(errorMessage);
-            setStatus("오류");
-            toast({ title: "피드백 생성 오류", description: errorMessage, variant: "destructive" });
-            if (newResultRef) {
-                await updateDoc(newResultRef, { status: '오류', aiFeedback: errorMessage });
-            }
-        } finally {
-            setIsLoading(false);
-            sessionStorage.removeItem(SESSION_STORAGE_KEY);
-        }
-    }, [user, toast, router]);
-
-    useEffect(() => {
-        if(authLoading) return;
-        if(!user) {
-            router.push('/');
-            return;
-        }
-
-        const storedDataString = sessionStorage.getItem(SESSION_STORAGE_KEY);
-        if (!storedDataString) {
-            toast({
-                title: "오류",
-                description: "분석할 대화 기록을 찾을 수 없습니다. 대시보드로 돌아갑니다.",
-                variant: "destructive"
-            });
-            router.push('/student/dashboard');
-            return;
-        }
-
-        const storedData: StoredSessionData = JSON.parse(storedDataString);
-        generateFeedback(storedData);
         
-    }, [user, authLoading, router, toast, generateFeedback]);
-
-
-    if (isLoading || authLoading) {
-        return (
-            <div className="flex flex-col items-center justify-center text-center p-8 h-96">
-                <AnalysisProgressView currentStep={analysisStep} />
-            </div>
-        );
-    }
-  
-    if (error || status === '오류') {
-      return (
-          <Card className="flex flex-col items-center justify-center text-center p-8 min-h-80 bg-destructive/10 border-destructive">
+        {(pronunciationScore !== undefined && pronunciationFeedback) || contentScore !== undefined && (
+          <Card>
               <CardHeader>
-                  <AlertTriangle className="h-12 w-12 text-destructive mx-auto mb-4" />
-                  <CardTitle className="text-destructive">분석 오류</CardTitle>
-                  <CardDescription className="text-destructive-foreground">{error || "AI가 답변을 분석하는 데 실패했습니다. 다시 시도해주세요."}</CardDescription>
+                <div className="flex items-center gap-3">
+                  <Target className="w-8 h-8 text-primary shrink-0" />
+                  <div>
+                    <CardTitle className="text-2xl">상세 분석</CardTitle>
+                    <CardDescription>AI가 분석한 내용/발음 정확도와 피드백입니다.</CardDescription>
+                  </div>
+                </div>
               </CardHeader>
-              <CardContent>
-                <Button onClick={() => router.push(`/student/assessment/free-talk?id=${assessmentIdOnError}`)}>
-                    대화로 돌아가기
-                </Button>
+              <CardContent className="space-y-4">
+                  {contentScore !== undefined && (
+                      <div className="w-full">
+                         <div className="flex justify-between mb-1">
+                            <span className="text-base font-medium text-primary">내용 점수</span>
+                            <span className="text-sm font-medium text-primary">{contentScore}%</span>
+                        </div>
+                        <Progress value={contentScore} className="h-2" />
+                      </div>
+                  )}
+                  {pronunciationScore !== undefined && (
+                      <div className="w-full">
+                         <div className="flex justify-between mb-1">
+                            <span className="text-base font-medium text-primary">발음 점수</span>
+                            <span className="text-sm font-medium text-primary">{pronunciationScore}%</span>
+                        </div>
+                        <Progress value={pronunciationScore} className="h-2" />
+                      </div>
+                  )}
+                  {pronunciationFeedback && (
+                      <div className="p-4 bg-muted/50 rounded-lg whitespace-pre-wrap font-body text-base leading-relaxed">
+                        <h4 className="font-semibold mb-2">발음 피드백</h4>
+                        {pronunciationFeedback}
+                      </div>
+                  )}
               </CardContent>
           </Card>
-      );
-    }
+        )}
 
-    if (!result) {
-        return <div className="text-center p-8">피드백을 불러오지 못했습니다.</div>;
-    }
-
-
-    return (
-        <div className="space-y-6">
-            <FeedbackView result={result} />
-            <div className="text-center">
-                <Button onClick={() => router.push('/student/dashboard')}>대시보드로 돌아가기</Button>
-            </div>
-        </div>
-    );
+        <Card>
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <MessageSquareQuote className="w-8 h-8 text-primary shrink-0" />
+                <div>
+                  <CardTitle className="text-2xl">AI 종합 피드백</CardTitle>
+                  <CardDescription>AI가 생성한 성과 분석입니다.</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="p-4 bg-muted/50 rounded-lg whitespace-pre-wrap font-body text-base leading-relaxed">
+                {aiFeedback}
+              </div>
+            </CardContent>
+            <CardFooter className="flex-col items-start gap-4">
+                <p className="text-sm font-medium">이 피드백이 도움이 되었나요?</p>
+                <div className="flex gap-2">
+                    <Button variant={satisfaction === 'good' ? 'default' : 'outline'} onClick={() => setSatisfaction('good')}>
+                        <ThumbsUp className="mr-2 h-4 w-4" /> 유용함
+                    </Button>
+                    <Button variant={satisfaction === 'bad' ? 'destructive' : 'outline'} onClick={() => setSatisfaction('bad')}>
+                        <ThumbsDown className="mr-2 h-4 w-4" /> 유용하지 않음
+                    </Button>
+                </div>
+            </CardFooter>
+        </Card>
+      </div>
+      
+      <div className="lg:col-span-1 space-y-6">
+        {isLatestAttempt && (
+             <Card>
+                <CardHeader>
+                  <CardTitle>다시 해보기</CardTitle>
+                  <CardDescription>이 평가에 다시 도전하여 실력을 향상시켜 보세요.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Link href={retryLink} passHref>
+                    <Button className="w-full">
+                      <Repeat className="mr-2 h-4 w-4" /> 다시 해보기
+                    </Button>
+                  </Link>
+                </CardContent>
+              </Card>
+        )}
+        <Card>
+          <CardHeader>
+            <CardTitle>교사에게 보내는 피드백</CardTitle>
+            <CardDescription>이 평가 활동에 대해 어떻게 생각하는지 교사에게 알려주세요.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Textarea 
+              placeholder="예: 주제는 흥미로웠지만 시간이 좀 짧았습니다."
+              value={teacherFeedback}
+              onChange={(e) => setTeacherFeedback(e.target.value)}
+              rows={6}
+            />
+          </CardContent>
+          <CardFooter>
+            <Button className="w-full" onClick={handleSubmitFeedback} disabled={isSubmitting}>
+              {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+              {isSubmitting ? "제출 중..." : "피드백 보내기"}
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
+    </div>
+  )
 }

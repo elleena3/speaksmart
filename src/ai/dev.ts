@@ -26,5 +26,7 @@ import '@/ai/flows/analyze-read-aloud-flow';
 
 // New flow for the Misc page's handwriting analysis tool
 import '@/ai/flows/analyze-handwriting-flow';
-    
 
+// New flow for growth analysis
+import '@/ai/flows/generate-growth-feedback-flow';
+    
