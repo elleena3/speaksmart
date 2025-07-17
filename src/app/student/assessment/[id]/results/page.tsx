@@ -173,7 +173,12 @@ export default function AssessmentResultsPage() {
   useEffect(() => {
     if (authLoading || !user || !id) return;
     
+    // Check for new submission first.
     const sessionData = sessionStorage.getItem(SESSION_STORAGE_KEY);
+    if(sessionData) {
+        processMonologueSubmission();
+        return; // Exit early to let submission process, listener will catch updates.
+    }
     
     const q = query(
         collection(db, "results"),
@@ -184,7 +189,6 @@ export default function AssessmentResultsPage() {
     const unsubscribe = onSnapshot(q, async (snapshot) => {
         const dbResults = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as StudentResult));
         
-        // ** FIX: Sort on client side to avoid composite index **
         dbResults.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
 
         const stillProcessing = dbResults.some(r => r.status !== '채점 완료' && r.status !== '오류');
@@ -203,10 +207,18 @@ export default function AssessmentResultsPage() {
               setStatus("completed");
             } else {
               setStatus("analyzing");
+              // Try to find current step from latest result status
+              const latestStatus = dbResults[dbResults.length-1].status as ResultStatus;
+              if(latestStatus.includes('텍스트')){
+                setAnalysisStep('transcribe')
+              } else if (latestStatus.includes('분석')) {
+                setAnalysisStep('analyze')
+              } else if (latestStatus.includes('리포트')) {
+                setAnalysisStep('report')
+              }
             }
-        } else if (sessionData) {
-            processMonologueSubmission();
         } else {
+            // No results and no session data, must be completed or never started
             setStatus("completed");
         }
     }, (err) => {

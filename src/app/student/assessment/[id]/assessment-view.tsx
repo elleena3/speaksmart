@@ -15,6 +15,8 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
 type RecordingState = "idle" | "countdown" | "recording" | "recorded" | "submitting";
 
 const mimeType = 'audio/webm;codecs=opus';
+const SESSION_STORAGE_KEY = 'monologueSessionData';
+
 
 export function AssessmentView({ assessmentDetails }: { assessmentDetails: TeacherAssessment }) {
   const { user } = useAuth();
@@ -170,12 +172,15 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
 
     try {
         toast({ title: "답변 업로드 중...", description: "파일을 업로드하고 분석 페이지로 이동합니다." });
+        
+        // Remove any previous session data to ensure this new submission is processed
+        sessionStorage.removeItem(SESSION_STORAGE_KEY);
 
         const storageRef = ref(storage, `recordings/${user.uid}_${assessmentDetails.id}_${Date.now()}.webm`);
         const snapshot = await uploadBytes(storageRef, audioBlob);
         const downloadURL = await getDownloadURL(snapshot.ref);
 
-        sessionStorage.setItem('monologueSessionData', JSON.stringify({
+        sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({
             assessmentId: assessmentDetails.id,
             studentRecordingUrl: downloadURL,
             assessmentDetails: assessmentDetails, 
