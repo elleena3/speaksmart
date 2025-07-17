@@ -8,6 +8,7 @@ import { type StudentResult, type ResultStatus, type TeacherAssessment } from "@
 import { useAuth } from "@/context/auth-context";
 import { Loader2, AlertTriangle, CheckCircle2, UploadCloud, AudioLines, FileScan, Sparkles } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { db } from "@/lib/firebase";
 import { collection, query, where, onSnapshot, doc, setDoc, updateDoc, getDocs, serverTimestamp } from "firebase/firestore";
 import { generateMonologueAnalysis } from "@/ai/flows/generate-monologue-analysis-flow";
@@ -151,11 +152,17 @@ export default function AssessmentResultsPage() {
 
     } catch (e: any) {
       console.error("Error generating analysis:", e);
-      setError("AI 분석 중 오류가 발생했습니다: " + e.message);
+      let errorMessage = "AI 분석 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
+      if (e.message && e.message.includes("503") && e.message.includes("overloaded")) {
+          errorMessage = "AI 모델이 과부하 상태입니다. 잠시 후 다시 시도하거나, 교사에게 문의하여 다른 AI 모델로 평가를 변경해달라고 요청할 수 있습니다.";
+      } else {
+          errorMessage = `AI 분석 중 오류가 발생했습니다: ${e.message}`;
+      }
+      setError(errorMessage);
       setStatus("오류");
       await updateDoc(newResultRef, { 
           status: '오류', 
-          aiFeedback: `AI 분석 중 오류가 발생했습니다: ${e.message}` 
+          aiFeedback: errorMessage
       });
     } finally {
         sessionStorage.removeItem(SESSION_STORAGE_KEY);
@@ -215,12 +222,17 @@ export default function AssessmentResultsPage() {
   
   if (error || status === '오류') {
     return (
-        <Card className="flex flex-col items-center justify-center text-center p-8 h-80 bg-destructive/10 border-destructive">
+        <Card className="flex flex-col items-center justify-center text-center p-8 min-h-80 bg-destructive/10 border-destructive">
             <CardHeader>
                 <AlertTriangle className="h-12 w-12 text-destructive mx-auto mb-4" />
                 <CardTitle className="text-destructive">분석 오류</CardTitle>
                 <CardDescription className="text-destructive-foreground">{error || result?.aiFeedback || "AI가 답변을 분석하는 데 실패했습니다. 다시 시도해주세요."}</CardDescription>
             </CardHeader>
+            <CardContent>
+                <Button onClick={() => router.push(`/student/assessment/${id}`)}>
+                    평가로 돌아가기
+                </Button>
+            </CardContent>
         </Card>
     );
   }

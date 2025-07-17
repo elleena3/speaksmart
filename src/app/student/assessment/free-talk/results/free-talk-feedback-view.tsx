@@ -79,6 +79,7 @@ export function FreeTalkFeedbackView() {
     const [status, setStatus] = useState<ResultStatus>("분석 중");
     const [analysisStep, setAnalysisStep] = useState<AnalysisStep | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [assessmentIdOnError, setAssessmentIdOnError] = useState<string | null>(null);
 
     const router = useRouter();
     const { toast } = useToast();
@@ -90,6 +91,7 @@ export function FreeTalkFeedbackView() {
 
         try {
             const { assessment, studentRecordingUrl, conversationHistory } = sessionData;
+            setAssessmentIdOnError(assessment.id);
             
             // For practice sessions, we don't save to DB.
             if (assessment.id === 'free-talk-practice') {
@@ -171,11 +173,17 @@ export function FreeTalkFeedbackView() {
 
         } catch (e: any) {
             console.error("Error generating feedback:", e);
-            setError("AI 분석 중 오류가 발생했습니다: " + e.message);
+            let errorMessage = "AI 분석 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
+            if (e.message && e.message.includes("503") && e.message.includes("overloaded")) {
+                errorMessage = "AI 모델이 과부하 상태입니다. 잠시 후 다시 시도하거나, 교사에게 문의하여 다른 AI 모델로 평가를 변경해달라고 요청할 수 있습니다.";
+            } else {
+                errorMessage = `AI 분석 중 오류가 발생했습니다: ${e.message}`;
+            }
+            setError(errorMessage);
             setStatus("오류");
-            toast({ title: "피드백 생성 오류", description: "피드백을 생성하는 중 오류가 발생했습니다.", variant: "destructive" });
+            toast({ title: "피드백 생성 오류", description: errorMessage, variant: "destructive" });
             if (newResultRef) {
-                await updateDoc(newResultRef, { status: '오류', aiFeedback: `AI 분석 중 오류가 발생했습니다: ${e.message}` });
+                await updateDoc(newResultRef, { status: '오류', aiFeedback: errorMessage });
             }
         } finally {
             setIsLoading(false);
@@ -217,12 +225,17 @@ export function FreeTalkFeedbackView() {
   
     if (error || status === '오류') {
       return (
-          <Card className="flex flex-col items-center justify-center text-center p-8 h-80 bg-destructive/10 border-destructive">
+          <Card className="flex flex-col items-center justify-center text-center p-8 min-h-80 bg-destructive/10 border-destructive">
               <CardHeader>
                   <AlertTriangle className="h-12 w-12 text-destructive mx-auto mb-4" />
                   <CardTitle className="text-destructive">분석 오류</CardTitle>
                   <CardDescription className="text-destructive-foreground">{error || "AI가 답변을 분석하는 데 실패했습니다. 다시 시도해주세요."}</CardDescription>
               </CardHeader>
+              <CardContent>
+                <Button onClick={() => router.push(`/student/assessment/free-talk?id=${assessmentIdOnError}`)}>
+                    대화로 돌아가기
+                </Button>
+              </CardContent>
           </Card>
       );
     }
