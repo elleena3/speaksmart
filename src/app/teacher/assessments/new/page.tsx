@@ -269,7 +269,7 @@ export default function NewAssessmentPage() {
                           <SelectValue placeholder={t.teacherAssessmentForm.voicePlaceholder} />
                         </SelectTrigger>
                       </FormControl>
-                      <SelectContent>
+                      <SelectContent position="popper">
                         <SelectGroup>
                           <SelectLabel>{t.teacherAssessmentForm.voices.female}</SelectLabel>
                           {femaleVoices.map(voice => (
