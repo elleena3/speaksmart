@@ -11,7 +11,7 @@ import { Loader2, AlertTriangle, CheckCircle2, UploadCloud, AudioLines, FileScan
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { db } from "@/lib/firebase";
-import { collection, query, where, onSnapshot, doc, setDoc, updateDoc, getDocs, getDoc, serverTimestamp, writeBatch, orderBy } from "firebase/firestore";
+import { collection, query, where, onSnapshot, doc, setDoc, updateDoc, getDocs, getDoc, writeBatch } from "firebase/firestore";
 import { generateDialogueAnalysis } from "@/ai/flows/generate-dialogue-analysis-flow";
 import { useToast } from "@/hooks/use-toast";
 
@@ -186,12 +186,15 @@ export default function FreeTalkResultsPage() {
         const q = query(
             collection(db, "results"),
             where("assessmentId", "==", assessmentId),
-            where("studentId", "==", user.uid),
-            orderBy("createdAt", "asc")
+            where("studentId", "==", user.uid)
         );
         
         const unsubscribe = onSnapshot(q, async (snapshot) => {
             const dbResults = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as StudentResult));
+            
+            // ** FIX: Sort on client side to avoid composite index **
+            dbResults.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+
             const stillProcessing = dbResults.some(r => r.status !== '채점 완료' && r.status !== '오류');
             
             if (dbResults.length > 0) {
