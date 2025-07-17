@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useRouter } from "next/navigation";
@@ -11,7 +12,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, CalendarIcon } from "lucide-react";
+import { Loader2, CalendarIcon, ChevronsUpDown, Check } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -19,9 +20,9 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { useLanguage } from "@/context/language-context";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { scenarios, type TeacherAssessment, femaleVoices, maleVoices, allVoices, evaluationModels, voiceDescriptions } from "@/lib/types";
+import { scenarios, type TeacherAssessment, femaleVoices, maleVoices, allVoices, evaluationModels, voiceDescriptions, type AiVoice } from "@/lib/types";
 import { useAuth, mockStudents } from "@/context/auth-context";
 import { addDoc, collection } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -32,6 +33,7 @@ export default function NewAssessmentPage() {
   const { toast } = useToast();
   const { t, language } = useLanguage();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [voicePopoverOpen, setVoicePopoverOpen] = useState(false);
   
   const formSchema = useMemo(() => z.object({
     title: z.string().optional(),
@@ -261,33 +263,76 @@ export default function NewAssessmentPage() {
                 control={form.control}
                 name="aiVoice"
                 render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="flex flex-col">
                     <FormLabel>{t.teacherAssessmentForm.voiceLabel}</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder={t.teacherAssessmentForm.voicePlaceholder} />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent position="popper">
-                        <SelectGroup>
-                          <SelectLabel>{t.teacherAssessmentForm.voices.female}</SelectLabel>
-                          {femaleVoices.map(voice => (
-                            <SelectItem key={voice} value={voice}>
-                              {voice} <span className="text-muted-foreground ml-2">({voiceDescriptions[voice]})</span>
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                        <SelectGroup>
-                          <SelectLabel>{t.teacherAssessmentForm.voices.male}</SelectLabel>
-                           {maleVoices.map(voice => (
-                            <SelectItem key={voice} value={voice}>
-                              {voice} <span className="text-muted-foreground ml-2">({voiceDescriptions[voice]})</span>
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
+                    <Popover open={voicePopoverOpen} onOpenChange={setVoicePopoverOpen}>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            className={cn("w-full justify-between", !field.value && "text-muted-foreground")}
+                          >
+                            {field.value
+                              ? `${field.value} (${voiceDescriptions[field.value as AiVoice]})`
+                              : t.teacherAssessmentForm.voicePlaceholder}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[450px] p-0" align="start">
+                        <div className="grid grid-cols-2 gap-2 p-2">
+                            <div>
+                                <p className="px-2 py-1.5 text-sm font-semibold">{t.teacherAssessmentForm.voices.female}</p>
+                                <div className="flex flex-col space-y-1">
+                                {femaleVoices.map((voice) => (
+                                    <Button
+                                        key={voice}
+                                        variant="ghost"
+                                        className="w-full justify-start text-left h-auto"
+                                        onClick={() => {
+                                            form.setValue("aiVoice", voice);
+                                            setVoicePopoverOpen(false);
+                                        }}
+                                    >
+                                        <div className="flex items-center">
+                                            <Check className={cn("mr-2 h-4 w-4", field.value === voice ? "opacity-100" : "opacity-0")} />
+                                            <div>
+                                                <p className="font-medium">{voice}</p>
+                                                <p className="text-xs text-muted-foreground">{voiceDescriptions[voice]}</p>
+                                            </div>
+                                        </div>
+                                    </Button>
+                                ))}
+                                </div>
+                            </div>
+                            <div>
+                               <p className="px-2 py-1.5 text-sm font-semibold">{t.teacherAssessmentForm.voices.male}</p>
+                               <div className="flex flex-col space-y-1">
+                                {maleVoices.map((voice) => (
+                                    <Button
+                                        key={voice}
+                                        variant="ghost"
+                                        className="w-full justify-start text-left h-auto"
+                                        onClick={() => {
+                                            form.setValue("aiVoice", voice);
+                                            setVoicePopoverOpen(false);
+                                        }}
+                                    >
+                                        <div className="flex items-center">
+                                             <Check className={cn("mr-2 h-4 w-4", field.value === voice ? "opacity-100" : "opacity-0")} />
+                                             <div>
+                                                <p className="font-medium">{voice}</p>
+                                                <p className="text-xs text-muted-foreground">{voiceDescriptions[voice]}</p>
+                                            </div>
+                                        </div>
+                                    </Button>
+                                ))}
+                                </div>
+                            </div>
+                        </div>
+                      </PopoverContent>
+                    </Popover>
                     <FormDescription>{t.teacherAssessmentForm.voiceDescription}</FormDescription>
                     <FormMessage />
                   </FormItem>
