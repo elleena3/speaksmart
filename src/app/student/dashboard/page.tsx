@@ -68,8 +68,8 @@ function AssessmentCard({ assessment, t }: { assessment: CombinedAssessment, t: 
     <Card className="flex flex-col hover:shadow-md transition-shadow">
       <CardHeader>
         <div className="flex justify-between items-start">
-          <CardTitle className="text-xl">{assessment.title}</CardTitle>
-          <Badge variant={getBadgeVariant()}>
+          <CardTitle className="text-xl break-keep">{assessment.title}</CardTitle>
+          <Badge variant={getBadgeVariant()} className="whitespace-nowrap">
             {getStatusText()}
           </Badge>
         </div>
