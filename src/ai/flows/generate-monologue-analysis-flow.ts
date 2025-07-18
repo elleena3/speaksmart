@@ -20,6 +20,28 @@ import {
 } from '@/lib/types/ai-schemas';
 import { evaluationModels } from '@/lib/types';
 
+// Helper function for retrying API calls on overload
+async function withRetry<T>(fn: () => Promise<T>, retries = 2, delay = 1500): Promise<T> {
+  let lastError: any;
+  for (let i = 0; i <= retries; i++) {
+    try {
+      return await fn();
+    } catch (error: any) {
+      lastError = error;
+      if (error.message && (error.message.includes('overloaded') || error.message.includes('503'))) {
+        console.warn(`Attempt ${i + 1} failed due to model overload. Retrying in ${delay}ms...`);
+        if (i < retries) {
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      } else {
+        // Not a retryable error, throw immediately
+        throw error;
+      }
+    }
+  }
+  throw lastError;
+}
+
 /**
  * Main exported function to be called by the client for monologue analysis.
  */
@@ -101,8 +123,8 @@ const generateMonologueAnalysisFlow = ai.defineFlow(
     const model = input.evaluationModel || 'gemini-2.5-flash';
     const prompts = createPrompt(model);
 
-    // Step 1: Transcribe the audio.
-    const transcriptionResult = await prompts.transcription({ studentRecordingUrl: input.studentRecordingUrl });
+    // Step 1: Transcribe the audio with retry logic.
+    const transcriptionResult = await withRetry(() => prompts.transcription({ studentRecordingUrl: input.studentRecordingUrl }));
     const studentTranscript = transcriptionResult.text;
 
     if (!studentTranscript || studentTranscript.trim() === "" || studentTranscript.includes('기록되지 않았습니다') || studentTranscript.includes('인식하지 못했습니다')) {
@@ -117,19 +139,19 @@ const generateMonologueAnalysisFlow = ai.defineFlow(
         }
     }
     
-    // Step 2: Run content and pronunciation analysis in PARALLEL.
+    // Step 2: Run content and pronunciation analysis in PARALLEL with retry logic.
     const [contentResult, pronunciationResult] = await Promise.all([
-      prompts.content({
+      withRetry(() => prompts.content({
         studentTranscript,
         activityPrompt: input.activityPrompt,
         expectedFormat: input.expectedFormat,
         studentName: input.studentName,
         assessmentTitle: input.assessmentTitle,
-      }),
-      prompts.pronunciation({
+      })),
+      withRetry(() => prompts.pronunciation({
         studentRecordingUrl: input.studentRecordingUrl,
         studentTranscript,
-      })
+      }))
     ]);
 
     const contentOutput = contentResult.output;

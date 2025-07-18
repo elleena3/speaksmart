@@ -20,6 +20,28 @@ import {
 } from '@/lib/types/ai-schemas';
 import { evaluationModels } from '@/lib/types';
 
+// Helper function for retrying API calls on overload
+async function withRetry<T>(fn: () => Promise<T>, retries = 2, delay = 1500): Promise<T> {
+  let lastError: any;
+  for (let i = 0; i <= retries; i++) {
+    try {
+      return await fn();
+    } catch (error: any) {
+      lastError = error;
+      if (error.message && (error.message.includes('overloaded') || error.message.includes('503'))) {
+        console.warn(`Attempt ${i + 1} failed due to model overload. Retrying in ${delay}ms...`);
+        if (i < retries) {
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      } else {
+        // Not a retryable error, throw immediately
+        throw error;
+      }
+    }
+  }
+  throw lastError;
+}
+
 /**
  * Main exported function to be called by the client for dialogue analysis.
  */
@@ -105,19 +127,19 @@ const generateDialogueAnalysisFlow = ai.defineFlow(
         }
     }
     
-    // Step 1: Run content and pronunciation analysis in PARALLEL.
+    // Step 1: Run content and pronunciation analysis in PARALLEL with retry logic.
     const [contentResult, pronunciationResult] = await Promise.all([
-      prompts.content({
+      withRetry(() => prompts.content({
         fullConversationTranscript: input.fullConversationTranscript,
         activityPrompt: input.activityPrompt,
         expectedFormat: input.expectedFormat,
         studentName: input.studentName,
         assessmentTitle: input.assessmentTitle,
-      }),
-      prompts.pronunciation({
+      })),
+      withRetry(() => prompts.pronunciation({
         studentRecordingUrl: input.studentRecordingUrl,
         studentTranscript: input.studentTranscript, // Use student-only transcript for pronunciation
-      })
+      }))
     ]);
 
     const contentOutput = contentResult.output;

@@ -20,6 +20,29 @@ import {
 import wav from 'wav';
 import { evaluationModels } from '@/lib/types';
 
+// Helper function for retrying API calls on overload
+async function withRetry<T>(fn: () => Promise<T>, retries = 2, delay = 1500): Promise<T> {
+  let lastError: any;
+  for (let i = 0; i <= retries; i++) {
+    try {
+      return await fn();
+    } catch (error: any) {
+      lastError = error;
+      if (error.message && (error.message.includes('overloaded') || error.message.includes('503'))) {
+        console.warn(`Attempt ${i + 1} failed due to model overload. Retrying in ${delay}ms...`);
+        if (i < retries) {
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      } else {
+        // Not a retryable error, throw immediately
+        throw error;
+      }
+    }
+  }
+  throw lastError;
+}
+
+
 export async function converseWithStudent(
   input: ConverseWithStudentInput
 ): Promise<ConverseWithStudentOutput> {
@@ -110,7 +133,7 @@ async function toWav(
 
 // Function to convert text to speech
 async function textToSpeech(text: string, voiceName: string = 'achernar'): Promise<string> {
-    const ttsResponse = await ai.generate({
+    const ttsResponse = await withRetry(() => ai.generate({
         model: googleAI.model('gemini-2.5-flash-preview-tts'),
         config: {
             responseModalities: ['AUDIO'],
@@ -121,7 +144,7 @@ async function textToSpeech(text: string, voiceName: string = 'achernar'): Promi
             },
         },
         prompt: text,
-    });
+    }));
 
     const audioMedia = ttsResponse.media;
     if (!audioMedia) {
@@ -153,13 +176,13 @@ const converseWithStudentFlow = ai.defineFlow(
 
     // Step 1: Transcribe student's audio if it exists.
     if (studentRecordingDataUri) {
-      const sttResponse = await ai.generate({
+      const sttResponse = await withRetry(() => ai.generate({
         model: googleAI.model(model),
         prompt: [
           { text: 'Transcribe this English audio.' },
           { media: { url: studentRecordingDataUri } },
         ],
-      });
+      }));
       studentTranscript = sttResponse.text;
       if (!studentTranscript?.trim()) {
           console.warn("Transcription result was empty.");
@@ -174,14 +197,14 @@ const converseWithStudentFlow = ai.defineFlow(
     }));
 
     // Step 2: Generate AI's text response based on transcript and history
-    const { output } = await conversationalPrompt({
+    const { output } = await withRetry(() => conversationalPrompt({
       history: historyForPrompt,
       studentTranscript: studentTranscript || undefined, 
       scenario: scenario || 'free-talk',
       scenarioPrompt: scenarioPrompt,
       conversationHistory: conversationHistory,
       aiVoice: aiVoice || 'achernar',
-    });
+    }));
 
     aiResponseText = output?.aiResponseText || "";
 

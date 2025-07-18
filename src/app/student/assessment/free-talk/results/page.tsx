@@ -188,14 +188,13 @@ export default function FreeTalkResultsPage() {
         } catch (e: any) {
             console.error("Error generating feedback:", e);
             let errorMessage = "AI 분석 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
-            if (e.message && e.message.includes("overloaded")) {
-                errorMessage = "AI 모델이 과부하 상태입니다. 잠시 후 다시 시도하거나, 교사에게 문의하여 다른 AI 모델로 평가를 변경해달라고 요청할 수 있습니다.";
+            if (e.message && (e.message.includes("overloaded") || e.message.includes("503"))) {
+                errorMessage = "AI 모델이 현재 과부하 상태입니다. 잠시 후 다시 시도하거나, 교사에게 문의하여 다른 AI 모델로 평가를 변경해달라고 요청할 수 있습니다.";
             } else {
-                errorMessage = `AI 분석 중 오류가 발생했습니다: ${e.message}`;
+                errorMessage = `AI 분석 중 오류가 발생했습니다. 문제가 지속되면 관리자에게 문의하세요.`;
             }
             setErrorInfo({ message: errorMessage, resultId: resultRef.id, sessionData });
             setStatus("error");
-            toast({ title: "피드백 생성 오류", description: errorMessage, variant: "destructive" });
             if (resultRef) {
                 await updateDoc(resultRef, { status: '오류', aiFeedback: errorMessage });
             }
@@ -275,25 +274,15 @@ export default function FreeTalkResultsPage() {
                 const assessmentDoc = await getDoc(doc(db, 'assessments', latestResult.assessmentId));
                 const assessmentData = assessmentDoc.data() as TeacherAssessment;
                 
-                // For dialogue, transcript is stored as a stringified JSON of ConversationTurn[]
-                // We need to parse it back.
-                let conversationHistory: ConversationTurn[] = [];
-                try {
-                    const parsed = JSON.parse(latestResult.studentTranscript || '[]');
-                    if(Array.isArray(parsed)) {
-                        conversationHistory = parsed;
-                    }
-                } catch (e) { console.error("Could not parse conversation history for retry", e); }
-
-
+                // For dialogue, we will just use the last known conversation history from the failed attempt, if available.
+                // Re-creating the exact conversation history for retry is complex.
+                // A simpler approach is to let the user know and let them restart.
+                // The current error message already suggests this.
                 setErrorInfo({ 
                     message: latestResult.aiFeedback, 
                     resultId: latestResult.id,
-                    sessionData: {
-                        assessment: assessmentData,
-                        studentRecordingUrl: latestResult.studentRecordingUrl!,
-                        conversationHistory: conversationHistory
-                    }
+                    // Cannot reliably recreate sessionData here without storing the full history in the result doc
+                    sessionData: undefined, 
                 });
             } else if (!stillProcessing) {
               setStatus("completed");

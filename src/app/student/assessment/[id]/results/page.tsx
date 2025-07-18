@@ -188,10 +188,10 @@ export default function AssessmentResultsPage() {
     } catch (e: any) {
       console.error("Error generating analysis:", e);
       let errorMessage = "AI 분석 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
-      if (e.message && e.message.includes("overloaded")) {
+      if (e.message && (e.message.includes("overloaded") || e.message.includes("503"))) {
           errorMessage = "AI 모델이 과부하 상태입니다. 잠시 후 다시 시도하거나, 교사에게 문의하여 다른 AI 모델로 평가를 변경해달라고 요청할 수 있습니다.";
       } else {
-          errorMessage = `AI 분석 중 오류가 발생했습니다: ${e.message}`;
+          errorMessage = `AI 분석 중 오류가 발생했습니다. 문제가 지속되면 관리자에게 문의하세요.`;
       }
       setErrorInfo({ message: errorMessage, resultId: resultRef.id, sessionData });
       setStatus("error");
