@@ -34,8 +34,8 @@ export const translations = {
         assessment: "평가",
         completionDate: "완료 날짜",
         score: "점수",
-        action: "작업",
-        viewFeedback: "피드백 보기",
+        action: "결과 보기",
+        viewFeedback: "결과 보기",
     },
     studentProfile: {
         title: "내 프로필",
@@ -243,8 +243,8 @@ export const translations = {
         assessment: "Assessment",
         completionDate: "Completion Date",
         score: "Score",
-        action: "Action",
-        viewFeedback: "View Feedback",
+        action: "View Result",
+        viewFeedback: "View Result",
     },
     studentProfile: {
         title: "My Profile",

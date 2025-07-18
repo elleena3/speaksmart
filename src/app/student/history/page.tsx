@@ -150,12 +150,12 @@ export default function HistoryPage() {
         <Table>
             <TableHeader>
                 <TableRow>
-                    <TableHead>{t.studentHistory.assessment}</TableHead>
-                    <TableHead>평가 유형</TableHead>
-                    <TableHead>{t.studentHistory.completionDate}</TableHead>
-                    <TableHead>내용 점수</TableHead>
-                    <TableHead>발음 점수</TableHead>
-                    <TableHead className="text-right">{t.studentHistory.action}</TableHead>
+                    <TableHead className="text-center">{t.studentHistory.assessment}</TableHead>
+                    <TableHead className="text-center">평가 유형</TableHead>
+                    <TableHead className="text-center">{t.studentHistory.completionDate}</TableHead>
+                    <TableHead className="text-center">내용 점수</TableHead>
+                    <TableHead className="text-center">발음 점수</TableHead>
+                    <TableHead className="text-center">{t.studentHistory.viewFeedback}</TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody>
@@ -167,20 +167,20 @@ export default function HistoryPage() {
                         return (
                             <TableRow 
                                 key={assessment.id}
-                                className={cn(!isLastInGroup && "border-b-0 border-dashed")}
+                                className={cn(!isLastInGroup && "border-b-0")}
                             >
-                                <TableCell className={cn("font-medium", !isLastInGroup && "pb-2", isLastInGroup && "pt-4")}>{getAssessmentTitle(assessment)}</TableCell>
-                                <TableCell className={cn(!isLastInGroup && "pb-2", isLastInGroup && "pt-4")}>
+                                <TableCell className={cn("font-medium text-center", !isLastInGroup && "pb-2", isLastInGroup && "pt-4 border-b border-dashed")}>{getAssessmentTitle(assessment)}</TableCell>
+                                <TableCell className={cn("text-center", !isLastInGroup && "pb-2", isLastInGroup && "pt-4 border-b border-dashed")}>
                                     <Badge variant="outline">{getAssessmentTypeText(assessment.assessmentType)}</Badge>
                                 </TableCell>
-                                <TableCell className={cn(!isLastInGroup && "pb-2", isLastInGroup && "pt-4")}>{assessment.createdAt ? format(new Date(assessment.createdAt), 'yyyy-MM-dd') : 'N/A'}</TableCell>
-                                <TableCell className={cn(!isLastInGroup && "pb-2", isLastInGroup && "pt-4")}>
+                                <TableCell className={cn("text-center", !isLastInGroup && "pb-2", isLastInGroup && "pt-4 border-b border-dashed")}>{assessment.createdAt ? format(new Date(assessment.createdAt), 'yyyy-MM-dd') : 'N/A'}</TableCell>
+                                <TableCell className={cn("text-center", !isLastInGroup && "pb-2", isLastInGroup && "pt-4 border-b border-dashed")}>
                                     <Badge variant="outline">{assessment.contentScore ?? assessment.score ?? 0}%</Badge>
                                 </TableCell>
-                                 <TableCell className={cn(!isLastInGroup && "pb-2", isLastInGroup && "pt-4")}>
+                                 <TableCell className={cn("text-center", !isLastInGroup && "pb-2", isLastInGroup && "pt-4 border-b border-dashed")}>
                                     <Badge variant="outline">{assessment.pronunciationScore ?? 0}%</Badge>
                                 </TableCell>
-                                <TableCell className={cn("text-right", !isLastInGroup && "pb-2", isLastInGroup && "pt-4")}>
+                                <TableCell className={cn("text-center", !isLastInGroup && "pb-2", isLastInGroup && "pt-4 border-b border-dashed")}>
                                     <Link href={getResultLink(assessment)}>
                                         <Button variant="secondary" size="sm">{t.studentHistory.viewFeedback}</Button>
                                     </Link>
@@ -201,4 +201,3 @@ export default function HistoryPage() {
     </Card>
   );
 }
-
