@@ -7,12 +7,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { type StudentResult, type TeacherAssessment } from '@/lib/types';
+import { type StudentResult, type TeacherAssessment } from "@/lib/types";
 import { useLanguage } from '@/context/language-context';
 import { useAuth } from '@/context/auth-context';
 import { Loader2, ChevronDown, TrendingUp } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -56,7 +56,7 @@ export default function HistoryPage() {
                 collection(db, "results"),
                 where("studentId", "==", user.uid)
             ));
-
+            
             const [assessmentsSnapshot, resultsSnapshot] = await Promise.all([assessmentsQuery, resultsQuery]);
             
             const assessmentsMap = new Map<string, TeacherAssessment>();
@@ -64,22 +64,26 @@ export default function HistoryPage() {
                 assessmentsMap.set(doc.id, { id: doc.id, ...doc.data() } as TeacherAssessment);
             });
 
-            const completedResults = resultsSnapshot.docs
-                .map(doc => ({ id: doc.id, ...doc.data() } as StudentResult))
+            const allResults: EnrichedResult[] = resultsSnapshot.docs
+                .map(doc => {
+                    const result = { id: doc.id, ...doc.data() } as StudentResult;
+                    const assessment = assessmentsMap.get(result.assessmentId);
+                    return {
+                        ...result,
+                        assessmentType: assessment?.assessmentType || 'monologue',
+                    };
+                });
+            
+            const completedResults = allResults
                 .filter(result => result.status === "채점 완료")
                 .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 
             const resultsByAssessmentId: { [key: string]: EnrichedResult[] } = {};
             completedResults.forEach(result => {
-                const assessment = assessmentsMap.get(result.assessmentId);
-                const enrichedResult: EnrichedResult = {
-                    ...result,
-                    assessmentType: assessment?.assessmentType || 'monologue',
-                };
                 if (!resultsByAssessmentId[result.assessmentId]) {
                     resultsByAssessmentId[result.assessmentId] = [];
                 }
-                resultsByAssessmentId[result.assessmentId].push(enrichedResult);
+                resultsByAssessmentId[result.assessmentId].push(result);
             });
 
             const grouped: GroupedResult[] = Object.values(resultsByAssessmentId).map(attempts => {
@@ -127,8 +131,12 @@ export default function HistoryPage() {
       return t.teacherAssessments.assessmentTypes.monologue;
   }
 
-  const getResultLink = (result: EnrichedResult) => {
-    return `/student/assessment/${result.assessmentId}/results`;
+  const getResultLink = (result: EnrichedResult, attemptNumber?: number) => {
+    const baseLink = `/student/assessment/${result.assessmentId}/results`;
+    if (attemptNumber) {
+        return `${baseLink}?attempt=${attemptNumber}`;
+    }
+    return baseLink;
   }
 
   return (
@@ -155,7 +163,7 @@ export default function HistoryPage() {
                         const isExpanded = !!openStates[group.assessmentId];
                         return (
                             <React.Fragment key={group.assessmentId}>
-                                 <TableRow className={cn("font-medium align-middle", !isExpanded && groupIndex === groupedAssessments.length - 1 ? 'border-b-0' : '')}>
+                                 <TableRow className={cn("font-medium align-middle", !isExpanded && groupIndex === groupedAssessments.length - 1 && 'border-b-0')}>
                                     <TableCell>
                                         <div className="flex items-center gap-2">
                                             {group.totalAttempts > 1 ? (
@@ -167,7 +175,7 @@ export default function HistoryPage() {
                                                 <div className="w-8 h-8 p-0"/> 
                                             )}
                                             <span className="font-semibold break-words">{group.assessmentTitle}</span>
-                                            {group.totalAttempts > 1 && <Badge variant="outline">총 {group.totalAttempts}회 응시</Badge>}
+                                            {group.totalAttempts > 1 && <Badge variant="outline" className="flex justify-center">총 {group.totalAttempts}회 응시</Badge>}
                                         </div>
                                     </TableCell>
                                     <TableCell className="text-center">
@@ -175,13 +183,13 @@ export default function HistoryPage() {
                                     </TableCell>
                                     <TableCell className="text-center whitespace-nowrap">{group.latestAttempt.createdAt ? format(new Date(group.latestAttempt.createdAt), 'yyyy-MM-dd') : 'N/A'}</TableCell>
                                     <TableCell className="text-center">
-                                        <Badge variant="outline">{group.latestAttempt.contentScore ?? group.latestAttempt.score ?? 0}%</Badge>
+                                        <Badge variant="outline" className="whitespace-nowrap">{group.latestAttempt.contentScore ?? group.latestAttempt.score ?? 0}%</Badge>
                                     </TableCell>
                                     <TableCell className="text-center">
-                                        <Badge variant="outline">{group.latestAttempt.pronunciationScore ?? 0}%</Badge>
+                                        <Badge variant="outline" className="whitespace-nowrap">{group.latestAttempt.pronunciationScore ?? 0}%</Badge>
                                     </TableCell>
                                     <TableCell className="text-center">
-                                        <Link href={getResultLink(group.latestAttempt)}>
+                                        <Link href={getResultLink(group.latestAttempt, group.totalAttempts)}>
                                             <Button variant="secondary" size="sm">
                                                 {group.totalAttempts > 1 ? <TrendingUp className="mr-2 h-4 w-4" /> : null}
                                                 {group.totalAttempts > 1 ? "종합 분석 보기" : "결과 보기"}
@@ -190,9 +198,9 @@ export default function HistoryPage() {
                                     </TableCell>
                                 </TableRow>
                                 {isExpanded && group.previousAttempts.map((attempt, index) => (
-                                     <TableRow key={attempt.id} className={cn(
-                                        "bg-muted/50 border-dashed",
-                                        (groupIndex === groupedAssessments.length - 1 && index === group.previousAttempts.length - 1) ? 'border-b-0' : 'border-b'
+                                     <TableRow key={attempt.id} className={cn("bg-muted/50 border-dashed",
+                                       (groupIndex === groupedAssessments.length - 1 && index === group.previousAttempts.length - 1) && 'border-b-0',
+                                       (groupIndex < groupedAssessments.length - 1 && index === group.previousAttempts.length - 1) && 'border-b-2'
                                      )}>
                                         <TableCell className="pl-12 text-muted-foreground">
                                           └ {index + 1}차 시도
@@ -204,13 +212,13 @@ export default function HistoryPage() {
                                             {attempt.createdAt ? format(new Date(attempt.createdAt), 'yyyy-MM-dd') : 'N/A'}
                                         </TableCell>
                                         <TableCell className="text-center">
-                                            <Badge variant="ghost">{attempt.contentScore ?? attempt.score ?? 0}%</Badge>
+                                            <Badge variant="ghost" className="whitespace-nowrap">{attempt.contentScore ?? attempt.score ?? 0}%</Badge>
                                         </TableCell>
                                         <TableCell className="text-center">
-                                            <Badge variant="ghost">{attempt.pronunciationScore ?? 0}%</Badge>
+                                            <Badge variant="ghost" className="whitespace-nowrap">{attempt.pronunciationScore ?? 0}%</Badge>
                                         </TableCell>
                                         <TableCell className="text-center">
-                                            <Link href={`${getResultLink(attempt)}?attempt=${index + 1}`}>
+                                            <Link href={getResultLink(attempt, index + 1)}>
                                                 <Button variant="ghost" size="sm">결과 보기</Button>
                                             </Link>
                                         </TableCell>
