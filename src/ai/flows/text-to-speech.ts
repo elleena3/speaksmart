@@ -108,7 +108,7 @@ async function toWav(
 }
 
 // Function to convert text to speech
-async function textToSpeech(text: string, voiceName: string = 'Alpheratz'): Promise<string> {
+async function textToSpeech(text: string, voiceName: string = 'achernar'): Promise<string> {
     const ttsResponse = await ai.generate({
         model: googleAI.model('gemini-2.5-flash-preview-tts'),
         config: {

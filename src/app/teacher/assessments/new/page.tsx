@@ -47,7 +47,7 @@ export default function NewAssessmentPage() {
     targetStudentIds: z.array(z.string()).optional(),
     scenario: z.enum(scenarios).optional(),
     recordingTimeLimit: z.coerce.number().int().min(0).optional(),
-    aiVoice: z.enum(allVoices).optional().default('Alpheratz'),
+    aiVoice: z.enum(allVoices).optional().default('achernar'),
     evaluationModel: z.enum(evaluationModels).optional().default('gemini-2.5-flash-lite-preview-06-17'),
   }).superRefine((data, ctx) => {
     const isFreeTalk = data.assessmentType === 'dialogue' && data.scenario === 'free-talk';
@@ -89,7 +89,7 @@ export default function NewAssessmentPage() {
       targetStudentIds: [],
       scenario: "free-talk",
       recordingTimeLimit: 0,
-      aiVoice: "Alpheratz",
+      aiVoice: "achernar",
       evaluationModel: "gemini-2.5-flash-lite-preview-06-17",
     },
   });

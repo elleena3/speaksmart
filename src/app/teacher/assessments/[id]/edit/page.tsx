@@ -51,7 +51,7 @@ export default function EditAssessmentPage() {
     targetStudentIds: z.union([z.literal('all'), z.array(z.string())]),
     scenario: z.enum(scenarios).optional(),
     recordingTimeLimit: z.coerce.number().int().min(0).optional(),
-    aiVoice: z.enum(allVoices).optional().default('Alpheratz'),
+    aiVoice: z.enum(allVoices).optional().default('achernar'),
     evaluationModel: z.enum(evaluationModels).optional().default('gemini-2.5-flash-lite-preview-06-17'),
   }).superRefine((data, ctx) => {
     const isFreeTalk = data.assessmentType === 'dialogue' && data.scenario === 'free-talk';
@@ -93,7 +93,7 @@ export default function EditAssessmentPage() {
       targetStudentIds: "all",
       scenario: "free-talk",
       recordingTimeLimit: 0,
-      aiVoice: 'Alpheratz',
+      aiVoice: 'achernar',
       evaluationModel: 'gemini-2.5-flash-lite-preview-06-17',
     },
   });
@@ -116,7 +116,7 @@ export default function EditAssessmentPage() {
               startDate: data.startDate ? new Date(data.startDate) : undefined,
               endDate: data.endDate ? new Date(data.endDate) : undefined,
               targetType: Array.isArray(data.targetStudentIds) ? 'specific' : 'all',
-              aiVoice: data.aiVoice || 'Alpheratz',
+              aiVoice: data.aiVoice || 'achernar',
               evaluationModel: data.evaluationModel || 'gemini-2.5-flash-lite-preview-06-17',
             });
         } else {
