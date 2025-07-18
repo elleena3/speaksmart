@@ -216,7 +216,6 @@ export default function FreeTalkResultsPage() {
         const storedDataString = sessionStorage.getItem(SESSION_STORAGE_KEY);
         if (storedDataString) {
             processDialogueSubmission(JSON.parse(storedDataString));
-            // IMPORTANT: Return here to prevent the snapshot listener from also running.
             return;
         }
 
@@ -289,7 +288,7 @@ export default function FreeTalkResultsPage() {
 
         return () => unsubscribe();
         
-    }, [user, authLoading, router, toast, processDialogueSubmission, assessmentId, assessment]);
+    }, [user, authLoading, assessmentId, processDialogueSubmission, assessment]);
 
 
     if (status === "loading" || authLoading) {

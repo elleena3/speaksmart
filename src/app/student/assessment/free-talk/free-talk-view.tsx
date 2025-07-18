@@ -255,7 +255,7 @@ export function FreeTalkView({ assessment }: { assessment: TeacherAssessment }) 
         sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({ 
             studentRecordingUrl: downloadURL,
             conversationHistory: conversation,
-            assessment: assessment,
+            assessment: assessment, // Pass the entire assessment object
         }));
         
         router.push(`/student/assessment/free-talk/results?id=${assessment.id}`);
