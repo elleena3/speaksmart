@@ -1,6 +1,7 @@
 
 "use client";
 
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -9,7 +10,6 @@ import Link from 'next/link';
 import { type StudentResult, type TeacherAssessment } from '@/lib/types';
 import { useLanguage } from '@/context/language-context';
 import { useAuth } from '@/context/auth-context';
-import { useEffect, useState } from 'react';
 import { Loader2, ChevronDown, TrendingUp } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
@@ -52,11 +52,11 @@ export default function HistoryPage() {
         try {
             const assessmentsQuery = getDocs(collection(db, "assessments"));
 
-            // **쿼리 단순화:** 복합 색인을 피하기 위해 'status' 필터링을 제거하고 클라이언트 측에서 처리합니다.
+            // **쿼리 단순화:** 복합 색인 오류를 피하기 위해 studentId로만 필터링합니다.
+            // 정렬과 추가 필터링은 클라이언트 측에서 수행합니다.
             const resultsQuery = getDocs(query(
                 collection(db, "results"),
-                where("studentId", "==", user.uid),
-                orderBy("createdAt", "desc")
+                where("studentId", "==", user.uid)
             ));
 
             const [assessmentsSnapshot, resultsSnapshot] = await Promise.all([assessmentsQuery, resultsQuery]);
@@ -66,10 +66,11 @@ export default function HistoryPage() {
                 assessmentsMap.set(doc.id, { id: doc.id, ...doc.data() } as TeacherAssessment);
             });
 
-            // **클라이언트 측 필터링:** '채점 완료' 상태인 결과만 필터링합니다.
+            // **클라이언트 측 필터링 및 정렬:**
             const completedResults = resultsSnapshot.docs
                 .map(doc => ({ id: doc.id, ...doc.data() } as StudentResult))
-                .filter(result => result.status === "채점 완료");
+                .filter(result => result.status === "채점 완료")
+                .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)); // 최신순으로 정렬
 
             const resultsByAssessmentId: { [key: string]: EnrichedResult[] } = {};
             completedResults.forEach(result => {
@@ -85,7 +86,7 @@ export default function HistoryPage() {
             });
 
             const grouped: GroupedResult[] = Object.values(resultsByAssessmentId).map(attempts => {
-                // 이미 쿼리에서 시간순으로 정렬(desc)되어 있으므로 첫 번째 항목이 최신 시도입니다.
+                // 이미 클라이언트 측에서 시간순으로 정렬(desc)했으므로 첫 번째 항목이 최신 시도입니다.
                 const latestAttempt = attempts[0];
                 const previousAttempts = attempts.slice(1);
                 return {
@@ -99,7 +100,7 @@ export default function HistoryPage() {
             });
             
             // 최신 시도의 생성 날짜를 기준으로 그룹 자체를 정렬합니다.
-            grouped.sort((a,b) => b.latestAttempt.createdAt - a.latestAttempt.createdAt);
+            grouped.sort((a,b) => (b.latestAttempt.createdAt || 0) - (a.latestAttempt.createdAt || 0));
 
             setGroupedAssessments(grouped);
         } catch (error) {
@@ -131,20 +132,9 @@ export default function HistoryPage() {
       return t.teacherAssessments.assessmentTypes.monologue;
   }
 
-  const getResultLink = (result: EnrichedResult, isLatest: boolean, totalAttempts: number) => {
-    const baseLink = `/student/assessment/${result.assessmentId}/results`;
-    if (totalAttempts > 1 && !isLatest) {
-        const group = groupedAssessments.find(g => g.assessmentId === result.assessmentId);
-        // previousAttempts는 오름차순으로 정렬되어 있으므로 index + 1이 시도 번호가 됩니다.
-        const attemptIndex = group?.previousAttempts.findIndex(p => p.id === result.id) ?? -1;
-        if (attemptIndex !== -1) {
-            return `${baseLink}?attempt=${attemptIndex + 1}`;
-        }
-    }
-    // 최신 시도이거나, 시도 횟수가 하나뿐이거나, 계산에 실패하면 종합 분석 페이지로 이동합니다.
-    return baseLink;
+  const getResultLink = (result: EnrichedResult) => {
+    return `/student/assessment/${result.assessmentId}/results`;
   }
-
 
   return (
     <Card>
@@ -166,13 +156,11 @@ export default function HistoryPage() {
             </TableHeader>
             <TableBody>
                 {groupedAssessments.length > 0 ? (
-                    groupedAssessments.map((group) => {
+                    groupedAssessments.map((group, groupIndex) => {
                         const isExpanded = openStates[group.assessmentId];
-                        const allAttempts = [ ...group.previousAttempts, group.latestAttempt];
-
                         return (
                             <React.Fragment key={group.assessmentId}>
-                                 <TableRow className="font-medium align-middle">
+                                 <TableRow className={cn("font-medium align-middle", groupIndex === groupedAssessments.length - 1 && !isExpanded ? 'border-b-0' : '')}>
                                     <TableCell>
                                         <div className="flex items-center gap-2">
                                             {group.totalAttempts > 1 ? (
@@ -181,7 +169,7 @@ export default function HistoryPage() {
                                                     <span className="sr-only">Toggle</span>
                                                 </Button>
                                             ) : (
-                                                <div className="w-8 h-8 p-0"/> // 아이콘 없는 경우 간격 유지
+                                                <div className="w-8 h-8 p-0"/> 
                                             )}
                                             <span className="font-semibold break-words">{group.assessmentTitle}</span>
                                             {group.totalAttempts > 1 && <Badge variant="outline">총 {group.totalAttempts}회 응시</Badge>}
@@ -192,13 +180,13 @@ export default function HistoryPage() {
                                     </TableCell>
                                     <TableCell className="text-center whitespace-nowrap">{group.latestAttempt.createdAt ? format(new Date(group.latestAttempt.createdAt), 'yyyy-MM-dd') : 'N/A'}</TableCell>
                                     <TableCell className="text-center">
-                                        <Badge variant="outline">{group.latestAttempt.contentScore ?? group.latestAttempt.score ?? 0}%</Badge>
+                                        <Badge variant="outline">{group.latestAttempt.score ?? 0}%</Badge>
                                     </TableCell>
                                     <TableCell className="text-center">
                                         <Badge variant="outline">{group.latestAttempt.pronunciationScore ?? 0}%</Badge>
                                     </TableCell>
                                     <TableCell className="text-center">
-                                        <Link href={getResultLink(group.latestAttempt, true, group.totalAttempts)}>
+                                        <Link href={getResultLink(group.latestAttempt)}>
                                             <Button variant="secondary" size="sm">
                                                 {group.totalAttempts > 1 ? <TrendingUp className="mr-2 h-4 w-4" /> : null}
                                                 {group.totalAttempts > 1 ? "종합 분석 보기" : "결과 보기"}
@@ -207,7 +195,10 @@ export default function HistoryPage() {
                                     </TableCell>
                                 </TableRow>
                                 {isExpanded && group.previousAttempts.map((attempt, index) => (
-                                     <TableRow key={attempt.id} className={cn("bg-muted/50 border-dashed")}>
+                                     <TableRow key={attempt.id} className={cn(
+                                        "bg-muted/50 border-dashed",
+                                        (groupIndex === groupedAssessments.length - 1 && index === group.previousAttempts.length - 1) ? 'border-b-0' : 'border-b'
+                                     )}>
                                         <TableCell className="pl-12 text-muted-foreground">
                                           └ {index + 1}차 시도
                                         </TableCell>
@@ -218,13 +209,13 @@ export default function HistoryPage() {
                                             {attempt.createdAt ? format(new Date(attempt.createdAt), 'yyyy-MM-dd') : 'N/A'}
                                         </TableCell>
                                         <TableCell className="text-center">
-                                            <Badge variant="ghost">{attempt.contentScore ?? attempt.score ?? 0}%</Badge>
+                                            <Badge variant="ghost">{attempt.score ?? 0}%</Badge>
                                         </TableCell>
                                         <TableCell className="text-center">
                                             <Badge variant="ghost">{attempt.pronunciationScore ?? 0}%</Badge>
                                         </TableCell>
                                         <TableCell className="text-center">
-                                            <Link href={getResultLink(attempt, false, group.totalAttempts)}>
+                                            <Link href={`${getResultLink(attempt)}?attempt=${index + 1}`}>
                                                 <Button variant="ghost" size="sm">결과 보기</Button>
                                             </Link>
                                         </TableCell>
