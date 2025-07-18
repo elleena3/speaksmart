@@ -64,13 +64,14 @@ export default function HistoryPage() {
                 assessmentsMap.set(doc.id, { id: doc.id, ...doc.data() } as TeacherAssessment);
             });
 
-            const allResults: EnrichedResult[] = resultsSnapshot.docs.map(doc => {
+            const allResults: EnrichedResult[] = [];
+            resultsSnapshot.forEach(doc => {
                 const result = { id: doc.id, ...doc.data() } as StudentResult;
                 const assessment = assessmentsMap.get(result.assessmentId);
-                return {
+                allResults.push({
                     ...result,
                     assessmentType: assessment?.assessmentType || 'monologue',
-                };
+                });
             });
             
             const completedResults = allResults
@@ -131,12 +132,10 @@ export default function HistoryPage() {
   }
 
   const getResultLink = (result: EnrichedResult, attemptNumber?: number) => {
-    const baseLink = result.assessmentType === 'dialogue' 
-        ? `/student/assessment/free-talk/results?id=${result.assessmentId}`
-        : `/student/assessment/${result.assessmentId}/results`;
+    const baseLink = `/student/assessment/${result.assessmentId}/results`;
 
     if (attemptNumber) {
-        return `${baseLink}&attempt=${attemptNumber}`;
+        return `${baseLink}?attempt=${attemptNumber}`;
     }
     return baseLink;
   }
@@ -151,7 +150,7 @@ export default function HistoryPage() {
         <Table>
             <TableHeader>
                 <TableRow>
-                    <TableHead className="w-[40%] pl-4">{t.studentHistory.assessment}</TableHead>
+                    <TableHead className="w-[40%] text-center">{t.studentHistory.assessment}</TableHead>
                     <TableHead className="text-center whitespace-nowrap">평가 유형</TableHead>
                     <TableHead className="text-center whitespace-nowrap">완료 날짜</TableHead>
                     <TableHead className="text-center whitespace-nowrap">내용 점수</TableHead>
@@ -165,7 +164,7 @@ export default function HistoryPage() {
                         const isExpanded = !!openStates[group.assessmentId];
                         return (
                             <React.Fragment key={group.assessmentId}>
-                                 <TableRow className={cn("font-medium align-middle", !isExpanded && groupIndex === groupedAssessments.length - 1 && 'border-b-0', isExpanded && 'border-b-2 border-dashed')}>
+                                 <TableRow className={cn("font-medium align-middle", isExpanded && 'border-b-2 border-dashed')}>
                                     <TableCell className="pl-4">
                                         <div className="flex items-center gap-2">
                                             {group.totalAttempts > 1 ? (
@@ -200,8 +199,8 @@ export default function HistoryPage() {
                                     </TableCell>
                                 </TableRow>
                                 {isExpanded && group.previousAttempts.map((attempt, index) => (
-                                     <TableRow key={attempt.id} className={cn("bg-muted/50 border-dashed",
-                                       index === group.previousAttempts.length - 1 ? 'border-b-2' : 'border-b'
+                                     <TableRow key={attempt.id} className={cn("bg-muted/50",
+                                       index === group.previousAttempts.length - 1 ? 'border-b-2 border-dashed' : 'border-b border-dashed'
                                      )}>
                                         <TableCell className="pl-12 text-muted-foreground">
                                           └ {index + 1}차 시도
