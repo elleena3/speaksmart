@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
-import { Send, ThumbsUp, ThumbsDown, MessageSquareQuote, Loader2, FileText, Target, Repeat } from "lucide-react"
+import { Send, ThumbsUp, ThumbsDown, MessageSquareQuote, Loader2, FileText, Target, Repeat, Bot, User } from "lucide-react"
 import { summarizeStudentFeedback } from "@/ai/flows/summarize-student-feedback"
 import { type StudentResult, type TeacherAssessment } from "@/lib/types"
 import { Progress } from "@/components/ui/progress"
@@ -28,7 +28,6 @@ export function FreeTalkFeedbackView({ result, assessment, isLatestAttempt }: Fe
 
   const {
     id: resultId,
-    assessmentTitle,
     aiFeedback,
     studentTranscript,
     studentRecordingUrl,
@@ -80,6 +79,12 @@ export function FreeTalkFeedbackView({ result, assessment, isLatestAttempt }: Fe
     ? `/student/assessment/free-talk?id=${assessment.id}`
     : `/student/assessment/${assessment.id}`;
 
+  const dialogueTurns = studentTranscript?.split('\n').map(line => {
+    const [role, ...textParts] = line.split(': ');
+    const text = textParts.join(': ');
+    return { role: role, text: text };
+  });
+
   return (
     <div className="grid gap-6 lg:grid-cols-3">
       <div className="lg:col-span-2 space-y-6">
@@ -101,8 +106,28 @@ export function FreeTalkFeedbackView({ result, assessment, isLatestAttempt }: Fe
                         </audio>
                     </div>
                 )}
-                <div className="p-4 bg-muted/50 rounded-lg whitespace-pre-wrap font-mono text-sm leading-relaxed italic max-h-60 overflow-y-auto">
-                    "{studentTranscript}"
+                <div className="p-4 bg-muted/50 rounded-lg max-h-80 overflow-y-auto space-y-4">
+                  {dialogueTurns?.map((turn, index) => (
+                    <div key={index} className={`flex items-start gap-3 ${turn.role === '학생' ? 'justify-start' : 'justify-end'}`}>
+                      {turn.role === '학생' && (
+                          <div className="p-2 rounded-full bg-background border">
+                              <User className="h-5 w-5 text-muted-foreground" />
+                          </div>
+                      )}
+                      <div className={`p-3 rounded-lg max-w-[80%] ${turn.role === '학생' ? 'bg-background' : 'bg-primary text-primary-foreground'}`}>
+                        <p className="text-sm font-semibold mb-1">{turn.role === '학생' ? '나' : assessment.aiVoice || 'AI'}</p>
+                        <p className="text-sm">{turn.text}</p>
+                      </div>
+                      {turn.role !== '학생' && (
+                          <div className="p-2 rounded-full bg-primary text-primary-foreground">
+                              <Bot className="h-5 w-5" />
+                          </div>
+                      )}
+                    </div>
+                  ))}
+                  {(!dialogueTurns || dialogueTurns.length === 0) && (
+                     <p className="text-muted-foreground text-center italic">대화 기록이 없습니다.</p>
+                  )}
                 </div>
             </CardContent>
         </Card>

@@ -97,7 +97,7 @@ export default function HistoryPage() {
                     previousAttempts: previousAttempts.reverse(), // Show oldest first in dropdown
                     totalAttempts: attempts.length,
                 };
-            });
+            }).filter(group => group.totalAttempts > 0); // Ensure there's at least one completed attempt
             
             grouped.sort((a,b) => (b.latestAttempt.createdAt || 0) - (a.latestAttempt.createdAt || 0));
 
@@ -188,7 +188,7 @@ export default function HistoryPage() {
                                     </TableCell>
                                     <TableCell className="text-center whitespace-nowrap">{group.latestAttempt.createdAt ? format(new Date(group.latestAttempt.createdAt), 'yyyy-MM-dd') : 'N/A'}</TableCell>
                                     <TableCell className="text-center">
-                                        <Badge variant="outline" className="whitespace-nowrap">{group.latestAttempt.contentScore ?? group.latestAttempt.score ?? 0}%</Badge>
+                                        <Badge variant="outline" className="whitespace-nowrap">{group.latestAttempt.contentScore ?? 0}%</Badge>
                                     </TableCell>
                                     <TableCell className="text-center">
                                         <Badge variant="outline" className="whitespace-nowrap">{group.latestAttempt.pronunciationScore ?? 0}%</Badge>
@@ -216,7 +216,7 @@ export default function HistoryPage() {
                                             {attempt.createdAt ? format(new Date(attempt.createdAt), 'yyyy-MM-dd') : 'N/A'}
                                         </TableCell>
                                         <TableCell className="text-center">
-                                            <Badge variant="ghost" className="whitespace-nowrap">{attempt.contentScore ?? attempt.score ?? 0}%</Badge>
+                                            <Badge variant="ghost" className="whitespace-nowrap">{attempt.contentScore ?? 0}%</Badge>
                                         </TableCell>
                                         <TableCell className="text-center">
                                             <Badge variant="ghost" className="whitespace-nowrap">{attempt.pronunciationScore ?? 0}%</Badge>
