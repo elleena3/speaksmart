@@ -91,7 +91,7 @@ export function GrowthView({ results, assessment, defaultTab }: GrowthViewProps)
     };
 
     return (
-        <Tabs defaultValue={defaultTab || "overview"} className="w-full">
+        <Tabs defaultValue={defaultTab || `attempt-${results.length}`} className="w-full">
             <TabsList className="grid w-full grid-cols-2 md:grid-cols-4">
                 <TabsTrigger value="overview">종합 분석</TabsTrigger>
                 {results.map((result, index) => (

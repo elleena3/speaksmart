@@ -220,7 +220,8 @@ export default function AssessmentResultsPage() {
     const sessionDataRaw = sessionStorage.getItem(SESSION_STORAGE_KEY);
     if(sessionDataRaw) {
         processMonologueSubmission(JSON.parse(sessionDataRaw));
-        return; // Stop further execution to allow analysis to complete
+        // IMPORTANT: Return here to prevent the snapshot listener from also running.
+        return; 
     }
     
     // 2. If no session data, set up listener for existing results.
@@ -231,14 +232,12 @@ export default function AssessmentResultsPage() {
     );
 
     const unsubscribe = onSnapshot(q, async (snapshot) => {
-        if (snapshot.empty && !sessionDataRaw) {
-            // If there are no results and no session data, it might be a stale page.
-            // Or the user hasn't submitted yet.
+        if (snapshot.empty) {
             const assessmentRef = doc(db, 'assessments', id);
             const assessmentSnap = await getDoc(assessmentRef);
             if (assessmentSnap.exists()) {
                 setAssessment(assessmentSnap.data() as TeacherAssessment);
-                setStatus("completed"); // Show "no results" message
+                setStatus("completed"); 
             } else {
                 notFound();
             }
@@ -250,12 +249,10 @@ export default function AssessmentResultsPage() {
             dbResults.push({ id: doc.id, ...doc.data() } as StudentResult);
         });
         
-        // Sort client-side to avoid complex index
         dbResults.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
 
         const stillProcessing = dbResults.some(r => r.status !== '채점 완료' && r.status !== '오류');
         
-        // Fetch assessment details if not already fetched
         if (!assessment) {
             const assessmentRef = doc(db, 'assessments', id);
             const assessmentSnap = await getDoc(assessmentRef);
@@ -275,11 +272,6 @@ export default function AssessmentResultsPage() {
             setErrorInfo({ 
                 message: latestResult.aiFeedback, 
                 resultId: latestResult.id,
-                sessionData: {
-                    assessmentId: latestResult.assessmentId,
-                    studentRecordingUrl: latestResult.studentRecordingUrl!,
-                    assessmentDetails: assessment!
-                }
             });
         } else if (!stillProcessing) {
           setStatus("completed");
@@ -341,7 +333,8 @@ export default function AssessmentResultsPage() {
   }
 
   if (status === 'completed' && assessment) {
-    if (results.length === 0) {
+    const completedResults = results.filter(r => r.status === '채점 완료');
+    if (completedResults.length === 0) {
       return (
          <div className="text-center p-8">
              <p>이 평가에 대한 제출된 결과가 없습니다. 평가를 먼저 완료해주세요.</p>
@@ -350,13 +343,13 @@ export default function AssessmentResultsPage() {
       );
     }
     
-    if (results.length === 1) {
-      return <FeedbackView result={results[0]} assessment={assessment} isLatestAttempt={true} />;
+    if (completedResults.length === 1) {
+      return <FeedbackView result={completedResults[0]} assessment={assessment} isLatestAttempt={true} />;
     }
 
-    if (results.length > 1) {
+    if (completedResults.length > 1) {
       const attemptNumber = searchParams.get('attempt');
-      return <GrowthView results={results} assessment={assessment} defaultTab={`attempt-${attemptNumber || results.length}`} />;
+      return <GrowthView results={completedResults} assessment={assessment} defaultTab={`attempt-${attemptNumber || completedResults.length}`} />;
     }
   }
 

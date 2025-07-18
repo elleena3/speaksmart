@@ -144,7 +144,7 @@ export default function FreeTalkResultsPage() {
                 date: new Date().toISOString(),
                 status: "분석 중",
                 studentRecordingUrl: studentRecordingUrl,
-                studentTranscript: fullConversationTranscript, // Store the full conversation here
+                studentTranscript: fullConversationTranscript, 
             };
             
             await setDoc(resultRef, initialData, { merge: true });
@@ -168,7 +168,7 @@ export default function FreeTalkResultsPage() {
 
             const finalResultData: Partial<StudentResult> = {
                 ...analysisResult,
-                studentTranscript: fullConversationTranscript, // Ensure it's saved again
+                studentTranscript: fullConversationTranscript, 
                 status: "채점 완료",
             };
             await updateDoc(resultRef, finalResultData);
@@ -211,17 +211,12 @@ export default function FreeTalkResultsPage() {
 
 
     useEffect(() => {
-        if(authLoading || !user) return;
+        if(authLoading || !user || !assessmentId) return;
         
-        if (!assessmentId) {
-            toast({ title: "평가 정보 없음", description: "대시보드로 돌아갑니다.", variant: "destructive" });
-            router.push('/student/dashboard');
-            return;
-        }
-
         const storedDataString = sessionStorage.getItem(SESSION_STORAGE_KEY);
         if (storedDataString) {
             processDialogueSubmission(JSON.parse(storedDataString));
+            // IMPORTANT: Return here to prevent the snapshot listener from also running.
             return;
         }
 
@@ -232,7 +227,7 @@ export default function FreeTalkResultsPage() {
         );
         
         const unsubscribe = onSnapshot(q, async (snapshot) => {
-             if (snapshot.empty && !storedDataString) {
+             if (snapshot.empty) {
                 const assessmentRef = doc(db, 'assessments', assessmentId);
                 const assessmentSnap = await getDoc(assessmentRef);
                 if (assessmentSnap.exists()) {

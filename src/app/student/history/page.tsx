@@ -131,12 +131,14 @@ export default function HistoryPage() {
       return t.teacherAssessments.assessmentTypes.monologue;
   }
 
-  const getResultLink = (result: EnrichedResult, attemptNumber?: number) => {
+  const getResultLink = (result: EnrichedResult, isLatest: boolean, totalAttempts: number) => {
+    const attemptNumber = isLatest ? totalAttempts : groupedAssessments.find(g => g.assessmentId === result.assessmentId)?.previousAttempts.findIndex(p => p.id === result.id)! + 1;
+    
     const baseLink = result.assessmentType === 'dialogue'
-        ? `/student/assessment/free-talk/results?id=${result.assessmentId}`
-        : `/student/assessment/${result.assessmentId}/results`;
+      ? `/student/assessment/free-talk/results?id=${result.assessmentId}`
+      : `/student/assessment/${result.assessmentId}/results`;
 
-    if (attemptNumber) {
+    if (totalAttempts > 1) {
         return `${baseLink}&attempt=${attemptNumber}`;
     }
     return baseLink;
@@ -162,7 +164,7 @@ export default function HistoryPage() {
             </TableHeader>
             <TableBody>
                 {groupedAssessments.length > 0 ? (
-                    groupedAssessments.map((group, groupIndex) => {
+                    groupedAssessments.map((group) => {
                         const isExpanded = !!openStates[group.assessmentId];
                         return (
                             <React.Fragment key={group.assessmentId}>
@@ -192,7 +194,7 @@ export default function HistoryPage() {
                                         <Badge variant="outline" className="whitespace-nowrap">{group.latestAttempt.pronunciationScore ?? 0}%</Badge>
                                     </TableCell>
                                     <TableCell className="text-center pr-4">
-                                        <Link href={getResultLink(group.latestAttempt, group.totalAttempts > 1 ? group.totalAttempts : undefined)}>
+                                        <Link href={getResultLink(group.latestAttempt, true, group.totalAttempts)}>
                                             <Button variant="secondary" size="sm">
                                                 {group.totalAttempts > 1 ? <TrendingUp className="mr-2 h-4 w-4" /> : null}
                                                 {group.totalAttempts > 1 ? "종합 분석 보기" : "결과 보기"}
@@ -220,7 +222,7 @@ export default function HistoryPage() {
                                             <Badge variant="ghost" className="whitespace-nowrap">{attempt.pronunciationScore ?? 0}%</Badge>
                                         </TableCell>
                                         <TableCell className="text-center pr-4">
-                                            <Link href={getResultLink(attempt, index + 1)}>
+                                            <Link href={getResultLink(attempt, false, group.totalAttempts)}>
                                                 <Button variant="ghost" size="sm">결과 보기</Button>
                                             </Link>
                                         </TableCell>
