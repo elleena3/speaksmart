@@ -9,7 +9,7 @@ import Link from 'next/link';
 import { type StudentResult, type TeacherAssessment } from '@/lib/types';
 import { useLanguage } from '@/context/language-context';
 import { useAuth } from '@/context/auth-context';
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { Loader2, ChevronDown, TrendingUp } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
@@ -123,10 +123,13 @@ export default function HistoryPage() {
   const getResultLink = (result: EnrichedResult, isLatest: boolean, totalAttempts: number) => {
     const baseLink = `/student/assessment/${result.assessmentId}/results`;
     if (isLatest && totalAttempts > 1) {
-      return baseLink; // Let it default to the overview tab
+      return baseLink; 
     }
-    // Find the attempt number for this specific result
-    return `${baseLink}?attempt=${totalAttempts - groupedAssessments.find(g => g.assessmentId === result.assessmentId)!.previousAttempts.findIndex(p => p.id === result.id)}`;
+    const attemptNumber = groupedAssessments
+        .find(g => g.assessmentId === result.assessmentId)
+        ?.previousAttempts.findIndex(p => p.id === result.id);
+        
+    return `${baseLink}?attempt=${totalAttempts - (attemptNumber ?? 0)}`;
   }
 
 
@@ -142,7 +145,7 @@ export default function HistoryPage() {
                 <TableRow>
                     <TableHead className="w-[40%] text-center">{t.studentHistory.assessment}</TableHead>
                     <TableHead className="text-center">평가 유형</TableHead>
-                    <TableHead className="text-center">{t.studentHistory.completionDate}</TableHead>
+                    <TableHead className="text-center">완료 날짜</TableHead>
                     <TableHead className="text-center">내용 점수</TableHead>
                     <TableHead className="text-center">발음 점수</TableHead>
                     <TableHead className="text-center">{t.studentHistory.viewFeedback}</TableHead>
@@ -150,10 +153,10 @@ export default function HistoryPage() {
             </TableHeader>
             <TableBody>
                 {groupedAssessments.length > 0 ? (
-                    groupedAssessments.map((group) => (
+                    groupedAssessments.map((group, groupIndex) => (
                         <Collapsible asChild key={group.assessmentId}>
                             <>
-                                <TableRow className="font-medium">
+                                <TableRow className="font-medium align-middle">
                                     <TableCell className="text-center">
                                         <div className="flex items-center justify-center gap-2">
                                             {group.totalAttempts > 1 && (
@@ -164,14 +167,14 @@ export default function HistoryPage() {
                                                     </Button>
                                                 </CollapsibleTrigger>
                                             )}
-                                            <span className={cn(group.totalAttempts <= 1 && "pl-8")}>{group.assessmentTitle}</span>
+                                            <span className={cn("font-semibold", group.totalAttempts <= 1 && "pl-8")}>{group.assessmentTitle}</span>
                                             {group.totalAttempts > 1 && <Badge variant="outline">총 {group.totalAttempts}회 응시</Badge>}
                                         </div>
                                     </TableCell>
                                     <TableCell className="text-center">
-                                        <Badge variant="outline">{getAssessmentTypeText(group.assessmentType)}</Badge>
+                                        <Badge variant="outline" className="whitespace-nowrap">{getAssessmentTypeText(group.assessmentType)}</Badge>
                                     </TableCell>
-                                    <TableCell className="text-center">{group.latestAttempt.createdAt ? format(new Date(group.latestAttempt.createdAt), 'yyyy-MM-dd') : 'N/A'}</TableCell>
+                                    <TableCell className="text-center whitespace-nowrap">{group.latestAttempt.createdAt ? format(new Date(group.latestAttempt.createdAt), 'yyyy-MM-dd') : 'N/A'}</TableCell>
                                     <TableCell className="text-center">
                                         <Badge variant="outline">{group.latestAttempt.contentScore ?? group.latestAttempt.score ?? 0}%</Badge>
                                     </TableCell>
@@ -190,14 +193,14 @@ export default function HistoryPage() {
                                 <CollapsibleContent asChild>
                                     <>
                                       {group.previousAttempts.map((attempt, index) => (
-                                          <TableRow key={attempt.id} className="bg-muted/50">
+                                          <TableRow key={attempt.id} className={cn("bg-muted/50", (index < group.previousAttempts.length - 1) && "border-b-dashed")}>
                                               <TableCell className="text-center pl-12 text-muted-foreground">
                                                 └ {group.totalAttempts - 1 - index}차 시도
                                               </TableCell>
                                               <TableCell className="text-center">
-                                                  <Badge variant="ghost">{getAssessmentTypeText(attempt.assessmentType)}</Badge>
+                                                  <Badge variant="ghost" className="whitespace-nowrap">{getAssessmentTypeText(attempt.assessmentType)}</Badge>
                                               </TableCell>
-                                              <TableCell className="text-center text-muted-foreground">
+                                              <TableCell className="text-center text-muted-foreground whitespace-nowrap">
                                                   {attempt.createdAt ? format(new Date(attempt.createdAt), 'yyyy-MM-dd') : 'N/A'}
                                               </TableCell>
                                               <TableCell className="text-center">
