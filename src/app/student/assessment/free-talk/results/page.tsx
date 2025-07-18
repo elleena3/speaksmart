@@ -1,13 +1,13 @@
 
 "use client";
 
-import { FreeTalkFeedbackView } from "./free-talk-feedback-view"
+import { FreeTalkFeedbackView } from "./free-talk-feedback-view";
 import { GrowthView } from "../../[id]/results/growth-view";
 import { useRouter, notFound, useSearchParams } from 'next/navigation';
 import { useEffect, useState, useCallback } from "react";
 import { type StudentResult, type ResultStatus, type TeacherAssessment, type ConversationTurn } from "@/lib/types";
 import { useAuth } from "@/context/auth-context";
-import { Loader2, AlertTriangle, CheckCircle2, UploadCloud, AudioLines, FileScan, Sparkles, RefreshCw } from "lucide-react";
+import { Loader2, AlertTriangle, CheckCircle2, UploadCloud, FileScan, Sparkles, RefreshCw } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { db } from "@/lib/firebase";
@@ -106,9 +106,7 @@ export default function FreeTalkResultsPage() {
     const [errorInfo, setErrorInfo] = useState<{ message: string, resultId?: string, sessionData?: DialogueSessionData } | null>(null);
     const { toast } = useToast();
     
-    // Get assessment ID from session data first, then from URL as fallback
-    const sessionDataStringForId = typeof window !== 'undefined' ? sessionStorage.getItem(SESSION_STORAGE_KEY) : null;
-    const assessmentId = sessionDataStringForId ? JSON.parse(sessionDataStringForId).assessment.id : searchParams.get('id');
+    const assessmentId = searchParams.get('id');
 
     const processDialogueSubmission = useCallback(async (sessionData: DialogueSessionData, existingResultId?: string) => {
         if (!user) return;
@@ -238,9 +236,9 @@ export default function FreeTalkResultsPage() {
                 const assessmentRef = doc(db, 'assessments', assessmentId);
                 const assessmentSnap = await getDoc(assessmentRef);
                 if (assessmentSnap.exists()) {
-                    setAssessment(assessmentSnap.data() as TeacherAssessment);
+                    setAssessment({id: assessmentSnap.id, ...assessmentSnap.data()} as TeacherAssessment);
                     setStatus("completed"); // Show "no results" message
-                } else {
+                } else if (assessmentId !== "free-talk-practice") {
                     notFound();
                 }
                 return;
@@ -271,18 +269,9 @@ export default function FreeTalkResultsPage() {
             if(latestResult?.status === '오류'){
                 setStatus('error');
                 
-                const assessmentDoc = await getDoc(doc(db, 'assessments', latestResult.assessmentId));
-                const assessmentData = assessmentDoc.data() as TeacherAssessment;
-                
-                // For dialogue, we will just use the last known conversation history from the failed attempt, if available.
-                // Re-creating the exact conversation history for retry is complex.
-                // A simpler approach is to let the user know and let them restart.
-                // The current error message already suggests this.
                 setErrorInfo({ 
                     message: latestResult.aiFeedback, 
                     resultId: latestResult.id,
-                    // Cannot reliably recreate sessionData here without storing the full history in the result doc
-                    sessionData: undefined, 
                 });
             } else if (!stillProcessing) {
               setStatus("completed");
@@ -347,7 +336,8 @@ export default function FreeTalkResultsPage() {
     }
 
     if (status === 'completed' && assessment) {
-      if (results.length === 0) {
+      const completedResults = results.filter(r => r.status === '채점 완료');
+      if (completedResults.length === 0) {
         return (
            <div className="text-center p-8">
                <p>이 평가에 대한 제출된 결과가 없습니다. 평가를 먼저 완료해주세요.</p>
@@ -355,12 +345,12 @@ export default function FreeTalkResultsPage() {
            </div>
         );
       }
-      if (results.length === 1) {
-        return <FreeTalkFeedbackView result={results[0]} assessment={assessment} isLatestAttempt={true} />;
+      if (completedResults.length === 1) {
+        return <FreeTalkFeedbackView result={completedResults[0]} assessment={assessment} isLatestAttempt={true} />;
       }
-      if (results.length > 1) {
+      if (completedResults.length > 1) {
         const attemptNumber = searchParams.get('attempt');
-        return <GrowthView results={results} assessment={assessment} defaultTab={`attempt-${attemptNumber || results.length}`} />;
+        return <GrowthView results={completedResults} assessment={assessment} defaultTab={`attempt-${attemptNumber || completedResults.length}`} />;
       }
     }
 

@@ -54,7 +54,8 @@ export default function HistoryPage() {
             
             const resultsQuery = getDocs(query(
                 collection(db, "results"),
-                where("studentId", "==", user.uid)
+                where("studentId", "==", user.uid),
+                where("status", "==", "채점 완료") // Only fetch completed results
             ));
             
             const [assessmentsSnapshot, resultsSnapshot] = await Promise.all([assessmentsQuery, resultsQuery]);
@@ -74,12 +75,11 @@ export default function HistoryPage() {
                 });
             });
             
-            const completedResults = allResults
-                .filter(result => result.status === "채점 완료")
-                .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+            // Sort by creation date descending
+            allResults.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 
             const resultsByAssessmentId: { [key: string]: EnrichedResult[] } = {};
-            completedResults.forEach(result => {
+            allResults.forEach(result => {
                 if (!resultsByAssessmentId[result.assessmentId]) {
                     resultsByAssessmentId[result.assessmentId] = [];
                 }
@@ -87,14 +87,14 @@ export default function HistoryPage() {
             });
 
             const grouped: GroupedResult[] = Object.values(resultsByAssessmentId).map(attempts => {
-                const latestAttempt = attempts[0];
+                const latestAttempt = attempts[0]; // The most recent one
                 const previousAttempts = attempts.slice(1);
                 return {
                     assessmentId: latestAttempt.assessmentId,
                     assessmentTitle: latestAttempt.assessmentTitle,
                     assessmentType: latestAttempt.assessmentType,
                     latestAttempt: latestAttempt,
-                    previousAttempts: previousAttempts.reverse(),
+                    previousAttempts: previousAttempts.reverse(), // Show oldest first in dropdown
                     totalAttempts: attempts.length,
                 };
             });
@@ -132,10 +132,12 @@ export default function HistoryPage() {
   }
 
   const getResultLink = (result: EnrichedResult, attemptNumber?: number) => {
-    const baseLink = `/student/assessment/${result.assessmentId}/results`;
+    const baseLink = result.assessmentType === 'dialogue'
+        ? `/student/assessment/free-talk/results?id=${result.assessmentId}`
+        : `/student/assessment/${result.assessmentId}/results`;
 
     if (attemptNumber) {
-        return `${baseLink}?attempt=${attemptNumber}`;
+        return `${baseLink}&attempt=${attemptNumber}`;
     }
     return baseLink;
   }
