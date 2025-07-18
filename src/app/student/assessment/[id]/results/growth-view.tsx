@@ -37,7 +37,7 @@ export function GrowthView({ results, assessment, defaultTab }: GrowthViewProps)
 
     const chartData = results.map((r, i) => ({
         name: `${i + 1}차`,
-        contentScore: r.contentScore ?? r.score ?? 0,
+        contentScore: r.contentScore ?? 0,
         pronunciationScore: r.pronunciationScore ?? 0,
     }));
 
@@ -51,14 +51,14 @@ export function GrowthView({ results, assessment, defaultTab }: GrowthViewProps)
                     const feedback = await generateGrowthFeedback({
                         previousAttempt: {
                             attemptNumber: results.length - 1,
-                            contentScore: previousAttempt.contentScore ?? previousAttempt.score ?? 0,
+                            contentScore: previousAttempt.contentScore ?? 0,
                             pronunciationScore: previousAttempt.pronunciationScore ?? 0,
                             transcript: previousAttempt.studentTranscript ?? "",
                             aiFeedback: previousAttempt.aiFeedback ?? "",
                         },
                         latestAttempt: {
                             attemptNumber: results.length,
-                            contentScore: latestAttempt.contentScore ?? latestAttempt.score ?? 0,
+                            contentScore: latestAttempt.contentScore ?? 0,
                             pronunciationScore: latestAttempt.pronunciationScore ?? 0,
                             transcript: latestAttempt.studentTranscript ?? "",
                             aiFeedback: latestAttempt.aiFeedback ?? "",

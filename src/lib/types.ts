@@ -99,7 +99,6 @@ export type StudentResult = {
   name: string; // Student's display name
   avatarUrl: string;
   status: ResultStatus;
-  score: number;
   date: string;
   aiFeedback: string;
   curricularRemarks: string;
@@ -111,5 +110,5 @@ export type StudentResult = {
   pronunciationFeedback?: string;
   teacherUid: string; // To query results by teacher
   createdAt: number;
-  contentScore?: number;
+  contentScore: number;
 }

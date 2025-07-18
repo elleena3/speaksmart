@@ -110,7 +110,7 @@ export default function StudentResultPage() {
                 ['평가명', assessment.title],
                 ['유형', isDialogue ? 'AI와 대화하기' : '혼자 말하기'],
                 ['제출일', studentResult.date],
-                ['내용 점수', `${studentResult.score ?? 0}%`],
+                ['내용 점수', `${studentResult.contentScore ?? 0}%`],
                 ['발음 점수', `${studentResult.pronunciationScore ?? 0}%`],
             ],
             theme: 'grid',
@@ -300,9 +300,9 @@ export default function StudentResultPage() {
                       <div className="w-full">
                           <div className="flex justify-between mb-1">
                               <span className="text-base font-medium text-primary">내용 점수</span>
-                              <span className="text-sm font-medium text-primary">{studentResult.score ?? 0}%</span>
+                              <span className="text-sm font-medium text-primary">{studentResult.contentScore ?? 0}%</span>
                           </div>
-                          <Progress value={studentResult.score} className="h-2" />
+                          <Progress value={studentResult.contentScore} className="h-2" />
                       </div>
                       <div className="w-full">
                           <div className="flex justify-between mb-1">

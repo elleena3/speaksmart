@@ -125,7 +125,7 @@ export default function AssessmentSubmissionsPage() {
                         {result.status}
                       </Badge>
                     </TableCell>
-                    <TableCell>{result.score ? `${result.score}%` : "N/A"}</TableCell>
+                    <TableCell>{result.contentScore ? `${result.contentScore}%` : "N/A"}</TableCell>
                     <TableCell>{result.createdAt ? format(new Date(result.createdAt), 'yyyy-MM-dd') : 'N/A'}</TableCell>
                     <TableCell className="text-right">
                        <Link href={`/teacher/assessment/${assessmentId}/${result.id}`}>

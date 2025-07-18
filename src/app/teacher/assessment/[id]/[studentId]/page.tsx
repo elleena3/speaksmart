@@ -110,7 +110,7 @@ export default function StudentResultPage() {
                 ['평가명', assessment.title],
                 ['유형', isDialogue ? 'AI와 대화하기' : '혼자 말하기'],
                 ['제출일', studentResult.date],
-                ['내용 점수', `${studentResult.score ?? 0}%`],
+                ['내용 점수', `${studentResult.contentScore ?? 0}%`],
                 ['발음 점수', `${studentResult.pronunciationScore ?? 0}%`],
             ],
             theme: 'grid',
@@ -249,12 +249,12 @@ export default function StudentResultPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {studentResult.studentRecordingDataUri && (
+                {studentResult.studentRecordingUrl && (
                   <div className="flex flex-col gap-2">
-                    <audio controls src={studentResult.studentRecordingDataUri} className="w-full">
+                    <audio controls src={studentResult.studentRecordingUrl} className="w-full">
                       Your browser does not support the audio element.
                     </audio>
-                     <a href={studentResult.studentRecordingDataUri} target="_blank" rel="noopener noreferrer" download={`${studentResult.name}_${assessment.title}_녹음.webm`} className="w-full">
+                     <a href={studentResult.studentRecordingUrl} target="_blank" rel="noopener noreferrer" download={`${studentResult.name}_${assessment.title}_녹음.webm`} className="w-full">
                         <Button variant="secondary" className="w-full">
                             <Mic className="mr-2 h-4 w-4" />
                             음성 파일 다운로드
@@ -300,9 +300,9 @@ export default function StudentResultPage() {
                       <div className="w-full">
                           <div className="flex justify-between mb-1">
                               <span className="text-base font-medium text-primary">내용 점수</span>
-                              <span className="text-sm font-medium text-primary">{studentResult.score ?? 0}%</span>
+                              <span className="text-sm font-medium text-primary">{studentResult.contentScore ?? 0}%</span>
                           </div>
-                          <Progress value={studentResult.score} className="h-2" />
+                          <Progress value={studentResult.contentScore} className="h-2" />
                       </div>
                       <div className="w-full">
                           <div className="flex justify-between mb-1">
