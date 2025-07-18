@@ -3,7 +3,7 @@
 
 import { FeedbackView } from "./feedback-view"
 import { GrowthView } from "./growth-view"
-import { useParams, useRouter, notFound } from 'next/navigation';
+import { useParams, useRouter, notFound, useSearchParams } from 'next/navigation';
 import { useEffect, useState, useCallback } from "react";
 import { type StudentResult, type ResultStatus, type TeacherAssessment } from "@/lib/types";
 import { useAuth } from "@/context/auth-context";
@@ -11,7 +11,7 @@ import { Loader2, AlertTriangle, CheckCircle2, UploadCloud, AudioLines, FileScan
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { db } from "@/lib/firebase";
-import { collection, query, where, onSnapshot, doc, setDoc, updateDoc, getDocs, getDoc, deleteDoc } from "firebase/firestore";
+import { collection, query, where, onSnapshot, doc, setDoc, updateDoc, getDocs, getDoc } from "firebase/firestore";
 import { generateMonologueAnalysis } from "@/ai/flows/generate-monologue-analysis-flow";
 import { useToast } from "@/hooks/use-toast";
 
@@ -80,6 +80,7 @@ export default function AssessmentResultsPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
   
   const [results, setResults] = useState<StudentResult[]>([]);
@@ -195,12 +196,14 @@ export default function AssessmentResultsPage() {
   useEffect(() => {
     if (authLoading || !user || !id) return;
     
+    // 1. Check for session data first. This means a new submission just happened.
     const sessionDataRaw = sessionStorage.getItem(SESSION_STORAGE_KEY);
     if(sessionDataRaw) {
         processMonologueSubmission(JSON.parse(sessionDataRaw));
-        return;
+        return; // Stop further execution to allow analysis to complete
     }
     
+    // 2. If no session data, set up listener for existing results.
     const q = query(
         collection(db, "results"),
         where("assessmentId", "==", id),
@@ -208,51 +211,68 @@ export default function AssessmentResultsPage() {
     );
 
     const unsubscribe = onSnapshot(q, async (snapshot) => {
-        const dbResults = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as StudentResult));
+        if (snapshot.empty && !sessionDataRaw) {
+            // If there are no results and no session data, it might be a stale page.
+            // Or the user hasn't submitted yet.
+            const assessmentRef = doc(db, 'assessments', id);
+            const assessmentSnap = await getDoc(assessmentRef);
+            if (assessmentSnap.exists()) {
+                setAssessment(assessmentSnap.data() as TeacherAssessment);
+                setStatus("completed"); // Show "no results" message
+            } else {
+                notFound();
+            }
+            return;
+        }
+
+        const dbResults: StudentResult[] = [];
+        snapshot.forEach(doc => {
+            dbResults.push({ id: doc.id, ...doc.data() } as StudentResult);
+        });
         
+        // Sort client-side to avoid complex index
         dbResults.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
 
         const stillProcessing = dbResults.some(r => r.status !== '채점 완료' && r.status !== '오류');
         
-        if (dbResults.length > 0) {
+        // Fetch assessment details if not already fetched
+        if (!assessment) {
             const assessmentRef = doc(db, 'assessments', id);
             const assessmentSnap = await getDoc(assessmentRef);
             if (assessmentSnap.exists()) {
-                const fetchedAssessment = {id: assessmentSnap.id, ...assessmentSnap.data()} as TeacherAssessment;
-                setAssessment(fetchedAssessment);
+                setAssessment({id: assessmentSnap.id, ...assessmentSnap.data()} as TeacherAssessment);
             } else {
                 notFound();
                 return;
             }
-            setResults(dbResults);
-            
-            const latestResult = dbResults[dbResults.length - 1];
-            if (latestResult.status === '오류') {
-                setStatus('error');
-                setErrorInfo({ 
-                    message: latestResult.aiFeedback, 
-                    resultId: latestResult.id,
-                    sessionData: {
-                        assessmentId: latestResult.assessmentId,
-                        studentRecordingUrl: latestResult.studentRecordingUrl!,
-                        assessmentDetails: assessment!
-                    }
-                });
-            } else if (!stillProcessing) {
-              setStatus("completed");
-            } else {
-              setStatus("analyzing");
-              const latestStatus = latestResult.status as ResultStatus;
-              if(latestStatus.includes('텍스트')){
-                setAnalysisStep('transcribe')
-              } else if (latestStatus.includes('분석')) {
-                setAnalysisStep('analyze')
-              } else if (latestStatus.includes('리포트')) {
-                setAnalysisStep('report')
-              }
-            }
+        }
+
+        setResults(dbResults);
+        
+        const latestResult = dbResults[dbResults.length - 1];
+        if (latestResult?.status === '오류') {
+            setStatus('error');
+            setErrorInfo({ 
+                message: latestResult.aiFeedback, 
+                resultId: latestResult.id,
+                sessionData: {
+                    assessmentId: latestResult.assessmentId,
+                    studentRecordingUrl: latestResult.studentRecordingUrl!,
+                    assessmentDetails: assessment!
+                }
+            });
+        } else if (!stillProcessing) {
+          setStatus("completed");
         } else {
-            setStatus("completed");
+          setStatus("analyzing");
+          const latestStatus = latestResult.status as ResultStatus;
+          if(latestStatus.includes('텍스트')){
+            setAnalysisStep('transcribe')
+          } else if (latestStatus.includes('분석')) {
+            setAnalysisStep('analyze')
+          } else if (latestStatus.includes('리포트')) {
+            setAnalysisStep('report')
+          }
         }
     }, (err) => {
         console.error("Error listening to result:", err);
@@ -288,7 +308,7 @@ export default function AssessmentResultsPage() {
                 <CardDescription className="text-destructive-foreground">{errorInfo?.message || "AI가 답변을 분석하는 데 실패했습니다. 다시 시도해주세요."}</CardDescription>
             </CardHeader>
             <CardContent className="flex gap-2">
-                <Button onClick={handleRetry}>
+                <Button onClick={handleRetry} disabled={!errorInfo?.sessionData}>
                     <RefreshCw className="mr-2 h-4 w-4" />
                     재분석 시도
                 </Button>
@@ -315,11 +335,10 @@ export default function AssessmentResultsPage() {
     }
 
     if (results.length > 1) {
-      return <GrowthView results={results} assessment={assessment} />;
+      const attemptNumber = searchParams.get('attempt');
+      return <GrowthView results={results} assessment={assessment} defaultTab={`attempt-${attemptNumber || results.length}`} />;
     }
   }
 
   return null;
 }
-
-    

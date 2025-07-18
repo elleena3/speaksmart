@@ -16,11 +16,16 @@ import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { format } from 'date-fns';
 
+type EnrichedResult = StudentResult & {
+    attemptNumber?: number;
+    totalAttempts?: number;
+};
+
 export default function HistoryPage() {
   const { t } = useLanguage();
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
-  const [completedAssessments, setCompletedAssessments] = useState<StudentResult[]>([]);
+  const [completedAssessments, setCompletedAssessments] = useState<EnrichedResult[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -33,20 +38,40 @@ export default function HistoryPage() {
     const fetchHistory = async () => {
         setIsLoading(true);
         try {
-            // orderBy removed to avoid composite index requirement. Sorting will be done on the client.
             const q = query(
                 collection(db, "results"),
-                where("studentId", "==", user.uid)
+                where("studentId", "==", user.uid),
+                where("status", "==", "채점 완료")
             );
             const querySnapshot = await getDocs(q);
-            const allResults = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as StudentResult));
+            let allResults = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as StudentResult));
+
+            // Group results by assessmentId
+            const groupedResults: { [key: string]: StudentResult[] } = {};
+            allResults.forEach(result => {
+                if (!groupedResults[result.assessmentId]) {
+                    groupedResults[result.assessmentId] = [];
+                }
+                groupedResults[result.assessmentId].push(result);
+            });
+
+            const enrichedResults: EnrichedResult[] = [];
+            for (const assessmentId in groupedResults) {
+                const attempts = groupedResults[assessmentId].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+                const totalAttempts = attempts.length;
+                attempts.forEach((attempt, index) => {
+                    enrichedResults.push({
+                        ...attempt,
+                        attemptNumber: index + 1,
+                        totalAttempts: totalAttempts,
+                    });
+                });
+            }
+
+            // Sort the final list by date, newest first
+            enrichedResults.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
             
-            // Filter and sort on the client side
-            const completedResults = allResults
-                .filter(result => result.status === "채점 완료")
-                .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)); // Sort by newest first
-            
-            setCompletedAssessments(completedResults);
+            setCompletedAssessments(enrichedResults);
         } catch (error) {
             console.error("Error fetching history: ", error);
         } finally {
@@ -65,6 +90,20 @@ export default function HistoryPage() {
     );
   }
 
+  const getAssessmentTitle = (assessment: EnrichedResult) => {
+    if (assessment.totalAttempts && assessment.totalAttempts > 1) {
+        return `${assessment.assessmentTitle} (${assessment.attemptNumber}차 시도)`;
+    }
+    return assessment.assessmentTitle;
+  }
+  
+  const getResultLink = (assessment: EnrichedResult) => {
+    if (assessment.totalAttempts && assessment.totalAttempts > 1) {
+        return `/student/assessment/${assessment.assessmentId}/results?attempt=${assessment.attemptNumber}`;
+    }
+    return `/student/assessment/${assessment.assessmentId}/results`;
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -77,7 +116,8 @@ export default function HistoryPage() {
                 <TableRow>
                     <TableHead>{t.studentHistory.assessment}</TableHead>
                     <TableHead>{t.studentHistory.completionDate}</TableHead>
-                    <TableHead>{t.studentHistory.score}</TableHead>
+                    <TableHead>내용 점수</TableHead>
+                    <TableHead>발음 점수</TableHead>
                     <TableHead className="text-right">{t.studentHistory.action}</TableHead>
                 </TableRow>
             </TableHeader>
@@ -85,13 +125,16 @@ export default function HistoryPage() {
                 {completedAssessments.length > 0 ? (
                     completedAssessments.map((assessment) => (
                         <TableRow key={assessment.id}>
-                            <TableCell className="font-medium">{assessment.assessmentTitle}</TableCell>
+                            <TableCell className="font-medium">{getAssessmentTitle(assessment)}</TableCell>
                             <TableCell>{assessment.createdAt ? format(new Date(assessment.createdAt), 'yyyy-MM-dd') : 'N/A'}</TableCell>
                             <TableCell>
-                                <Badge variant="outline">{assessment.score}%</Badge>
+                                <Badge variant="outline">{assessment.contentScore ?? assessment.score ?? 0}%</Badge>
+                            </TableCell>
+                             <TableCell>
+                                <Badge variant="outline">{assessment.pronunciationScore ?? 0}%</Badge>
                             </TableCell>
                             <TableCell className="text-right">
-                                <Link href={`/student/assessment/${assessment.assessmentId}/results`}>
+                                <Link href={getResultLink(assessment)}>
                                     <Button variant="secondary" size="sm">{t.studentHistory.viewFeedback}</Button>
                                 </Link>
                             </TableCell>
@@ -99,7 +142,7 @@ export default function HistoryPage() {
                     ))
                 ) : (
                     <TableRow>
-                        <TableCell colSpan={4} className="h-24 text-center">
+                        <TableCell colSpan={5} className="h-24 text-center">
                             완료된 평가가 없습니다.
                         </TableCell>
                     </TableRow>
@@ -110,3 +153,4 @@ export default function HistoryPage() {
     </Card>
   );
 }
+

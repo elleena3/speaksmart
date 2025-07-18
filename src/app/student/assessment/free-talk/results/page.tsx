@@ -86,6 +86,10 @@ export default function FreeTalkResultsPage() {
     const [analysisStep, setAnalysisStep] = useState<AnalysisStep | null>(null);
     const [errorInfo, setErrorInfo] = useState<{ message: string, resultId?: string, sessionData?: DialogueSessionData } | null>(null);
     const { toast } = useToast();
+    
+    // Get assessment ID from session data first, then from URL as fallback
+    const sessionDataStringForId = typeof window !== 'undefined' ? sessionStorage.getItem(SESSION_STORAGE_KEY) : null;
+    const assessmentId = sessionDataStringForId ? JSON.parse(sessionDataStringForId).assessment.id : searchParams.get('id');
 
     const processDialogueSubmission = useCallback(async (sessionData: DialogueSessionData, existingResultId?: string) => {
         if (!user) return;
@@ -123,7 +127,7 @@ export default function FreeTalkResultsPage() {
                 date: new Date().toISOString(),
                 status: "분석 중",
                 studentRecordingUrl: studentRecordingUrl,
-                studentTranscript: fullConversationTranscript,
+                studentTranscript: fullConversationTranscript, // Store the full conversation here
             };
             
             await setDoc(resultRef, initialData, { merge: true });
@@ -143,7 +147,7 @@ export default function FreeTalkResultsPage() {
             setAnalysisStep("report");
             const finalResultData: Partial<StudentResult> = {
                 ...analysisResult,
-                studentTranscript: fullConversationTranscript,
+                studentTranscript: fullConversationTranscript, // Ensure it's saved again
                 status: "채점 완료",
             };
             await updateDoc(resultRef, finalResultData);
@@ -188,14 +192,16 @@ export default function FreeTalkResultsPage() {
 
     useEffect(() => {
         if(authLoading || !user) return;
-
-        const storedDataString = sessionStorage.getItem(SESSION_STORAGE_KEY);
-        const sessionData: DialogueSessionData | null = storedDataString ? JSON.parse(storedDataString) : null;
-        const assessmentId = sessionData?.assessment?.id || searchParams.get('assessmentId');
-
+        
         if (!assessmentId) {
             toast({ title: "평가 정보 없음", description: "대시보드로 돌아갑니다.", variant: "destructive" });
             router.push('/student/dashboard');
+            return;
+        }
+
+        const storedDataString = sessionStorage.getItem(SESSION_STORAGE_KEY);
+        if (storedDataString) {
+            processDialogueSubmission(JSON.parse(storedDataString));
             return;
         }
 
@@ -206,13 +212,28 @@ export default function FreeTalkResultsPage() {
         );
         
         const unsubscribe = onSnapshot(q, async (snapshot) => {
-            const dbResults = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as StudentResult));
+             if (snapshot.empty && !storedDataString) {
+                const assessmentRef = doc(db, 'assessments', assessmentId);
+                const assessmentSnap = await getDoc(assessmentRef);
+                if (assessmentSnap.exists()) {
+                    setAssessment(assessmentSnap.data() as TeacherAssessment);
+                    setStatus("completed"); // Show "no results" message
+                } else {
+                    notFound();
+                }
+                return;
+            }
+
+            const dbResults: StudentResult[] = [];
+            snapshot.forEach(doc => {
+                dbResults.push({ id: doc.id, ...doc.data() } as StudentResult);
+            });
             
             dbResults.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
 
             const stillProcessing = dbResults.some(r => r.status !== '채점 완료' && r.status !== '오류');
             
-            if (dbResults.length > 0) {
+            if (!assessment) {
                 const assessmentRef = doc(db, 'assessments', assessmentId);
                 const assessmentSnap = await getDoc(assessmentRef);
                 if (assessmentSnap.exists()) {
@@ -221,29 +242,40 @@ export default function FreeTalkResultsPage() {
                     notFound();
                     return;
                 }
-                setResults(dbResults);
+            }
+            setResults(dbResults);
+            
+            const latestResult = dbResults[dbResults.length - 1];
+            if(latestResult?.status === '오류'){
+                setStatus('error');
                 
-                const latestResult = dbResults[dbResults.length - 1];
-                if(latestResult.status === '오류'){
-                    setStatus('error');
-                    setErrorInfo({ 
-                        message: latestResult.aiFeedback, 
-                        resultId: latestResult.id,
-                        sessionData: {
-                            assessment: (await getDoc(doc(db, 'assessments', latestResult.assessmentId))).data() as TeacherAssessment,
-                            studentRecordingUrl: latestResult.studentRecordingUrl!,
-                            conversationHistory: JSON.parse(latestResult.studentTranscript || '[]'),
-                        }
-                    });
-                } else if (!stillProcessing) {
-                  setStatus("completed");
-                } else {
-                  setStatus("analyzing");
-                }
-            } else if (sessionData) {
-                processDialogueSubmission(sessionData);
+                const assessmentDoc = await getDoc(doc(db, 'assessments', latestResult.assessmentId));
+                const assessmentData = assessmentDoc.data() as TeacherAssessment;
+                
+                // For dialogue, transcript is stored as a stringified JSON of ConversationTurn[]
+                // We need to parse it back.
+                let conversationHistory: ConversationTurn[] = [];
+                try {
+                    const parsed = JSON.parse(latestResult.studentTranscript || '[]');
+                    if(Array.isArray(parsed)) {
+                        conversationHistory = parsed;
+                    }
+                } catch (e) { console.error("Could not parse conversation history for retry", e); }
+
+
+                setErrorInfo({ 
+                    message: latestResult.aiFeedback, 
+                    resultId: latestResult.id,
+                    sessionData: {
+                        assessment: assessmentData,
+                        studentRecordingUrl: latestResult.studentRecordingUrl!,
+                        conversationHistory: conversationHistory
+                    }
+                });
+            } else if (!stillProcessing) {
+              setStatus("completed");
             } else {
-                setStatus("completed");
+              setStatus("analyzing");
             }
         }, (err) => {
             console.error("Error listening to result:", err);
@@ -253,7 +285,7 @@ export default function FreeTalkResultsPage() {
 
         return () => unsubscribe();
         
-    }, [user, authLoading, router, toast, processDialogueSubmission, searchParams]);
+    }, [user, authLoading, router, toast, processDialogueSubmission, assessmentId, assessment]);
 
 
     if (status === "loading" || authLoading) {
@@ -282,7 +314,7 @@ export default function FreeTalkResultsPage() {
                   <CardDescription className="text-destructive-foreground">{errorInfo?.message || "AI가 답변을 분석하는 데 실패했습니다. 다시 시도해주세요."}</CardDescription>
               </CardHeader>
               <CardContent className="flex gap-2">
-                <Button onClick={handleRetry}>
+                <Button onClick={handleRetry} disabled={!errorInfo?.sessionData}>
                     <RefreshCw className="mr-2 h-4 w-4" />
                     재분석 시도
                 </Button>
@@ -307,11 +339,10 @@ export default function FreeTalkResultsPage() {
         return <FreeTalkFeedbackView result={results[0]} assessment={assessment} isLatestAttempt={true} />;
       }
       if (results.length > 1) {
-        return <GrowthView results={results} assessment={assessment} />;
+        const attemptNumber = searchParams.get('attempt');
+        return <GrowthView results={results} assessment={assessment} defaultTab={`attempt-${attemptNumber || results.length}`} />;
       }
     }
 
     return null;
 }
-
-    

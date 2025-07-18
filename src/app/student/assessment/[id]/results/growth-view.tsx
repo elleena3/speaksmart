@@ -17,6 +17,7 @@ import { Repeat } from "lucide-react";
 type GrowthViewProps = {
     results: StudentResult[];
     assessment: TeacherAssessment;
+    defaultTab?: string;
 }
 
 const chartConfig = {
@@ -30,13 +31,13 @@ const chartConfig = {
     },
 };
 
-export function GrowthView({ results, assessment }: GrowthViewProps) {
+export function GrowthView({ results, assessment, defaultTab }: GrowthViewProps) {
     const [growthFeedback, setGrowthFeedback] = useState<GenerateGrowthFeedbackOutput | null>(null);
     const [isLoadingFeedback, setIsLoadingFeedback] = useState(true);
 
     const chartData = results.map((r, i) => ({
         name: `${i + 1}차`,
-        contentScore: r.contentScore ?? 0,
+        contentScore: r.contentScore ?? r.score ?? 0,
         pronunciationScore: r.pronunciationScore ?? 0,
     }));
 
@@ -50,14 +51,14 @@ export function GrowthView({ results, assessment }: GrowthViewProps) {
                     const feedback = await generateGrowthFeedback({
                         previousAttempt: {
                             attemptNumber: results.length - 1,
-                            contentScore: previousAttempt.contentScore ?? 0,
+                            contentScore: previousAttempt.contentScore ?? previousAttempt.score ?? 0,
                             pronunciationScore: previousAttempt.pronunciationScore ?? 0,
                             transcript: previousAttempt.studentTranscript ?? "",
                             aiFeedback: previousAttempt.aiFeedback ?? "",
                         },
                         latestAttempt: {
                             attemptNumber: results.length,
-                            contentScore: latestAttempt.contentScore ?? 0,
+                            contentScore: latestAttempt.contentScore ?? latestAttempt.score ?? 0,
                             pronunciationScore: latestAttempt.pronunciationScore ?? 0,
                             transcript: latestAttempt.studentTranscript ?? "",
                             aiFeedback: latestAttempt.aiFeedback ?? "",
@@ -73,6 +74,8 @@ export function GrowthView({ results, assessment }: GrowthViewProps) {
                 }
             };
             fetchGrowthFeedback();
+        } else {
+            setIsLoadingFeedback(false);
         }
     }, [results, assessment.title]);
     
@@ -88,7 +91,7 @@ export function GrowthView({ results, assessment }: GrowthViewProps) {
     };
 
     return (
-        <Tabs defaultValue="overview" className="w-full">
+        <Tabs defaultValue={defaultTab || "overview"} className="w-full">
             <TabsList className="grid w-full grid-cols-2 md:grid-cols-4">
                 <TabsTrigger value="overview">종합 분석</TabsTrigger>
                 {results.map((result, index) => (
@@ -116,23 +119,25 @@ export function GrowthView({ results, assessment }: GrowthViewProps) {
                         </ResponsiveContainer>
                     </CardContent>
                 </Card>
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><Sparkles />AI 성장 피드백</CardTitle>
-                        <CardDescription>이전 시도와 최신 시도를 비교한 AI의 분석입니다.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        {isLoadingFeedback ? (
-                            <div className="flex items-center justify-center p-8">
-                                <Loader2 className="h-8 w-8 animate-spin" />
-                            </div>
-                        ) : (
-                            <div className="p-4 bg-muted/50 rounded-lg whitespace-pre-wrap font-body text-base leading-relaxed">
-                                {growthFeedback?.growthFeedback}
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
+                {results.length > 1 && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2"><Sparkles />AI 성장 피드백</CardTitle>
+                            <CardDescription>이전 시도와 최신 시도를 비교한 AI의 분석입니다.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            {isLoadingFeedback ? (
+                                <div className="flex items-center justify-center p-8">
+                                    <Loader2 className="h-8 w-8 animate-spin" />
+                                </div>
+                            ) : (
+                                <div className="p-4 bg-muted/50 rounded-lg whitespace-pre-wrap font-body text-base leading-relaxed">
+                                    {growthFeedback?.growthFeedback}
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                )}
                  <Card>
                     <CardHeader>
                       <CardTitle>다시 해보기</CardTitle>
