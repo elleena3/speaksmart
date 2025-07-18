@@ -51,10 +51,11 @@ export default function HistoryPage() {
         setIsLoading(true);
         try {
             const assessmentsQuery = getDocs(collection(db, "assessments"));
+
+            // **쿼리 단순화:** 복합 색인을 피하기 위해 'status' 필터링을 제거하고 클라이언트 측에서 처리합니다.
             const resultsQuery = getDocs(query(
                 collection(db, "results"),
                 where("studentId", "==", user.uid),
-                where("status", "==", "채점 완료"),
                 orderBy("createdAt", "desc")
             ));
 
@@ -65,9 +66,13 @@ export default function HistoryPage() {
                 assessmentsMap.set(doc.id, { id: doc.id, ...doc.data() } as TeacherAssessment);
             });
 
+            // **클라이언트 측 필터링:** '채점 완료' 상태인 결과만 필터링합니다.
+            const completedResults = resultsSnapshot.docs
+                .map(doc => ({ id: doc.id, ...doc.data() } as StudentResult))
+                .filter(result => result.status === "채점 완료");
+
             const resultsByAssessmentId: { [key: string]: EnrichedResult[] } = {};
-            resultsSnapshot.docs.forEach(doc => {
-                const result = { id: doc.id, ...doc.data() } as StudentResult;
+            completedResults.forEach(result => {
                 const assessment = assessmentsMap.get(result.assessmentId);
                 const enrichedResult: EnrichedResult = {
                     ...result,
@@ -80,7 +85,7 @@ export default function HistoryPage() {
             });
 
             const grouped: GroupedResult[] = Object.values(resultsByAssessmentId).map(attempts => {
-                // Already sorted by query (desc)
+                // 이미 쿼리에서 시간순으로 정렬(desc)되어 있으므로 첫 번째 항목이 최신 시도입니다.
                 const latestAttempt = attempts[0];
                 const previousAttempts = attempts.slice(1);
                 return {
@@ -88,10 +93,13 @@ export default function HistoryPage() {
                     assessmentTitle: latestAttempt.assessmentTitle,
                     assessmentType: latestAttempt.assessmentType,
                     latestAttempt: latestAttempt,
-                    previousAttempts: previousAttempts.reverse(), // Show oldest first when expanded
+                    previousAttempts: previousAttempts.reverse(), // 확장 시에는 가장 오래된 시도가 먼저 보이도록 순서를 뒤집습니다.
                     totalAttempts: attempts.length,
                 };
             });
+            
+            // 최신 시도의 생성 날짜를 기준으로 그룹 자체를 정렬합니다.
+            grouped.sort((a,b) => b.latestAttempt.createdAt - a.latestAttempt.createdAt);
 
             setGroupedAssessments(grouped);
         } catch (error) {
@@ -125,15 +133,15 @@ export default function HistoryPage() {
 
   const getResultLink = (result: EnrichedResult, isLatest: boolean, totalAttempts: number) => {
     const baseLink = `/student/assessment/${result.assessmentId}/results`;
-    if (!isLatest) {
-        // Find the attempt number for non-latest attempts
+    if (totalAttempts > 1 && !isLatest) {
         const group = groupedAssessments.find(g => g.assessmentId === result.assessmentId);
+        // previousAttempts는 오름차순으로 정렬되어 있으므로 index + 1이 시도 번호가 됩니다.
         const attemptIndex = group?.previousAttempts.findIndex(p => p.id === result.id) ?? -1;
         if (attemptIndex !== -1) {
             return `${baseLink}?attempt=${attemptIndex + 1}`;
         }
     }
-    // For latest attempt, or if calculation fails, go to the default results view which shows the growth view or latest result
+    // 최신 시도이거나, 시도 횟수가 하나뿐이거나, 계산에 실패하면 종합 분석 페이지로 이동합니다.
     return baseLink;
   }
 
@@ -148,7 +156,7 @@ export default function HistoryPage() {
         <Table>
             <TableHeader>
                 <TableRow>
-                    <TableHead className="w-[40%] text-center">{t.studentHistory.assessment}</TableHead>
+                    <TableHead className="w-[40%]">{t.studentHistory.assessment}</TableHead>
                     <TableHead className="text-center">평가 유형</TableHead>
                     <TableHead className="text-center">완료 날짜</TableHead>
                     <TableHead className="text-center">내용 점수</TableHead>
@@ -158,47 +166,49 @@ export default function HistoryPage() {
             </TableHeader>
             <TableBody>
                 {groupedAssessments.length > 0 ? (
-                    groupedAssessments.flatMap((group, groupIndex) => {
+                    groupedAssessments.map((group) => {
                         const isExpanded = openStates[group.assessmentId];
-                        const rows = [
-                             <TableRow key={group.assessmentId} className="font-medium align-middle">
-                                <TableCell className="text-center">
-                                    <div className="flex items-center justify-center gap-2">
-                                        {group.totalAttempts > 1 && (
-                                            <Button variant="ghost" size="sm" className="w-8 h-8 p-0" onClick={() => toggleGroup(group.assessmentId)}>
-                                                <ChevronDown className={cn("h-4 w-4 transition-transform", isExpanded && "rotate-180")} />
-                                                <span className="sr-only">Toggle</span>
+                        const allAttempts = [ ...group.previousAttempts, group.latestAttempt];
+
+                        return (
+                            <React.Fragment key={group.assessmentId}>
+                                 <TableRow className="font-medium align-middle">
+                                    <TableCell>
+                                        <div className="flex items-center gap-2">
+                                            {group.totalAttempts > 1 ? (
+                                                <Button variant="ghost" size="sm" className="w-8 h-8 p-0" onClick={() => toggleGroup(group.assessmentId)}>
+                                                    <ChevronDown className={cn("h-4 w-4 transition-transform", isExpanded && "rotate-180")} />
+                                                    <span className="sr-only">Toggle</span>
+                                                </Button>
+                                            ) : (
+                                                <div className="w-8 h-8 p-0"/> // 아이콘 없는 경우 간격 유지
+                                            )}
+                                            <span className="font-semibold break-words">{group.assessmentTitle}</span>
+                                            {group.totalAttempts > 1 && <Badge variant="outline">총 {group.totalAttempts}회 응시</Badge>}
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="text-center">
+                                        <Badge variant="outline" className="whitespace-nowrap">{getAssessmentTypeText(group.assessmentType)}</Badge>
+                                    </TableCell>
+                                    <TableCell className="text-center whitespace-nowrap">{group.latestAttempt.createdAt ? format(new Date(group.latestAttempt.createdAt), 'yyyy-MM-dd') : 'N/A'}</TableCell>
+                                    <TableCell className="text-center">
+                                        <Badge variant="outline">{group.latestAttempt.contentScore ?? group.latestAttempt.score ?? 0}%</Badge>
+                                    </TableCell>
+                                    <TableCell className="text-center">
+                                        <Badge variant="outline">{group.latestAttempt.pronunciationScore ?? 0}%</Badge>
+                                    </TableCell>
+                                    <TableCell className="text-center">
+                                        <Link href={getResultLink(group.latestAttempt, true, group.totalAttempts)}>
+                                            <Button variant="secondary" size="sm">
+                                                {group.totalAttempts > 1 ? <TrendingUp className="mr-2 h-4 w-4" /> : null}
+                                                {group.totalAttempts > 1 ? "종합 분석 보기" : "결과 보기"}
                                             </Button>
-                                        )}
-                                        <span className={cn("font-semibold break-words", group.totalAttempts <= 1 && "pl-8")}>{group.assessmentTitle}</span>
-                                        {group.totalAttempts > 1 && <Badge variant="outline">총 {group.totalAttempts}회 응시</Badge>}
-                                    </div>
-                                </TableCell>
-                                <TableCell className="text-center">
-                                    <Badge variant="outline" className="whitespace-nowrap">{getAssessmentTypeText(group.assessmentType)}</Badge>
-                                </TableCell>
-                                <TableCell className="text-center whitespace-nowrap">{group.latestAttempt.createdAt ? format(new Date(group.latestAttempt.createdAt), 'yyyy-MM-dd') : 'N/A'}</TableCell>
-                                <TableCell className="text-center">
-                                    <Badge variant="outline">{group.latestAttempt.contentScore ?? group.latestAttempt.score ?? 0}%</Badge>
-                                </TableCell>
-                                <TableCell className="text-center">
-                                    <Badge variant="outline">{group.latestAttempt.pronunciationScore ?? 0}%</Badge>
-                                </TableCell>
-                                <TableCell className="text-center">
-                                    <Link href={getResultLink(group.latestAttempt, true, group.totalAttempts)}>
-                                        <Button variant="secondary" size="sm">
-                                            {group.totalAttempts > 1 ? <TrendingUp className="mr-2 h-4 w-4" /> : null}
-                                            {group.totalAttempts > 1 ? "종합 분석 보기" : "결과 보기"}
-                                        </Button>
-                                    </Link>
-                                </TableCell>
-                            </TableRow>
-                        ];
-                        if (isExpanded) {
-                            group.previousAttempts.forEach((attempt, index) => {
-                                rows.push(
-                                    <TableRow key={attempt.id} className={cn("bg-muted/50", (index < group.previousAttempts.length - 1) && "border-dashed")}>
-                                        <TableCell className="text-center pl-12 text-muted-foreground">
+                                        </Link>
+                                    </TableCell>
+                                </TableRow>
+                                {isExpanded && group.previousAttempts.map((attempt, index) => (
+                                     <TableRow key={attempt.id} className={cn("bg-muted/50 border-dashed")}>
+                                        <TableCell className="pl-12 text-muted-foreground">
                                           └ {index + 1}차 시도
                                         </TableCell>
                                         <TableCell className="text-center">
@@ -219,10 +229,9 @@ export default function HistoryPage() {
                                             </Link>
                                         </TableCell>
                                     </TableRow>
-                                );
-                            });
-                        }
-                        return rows;
+                                ))}
+                            </React.Fragment>
+                        );
                     })
                 ) : (
                     <TableRow>
