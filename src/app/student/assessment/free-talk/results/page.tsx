@@ -14,6 +14,7 @@ import { db } from "@/lib/firebase";
 import { collection, query, where, onSnapshot, doc, setDoc, updateDoc, getDocs, getDoc } from "firebase/firestore";
 import { generateDialogueAnalysis } from "@/ai/flows/generate-dialogue-analysis-flow";
 import { useToast } from "@/hooks/use-toast";
+import { Progress } from "@/components/ui/progress";
 
 const SESSION_STORAGE_KEY = 'freeTalkSessionData';
 
@@ -28,6 +29,23 @@ const analysisSteps: { key: AnalysisStep, text: string, icon: React.FC<any> }[] 
 
 
 function AnalysisProgressView({ currentStep }: { currentStep: AnalysisStep | null }) {
+    const [progress, setProgress] = useState(0);
+    const estimatedTotalTime = 90000; // 90초 (1.5분)
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setProgress(prev => {
+                if (prev >= 95) { // 95%에서 멈춰서 완료를 기다림
+                    clearInterval(interval);
+                    return 95;
+                }
+                return prev + 1;
+            });
+        }, estimatedTotalTime / 100); 
+
+        return () => clearInterval(interval);
+    }, []);
+
     const getCurrentStepIndex = () => {
         if (!currentStep) return -1;
         return analysisSteps.findIndex(step => step.key === currentStep);
@@ -40,7 +58,8 @@ function AnalysisProgressView({ currentStep }: { currentStep: AnalysisStep | nul
                 <CardTitle>AI 분석 진행 중</CardTitle>
                 <CardDescription>대화 내용을 분석하고 있습니다. 이 과정은 최대 1-2분 소요될 수 있습니다.</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-6">
+                <Progress value={progress} className="w-full h-2" />
                 <ul className="space-y-4">
                     {analysisSteps.map((step, index) => {
                         const isCompleted = index < currentStepIndex;
@@ -133,6 +152,8 @@ export default function FreeTalkResultsPage() {
             await setDoc(resultRef, initialData, { merge: true });
 
             setAnalysisStep("analyze");
+            await updateDoc(resultRef, { status: "내용 및 발음 분석 중..." });
+            
             const analysisResult = await generateDialogueAnalysis({
                 studentRecordingUrl: studentRecordingUrl,
                 studentTranscript: studentOnlyTranscript,
@@ -145,6 +166,8 @@ export default function FreeTalkResultsPage() {
             });
 
             setAnalysisStep("report");
+            await updateDoc(resultRef, { status: "리포트 생성 중..." });
+
             const finalResultData: Partial<StudentResult> = {
                 ...analysisResult,
                 studentTranscript: fullConversationTranscript, // Ensure it's saved again
@@ -276,6 +299,14 @@ export default function FreeTalkResultsPage() {
               setStatus("completed");
             } else {
               setStatus("analyzing");
+              const latestStatus = latestResult.status as ResultStatus;
+              if (latestStatus.includes('분석')) {
+                setAnalysisStep('analyze');
+              } else if (latestStatus.includes('리포트')) {
+                setAnalysisStep('report');
+              } else {
+                setAnalysisStep('upload');
+              }
             }
         }, (err) => {
             console.error("Error listening to result:", err);

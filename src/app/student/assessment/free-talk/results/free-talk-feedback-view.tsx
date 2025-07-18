@@ -88,8 +88,8 @@ export function FreeTalkFeedbackView({ result, assessment, isLatestAttempt }: Fe
               <div className="flex items-center gap-3">
                 <FileText className="w-8 h-8 text-primary shrink-0" />
                 <div>
-                  <CardTitle className="text-2xl">내 답변</CardTitle>
-                  <CardDescription>음성인식으로 변환된 나의 답변과 녹음 파일입니다.</CardDescription>
+                  <CardTitle className="text-2xl">대화 기록</CardTitle>
+                  <CardDescription>AI와의 전체 대화 기록과 전체 녹음 파일입니다.</CardDescription>
                 </div>
               </div>
             </CardHeader>
