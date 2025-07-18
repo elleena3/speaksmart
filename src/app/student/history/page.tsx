@@ -51,7 +51,7 @@ export default function HistoryPage() {
         setIsLoading(true);
         try {
             const assessmentsQuery = getDocs(collection(db, "assessments"));
-
+            
             const resultsQuery = getDocs(query(
                 collection(db, "results"),
                 where("studentId", "==", user.uid)
@@ -64,15 +64,14 @@ export default function HistoryPage() {
                 assessmentsMap.set(doc.id, { id: doc.id, ...doc.data() } as TeacherAssessment);
             });
 
-            const allResults: EnrichedResult[] = resultsSnapshot.docs
-                .map(doc => {
-                    const result = { id: doc.id, ...doc.data() } as StudentResult;
-                    const assessment = assessmentsMap.get(result.assessmentId);
-                    return {
-                        ...result,
-                        assessmentType: assessment?.assessmentType || 'monologue',
-                    };
-                });
+            const allResults: EnrichedResult[] = resultsSnapshot.docs.map(doc => {
+                const result = { id: doc.id, ...doc.data() } as StudentResult;
+                const assessment = assessmentsMap.get(result.assessmentId);
+                return {
+                    ...result,
+                    assessmentType: assessment?.assessmentType || 'monologue',
+                };
+            });
             
             const completedResults = allResults
                 .filter(result => result.status === "채점 완료")
@@ -132,9 +131,12 @@ export default function HistoryPage() {
   }
 
   const getResultLink = (result: EnrichedResult, attemptNumber?: number) => {
-    const baseLink = `/student/assessment/${result.assessmentId}/results`;
+    const baseLink = result.assessmentType === 'dialogue' 
+        ? `/student/assessment/free-talk/results?id=${result.assessmentId}`
+        : `/student/assessment/${result.assessmentId}/results`;
+
     if (attemptNumber) {
-        return `${baseLink}?attempt=${attemptNumber}`;
+        return `${baseLink}&attempt=${attemptNumber}`;
     }
     return baseLink;
   }
@@ -145,16 +147,16 @@ export default function HistoryPage() {
         <CardTitle>{t.studentHistory.title}</CardTitle>
         <CardDescription>{t.studentHistory.description}</CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-0">
         <Table>
             <TableHeader>
                 <TableRow>
-                    <TableHead className="w-[40%]">{t.studentHistory.assessment}</TableHead>
+                    <TableHead className="w-[40%] pl-4">{t.studentHistory.assessment}</TableHead>
                     <TableHead className="text-center whitespace-nowrap">평가 유형</TableHead>
                     <TableHead className="text-center whitespace-nowrap">완료 날짜</TableHead>
                     <TableHead className="text-center whitespace-nowrap">내용 점수</TableHead>
                     <TableHead className="text-center whitespace-nowrap">발음 점수</TableHead>
-                    <TableHead className="text-center whitespace-nowrap">결과 보기</TableHead>
+                    <TableHead className="text-center pr-4">결과 보기</TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody>
@@ -163,8 +165,8 @@ export default function HistoryPage() {
                         const isExpanded = !!openStates[group.assessmentId];
                         return (
                             <React.Fragment key={group.assessmentId}>
-                                 <TableRow className={cn("font-medium align-middle", !isExpanded && groupIndex === groupedAssessments.length - 1 && 'border-b-0')}>
-                                    <TableCell>
+                                 <TableRow className={cn("font-medium align-middle", !isExpanded && groupIndex === groupedAssessments.length - 1 && 'border-b-0', isExpanded && 'border-b-2 border-dashed')}>
+                                    <TableCell className="pl-4">
                                         <div className="flex items-center gap-2">
                                             {group.totalAttempts > 1 ? (
                                                 <Button variant="ghost" size="sm" className="w-8 h-8 p-0" onClick={() => toggleGroup(group.assessmentId)}>
@@ -188,8 +190,8 @@ export default function HistoryPage() {
                                     <TableCell className="text-center">
                                         <Badge variant="outline" className="whitespace-nowrap">{group.latestAttempt.pronunciationScore ?? 0}%</Badge>
                                     </TableCell>
-                                    <TableCell className="text-center">
-                                        <Link href={getResultLink(group.latestAttempt, group.totalAttempts)}>
+                                    <TableCell className="text-center pr-4">
+                                        <Link href={getResultLink(group.latestAttempt, group.totalAttempts > 1 ? group.totalAttempts : undefined)}>
                                             <Button variant="secondary" size="sm">
                                                 {group.totalAttempts > 1 ? <TrendingUp className="mr-2 h-4 w-4" /> : null}
                                                 {group.totalAttempts > 1 ? "종합 분석 보기" : "결과 보기"}
@@ -199,8 +201,7 @@ export default function HistoryPage() {
                                 </TableRow>
                                 {isExpanded && group.previousAttempts.map((attempt, index) => (
                                      <TableRow key={attempt.id} className={cn("bg-muted/50 border-dashed",
-                                       (groupIndex === groupedAssessments.length - 1 && index === group.previousAttempts.length - 1) && 'border-b-0',
-                                       (groupIndex < groupedAssessments.length - 1 && index === group.previousAttempts.length - 1) && 'border-b-2'
+                                       index === group.previousAttempts.length - 1 ? 'border-b-2' : 'border-b'
                                      )}>
                                         <TableCell className="pl-12 text-muted-foreground">
                                           └ {index + 1}차 시도
@@ -217,7 +218,7 @@ export default function HistoryPage() {
                                         <TableCell className="text-center">
                                             <Badge variant="ghost" className="whitespace-nowrap">{attempt.pronunciationScore ?? 0}%</Badge>
                                         </TableCell>
-                                        <TableCell className="text-center">
+                                        <TableCell className="text-center pr-4">
                                             <Link href={getResultLink(attempt, index + 1)}>
                                                 <Button variant="ghost" size="sm">결과 보기</Button>
                                             </Link>
