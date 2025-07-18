@@ -37,12 +37,13 @@ const createConversationalPrompt = (modelName: z.infer<typeof evaluationModels[n
           scenario: true,
           scenarioPrompt: true, 
           conversationHistory: true,
+          aiVoice: true,
         }).extend({
             history: z.array(ConversationTurnSchema.extend({ isUser: z.boolean() })),
         })
       },
       output: { schema: ConverseWithStudentOutputSchema.pick({ aiResponseText: true }) },
-      prompt: `You are an AI English conversation partner. Your name is "Alex". You are friendly, patient, and encouraging. Your goal is to have a natural, engaging conversation with a student learning English.
+      prompt: `You are an AI English conversation partner. Your name is "{{aiVoice}}". You are friendly, patient, and encouraging. Your goal is to have a natural, engaging conversation with a student learning English.
 
     IMPORTANT RULE: If the student's transcript is "(The user did not say anything)", you MUST respond by asking them to speak again, for example: "Sorry, I didn't catch that. Could you please say that again?" or "I couldn't hear you, can you repeat that?". Do not say "Okay, I see" or try to continue the conversation.
 
@@ -71,7 +72,7 @@ const createConversationalPrompt = (modelName: z.infer<typeof evaluationModels[n
     {{else}}
     You are starting the conversation. Greet the student according to your role and the situation. Keep it short and friendly.
     For example, if you are a shop assistant: "Hi, welcome to our store. Let me know if you need any help finding something."
-    For a free talk, you could say: "Hi there! I'm Alex. How are you doing today?"
+    For a free talk, you could say: "Hi there! I'm {{aiVoice}}. How are you doing today?"
     You:
     {{/if}}
     `,
@@ -178,7 +179,8 @@ const converseWithStudentFlow = ai.defineFlow(
       studentTranscript: studentTranscript || undefined, 
       scenario: scenario || 'free-talk',
       scenarioPrompt: scenarioPrompt,
-      conversationHistory: conversationHistory
+      conversationHistory: conversationHistory,
+      aiVoice: aiVoice || 'achernar',
     });
 
     aiResponseText = output?.aiResponseText || "";
