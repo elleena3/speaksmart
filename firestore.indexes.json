@@ -48,11 +48,11 @@
       "queryScope": "COLLECTION",
       "fields": [
         {
-          "fieldPath": "studentId",
+          "fieldPath": "status",
           "order": "ASCENDING"
         },
         {
-          "fieldPath": "status",
+          "fieldPath": "studentId",
           "order": "ASCENDING"
         },
         {
