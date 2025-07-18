@@ -7,17 +7,18 @@ import { useParams, useRouter, notFound } from 'next/navigation';
 import { useEffect, useState, useCallback } from "react";
 import { type StudentResult, type ResultStatus, type TeacherAssessment } from "@/lib/types";
 import { useAuth } from "@/context/auth-context";
-import { Loader2, AlertTriangle, CheckCircle2, UploadCloud, AudioLines, FileScan, Sparkles } from "lucide-react";
+import { Loader2, AlertTriangle, CheckCircle2, UploadCloud, AudioLines, FileScan, Sparkles, RefreshCw } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { db } from "@/lib/firebase";
-import { collection, query, where, onSnapshot, doc, setDoc, updateDoc, getDocs, getDoc } from "firebase/firestore";
+import { collection, query, where, onSnapshot, doc, setDoc, updateDoc, getDocs, getDoc, deleteDoc } from "firebase/firestore";
 import { generateMonologueAnalysis } from "@/ai/flows/generate-monologue-analysis-flow";
 import { useToast } from "@/hooks/use-toast";
 
 const SESSION_STORAGE_KEY = 'monologueSessionData';
 
 type AnalysisStep = "upload" | "transcribe" | "analyze" | "report";
+type PageStatus = "loading" | "analyzing" | "completed" | "error";
 
 const analysisSteps: { key: AnalysisStep, text: string, icon: React.FC<any> }[] = [
     { key: "upload", text: "답변 파일 업로드", icon: UploadCloud },
@@ -68,6 +69,13 @@ function AnalysisProgressView({ currentStep }: { currentStep: AnalysisStep | nul
     );
 }
 
+type MonologueSessionData = {
+    assessmentId: string, 
+    studentRecordingUrl: string, 
+    assessmentDetails: TeacherAssessment
+};
+
+
 export default function AssessmentResultsPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -77,25 +85,30 @@ export default function AssessmentResultsPage() {
   const [results, setResults] = useState<StudentResult[]>([]);
   const [assessment, setAssessment] = useState<TeacherAssessment | null>(null);
   const [analysisStep, setAnalysisStep] = useState<AnalysisStep | null>(null);
-  const [status, setStatus] = useState<"loading" | "analyzing" | "completed" | "error">("loading");
-  const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState<PageStatus>("loading");
+  const [errorInfo, setErrorInfo] = useState<{ message: string, resultId?: string, sessionData?: MonologueSessionData } | null>(null);
   const { toast } = useToast();
 
-  const processMonologueSubmission = useCallback(async () => {
-    const sessionDataRaw = sessionStorage.getItem(SESSION_STORAGE_KEY);
-    if (!sessionDataRaw || !user) return;
+  const processMonologueSubmission = useCallback(async (sessionData: MonologueSessionData, existingResultId?: string) => {
+    if (!user) return;
     
     setStatus("analyzing");
-    const { assessmentId, studentRecordingUrl, assessmentDetails } = JSON.parse(sessionDataRaw) as { assessmentId: string, studentRecordingUrl: string, assessmentDetails: TeacherAssessment };
+    setErrorInfo(null);
+    const { assessmentId, studentRecordingUrl, assessmentDetails } = sessionData;
     
     if (assessmentId !== id) {
         sessionStorage.removeItem(SESSION_STORAGE_KEY);
         setStatus("error");
-        setError("세션 정보가 현재 평가와 일치하지 않습니다.");
+        setErrorInfo({ message: "세션 정보가 현재 평가와 일치하지 않습니다."});
         return;
     }
     
-    let newResultRef = doc(collection(db, "results"));
+    let resultRef;
+    if (existingResultId) {
+        resultRef = doc(db, "results", existingResultId);
+    } else {
+        resultRef = doc(collection(db, "results"));
+    }
     
     try {
         setAnalysisStep("upload");
@@ -111,10 +124,10 @@ export default function AssessmentResultsPage() {
             status: "텍스트 변환 중",
             studentRecordingUrl: studentRecordingUrl,
         };
-        await setDoc(newResultRef, initialData, { merge: true });
+        await setDoc(resultRef, initialData, { merge: true });
         
         setAnalysisStep("transcribe");
-        await updateDoc(newResultRef, { status: "텍스트 변환 중" });
+        await updateDoc(resultRef, { status: "텍스트 변환 중" });
 
         const analysisResult = await generateMonologueAnalysis({
             studentRecordingUrl: studentRecordingUrl,
@@ -126,16 +139,16 @@ export default function AssessmentResultsPage() {
         });
 
         setAnalysisStep("analyze");
-        await updateDoc(newResultRef, { status: "내용 및 발음 분석 중..." });
+        await updateDoc(resultRef, { status: "내용 및 발음 분석 중..." });
         
         setAnalysisStep("report");
-        await updateDoc(newResultRef, { status: "리포트 생성 중" });
+        await updateDoc(resultRef, { status: "리포트 생성 중" });
 
         const finalResultData: Partial<StudentResult> = {
             ...analysisResult,
             status: '채점 완료',
         };
-        await updateDoc(newResultRef, finalResultData);
+        await updateDoc(resultRef, finalResultData);
         
         const assessmentRef = doc(db, "assessments", assessmentDetails.id);
         const resultsCollection = collection(db, "results");
@@ -154,14 +167,14 @@ export default function AssessmentResultsPage() {
     } catch (e: any) {
       console.error("Error generating analysis:", e);
       let errorMessage = "AI 분석 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
-      if (e.message && e.message.includes("503") && e.message.includes("overloaded")) {
+      if (e.message && e.message.includes("overloaded")) {
           errorMessage = "AI 모델이 과부하 상태입니다. 잠시 후 다시 시도하거나, 교사에게 문의하여 다른 AI 모델로 평가를 변경해달라고 요청할 수 있습니다.";
       } else {
           errorMessage = `AI 분석 중 오류가 발생했습니다: ${e.message}`;
       }
-      setError(errorMessage);
+      setErrorInfo({ message: errorMessage, resultId: resultRef.id, sessionData });
       setStatus("error");
-      await updateDoc(newResultRef, { 
+      await updateDoc(resultRef, { 
           status: '오류', 
           aiFeedback: errorMessage
       });
@@ -170,14 +183,22 @@ export default function AssessmentResultsPage() {
     }
   }, [id, user, toast]);
 
+  const handleRetry = () => {
+    if (errorInfo?.sessionData) {
+        processMonologueSubmission(errorInfo.sessionData, errorInfo.resultId);
+    } else {
+        toast({ title: "재시도 정보 없음", description: "재시도할 수 있는 정보가 없습니다.", variant: "destructive"});
+    }
+  }
+
+
   useEffect(() => {
     if (authLoading || !user || !id) return;
     
-    // Check for new submission first.
-    const sessionData = sessionStorage.getItem(SESSION_STORAGE_KEY);
-    if(sessionData) {
-        processMonologueSubmission();
-        return; // Exit early to let submission process, listener will catch updates.
+    const sessionDataRaw = sessionStorage.getItem(SESSION_STORAGE_KEY);
+    if(sessionDataRaw) {
+        processMonologueSubmission(JSON.parse(sessionDataRaw));
+        return;
     }
     
     const q = query(
@@ -197,18 +218,31 @@ export default function AssessmentResultsPage() {
             const assessmentRef = doc(db, 'assessments', id);
             const assessmentSnap = await getDoc(assessmentRef);
             if (assessmentSnap.exists()) {
-                setAssessment({id: assessmentSnap.id, ...assessmentSnap.data()} as TeacherAssessment);
+                const fetchedAssessment = {id: assessmentSnap.id, ...assessmentSnap.data()} as TeacherAssessment;
+                setAssessment(fetchedAssessment);
             } else {
                 notFound();
                 return;
             }
             setResults(dbResults);
-            if (!stillProcessing) {
+            
+            const latestResult = dbResults[dbResults.length - 1];
+            if (latestResult.status === '오류') {
+                setStatus('error');
+                setErrorInfo({ 
+                    message: latestResult.aiFeedback, 
+                    resultId: latestResult.id,
+                    sessionData: {
+                        assessmentId: latestResult.assessmentId,
+                        studentRecordingUrl: latestResult.studentRecordingUrl!,
+                        assessmentDetails: assessment!
+                    }
+                });
+            } else if (!stillProcessing) {
               setStatus("completed");
             } else {
               setStatus("analyzing");
-              // Try to find current step from latest result status
-              const latestStatus = dbResults[dbResults.length-1].status as ResultStatus;
+              const latestStatus = latestResult.status as ResultStatus;
               if(latestStatus.includes('텍스트')){
                 setAnalysisStep('transcribe')
               } else if (latestStatus.includes('분석')) {
@@ -218,17 +252,16 @@ export default function AssessmentResultsPage() {
               }
             }
         } else {
-            // No results and no session data, must be completed or never started
             setStatus("completed");
         }
     }, (err) => {
         console.error("Error listening to result:", err);
-        setError("결과를 실시간으로 업데이트하는 중 오류가 발생했습니다.");
+        setErrorInfo({ message: "결과를 실시간으로 업데이트하는 중 오류가 발생했습니다."});
         setStatus("error");
     });
     
     return () => unsubscribe();
-  }, [id, user, authLoading, router, processMonologueSubmission]);
+  }, [id, user, authLoading, router, processMonologueSubmission, assessment]);
   
   if (status === "loading" || authLoading) {
     return (
@@ -247,16 +280,19 @@ export default function AssessmentResultsPage() {
   }
 
   if (status === 'error') {
-    const latestResultIsError = results.length > 0 && results[results.length - 1].status === '오류';
     return (
         <Card className="flex flex-col items-center justify-center text-center p-8 min-h-80 bg-destructive/10 border-destructive">
             <CardHeader>
                 <AlertTriangle className="h-12 w-12 text-destructive mx-auto mb-4" />
                 <CardTitle className="text-destructive">분석 오류</CardTitle>
-                <CardDescription className="text-destructive-foreground">{error || (latestResultIsError ? results[results.length-1].aiFeedback : "AI가 답변을 분석하는 데 실패했습니다. 다시 시도해주세요.")}</CardDescription>
+                <CardDescription className="text-destructive-foreground">{errorInfo?.message || "AI가 답변을 분석하는 데 실패했습니다. 다시 시도해주세요."}</CardDescription>
             </CardHeader>
-            <CardContent>
-                <Button onClick={() => router.push(`/student/assessment/${id}`)}>
+            <CardContent className="flex gap-2">
+                <Button onClick={handleRetry}>
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    재분석 시도
+                </Button>
+                <Button variant="secondary" onClick={() => router.push(`/student/assessment/${id}`)}>
                     평가로 돌아가기
                 </Button>
             </CardContent>
@@ -285,3 +321,5 @@ export default function AssessmentResultsPage() {
 
   return null;
 }
+
+    
