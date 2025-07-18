@@ -10,24 +10,34 @@ import { type StudentResult, type TeacherAssessment } from '@/lib/types';
 import { useLanguage } from '@/context/language-context';
 import { useAuth } from '@/context/auth-context';
 import { useEffect, useState, useMemo } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ChevronDown, TrendingUp } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+
 
 type EnrichedResult = StudentResult & {
     assessmentType?: 'monologue' | 'dialogue';
-    attemptNumber?: number;
-    totalAttempts?: number;
 };
+
+type GroupedResult = {
+  assessmentId: string;
+  assessmentTitle: string;
+  assessmentType?: 'monologue' | 'dialogue';
+  latestAttempt: EnrichedResult;
+  previousAttempts: EnrichedResult[];
+  totalAttempts: number;
+};
+
 
 export default function HistoryPage() {
   const { t } = useLanguage();
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
-  const [completedAssessments, setCompletedAssessments] = useState<EnrichedResult[]>([]);
+  const [groupedAssessments, setGroupedAssessments] = useState<GroupedResult[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -40,7 +50,6 @@ export default function HistoryPage() {
     const fetchHistory = async () => {
         setIsLoading(true);
         try {
-            // Fetch all assessments and results in parallel
             const assessmentsQuery = getDocs(collection(db, "assessments"));
             const resultsQuery = getDocs(query(
                 collection(db, "results"),
@@ -55,49 +64,37 @@ export default function HistoryPage() {
                 assessmentsMap.set(doc.id, { id: doc.id, ...doc.data() } as TeacherAssessment);
             });
 
-            let allResults = resultsSnapshot.docs.map(doc => {
+            const resultsByAssessmentId: { [key: string]: EnrichedResult[] } = {};
+            resultsSnapshot.docs.forEach(doc => {
                 const result = { id: doc.id, ...doc.data() } as StudentResult;
                 const assessment = assessmentsMap.get(result.assessmentId);
-                return {
+                const enrichedResult: EnrichedResult = {
                     ...result,
                     assessmentType: assessment?.assessmentType || 'monologue',
                 };
+                if (!resultsByAssessmentId[result.assessmentId]) {
+                    resultsByAssessmentId[result.assessmentId] = [];
+                }
+                resultsByAssessmentId[result.assessmentId].push(enrichedResult);
             });
 
-            // Group results by assessmentId
-            const groupedResults: { [key: string]: EnrichedResult[] } = {};
-            allResults.forEach(result => {
-                if (!groupedResults[result.assessmentId]) {
-                    groupedResults[result.assessmentId] = [];
-                }
-                groupedResults[result.assessmentId].push(result);
+            const grouped: GroupedResult[] = Object.values(resultsByAssessmentId).map(attempts => {
+                attempts.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)); // Newest first
+                const latestAttempt = attempts[0];
+                const previousAttempts = attempts.slice(1);
+                return {
+                    assessmentId: latestAttempt.assessmentId,
+                    assessmentTitle: latestAttempt.assessmentTitle,
+                    assessmentType: latestAttempt.assessmentType,
+                    latestAttempt: latestAttempt,
+                    previousAttempts: previousAttempts,
+                    totalAttempts: attempts.length,
+                };
             });
 
-            const enrichedResults: EnrichedResult[] = [];
-            for (const assessmentId in groupedResults) {
-                const attempts = groupedResults[assessmentId].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
-                const totalAttempts = attempts.length;
-                attempts.forEach((attempt, index) => {
-                    enrichedResults.push({
-                        ...attempt,
-                        attemptNumber: index + 1,
-                        totalAttempts: totalAttempts,
-                    });
-                });
-            }
-
-            // Sort the final list by date (newest first), then by assessmentId, then by attempt number
-            enrichedResults.sort((a, b) => {
-                if (b.createdAt !== a.createdAt) {
-                    return (b.createdAt || 0) - (a.createdAt || 0);
-                }
-                if (a.assessmentId !== b.assessmentId) {
-                    return a.assessmentId.localeCompare(b.assessmentId);
-                }
-                return (a.attemptNumber || 0) - (b.attemptNumber || 0);
-            });
+            grouped.sort((a, b) => (b.latestAttempt.createdAt || 0) - (a.latestAttempt.createdAt || 0));
             
-            setCompletedAssessments(enrichedResults);
+            setGroupedAssessments(grouped);
         } catch (error) {
             console.error("Error fetching history: ", error);
         } finally {
@@ -115,28 +112,21 @@ export default function HistoryPage() {
         </div>
     );
   }
-
-  const getAssessmentTitle = (assessment: EnrichedResult) => {
-    if (assessment.totalAttempts && assessment.totalAttempts > 1) {
-        return `${assessment.assessmentTitle} (${assessment.attemptNumber}차 시도)`;
-    }
-    return assessment.assessmentTitle;
-  }
-  
-  const getResultLink = (assessment: EnrichedResult) => {
-    const baseLink = `/student/assessment/${assessment.assessmentId}/results`;
-
-    if (assessment.totalAttempts && assessment.totalAttempts > 1) {
-        return `${baseLink}?attempt=${assessment.attemptNumber}`;
-    }
-    return baseLink;
-  }
   
   const getAssessmentTypeText = (assessmentType?: 'monologue' | 'dialogue') => {
       if (assessmentType === 'dialogue') {
           return t.teacherAssessments.assessmentTypes.dialogue;
       }
       return t.teacherAssessments.assessmentTypes.monologue;
+  }
+
+  const getResultLink = (result: EnrichedResult, isLatest: boolean, totalAttempts: number) => {
+    const baseLink = `/student/assessment/${result.assessmentId}/results`;
+    if (isLatest && totalAttempts > 1) {
+      return baseLink; // Let it default to the overview tab
+    }
+    // Find the attempt number for this specific result
+    return `${baseLink}?attempt=${totalAttempts - groupedAssessments.find(g => g.assessmentId === result.assessmentId)!.previousAttempts.findIndex(p => p.id === result.id)}`;
   }
 
 
@@ -150,7 +140,7 @@ export default function HistoryPage() {
         <Table>
             <TableHeader>
                 <TableRow>
-                    <TableHead className="text-center">{t.studentHistory.assessment}</TableHead>
+                    <TableHead className="w-[40%] text-center">{t.studentHistory.assessment}</TableHead>
                     <TableHead className="text-center">평가 유형</TableHead>
                     <TableHead className="text-center">{t.studentHistory.completionDate}</TableHead>
                     <TableHead className="text-center">내용 점수</TableHead>
@@ -159,35 +149,75 @@ export default function HistoryPage() {
                 </TableRow>
             </TableHeader>
             <TableBody>
-                {completedAssessments.length > 0 ? (
-                    completedAssessments.map((assessment, index) => {
-                        const nextAssessment = completedAssessments[index + 1];
-                        const isLastInGroup = !nextAssessment || nextAssessment.assessmentId !== assessment.assessmentId;
-                        
-                        return (
-                            <TableRow 
-                                key={assessment.id}
-                                className={cn(!isLastInGroup && "border-b-0")}
-                            >
-                                <TableCell className={cn("font-medium text-center", !isLastInGroup && "pb-2", isLastInGroup && "pt-4 border-b border-dashed")}>{getAssessmentTitle(assessment)}</TableCell>
-                                <TableCell className={cn("text-center", !isLastInGroup && "pb-2", isLastInGroup && "pt-4 border-b border-dashed")}>
-                                    <Badge variant="outline">{getAssessmentTypeText(assessment.assessmentType)}</Badge>
-                                </TableCell>
-                                <TableCell className={cn("text-center", !isLastInGroup && "pb-2", isLastInGroup && "pt-4 border-b border-dashed")}>{assessment.createdAt ? format(new Date(assessment.createdAt), 'yyyy-MM-dd') : 'N/A'}</TableCell>
-                                <TableCell className={cn("text-center", !isLastInGroup && "pb-2", isLastInGroup && "pt-4 border-b border-dashed")}>
-                                    <Badge variant="outline">{assessment.contentScore ?? assessment.score ?? 0}%</Badge>
-                                </TableCell>
-                                 <TableCell className={cn("text-center", !isLastInGroup && "pb-2", isLastInGroup && "pt-4 border-b border-dashed")}>
-                                    <Badge variant="outline">{assessment.pronunciationScore ?? 0}%</Badge>
-                                </TableCell>
-                                <TableCell className={cn("text-center", !isLastInGroup && "pb-2", isLastInGroup && "pt-4 border-b border-dashed")}>
-                                    <Link href={getResultLink(assessment)}>
-                                        <Button variant="secondary" size="sm">{t.studentHistory.viewFeedback}</Button>
-                                    </Link>
-                                </TableCell>
-                            </TableRow>
-                        );
-                    })
+                {groupedAssessments.length > 0 ? (
+                    groupedAssessments.map((group) => (
+                        <Collapsible asChild key={group.assessmentId}>
+                            <>
+                                <TableRow className="font-medium">
+                                    <TableCell className="text-center">
+                                        <div className="flex items-center justify-center gap-2">
+                                            {group.totalAttempts > 1 && (
+                                                <CollapsibleTrigger asChild>
+                                                    <Button variant="ghost" size="sm" className="w-8 h-8 p-0 data-[state=open]:rotate-180">
+                                                        <ChevronDown className="h-4 w-4" />
+                                                        <span className="sr-only">Toggle</span>
+                                                    </Button>
+                                                </CollapsibleTrigger>
+                                            )}
+                                            <span className={cn(group.totalAttempts <= 1 && "pl-8")}>{group.assessmentTitle}</span>
+                                            {group.totalAttempts > 1 && <Badge variant="outline">총 {group.totalAttempts}회 응시</Badge>}
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="text-center">
+                                        <Badge variant="outline">{getAssessmentTypeText(group.assessmentType)}</Badge>
+                                    </TableCell>
+                                    <TableCell className="text-center">{group.latestAttempt.createdAt ? format(new Date(group.latestAttempt.createdAt), 'yyyy-MM-dd') : 'N/A'}</TableCell>
+                                    <TableCell className="text-center">
+                                        <Badge variant="outline">{group.latestAttempt.contentScore ?? group.latestAttempt.score ?? 0}%</Badge>
+                                    </TableCell>
+                                    <TableCell className="text-center">
+                                        <Badge variant="outline">{group.latestAttempt.pronunciationScore ?? 0}%</Badge>
+                                    </TableCell>
+                                    <TableCell className="text-center">
+                                        <Link href={getResultLink(group.latestAttempt, true, group.totalAttempts)}>
+                                            <Button variant="secondary" size="sm">
+                                                {group.totalAttempts > 1 ? <TrendingUp className="mr-2 h-4 w-4" /> : null}
+                                                {group.totalAttempts > 1 ? "종합 분석 보기" : "결과 보기"}
+                                            </Button>
+                                        </Link>
+                                    </TableCell>
+                                </TableRow>
+                                <CollapsibleContent asChild>
+                                    <>
+                                      {group.previousAttempts.map((attempt, index) => (
+                                          <TableRow key={attempt.id} className="bg-muted/50">
+                                              <TableCell className="text-center pl-12 text-muted-foreground">
+                                                └ {group.totalAttempts - 1 - index}차 시도
+                                              </TableCell>
+                                              <TableCell className="text-center">
+                                                  <Badge variant="ghost">{getAssessmentTypeText(attempt.assessmentType)}</Badge>
+                                              </TableCell>
+                                              <TableCell className="text-center text-muted-foreground">
+                                                  {attempt.createdAt ? format(new Date(attempt.createdAt), 'yyyy-MM-dd') : 'N/A'}
+                                              </TableCell>
+                                              <TableCell className="text-center">
+                                                  <Badge variant="ghost">{attempt.contentScore ?? attempt.score ?? 0}%</Badge>
+                                              </TableCell>
+                                              <TableCell className="text-center">
+                                                  <Badge variant="ghost">{attempt.pronunciationScore ?? 0}%</Badge>
+                                              </TableCell>
+                                              <TableCell className="text-center">
+                                                  <Link href={`/student/assessment/${attempt.assessmentId}/results?attempt=${group.totalAttempts - 1 - index}`}>
+                                                      <Button variant="ghost" size="sm">결과 보기</Button>
+                                                  </Link>
+                                              </TableCell>
+                                          </TableRow>
+                                      ))}
+                                    </>
+                                </CollapsibleContent>
+                             </>
+                        </Collapsible>
+                    ))
                 ) : (
                     <TableRow>
                         <TableCell colSpan={6} className="h-24 text-center">
