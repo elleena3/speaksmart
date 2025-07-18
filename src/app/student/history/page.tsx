@@ -52,8 +52,6 @@ export default function HistoryPage() {
         try {
             const assessmentsQuery = getDocs(collection(db, "assessments"));
 
-            // **쿼리 단순화:** 복합 색인 오류를 피하기 위해 studentId로만 필터링합니다.
-            // 정렬과 추가 필터링은 클라이언트 측에서 수행합니다.
             const resultsQuery = getDocs(query(
                 collection(db, "results"),
                 where("studentId", "==", user.uid)
@@ -66,11 +64,10 @@ export default function HistoryPage() {
                 assessmentsMap.set(doc.id, { id: doc.id, ...doc.data() } as TeacherAssessment);
             });
 
-            // **클라이언트 측 필터링 및 정렬:**
             const completedResults = resultsSnapshot.docs
                 .map(doc => ({ id: doc.id, ...doc.data() } as StudentResult))
                 .filter(result => result.status === "채점 완료")
-                .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)); // 최신순으로 정렬
+                .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 
             const resultsByAssessmentId: { [key: string]: EnrichedResult[] } = {};
             completedResults.forEach(result => {
@@ -86,7 +83,6 @@ export default function HistoryPage() {
             });
 
             const grouped: GroupedResult[] = Object.values(resultsByAssessmentId).map(attempts => {
-                // 이미 클라이언트 측에서 시간순으로 정렬(desc)했으므로 첫 번째 항목이 최신 시도입니다.
                 const latestAttempt = attempts[0];
                 const previousAttempts = attempts.slice(1);
                 return {
@@ -94,12 +90,11 @@ export default function HistoryPage() {
                     assessmentTitle: latestAttempt.assessmentTitle,
                     assessmentType: latestAttempt.assessmentType,
                     latestAttempt: latestAttempt,
-                    previousAttempts: previousAttempts.reverse(), // 확장 시에는 가장 오래된 시도가 먼저 보이도록 순서를 뒤집습니다.
+                    previousAttempts: previousAttempts.reverse(),
                     totalAttempts: attempts.length,
                 };
             });
             
-            // 최신 시도의 생성 날짜를 기준으로 그룹 자체를 정렬합니다.
             grouped.sort((a,b) => (b.latestAttempt.createdAt || 0) - (a.latestAttempt.createdAt || 0));
 
             setGroupedAssessments(grouped);
@@ -147,20 +142,20 @@ export default function HistoryPage() {
             <TableHeader>
                 <TableRow>
                     <TableHead className="w-[40%]">{t.studentHistory.assessment}</TableHead>
-                    <TableHead className="text-center">평가 유형</TableHead>
-                    <TableHead className="text-center">완료 날짜</TableHead>
-                    <TableHead className="text-center">내용 점수</TableHead>
-                    <TableHead className="text-center">발음 점수</TableHead>
-                    <TableHead className="text-center">{t.studentHistory.viewFeedback}</TableHead>
+                    <TableHead className="text-center whitespace-nowrap">평가 유형</TableHead>
+                    <TableHead className="text-center whitespace-nowrap">완료 날짜</TableHead>
+                    <TableHead className="text-center whitespace-nowrap">내용 점수</TableHead>
+                    <TableHead className="text-center whitespace-nowrap">발음 점수</TableHead>
+                    <TableHead className="text-center whitespace-nowrap">결과 보기</TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody>
                 {groupedAssessments.length > 0 ? (
                     groupedAssessments.map((group, groupIndex) => {
-                        const isExpanded = openStates[group.assessmentId];
+                        const isExpanded = !!openStates[group.assessmentId];
                         return (
                             <React.Fragment key={group.assessmentId}>
-                                 <TableRow className={cn("font-medium align-middle", groupIndex === groupedAssessments.length - 1 && !isExpanded ? 'border-b-0' : '')}>
+                                 <TableRow className={cn("font-medium align-middle", !isExpanded && groupIndex === groupedAssessments.length - 1 ? 'border-b-0' : '')}>
                                     <TableCell>
                                         <div className="flex items-center gap-2">
                                             {group.totalAttempts > 1 ? (
@@ -180,7 +175,7 @@ export default function HistoryPage() {
                                     </TableCell>
                                     <TableCell className="text-center whitespace-nowrap">{group.latestAttempt.createdAt ? format(new Date(group.latestAttempt.createdAt), 'yyyy-MM-dd') : 'N/A'}</TableCell>
                                     <TableCell className="text-center">
-                                        <Badge variant="outline">{group.latestAttempt.score ?? 0}%</Badge>
+                                        <Badge variant="outline">{group.latestAttempt.contentScore ?? group.latestAttempt.score ?? 0}%</Badge>
                                     </TableCell>
                                     <TableCell className="text-center">
                                         <Badge variant="outline">{group.latestAttempt.pronunciationScore ?? 0}%</Badge>
@@ -209,7 +204,7 @@ export default function HistoryPage() {
                                             {attempt.createdAt ? format(new Date(attempt.createdAt), 'yyyy-MM-dd') : 'N/A'}
                                         </TableCell>
                                         <TableCell className="text-center">
-                                            <Badge variant="ghost">{attempt.score ?? 0}%</Badge>
+                                            <Badge variant="ghost">{attempt.contentScore ?? attempt.score ?? 0}%</Badge>
                                         </TableCell>
                                         <TableCell className="text-center">
                                             <Badge variant="ghost">{attempt.pronunciationScore ?? 0}%</Badge>
