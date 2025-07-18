@@ -154,7 +154,7 @@ export default function HistoryPage() {
             <TableBody>
                 {groupedAssessments.length > 0 ? (
                     groupedAssessments.map((group, groupIndex) => (
-                        <Collapsible asChild key={group.assessmentId}>
+                        <Collapsible key={group.assessmentId}>
                             <>
                                 <TableRow className="font-medium align-middle">
                                     <TableCell className="text-center">
@@ -193,7 +193,7 @@ export default function HistoryPage() {
                                 <CollapsibleContent asChild>
                                     <>
                                       {group.previousAttempts.map((attempt, index) => (
-                                          <TableRow key={attempt.id} className={cn("bg-muted/50", (index < group.previousAttempts.length - 1) && "border-b-dashed")}>
+                                          <TableRow key={attempt.id} className={cn("bg-muted/50", (index < group.previousAttempts.length - 1) && "border-dashed")}>
                                               <TableCell className="text-center pl-12 text-muted-foreground">
                                                 └ {group.totalAttempts - 1 - index}차 시도
                                               </TableCell>
