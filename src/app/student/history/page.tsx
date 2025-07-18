@@ -124,11 +124,10 @@ export default function HistoryPage() {
   }
   
   const getResultLink = (assessment: EnrichedResult) => {
-    const pageType = assessment.assessmentType === 'dialogue' ? 'free-talk' : '[id]';
-    const baseLink = `/student/assessment/${assessment.assessmentType === 'dialogue' ? `free-talk/results?id=${assessment.assessmentId}` : `${assessment.assessmentId}/results`}`;
+    const baseLink = `/student/assessment/${assessment.assessmentId}/results`;
 
     if (assessment.totalAttempts && assessment.totalAttempts > 1) {
-        return `${baseLink}&attempt=${assessment.attemptNumber}`;
+        return `${baseLink}?attempt=${assessment.attemptNumber}`;
     }
     return baseLink;
   }
@@ -168,20 +167,20 @@ export default function HistoryPage() {
                         return (
                             <TableRow 
                                 key={assessment.id}
-                                className={cn(!isLastInGroup && "border-b-dashed")}
+                                className={cn(!isLastInGroup && "border-b-0 border-dashed")}
                             >
-                                <TableCell className="font-medium">{getAssessmentTitle(assessment)}</TableCell>
-                                <TableCell>
+                                <TableCell className={cn("font-medium", !isLastInGroup && "pb-2", isLastInGroup && "pt-4")}>{getAssessmentTitle(assessment)}</TableCell>
+                                <TableCell className={cn(!isLastInGroup && "pb-2", isLastInGroup && "pt-4")}>
                                     <Badge variant="outline">{getAssessmentTypeText(assessment.assessmentType)}</Badge>
                                 </TableCell>
-                                <TableCell>{assessment.createdAt ? format(new Date(assessment.createdAt), 'yyyy-MM-dd') : 'N/A'}</TableCell>
-                                <TableCell>
+                                <TableCell className={cn(!isLastInGroup && "pb-2", isLastInGroup && "pt-4")}>{assessment.createdAt ? format(new Date(assessment.createdAt), 'yyyy-MM-dd') : 'N/A'}</TableCell>
+                                <TableCell className={cn(!isLastInGroup && "pb-2", isLastInGroup && "pt-4")}>
                                     <Badge variant="outline">{assessment.contentScore ?? assessment.score ?? 0}%</Badge>
                                 </TableCell>
-                                 <TableCell>
+                                 <TableCell className={cn(!isLastInGroup && "pb-2", isLastInGroup && "pt-4")}>
                                     <Badge variant="outline">{assessment.pronunciationScore ?? 0}%</Badge>
                                 </TableCell>
-                                <TableCell className="text-right">
+                                <TableCell className={cn("text-right", !isLastInGroup && "pb-2", isLastInGroup && "pt-4")}>
                                     <Link href={getResultLink(assessment)}>
                                         <Button variant="secondary" size="sm">{t.studentHistory.viewFeedback}</Button>
                                     </Link>
@@ -202,3 +201,4 @@ export default function HistoryPage() {
     </Card>
   );
 }
+
