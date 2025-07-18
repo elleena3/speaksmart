@@ -6,17 +6,19 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { type StudentResult } from '@/lib/types';
+import { type StudentResult, type TeacherAssessment } from '@/lib/types';
 import { useLanguage } from '@/context/language-context';
 import { useAuth } from '@/context/auth-context';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
 
 type EnrichedResult = StudentResult & {
+    assessmentType?: 'monologue' | 'dialogue';
     attemptNumber?: number;
     totalAttempts?: number;
 };
@@ -38,16 +40,32 @@ export default function HistoryPage() {
     const fetchHistory = async () => {
         setIsLoading(true);
         try {
-            const q = query(
+            // Fetch all assessments and results in parallel
+            const assessmentsQuery = getDocs(collection(db, "assessments"));
+            const resultsQuery = getDocs(query(
                 collection(db, "results"),
                 where("studentId", "==", user.uid),
                 where("status", "==", "채점 완료")
-            );
-            const querySnapshot = await getDocs(q);
-            let allResults = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as StudentResult));
+            ));
+
+            const [assessmentsSnapshot, resultsSnapshot] = await Promise.all([assessmentsQuery, resultsQuery]);
+            
+            const assessmentsMap = new Map<string, TeacherAssessment>();
+            assessmentsSnapshot.forEach(doc => {
+                assessmentsMap.set(doc.id, { id: doc.id, ...doc.data() } as TeacherAssessment);
+            });
+
+            let allResults = resultsSnapshot.docs.map(doc => {
+                const result = { id: doc.id, ...doc.data() } as StudentResult;
+                const assessment = assessmentsMap.get(result.assessmentId);
+                return {
+                    ...result,
+                    assessmentType: assessment?.assessmentType || 'monologue',
+                };
+            });
 
             // Group results by assessmentId
-            const groupedResults: { [key: string]: StudentResult[] } = {};
+            const groupedResults: { [key: string]: EnrichedResult[] } = {};
             allResults.forEach(result => {
                 if (!groupedResults[result.assessmentId]) {
                     groupedResults[result.assessmentId] = [];
@@ -68,8 +86,16 @@ export default function HistoryPage() {
                 });
             }
 
-            // Sort the final list by date, newest first
-            enrichedResults.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+            // Sort the final list by date (newest first), then by assessmentId, then by attempt number
+            enrichedResults.sort((a, b) => {
+                if (b.createdAt !== a.createdAt) {
+                    return (b.createdAt || 0) - (a.createdAt || 0);
+                }
+                if (a.assessmentId !== b.assessmentId) {
+                    return a.assessmentId.localeCompare(b.assessmentId);
+                }
+                return (a.attemptNumber || 0) - (b.attemptNumber || 0);
+            });
             
             setCompletedAssessments(enrichedResults);
         } catch (error) {
@@ -98,11 +124,22 @@ export default function HistoryPage() {
   }
   
   const getResultLink = (assessment: EnrichedResult) => {
+    const pageType = assessment.assessmentType === 'dialogue' ? 'free-talk' : '[id]';
+    const baseLink = `/student/assessment/${assessment.assessmentType === 'dialogue' ? `free-talk/results?id=${assessment.assessmentId}` : `${assessment.assessmentId}/results`}`;
+
     if (assessment.totalAttempts && assessment.totalAttempts > 1) {
-        return `/student/assessment/${assessment.assessmentId}/results?attempt=${assessment.attemptNumber}`;
+        return `${baseLink}&attempt=${assessment.attemptNumber}`;
     }
-    return `/student/assessment/${assessment.assessmentId}/results`;
+    return baseLink;
   }
+  
+  const getAssessmentTypeText = (assessmentType?: 'monologue' | 'dialogue') => {
+      if (assessmentType === 'dialogue') {
+          return t.teacherAssessments.assessmentTypes.dialogue;
+      }
+      return t.teacherAssessments.assessmentTypes.monologue;
+  }
+
 
   return (
     <Card>
@@ -115,6 +152,7 @@ export default function HistoryPage() {
             <TableHeader>
                 <TableRow>
                     <TableHead>{t.studentHistory.assessment}</TableHead>
+                    <TableHead>평가 유형</TableHead>
                     <TableHead>{t.studentHistory.completionDate}</TableHead>
                     <TableHead>내용 점수</TableHead>
                     <TableHead>발음 점수</TableHead>
@@ -123,26 +161,37 @@ export default function HistoryPage() {
             </TableHeader>
             <TableBody>
                 {completedAssessments.length > 0 ? (
-                    completedAssessments.map((assessment) => (
-                        <TableRow key={assessment.id}>
-                            <TableCell className="font-medium">{getAssessmentTitle(assessment)}</TableCell>
-                            <TableCell>{assessment.createdAt ? format(new Date(assessment.createdAt), 'yyyy-MM-dd') : 'N/A'}</TableCell>
-                            <TableCell>
-                                <Badge variant="outline">{assessment.contentScore ?? assessment.score ?? 0}%</Badge>
-                            </TableCell>
-                             <TableCell>
-                                <Badge variant="outline">{assessment.pronunciationScore ?? 0}%</Badge>
-                            </TableCell>
-                            <TableCell className="text-right">
-                                <Link href={getResultLink(assessment)}>
-                                    <Button variant="secondary" size="sm">{t.studentHistory.viewFeedback}</Button>
-                                </Link>
-                            </TableCell>
-                        </TableRow>
-                    ))
+                    completedAssessments.map((assessment, index) => {
+                        const nextAssessment = completedAssessments[index + 1];
+                        const isLastInGroup = !nextAssessment || nextAssessment.assessmentId !== assessment.assessmentId;
+                        
+                        return (
+                            <TableRow 
+                                key={assessment.id}
+                                className={cn(!isLastInGroup && "border-b-dashed")}
+                            >
+                                <TableCell className="font-medium">{getAssessmentTitle(assessment)}</TableCell>
+                                <TableCell>
+                                    <Badge variant="outline">{getAssessmentTypeText(assessment.assessmentType)}</Badge>
+                                </TableCell>
+                                <TableCell>{assessment.createdAt ? format(new Date(assessment.createdAt), 'yyyy-MM-dd') : 'N/A'}</TableCell>
+                                <TableCell>
+                                    <Badge variant="outline">{assessment.contentScore ?? assessment.score ?? 0}%</Badge>
+                                </TableCell>
+                                 <TableCell>
+                                    <Badge variant="outline">{assessment.pronunciationScore ?? 0}%</Badge>
+                                </TableCell>
+                                <TableCell className="text-right">
+                                    <Link href={getResultLink(assessment)}>
+                                        <Button variant="secondary" size="sm">{t.studentHistory.viewFeedback}</Button>
+                                    </Link>
+                                </TableCell>
+                            </TableRow>
+                        );
+                    })
                 ) : (
                     <TableRow>
-                        <TableCell colSpan={5} className="h-24 text-center">
+                        <TableCell colSpan={6} className="h-24 text-center">
                             완료된 평가가 없습니다.
                         </TableCell>
                     </TableRow>
@@ -153,4 +202,3 @@ export default function HistoryPage() {
     </Card>
   );
 }
-
