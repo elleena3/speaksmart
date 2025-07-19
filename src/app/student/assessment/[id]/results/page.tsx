@@ -220,11 +220,10 @@ export default function AssessmentResultsPage() {
     const sessionDataRaw = sessionStorage.getItem(SESSION_STORAGE_KEY);
     if(sessionDataRaw) {
         processMonologueSubmission(JSON.parse(sessionDataRaw));
-        // IMPORTANT: Return here to prevent the snapshot listener from also running.
-        return; 
+        // IMPORTANT: We do not return here anymore, we let the listener handle UI updates.
     }
     
-    // 2. If no session data, set up listener for existing results.
+    // 2. Set up listener for existing and new results for this user/assessment.
     const q = query(
         collection(db, "results"),
         where("assessmentId", "==", id),
@@ -232,7 +231,7 @@ export default function AssessmentResultsPage() {
     );
 
     const unsubscribe = onSnapshot(q, async (snapshot) => {
-        if (snapshot.empty) {
+        if (snapshot.empty && !sessionStorage.getItem(SESSION_STORAGE_KEY)) {
             const assessmentRef = doc(db, 'assessments', id);
             const assessmentSnap = await getDoc(assessmentRef);
             if (assessmentSnap.exists()) {
@@ -270,7 +269,7 @@ export default function AssessmentResultsPage() {
         if (latestResult?.status === '오류') {
             setStatus('error');
             setErrorInfo({ 
-                message: latestResult.aiFeedback, 
+                message: latestResult.aiFeedback || '오류가 발생했습니다.', 
                 resultId: latestResult.id,
             });
         } else if (!stillProcessing) {
@@ -284,6 +283,8 @@ export default function AssessmentResultsPage() {
             setAnalysisStep('analyze')
           } else if (latestStatus.includes('리포트')) {
             setAnalysisStep('report')
+          } else {
+            setAnalysisStep('upload');
           }
         }
     }, (err) => {
@@ -293,7 +294,7 @@ export default function AssessmentResultsPage() {
     });
     
     return () => unsubscribe();
-  }, [id, user, authLoading, router, processMonologueSubmission, assessment]);
+  }, [id, user, authLoading, router, assessment]);
   
   if (status === "loading" || authLoading) {
     return (

@@ -126,7 +126,7 @@ export default function FreeTalkResultsPage() {
             setAnalysisStep("upload");
             
             const fullConversationTranscript = conversationHistory
-                .map(turn => `${turn.role === 'user' ? '학생' : 'AI'}: ${turn.text}`)
+                .map(turn => `${turn.role === 'user' ? '학생' : (assessment.aiVoice || 'AI')}: ${turn.text}`)
                 .join('\n');
             const studentOnlyTranscript = conversationHistory
                 .filter(turn => turn.role === 'user')
@@ -216,7 +216,6 @@ export default function FreeTalkResultsPage() {
         const storedDataString = sessionStorage.getItem(SESSION_STORAGE_KEY);
         if (storedDataString) {
             processDialogueSubmission(JSON.parse(storedDataString));
-            return;
         }
 
         const q = query(
@@ -226,7 +225,7 @@ export default function FreeTalkResultsPage() {
         );
         
         const unsubscribe = onSnapshot(q, async (snapshot) => {
-             if (snapshot.empty) {
+             if (snapshot.empty && !sessionStorage.getItem(SESSION_STORAGE_KEY)) {
                 const assessmentRef = doc(db, 'assessments', assessmentId);
                 const assessmentSnap = await getDoc(assessmentRef);
                 if (assessmentSnap.exists()) {
@@ -264,7 +263,7 @@ export default function FreeTalkResultsPage() {
                 setStatus('error');
                 
                 setErrorInfo({ 
-                    message: latestResult.aiFeedback, 
+                    message: latestResult.aiFeedback || '오류가 발생했습니다.', 
                     resultId: latestResult.id,
                 });
             } else if (!stillProcessing) {
@@ -288,7 +287,7 @@ export default function FreeTalkResultsPage() {
 
         return () => unsubscribe();
         
-    }, [user, authLoading, assessmentId, processDialogueSubmission, assessment]);
+    }, [user, authLoading, assessmentId, assessment]);
 
 
     if (status === "loading" || authLoading) {
