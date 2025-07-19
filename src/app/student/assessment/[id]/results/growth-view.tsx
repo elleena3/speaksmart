@@ -13,6 +13,8 @@ import { Loader2, Sparkles, TrendingUp, DraftingCompass } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { Repeat } from "lucide-react";
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from "remark-gfm";
 
 type GrowthViewProps = {
     results: StudentResult[];
@@ -186,10 +188,10 @@ export function GrowthView({ results, assessment, defaultTab }: GrowthViewProps)
                                     <Loader2 className="h-8 w-8 animate-spin" />
                                 </div>
                             ) : (
-                                <div 
-                                    className="p-4 bg-muted/50 rounded-lg whitespace-pre-wrap font-body text-sm leading-relaxed"
-                                    dangerouslySetInnerHTML={{ __html: growthFeedback?.growthFeedback || '' }}
-                                >
+                                <div className="p-4 bg-muted/50 rounded-lg whitespace-pre-wrap font-body text-sm leading-relaxed markdown-content">
+                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                        {growthFeedback?.growthFeedback || ''}
+                                    </ReactMarkdown>
                                 </div>
                             )}
                         </CardContent>

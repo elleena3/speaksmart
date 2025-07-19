@@ -192,38 +192,9 @@ export default function AssessmentResultsPage() {
   useEffect(() => {
     if (authLoading || !user || !id) return;
 
-    // Check for a new submission first.
     const sessionDataRaw = sessionStorage.getItem(SESSION_STORAGE_KEY);
-    if (sessionDataRaw) {
-        const sessionData = JSON.parse(sessionDataRaw);
-        if (sessionData.assessmentId === id) {
-            // New submission exists. Process it and then start listening for results.
-            processMonologueSubmission(sessionData).then(() => {
-                // Now that processing is kicked off, start listening.
-                const q = query(
-                    collection(db, "results"),
-                    where("assessmentId", "==", id),
-                    where("studentId", "==", user.uid)
-                );
-                return onSnapshot(q, handleSnapshot, handleError);
-            });
-            return; // Don't set up the listener twice.
-        }
-    }
-
-    // If no new submission, just listen for existing results.
-    const q = query(
-        collection(db, "results"),
-        where("assessmentId", "==", id),
-        where("studentId", "==", user.uid)
-    );
-    const unsubscribe = onSnapshot(q, handleSnapshot, handleError);
-
-    return () => unsubscribe();
     
-    // Define snapshot and error handlers inside useEffect or as standalone functions
-    // to avoid re-creation on every render, ensuring they are declared before use.
-    async function handleSnapshot(snapshot: any) {
+    const handleSnapshot = async (snapshot: any) => {
         if (snapshot.empty) {
             const assessmentRef = doc(db, 'assessments', id as string);
             const assessmentSnap = await getDoc(assessmentRef);
@@ -251,22 +222,50 @@ export default function AssessmentResultsPage() {
         setResults(dbResults);
         const latestResult = dbResults[dbResults.length - 1];
         
+        // This logic now correctly handles state transition from analyzing to completed.
         if (latestResult && latestResult.status === '채점 완료') {
             setStatus("completed");
         } else if (latestResult && latestResult.status === '오류') {
             setStatus('error');
             setErrorInfo({ message: latestResult.aiFeedback || '알 수 없는 오류가 발생했습니다.' });
-        } else if (status === 'loading') {
+        } else {
+            // It's still analyzing
             setStatus('analyzing');
         }
     }
     
-    function handleError(err: any) {
+    const handleError = (err: any) => {
         console.error("Error listening to result:", err);
         setErrorInfo({ message: "결과를 실시간으로 업데이트하는 중 오류가 발생했습니다."});
         setStatus("error");
     }
 
+    if (sessionDataRaw) {
+        const sessionData = JSON.parse(sessionDataRaw);
+        if (sessionData.assessmentId === id) {
+            // New submission exists. Process it.
+            // The listener will be set up AFTER processing is done to avoid race conditions.
+            processMonologueSubmission(sessionData).then(() => {
+                // Now that processing is kicked off, start listening.
+                const q = query(
+                    collection(db, "results"),
+                    where("assessmentId", "==", id),
+                    where("studentId", "==", user.uid)
+                );
+                const unsubscribe = onSnapshot(q, handleSnapshot, handleError);
+                return () => unsubscribe();
+            });
+        }
+    } else {
+        // If no new submission, just listen for existing results.
+        const q = query(
+            collection(db, "results"),
+            where("assessmentId", "==", id),
+            where("studentId", "==", user.uid)
+        );
+        const unsubscribe = onSnapshot(q, handleSnapshot, handleError);
+        return () => unsubscribe();
+    }
   }, [id, user, authLoading, processMonologueSubmission, assessment]);
   
   if (status === "loading" || authLoading) {

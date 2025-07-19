@@ -197,9 +197,10 @@ export default function FreeTalkResultsPage() {
     useEffect(() => {
         if(authLoading || !user || !assessmentId) return;
         
-        // Define snapshot and error handlers here so they are not redefined on each render.
-        async function handleSnapshot(snapshot: any) {
-             if (snapshot.empty) {
+        const sessionDataRaw = sessionStorage.getItem(SESSION_STORAGE_KEY);
+
+        const handleSnapshot = async (snapshot: any) => {
+             if (snapshot.empty && !sessionStorage.getItem(SESSION_STORAGE_KEY)) {
                 const assessmentRef = doc(db, 'assessments', assessmentId as string);
                 const assessmentSnap = await getDoc(assessmentRef);
                 if (assessmentSnap.exists()) {
@@ -239,44 +240,41 @@ export default function FreeTalkResultsPage() {
             } else if (latestResult && latestResult.status === '오류') {
                 setStatus('error');
                 setErrorInfo({ message: latestResult.aiFeedback || '알 수 없는 오류가 발생했습니다.' });
-            } else if (status === 'loading') {
-                setStatus('analyzing');
+            } else if (!sessionStorage.getItem(SESSION_STORAGE_KEY)) {
+                 setStatus('analyzing');
             }
         }
 
-        function handleError(err: any) {
+        const handleError = (err: any) => {
             console.error("Error listening to result:", err);
             setErrorInfo({ message: "결과를 실시간으로 업데이트하는 중 오류가 발생했습니다."});
             setStatus("error");
         }
 
-        // Check for a new submission first.
-        const sessionDataRaw = sessionStorage.getItem(SESSION_STORAGE_KEY);
         if (sessionDataRaw) {
             const sessionData = JSON.parse(sessionDataRaw);
             if (sessionData.assessment.id === assessmentId) {
-                // New submission exists. Process it and then start listening.
+                // New submission exists. Process it, then start listening.
                 processDialogueSubmission(sessionData).then(() => {
                     const q = query(
                         collection(db, "results"),
                         where("assessmentId", "==", assessmentId),
                         where("studentId", "==", user.uid)
                     );
-                    onSnapshot(q, handleSnapshot, handleError);
+                    const unsubscribe = onSnapshot(q, handleSnapshot, handleError);
+                    return () => unsubscribe();
                 });
-                return; // Don't set up the listener twice.
             }
+        } else {
+            // If no new submission, just listen for existing results.
+            const q = query(
+                collection(db, "results"),
+                where("assessmentId", "==", assessmentId),
+                where("studentId", "==", user.uid)
+            );
+            const unsubscribe = onSnapshot(q, handleSnapshot, handleError);
+            return () => unsubscribe();
         }
-
-        // If no new submission, just listen for existing results.
-        const q = query(
-            collection(db, "results"),
-            where("assessmentId", "==", assessmentId),
-            where("studentId", "==", user.uid)
-        );
-        const unsubscribe = onSnapshot(q, handleSnapshot, handleError);
-
-        return () => unsubscribe();
         
     }, [assessmentId, user, authLoading, processDialogueSubmission, assessment]);
 
