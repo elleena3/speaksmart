@@ -7,36 +7,38 @@ import { Mic, StopCircle, Loader2, Bot, User, Play, Volume2, BrainCircuit, Downl
 import { useToast } from "@/hooks/use-toast"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { type ConversationTurn } from "@/lib/types/ai-schemas";
-import { converseWithNativeTeacher } from "@/ai/flows/create-concurrent-teacher-flow"
+import { converseWithConcurrentTeacher, transcribeUserAudio } from "@/ai/flows/create-concurrent-teacher-flow"
 
 const mimeType = 'audio/webm;codecs=opus';
 
+type SessionState = "idle" | "initializing" | "user_replying" | "processing" | "speaking" | "finished";
+
 export function ConcurrentConversationTool() {
-  const [sessionState, setSessionState] = useState<"idle" | "initializing" | "recording" | "processing" | "speaking" | "waiting_for_user" | "finished">("idle");
+  const [sessionState, setSessionState] = useState<SessionState>("idle");
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
   const [interimTranscript, setInterimTranscript] = useState<string | null>(null);
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
 
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioStreamRef = useRef<MediaStream | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
+  const mainRecorderRef = useRef<MediaRecorder | null>(null);
+  const userReplyRecorderRef = useRef<MediaRecorder | null>(null);
+  
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
   const scrollAreaRef = useRef<HTMLDivElement | null>(null);
 
   const { toast } = useToast();
 
-  const cleanupRecorder = useCallback(() => {
-    if (audioStreamRef.current) {
-      audioStreamRef.current.getTracks().forEach(track => track.stop());
-      audioStreamRef.current = null;
-    }
-    if (mediaRecorderRef.current) {
-      mediaRecorderRef.current.ondataavailable = null;
-      mediaRecorderRef.current.onstop = null;
-      mediaRecorderRef.current.onerror = null;
-      mediaRecorderRef.current = null;
-    }
-    audioChunksRef.current = [];
+  const cleanupRecorders = useCallback(() => {
+    [mainRecorderRef, userReplyRecorderRef].forEach(ref => {
+      if (ref.current) {
+        if (ref.current.stream) {
+          ref.current.stream.getTracks().forEach(track => track.stop());
+        }
+        ref.current.ondataavailable = null;
+        ref.current.onstop = null;
+        ref.current.onerror = null;
+        ref.current = null;
+      }
+    });
   }, []);
 
   const cleanupAudioPlayer = useCallback(() => {
@@ -50,10 +52,10 @@ export function ConcurrentConversationTool() {
   useEffect(() => {
     // Cleanup on component unmount
     return () => {
-      cleanupRecorder();
+      cleanupRecorders();
       cleanupAudioPlayer();
     };
-  }, [cleanupRecorder, cleanupAudioPlayer]);
+  }, [cleanupRecorders, cleanupAudioPlayer]);
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -65,7 +67,7 @@ export function ConcurrentConversationTool() {
   }, [conversation, interimTranscript]);
 
   const handleReset = () => {
-    cleanupRecorder();
+    cleanupRecorders();
     cleanupAudioPlayer();
     setConversation([]);
     setInterimTranscript(null);
@@ -73,49 +75,55 @@ export function ConcurrentConversationTool() {
     setSessionState('idle');
   }
 
-  const startConversationAndRecording = async () => {
+  const startConversation = async () => {
     handleReset();
-    setSessionState("recording");
+    setSessionState("initializing");
     
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      audioStreamRef.current = stream;
+      const mainStream = await navigator.mediaDevices.getUserMedia({ audio: true });
       
       const audioContext = new AudioContext();
       const destination = audioContext.createMediaStreamDestination();
-
-      // User mic input
-      const micSource = audioContext.createMediaStreamSource(stream);
+      
+      const micSource = audioContext.createMediaStreamSource(mainStream);
       micSource.connect(destination);
       
-      // AI audio output
       if (audioPlayerRef.current) {
         const audioSource = audioContext.createMediaElementSource(audioPlayerRef.current);
         audioSource.connect(destination);
-        audioSource.connect(audioContext.destination); // Play AI audio through speakers
+        audioSource.connect(audioContext.destination);
       }
-
-      mediaRecorderRef.current = new MediaRecorder(destination.stream, { mimeType });
-      audioChunksRef.current = [];
-
-      mediaRecorderRef.current.ondataavailable = (event) => {
-        if (event.data.size > 0) audioChunksRef.current.push(event.data);
+      
+      mainRecorderRef.current = new MediaRecorder(destination.stream, { mimeType });
+      const mainChunks: Blob[] = [];
+      mainRecorderRef.current.ondataavailable = (event) => {
+        if (event.data.size > 0) mainChunks.push(event.data);
       };
       
-      mediaRecorderRef.current.onstop = () => {
-        const blob = new Blob(audioChunksRef.current, { type: mimeType });
+      mainRecorderRef.current.onstop = () => {
+        const blob = new Blob(mainChunks, { type: mimeType });
         setRecordedBlob(blob);
-        setSessionState("finished");
-        stream.getTracks().forEach(track => track.stop());
+        mainStream.getTracks().forEach(track => track.stop());
+        destination.stream.getTracks().forEach(track => track.stop());
         audioContext.close().catch(e => console.warn("AudioContext could not be closed:", e));
+        setSessionState("finished");
       };
       
-      mediaRecorderRef.current.start();
+      mainRecorderRef.current.start();
       toast({ title: "전체 대화 녹음 시작됨", description: "AI 음성과 사용자 음성이 모두 녹음됩니다." });
 
       // Get AI's first turn
-      processTurn(null);
+      const { aiResponseText, aiResponseAudioDataUri } = await converseWithConcurrentTeacher({
+          studentTranscript: null,
+          conversationHistory: [],
+      });
+      setConversation([{ role: 'model', text: aiResponseText }]);
 
+      if (audioPlayerRef.current) {
+          audioPlayerRef.current.src = aiResponseAudioDataUri;
+          audioPlayerRef.current.play();
+          setSessionState("speaking");
+      }
     } catch (err) {
       console.error("Error setting up recording:", err);
       toast({ title: "녹음 오류", description: "마이크 접근 또는 오디오 설정에 문제가 있습니다.", variant: "destructive" });
@@ -123,21 +131,60 @@ export function ConcurrentConversationTool() {
     }
   };
 
-  const processTurn = async (userAudioUri: string | null) => {
-    setSessionState(userAudioUri ? 'processing' : 'initializing');
-    if (userAudioUri) setInterimTranscript("처리 중...");
+  const handleUserResponse = async () => {
+    if (sessionState !== 'speaking' && sessionState !== 'initializing') return;
+    setSessionState("user_replying");
+    setInterimTranscript("듣고 있어요...");
 
     try {
-        const { studentTranscript, aiResponseText, aiResponseAudioDataUri } = await converseWithNativeTeacher({
-            studentRecordingDataUri: userAudioUri,
+      const userStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      userReplyRecorderRef.current = new MediaRecorder(userStream, { mimeType });
+      const userChunks: Blob[] = [];
+      
+      userReplyRecorderRef.current.ondataavailable = e => userChunks.push(e.data);
+      
+      userReplyRecorderRef.current.onstop = () => {
+        userStream.getTracks().forEach(track => track.stop());
+        if (userChunks.length === 0) {
+            processTurn(""); // Send empty string if no audio
+            return;
+        }
+        const blob = new Blob(userChunks, { type: mimeType });
+        const reader = new FileReader();
+        reader.readAsDataURL(blob);
+        reader.onloadend = () => processTurn(reader.result as string);
+      };
+      
+      userReplyRecorderRef.current.start();
+    } catch(err) {
+      toast({ title: "마이크 오류", description: "마이크에 접근할 수 없습니다.", variant: "destructive" });
+      setInterimTranscript(null);
+      setSessionState('speaking');
+    }
+  }
+
+  const handleStopUserResponse = () => {
+      if (userReplyRecorderRef.current?.state === 'recording') {
+          userReplyRecorderRef.current.stop();
+          setSessionState('processing');
+      }
+  }
+
+  const processTurn = async (userAudioUri: string) => {
+    setSessionState('processing');
+    setInterimTranscript("처리 중...");
+
+    try {
+        const studentTranscript = userAudioUri ? await transcribeUserAudio(userAudioUri) : "(The user did not say anything)";
+        setInterimTranscript(null);
+        setConversation(prev => [...prev, { role: 'user', text: studentTranscript }]);
+
+        const { aiResponseText, aiResponseAudioDataUri } = await converseWithConcurrentTeacher({
+            studentTranscript: studentTranscript,
             conversationHistory: conversation,
         });
 
-        if(userAudioUri) {
-            setConversation(prev => [...prev, { role: 'user', text: studentTranscript }]);
-        }
         setConversation(prev => [...prev, { role: 'model', text: aiResponseText }]);
-        setInterimTranscript(null);
 
         if (audioPlayerRef.current) {
             audioPlayerRef.current.src = aiResponseAudioDataUri;
@@ -147,49 +194,16 @@ export function ConcurrentConversationTool() {
     } catch (error) {
         console.error("Error processing turn:", error);
         toast({ title: "처리 오류", description: "AI 응답을 가져오는 중 오류가 발생했습니다.", variant: "destructive" });
-        setSessionState("waiting_for_user");
+        setSessionState("speaking"); // Let them try again
     }
   }
 
   const handleStopConversation = () => {
-    if (mediaRecorderRef.current?.state === 'recording') {
-        mediaRecorderRef.current.stop();
+    if (mainRecorderRef.current?.state === 'recording') {
+        mainRecorderRef.current.stop();
     }
-    // Other states might need cleanup too
-    if (audioStreamRef.current) {
-        audioStreamRef.current.getTracks().forEach(track => track.stop());
-    }
-    setSessionState("finished");
-  };
-
-  const handleUserResponse = async () => {
-    setInterimTranscript("듣고 있어요...");
-    
-    try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const tempRecorder = new MediaRecorder(stream, { mimeType });
-        const tempChunks: Blob[] = [];
-
-        tempRecorder.ondataavailable = e => tempChunks.push(e.data);
-        tempRecorder.onstop = () => {
-            const blob = new Blob(tempChunks, { type: mimeType });
-            const reader = new FileReader();
-            reader.readAsDataURL(blob);
-            reader.onloadend = () => processTurn(reader.result as string);
-            stream.getTracks().forEach(track => track.stop());
-        };
-        
-        setTimeout(() => {
-            if (tempRecorder.state === 'recording') {
-                tempRecorder.stop();
-            }
-        }, 5000); // 5-second response limit for user
-        tempRecorder.start();
-        
-    } catch (err) {
-        toast({ title: "마이크 오류", description: "마이크에 접근할 수 없습니다.", variant: "destructive" });
-        setInterimTranscript(null);
-    }
+    cleanupRecorders();
+    cleanupAudioPlayer();
   };
 
 
@@ -197,21 +211,33 @@ export function ConcurrentConversationTool() {
     switch (sessionState) {
       case "idle":
         return (
-          <Button size="lg" onClick={startConversationAndRecording} className="w-full">
+          <Button size="lg" onClick={startConversation} className="w-full">
             <Play className="mr-2 h-5 w-5" />
             대화 및 녹음 시작
           </Button>
         );
-      case "recording":
-      case "speaking":
-      case "processing":
       case "initializing":
+      case "processing":
+          return (
+             <Button size="lg" disabled className="w-full">
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                {sessionState === "initializing" ? "AI 준비 중..." : "AI 생각 중..."}
+            </Button>
+          )
+      case "speaking":
         return (
-          <Button size="lg" onClick={handleStopConversation} className="w-full" variant="destructive">
-            <StopCircle className="mr-2 h-5 w-5" />
-            대화 및 녹음 중지
-          </Button>
+            <Button size="lg" onClick={handleUserResponse} className="w-full">
+                <Mic className="mr-2 h-5 w-5" />
+                응답하기
+            </Button>
         );
+      case "user_replying":
+          return (
+            <Button size="lg" onClick={handleStopUserResponse} className="w-full" variant="destructive">
+                <StopCircle className="mr-2 h-5 w-5" />
+                말하기 중지
+            </Button>
+          )
       case "finished":
         return (
             <div className="flex gap-2">
@@ -229,13 +255,6 @@ export function ConcurrentConversationTool() {
                 </Button>
             </div>
         );
-      case "waiting_for_user":
-          return (
-              <Button size="lg" disabled className="w-full">
-                  <Mic className="mr-2 h-5 w-5 animate-pulse" />
-                  AI가 응답을 기다립니다... (대화 종료됨)
-              </Button>
-          );
     }
   };
 
@@ -259,11 +278,11 @@ export function ConcurrentConversationTool() {
                   <audio src={URL.createObjectURL(recordedBlob)} controls className="mt-4 w-full max-w-sm"></audio>
               </div>
             )}
-            {["initializing", "recording", "speaking", "processing"].includes(sessionState) && (
+            {["initializing"].includes(sessionState) && (
                  <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground pt-12">
                      <Loader2 className="h-12 w-12 mb-4 animate-spin"/>
                      <p className="font-semibold">
-                         {sessionState === 'recording' ? "대화가 녹음 중입니다..." : "AI가 응답을 준비 중입니다..."}
+                         AI가 응답을 준비 중입니다...
                      </p>
                  </div>
             )}
@@ -284,24 +303,33 @@ export function ConcurrentConversationTool() {
                 )}
               </div>
             ))}
+             {interimTranscript && (
+                <div className="flex items-start gap-3 justify-start">
+                    <div className="p-2 rounded-full bg-muted">
+                        <User className="h-5 w-5" />
+                    </div>
+                    <div className="p-3 rounded-lg max-w-[80%] bg-muted">
+                        <p className="text-sm text-muted-foreground italic">{interimTranscript}</p>
+                    </div>
+                </div>
+            )}
         </div>
       </ScrollArea>
       
       <div className="flex flex-col gap-2">
-        <div className="flex gap-2">
+        <div className="flex justify-between gap-2">
             <div className="flex-grow">
               {getButtonState()}
             </div>
+            {sessionState !== "idle" && sessionState !== 'finished' && (
+              <Button onClick={handleStopConversation} variant="destructive">
+                대화 종료
+              </Button>
+            )}
         </div>
       </div>
 
-      <audio ref={audioPlayerRef} onEnded={() => {
-          if (mediaRecorderRef.current?.state === 'recording') {
-            handleUserResponse();
-          } else {
-            setSessionState('finished');
-          }
-      }} crossOrigin="anonymous" className="hidden" />
+      <audio ref={audioPlayerRef} onEnded={handleUserResponse} crossOrigin="anonymous" className="hidden" />
     </div>
   );
 }

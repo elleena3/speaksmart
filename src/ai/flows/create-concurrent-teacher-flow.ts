@@ -18,10 +18,10 @@ import wav from 'wav';
 
 
 const ConverseWithNativeTeacherInputSchema = z.object({
-  studentRecordingDataUri: z
+  studentTranscript: z
     .string()
     .describe(
-      "The user's voice recording as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'"
+      "The user's speech transcribed to text."
     ).nullable(),
   conversationHistory: z
     .array(ConversationTurnSchema)
@@ -32,16 +32,32 @@ type ConverseWithNativeTeacherInput = z.infer<typeof ConverseWithNativeTeacherIn
 const ConverseWithNativeTeacherOutputSchema = z.object({
   aiResponseText: z.string().describe('The text of the AI conversational partner.'),
   aiResponseAudioDataUri: z.string().describe("The AI's response as a playable audio data URI."),
-  studentTranscript: z.string().describe("The transcript of the user's speech."),
 });
 type ConverseWithNativeTeacherOutput = z.infer<typeof ConverseWithNativeTeacherOutputSchema>;
 
 
-export async function converseWithNativeTeacher(
+export async function converseWithConcurrentTeacher(
   input: ConverseWithNativeTeacherInput
 ): Promise<ConverseWithNativeTeacherOutput> {
-  return converseWithNativeTeacherFlow(input);
+  return converseWithConcurrentTeacherFlow(input);
 }
+
+export async function transcribeUserAudio(audioDataUri: string): Promise<string> {
+  const sttResponse = await ai.generate({
+    model: googleAI.model('gemini-2.5-flash'),
+    prompt: [
+      { text: 'Transcribe this English audio.' },
+      { media: { url: audioDataUri } },
+    ],
+  });
+  const transcript = sttResponse.text;
+  if (!transcript?.trim()) {
+      console.warn("Transcription result was empty.");
+      return "(The user did not say anything)"; 
+  }
+  return transcript;
+}
+
 
 const conversationalPrompt = ai.definePrompt({
   name: 'concurrentTeacherConversationalPrompt',
@@ -61,7 +77,7 @@ Your primary goals are:
 3.  Assess the user's English proficiency level based on their speech.
 4.  Adapt your language to the user's level. If their English is basic, use simpler words and sentence structures. If they are advanced, use more sophisticated language.
 
-IMPORTANT RULE: If the user's transcript is empty or indicates no speech, you MUST ask them to speak again, for example: "Sorry, I didn't catch that. Could you please say that again?" or "I couldn't hear you, can you repeat that?". Do not try to continue the conversation.
+IMPORTANT RULE: If the user's transcript is "(The user did not say anything)", you MUST ask them to speak again, for example: "Sorry, I didn't catch that. Could you please say that again?" or "I couldn't hear you, can you repeat that?". Do not try to continue the conversation.
 
 Conversation History (if any):
 {{#each history}}
@@ -135,31 +151,15 @@ async function textToSpeech(text: string): Promise<string> {
     return 'data:audio/wav;base64,' + await toWav(pcmBuffer);
 }
 
-const converseWithNativeTeacherFlow = ai.defineFlow(
+const converseWithConcurrentTeacherFlow = ai.defineFlow(
   {
-    name: 'concurrentConverseWithNativeTeacherFlow',
+    name: 'converseWithConcurrentTeacherFlow',
     inputSchema: ConverseWithNativeTeacherInputSchema,
     outputSchema: ConverseWithNativeTeacherOutputSchema,
   },
-  async ({ studentRecordingDataUri, conversationHistory }) => {
-    let studentTranscript = "";
+  async ({ studentTranscript, conversationHistory }) => {
     let aiResponseText = "";
-
-    if (studentRecordingDataUri) {
-      const sttResponse = await ai.generate({
-        model: googleAI.model('gemini-2.5-flash'),
-        prompt: [
-          { text: 'Transcribe this English audio.' },
-          { media: { url: studentRecordingDataUri } },
-        ],
-      });
-      studentTranscript = sttResponse.text;
-      if (!studentTranscript?.trim()) {
-          console.warn("Transcription result was empty.");
-          studentTranscript = "(The user did not say anything)"; 
-      }
-    }
-
+    
     const historyForPrompt = conversationHistory.map(turn => ({
       ...turn,
       isUser: turn.role === 'user',
@@ -180,7 +180,6 @@ const converseWithNativeTeacherFlow = ai.defineFlow(
     const aiResponseAudioDataUri = await textToSpeech(aiResponseText);
 
     return {
-      studentTranscript: studentTranscript === "(The user did not say anything)" ? "" : studentTranscript,
       aiResponseText,
       aiResponseAudioDataUri,
     };
