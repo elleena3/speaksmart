@@ -13,7 +13,6 @@ import { Button } from "@/components/ui/button";
 import { db } from "@/lib/firebase";
 import { collection, query, where, onSnapshot, doc, setDoc, updateDoc, getDocs, getDoc } from "firebase/firestore";
 import { generateDialogueAnalysis } from "@/ai/flows/generate-dialogue-analysis-flow";
-import { useToast } from "@/hooks/use-toast";
 import { Progress } from "@/components/ui/progress";
 
 const SESSION_STORAGE_KEY = 'freeTalkSessionData';
@@ -205,7 +204,59 @@ export default function FreeTalkResultsPage() {
             const sessionData = JSON.parse(sessionDataRaw);
             if (sessionData.assessment.id === assessmentId) {
                 processDialogueSubmission(sessionData).then(() => {
-                     const q = query(
+                    const handleSnapshot = async (snapshot: any) => {
+                         if (snapshot.empty && status !== 'analyzing') {
+                            const assessmentRef = doc(db, 'assessments', assessmentId);
+                            const assessmentSnap = await getDoc(assessmentRef);
+                            if (assessmentSnap.exists()) {
+                                setAssessment({id: assessmentSnap.id, ...assessmentSnap.data()} as TeacherAssessment);
+                                setResults([]);
+                                setStatus("completed");
+                            } else if (assessmentId !== "free-talk-practice") {
+                                notFound();
+                            }
+                            return;
+                        }
+
+                        const dbResults: StudentResult[] = snapshot.docs.map((doc:any) => ({ id: doc.id, ...doc.data() }));
+                        dbResults.sort((a, b) => (a.createdAt || 0) - (a.createdAt || 0));
+                        
+                        if (!assessment) {
+                             const assessmentRef = doc(db, 'assessments', assessmentId);
+                            const assessmentSnap = await getDoc(assessmentRef);
+                            if (assessmentSnap.exists()) {
+                                setAssessment({id: assessmentSnap.id, ...assessmentSnap.data()} as TeacherAssessment);
+                            } else if (assessmentId !== "free-talk-practice") {
+                                notFound();
+                                return;
+                            } else {
+                                // Fallback for generic free-talk
+                                setAssessment({
+                                  id: "free-talk-practice",
+                                  title: "자유 대화 연습",
+                                  assessmentType: "dialogue",
+                                } as any);
+                            }
+                        }
+                        
+                        setResults(dbResults);
+                        const latestResult = dbResults[dbResults.length - 1];
+
+                         if (latestResult.status === '채점 완료') {
+                            setStatus("completed");
+                        } else if (latestResult.status === '오류') {
+                            setStatus('error');
+                            setErrorInfo({ message: latestResult.aiFeedback || '알 수 없는 오류가 발생했습니다.' });
+                        }
+                    };
+
+                    const handleError = (err: any) => {
+                        console.error("Error listening to result:", err);
+                        setErrorInfo({ message: "결과를 실시간으로 업데이트하는 중 오류가 발생했습니다."});
+                        setStatus("error");
+                    };
+
+                    const q = query(
                         collection(db, "results"),
                         where("assessmentId", "==", assessmentId),
                         where("studentId", "==", user.uid)
@@ -231,16 +282,7 @@ export default function FreeTalkResultsPage() {
                 return;
             }
 
-            const dbResults: StudentResult[] = [];
-            let hasUnfinishedJob = false;
-            snapshot.forEach((doc: any) => {
-                const result = { id: doc.id, ...doc.data() } as StudentResult;
-                if (result.status !== '채점 완료' && result.status !== '오류') {
-                    hasUnfinishedJob = true;
-                }
-                dbResults.push(result);
-            });
-            
+            const dbResults: StudentResult[] = snapshot.docs.map((doc:any) => ({ id: doc.id, ...doc.data() }));
             dbResults.sort((a, b) => (a.createdAt || 0) - (a.createdAt || 0));
 
             if (!assessment) {
@@ -261,27 +303,7 @@ export default function FreeTalkResultsPage() {
                 }
             }
             setResults(dbResults);
-            
-            if (hasUnfinishedJob && status !== 'analyzing') {
-                setStatus("analyzing");
-                const latestResult = dbResults[dbResults.length - 1];
-                const latestStatus = latestResult.status as ResultStatus;
-                if (latestStatus.includes('분석')) {
-                    setAnalysisStep('analyze');
-                } else if (latestStatus.includes('리포트')) {
-                    setAnalysisStep('report');
-                } else {
-                    setAnalysisStep('upload');
-                }
-            } else if (!hasUnfinishedJob && status !== 'completed') {
-                const latestResult = dbResults[dbResults.length - 1];
-                 if (latestResult.status === '오류') {
-                    setStatus('error');
-                    setErrorInfo({ message: latestResult.aiFeedback || '알 수 없는 오류가 발생했습니다.' });
-                } else {
-                    setStatus("completed");
-                }
-            }
+            setStatus("completed");
         };
 
         const handleError = (err: any) => {
@@ -299,7 +321,7 @@ export default function FreeTalkResultsPage() {
 
         return () => unsubscribe();
         
-    }, [assessmentId, user, authLoading]);
+    }, [assessmentId, user, authLoading, processDialogueSubmission, assessment]);
 
 
     if (status === "loading" || authLoading) {

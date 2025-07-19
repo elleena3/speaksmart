@@ -13,7 +13,6 @@ import { Button } from "@/components/ui/button";
 import { db } from "@/lib/firebase";
 import { collection, query, where, onSnapshot, doc, setDoc, updateDoc, getDocs, getDoc } from "firebase/firestore";
 import { generateMonologueAnalysis } from "@/ai/flows/generate-monologue-analysis-flow";
-import { useToast } from "@/hooks/use-toast";
 import { Progress } from "@/components/ui/progress";
 
 const SESSION_STORAGE_KEY = 'monologueSessionData';
@@ -148,7 +147,6 @@ export default function AssessmentResultsPage() {
             useRubric: assessmentDetails.useRubric || false,
         });
 
-        setAnalysisStep("analyze");
         await updateDoc(resultRef, { status: "리포트 생성 중" });
         setAnalysisStep("report");
 
@@ -196,22 +194,65 @@ export default function AssessmentResultsPage() {
 
     const sessionDataRaw = sessionStorage.getItem(SESSION_STORAGE_KEY);
     if (sessionDataRaw) {
-      const sessionData = JSON.parse(sessionDataRaw);
-      if (sessionData.assessmentId === id) {
-        // This is a new submission, process it and then set up the listener.
-        processMonologueSubmission(sessionData).then(() => {
-           const q = query(
-                collection(db, "results"),
-                where("assessmentId", "==", id),
-                where("studentId", "==", user.uid)
-            );
-            const unsubscribe = onSnapshot(q, handleSnapshot, handleError);
-            return () => unsubscribe();
-        });
-        return; 
-      }
+        const sessionData = JSON.parse(sessionDataRaw);
+        if (sessionData.assessmentId === id) {
+            processMonologueSubmission(sessionData).then(() => {
+                // After processing, set up the listener to get the final result
+                const handleSnapshot = async (snapshot: any) => {
+                    if (snapshot.empty && status !== 'analyzing') {
+                        const assessmentRef = doc(db, 'assessments', id);
+                        const assessmentSnap = await getDoc(assessmentRef);
+                        if (assessmentSnap.exists()) {
+                            setAssessment({id: assessmentSnap.id, ...assessmentSnap.data()} as TeacherAssessment);
+                            setResults([]);
+                            setStatus("completed"); 
+                        } else {
+                            notFound();
+                        }
+                        return;
+                    }
+
+                    const dbResults: StudentResult[] = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
+                    dbResults.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+                    
+                    if (!assessment && dbResults.length > 0) {
+                        const assessmentRef = doc(db, 'assessments', id);
+                        const assessmentSnap = await getDoc(assessmentRef);
+                        if (assessmentSnap.exists()) {
+                            setAssessment({id: assessmentSnap.id, ...assessmentSnap.data()} as TeacherAssessment);
+                        }
+                    }
+                    
+                    setResults(dbResults);
+                    const latestResult = dbResults[dbResults.length - 1];
+                    
+                    if (latestResult.status === '채점 완료') {
+                        setStatus("completed");
+                    } else if (latestResult.status === '오류') {
+                        setStatus('error');
+                        setErrorInfo({ message: latestResult.aiFeedback || '알 수 없는 오류가 발생했습니다.' });
+                    }
+                };
+                
+                const handleError = (err: any) => {
+                    console.error("Error listening to result:", err);
+                    setErrorInfo({ message: "결과를 실시간으로 업데이트하는 중 오류가 발생했습니다."});
+                    setStatus("error");
+                };
+
+                const q = query(
+                    collection(db, "results"),
+                    where("assessmentId", "==", id),
+                    where("studentId", "==", user.uid)
+                );
+                const unsubscribe = onSnapshot(q, handleSnapshot, handleError);
+                return () => unsubscribe();
+            });
+            return; // Don't set up the listener twice.
+        }
     }
 
+    // This is for viewing existing results.
     const handleSnapshot = async (snapshot: any) => {
         if (snapshot.empty) {
             const assessmentRef = doc(db, 'assessments', id);
@@ -226,16 +267,7 @@ export default function AssessmentResultsPage() {
             return;
         }
 
-        const dbResults: StudentResult[] = [];
-        let hasUnfinishedJob = false;
-        snapshot.forEach((doc: any) => {
-            const result = { id: doc.id, ...doc.data() } as StudentResult;
-            if (result.status !== '채점 완료' && result.status !== '오류') {
-                hasUnfinishedJob = true;
-            }
-            dbResults.push(result);
-        });
-        
+        const dbResults: StudentResult[] = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
         dbResults.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
 
         if (!assessment) {
@@ -250,29 +282,7 @@ export default function AssessmentResultsPage() {
         }
         
         setResults(dbResults);
-        
-        if (hasUnfinishedJob && status !== 'analyzing') {
-            setStatus("analyzing");
-            const latestResult = dbResults[dbResults.length - 1];
-            const latestStatus = latestResult.status as ResultStatus;
-            if(latestStatus.includes('텍스트')){
-                setAnalysisStep('transcribe')
-            } else if (latestStatus.includes('분석')) {
-                setAnalysisStep('analyze')
-            } else if (latestStatus.includes('리포트')) {
-                setAnalysisStep('report')
-            } else {
-                setAnalysisStep('upload');
-            }
-        } else if (!hasUnfinishedJob && status !== 'completed') {
-            const latestResult = dbResults[dbResults.length - 1];
-            if (latestResult.status === '오류') {
-                setStatus('error');
-                setErrorInfo({ message: latestResult.aiFeedback || '알 수 없는 오류가 발생했습니다.' });
-            } else {
-                setStatus("completed");
-            }
-        }
+        setStatus("completed");
     };
     
     const handleError = (err: any) => {
@@ -281,7 +291,6 @@ export default function AssessmentResultsPage() {
         setStatus("error");
     };
     
-    // This is for viewing existing results.
     const q = query(
         collection(db, "results"),
         where("assessmentId", "==", id),
@@ -290,7 +299,7 @@ export default function AssessmentResultsPage() {
     const unsubscribe = onSnapshot(q, handleSnapshot, handleError);
     
     return () => unsubscribe();
-  }, [id, user, authLoading]);
+  }, [id, user, authLoading, processMonologueSubmission, assessment]);
   
   if (status === "loading" || authLoading) {
     return (
