@@ -132,7 +132,7 @@ export function FreeTalkFeedbackView({ result, assessment, isLatestAttempt }: Fe
             </CardContent>
         </Card>
         
-        {(pronunciationScore !== undefined && pronunciationFeedback) || contentScore !== undefined && (
+        {(pronunciationScore !== undefined && pronunciationFeedback) || contentScore !== undefined ? (
           <Card>
               <CardHeader>
                 <div className="flex items-center gap-3">
@@ -170,7 +170,7 @@ export function FreeTalkFeedbackView({ result, assessment, isLatestAttempt }: Fe
                   )}
               </CardContent>
           </Card>
-        )}
+        ) : null}
 
         <Card>
             <CardHeader>
