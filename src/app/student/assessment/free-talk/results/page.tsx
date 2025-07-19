@@ -143,9 +143,8 @@ export default function FreeTalkResultsPage() {
             };
             
             await setDoc(resultRef, initialData, { merge: true });
-
-            setAnalysisStep("analyze");
             await updateDoc(resultRef, { status: "내용 및 발음 분석 중..." });
+            setAnalysisStep("analyze");
             
             const analysisResult = await generateDialogueAnalysis({
                 studentRecordingUrl: studentRecordingUrl,
@@ -157,9 +156,9 @@ export default function FreeTalkResultsPage() {
                 assessmentTitle: assessment.title.replace(/ - 복사본(\s\d+)?$/, ''),
                 evaluationModel: assessment.evaluationModel,
             });
-
-            setAnalysisStep("report");
+            
             await updateDoc(resultRef, { status: "리포트 생성 중..." });
+            setAnalysisStep("report");
 
             const finalResultData: Partial<StudentResult> = {
                 ...analysisResult,
@@ -202,24 +201,11 @@ export default function FreeTalkResultsPage() {
         const sessionDataRaw = sessionStorage.getItem(SESSION_STORAGE_KEY);
         if (sessionDataRaw) {
             const sessionData = JSON.parse(sessionDataRaw);
-            processDialogueSubmission(sessionData).then(() => {
-                const q = query(
-                    collection(db, "results"),
-                    where("assessmentId", "==", assessmentId),
-                    where("studentId", "==", user.uid)
-                );
-                const unsubscribe = onSnapshot(q, handleSnapshot, handleError);
-                return () => unsubscribe();
-            });
-            return;
+            if (sessionData.assessment.id === assessmentId) {
+                processDialogueSubmission(sessionData);
+            }
         }
 
-        const q = query(
-            collection(db, "results"),
-            where("assessmentId", "==", assessmentId),
-            where("studentId", "==", user.uid)
-        );
-        
         const handleSnapshot = async (snapshot: any) => {
              if (snapshot.empty) {
                 const assessmentRef = doc(db, 'assessments', assessmentId);
@@ -235,8 +221,13 @@ export default function FreeTalkResultsPage() {
             }
 
             const dbResults: StudentResult[] = [];
+            let hasUnfinishedJob = false;
             snapshot.forEach((doc: any) => {
-                dbResults.push({ id: doc.id, ...doc.data() } as StudentResult);
+                const result = { id: doc.id, ...doc.data() } as StudentResult;
+                if (result.status !== '채점 완료' && result.status !== '오류') {
+                    hasUnfinishedJob = true;
+                }
+                dbResults.push(result);
             });
             
             dbResults.sort((a, b) => (a.createdAt || 0) - (a.createdAt || 0));
@@ -246,32 +237,39 @@ export default function FreeTalkResultsPage() {
                 const assessmentSnap = await getDoc(assessmentRef);
                 if (assessmentSnap.exists()) {
                     setAssessment({id: assessmentSnap.id, ...assessmentSnap.data()} as TeacherAssessment);
-                } else {
+                } else if (assessmentId !== "free-talk-practice") {
                     notFound();
                     return;
+                } else {
+                    // Fallback for generic free-talk
+                    setAssessment({
+                      id: "free-talk-practice",
+                      title: "자유 대화 연습",
+                      assessmentType: "dialogue",
+                    } as any);
                 }
             }
             setResults(dbResults);
             
-            const latestResult = dbResults[dbResults.length - 1];
-            
-            if (latestResult.status === '오류') {
-                setStatus('error');
-                setErrorInfo({ 
-                    message: latestResult.aiFeedback || '알 수 없는 오류가 발생했습니다.', 
-                });
-            } else if (latestResult.status !== '채점 완료') {
-              setStatus("analyzing");
-              const latestStatus = latestResult.status as ResultStatus;
-              if (latestStatus.includes('분석')) {
-                setAnalysisStep('analyze');
-              } else if (latestStatus.includes('리포트')) {
-                setAnalysisStep('report');
-              } else {
-                setAnalysisStep('upload');
-              }
-            } else {
-              setStatus("completed");
+            if (hasUnfinishedJob && status !== 'analyzing') {
+                setStatus("analyzing");
+                const latestResult = dbResults[dbResults.length - 1];
+                const latestStatus = latestResult.status as ResultStatus;
+                if (latestStatus.includes('분석')) {
+                    setAnalysisStep('analyze');
+                } else if (latestStatus.includes('리포트')) {
+                    setAnalysisStep('report');
+                } else {
+                    setAnalysisStep('upload');
+                }
+            } else if (!hasUnfinishedJob && status !== 'completed') {
+                const latestResult = dbResults[dbResults.length - 1];
+                 if (latestResult.status === '오류') {
+                    setStatus('error');
+                    setErrorInfo({ message: latestResult.aiFeedback || '알 수 없는 오류가 발생했습니다.' });
+                } else {
+                    setStatus("completed");
+                }
             }
         };
 
@@ -281,11 +279,16 @@ export default function FreeTalkResultsPage() {
             setStatus("error");
         };
 
+        const q = query(
+            collection(db, "results"),
+            where("assessmentId", "==", assessmentId),
+            where("studentId", "==", user.uid)
+        );
         const unsubscribe = onSnapshot(q, handleSnapshot, handleError);
 
         return () => unsubscribe();
         
-    }, [assessmentId, user, authLoading, processDialogueSubmission]);
+    }, [assessmentId, user, authLoading, processDialogueSubmission, assessment, status]);
 
 
     if (status === "loading" || authLoading) {
@@ -305,7 +308,8 @@ export default function FreeTalkResultsPage() {
     }
   
     if (status === 'error') {
-      const assessmentIdOnError = results[0]?.assessmentId || assessment?.id;
+      const assessmentIdOnError = results[0]?.assessmentId || assessment?.id || 'dashboard';
+      const redirectPath = assessmentIdOnError === 'dashboard' ? '/student/dashboard' : `/student/assessment/free-talk?id=${assessmentIdOnError}`;
       return (
           <Card className="flex flex-col items-center justify-center text-center p-8 min-h-80 bg-destructive/10 border-destructive">
               <CardHeader>
@@ -314,7 +318,7 @@ export default function FreeTalkResultsPage() {
                   <CardDescription className="text-destructive-foreground">{errorInfo?.message || "AI가 답변을 분석하는 데 실패했습니다. 다시 시도해주세요."}</CardDescription>
               </CardHeader>
               <CardContent>
-                <Button variant="secondary" onClick={() => router.push(`/student/assessment/free-talk?id=${assessmentIdOnError}`)}>
+                <Button variant="secondary" onClick={() => router.push(redirectPath)}>
                     대화로 돌아가기
                 </Button>
               </CardContent>

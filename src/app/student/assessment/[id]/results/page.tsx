@@ -11,7 +11,7 @@ import { Loader2, AlertTriangle, CheckCircle2, UploadCloud, AudioLines, FileScan
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { db } from "@/lib/firebase";
-import { collection, query, where, onSnapshot, doc, setDoc, updateDoc, getDocs, getDoc, serverTimestamp } from "firebase/firestore";
+import { collection, query, where, onSnapshot, doc, setDoc, updateDoc, getDocs, getDoc } from "firebase/firestore";
 import { generateMonologueAnalysis } from "@/ai/flows/generate-monologue-analysis-flow";
 import { useToast } from "@/hooks/use-toast";
 import { Progress } from "@/components/ui/progress";
@@ -115,9 +115,8 @@ export default function AssessmentResultsPage() {
     
     setStatus("analyzing");
     setErrorInfo(null);
-    const { assessmentId, studentRecordingUrl, assessmentDetails } = sessionData;
+    const { assessmentDetails, studentRecordingUrl } = sessionData;
     
-    // Create a new document reference for this submission
     const resultRef = doc(collection(db, "results"));
     
     try {
@@ -136,11 +135,8 @@ export default function AssessmentResultsPage() {
             studentRecordingUrl: studentRecordingUrl,
         };
         await setDoc(resultRef, initialData, { merge: true });
-        setAnalysisStep("transcribe");
         await updateDoc(resultRef, { status: "텍스트 변환 중" });
-
-        setAnalysisStep("analyze");
-        await updateDoc(resultRef, { status: "내용 및 발음 분석 중..." });
+        setAnalysisStep("transcribe");
         
         const analysisResult = await generateMonologueAnalysis({
             studentRecordingUrl: studentRecordingUrl,
@@ -151,8 +147,9 @@ export default function AssessmentResultsPage() {
             evaluationModel: assessmentDetails.evaluationModel,
         });
 
-        setAnalysisStep("report");
+        setAnalysisStep("analyze");
         await updateDoc(resultRef, { status: "리포트 생성 중" });
+        setAnalysisStep("report");
 
         const finalResultData: Partial<StudentResult> = {
             ...analysisResult,
@@ -196,30 +193,13 @@ export default function AssessmentResultsPage() {
   useEffect(() => {
     if (authLoading || !user || !id) return;
     
-    // Check for a new submission first.
     const sessionDataRaw = sessionStorage.getItem(SESSION_STORAGE_KEY);
     if(sessionDataRaw) {
-        // If there's a new submission, process it and then set up the listener.
         const sessionData = JSON.parse(sessionDataRaw);
-        processMonologueSubmission(sessionData).then(() => {
-            // After processing, immediately start listening for the final result.
-            const q = query(
-                collection(db, "results"),
-                where("assessmentId", "==", id),
-                where("studentId", "==", user.uid)
-            );
-            const unsubscribe = onSnapshot(q, handleSnapshot, handleError);
-            return () => unsubscribe();
-        });
-        return; // Don't set up the listener twice.
+        if (sessionData.assessmentId === id) {
+            processMonologueSubmission(sessionData);
+        }
     }
-    
-    // If no new submission, just listen for existing results.
-    const q = query(
-        collection(db, "results"),
-        where("assessmentId", "==", id),
-        where("studentId", "==", user.uid)
-    );
 
     const handleSnapshot = async (snapshot: any) => {
         if (snapshot.empty) {
@@ -236,8 +216,13 @@ export default function AssessmentResultsPage() {
         }
 
         const dbResults: StudentResult[] = [];
+        let hasUnfinishedJob = false;
         snapshot.forEach((doc: any) => {
-            dbResults.push({ id: doc.id, ...doc.data() } as StudentResult);
+            const result = { id: doc.id, ...doc.data() } as StudentResult;
+            if (result.status !== '채점 완료' && result.status !== '오류') {
+                hasUnfinishedJob = true;
+            }
+            dbResults.push(result);
         });
         
         dbResults.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
@@ -254,15 +239,10 @@ export default function AssessmentResultsPage() {
         }
         
         setResults(dbResults);
-        const latestResult = dbResults[dbResults.length - 1];
         
-        if (latestResult.status === '오류') {
-            setStatus('error');
-            setErrorInfo({ 
-                message: latestResult.aiFeedback || '알 수 없는 오류가 발생했습니다.', 
-            });
-        } else if (latestResult.status !== '채점 완료') {
+        if (hasUnfinishedJob && status !== 'analyzing') {
             setStatus("analyzing");
+            const latestResult = dbResults[dbResults.length - 1];
             const latestStatus = latestResult.status as ResultStatus;
             if(latestStatus.includes('텍스트')){
                 setAnalysisStep('transcribe')
@@ -273,21 +253,32 @@ export default function AssessmentResultsPage() {
             } else {
                 setAnalysisStep('upload');
             }
-        } else {
-            setStatus("completed");
+        } else if (!hasUnfinishedJob && status !== 'completed') {
+            const latestResult = dbResults[dbResults.length - 1];
+            if (latestResult.status === '오류') {
+                setStatus('error');
+                setErrorInfo({ message: latestResult.aiFeedback || '알 수 없는 오류가 발생했습니다.' });
+            } else {
+                setStatus("completed");
+            }
         }
     };
-
+    
     const handleError = (err: any) => {
         console.error("Error listening to result:", err);
         setErrorInfo({ message: "결과를 실시간으로 업데이트하는 중 오류가 발생했습니다."});
         setStatus("error");
     };
 
+    const q = query(
+        collection(db, "results"),
+        where("assessmentId", "==", id),
+        where("studentId", "==", user.uid)
+    );
     const unsubscribe = onSnapshot(q, handleSnapshot, handleError);
     
     return () => unsubscribe();
-  }, [id, user, authLoading]);
+  }, [id, user, authLoading, processMonologueSubmission]);
   
   if (status === "loading" || authLoading) {
     return (
