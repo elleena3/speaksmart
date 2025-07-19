@@ -57,14 +57,14 @@ export default function TeacherDashboard() {
 
   }, [user, authLoading, router, fetchAssessments]);
   
-  const getTargetAudienceText = (assessment: TeacherAssessment) => {
-    const { targetStudentIds } = assessment;
+  const getTargetAudienceText = (targetStudentIds?: string[] | 'all'): string => {
     if (!targetStudentIds || targetStudentIds === 'all') {
       return t.teacherAssessments.targetAudience.all;
     }
     if (Array.isArray(targetStudentIds)) {
       if (targetStudentIds.length === 1) {
-        return t.teacherAssessments.targetAudience.individual;
+        const student = mockStudents.find(s => s.uid === targetStudentIds[0]);
+        return student ? student.displayName || '개별' : '개별';
       }
       if (targetStudentIds.length > 1) {
         return `${t.teacherAssessments.targetAudience.group} (${targetStudentIds.length})`;
@@ -121,8 +121,7 @@ export default function TeacherDashboard() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="text-center">{t.teacherDashboard.title}</TableHead>
-                <TableHead className="text-center">{t.teacherAssessments.tableHeaderTarget}</TableHead>
+                <TableHead>{t.teacherDashboard.title}</TableHead>
                 <TableHead className="text-center">{t.teacherDashboard.completed}</TableHead>
                 <TableHead className="text-center">{t.teacherDashboard.avgScore}</TableHead>
                 <TableHead className="text-right">{t.teacherDashboard.actions}</TableHead>
@@ -131,13 +130,11 @@ export default function TeacherDashboard() {
             <TableBody>
               {assessments.length > 0 ? assessments.map((assessment) => (
                 <TableRow key={assessment.id}>
-                  <TableCell className="font-medium text-center">
+                  <TableCell className="font-medium">
                     <Link href={`/teacher/assessment/${assessment.id}`} className="hover:underline text-primary">
-                      {assessment.title}
+                      {`${assessment.title} (${getTargetAudienceText(assessment.targetStudentIds)})`}
                     </Link>
-                  </TableCell>
-                  <TableCell className="text-center">
-                      <Badge variant="secondary">{getTargetAudienceText(assessment)}</Badge>
+                     <p className="text-sm text-muted-foreground">{assessment.topic}</p>
                   </TableCell>
                   <TableCell className="text-center">
                     <div className="flex items-center justify-center gap-1.5">
@@ -166,7 +163,7 @@ export default function TeacherDashboard() {
                 </TableRow>
               )) : (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-24 text-center">
+                  <TableCell colSpan={4} className="h-24 text-center">
                     생성된 평가가 없습니다.
                   </TableCell>
                 </TableRow>

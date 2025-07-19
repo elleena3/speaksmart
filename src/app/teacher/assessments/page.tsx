@@ -64,7 +64,8 @@ export default function AssessmentsPage() {
       
       await addDoc(collection(db, "assessments"), {
         ...copyData,
-        title: `${copyData.title}${t.teacherAssessments.copySuffix}`,
+        title: `${copyData.title}`,
+        topic: `${copyData.topic} (복사본)`,
         createdAt: Date.now(),
         dateCreated: new Date().toISOString().split('T')[0],
         submissionCount: 0,
@@ -119,14 +120,14 @@ export default function AssessmentsPage() {
     return t.teacherAssessments.assessmentTypes.monologue;
   }
   
-  const getTargetAudienceText = (assessment: TeacherAssessment) => {
-    const { targetStudentIds } = assessment;
+  const getTargetAudienceText = (targetStudentIds?: string[] | 'all'): string => {
     if (!targetStudentIds || targetStudentIds === 'all') {
       return t.teacherAssessments.targetAudience.all;
     }
     if (Array.isArray(targetStudentIds)) {
       if (targetStudentIds.length === 1) {
-        return t.teacherAssessments.targetAudience.individual;
+        const student = mockStudents.find(s => s.uid === targetStudentIds[0]);
+        return student ? student.displayName || '개별' : '개별';
       }
       if (targetStudentIds.length > 1) {
         return `${t.teacherAssessments.targetAudience.group} (${targetStudentIds.length})`;
@@ -173,9 +174,8 @@ export default function AssessmentsPage() {
              <Table>
              <TableHeader>
                <TableRow>
-                 <TableHead className="text-center">{t.teacherAssessments.tableHeaderTitle}</TableHead>
+                 <TableHead>{t.teacherAssessments.tableHeaderTitle}</TableHead>
                  <TableHead className="text-center">{t.teacherAssessments.tableHeaderType}</TableHead>
-                 <TableHead className="text-center">{t.teacherAssessments.tableHeaderTarget}</TableHead>
                  <TableHead className="text-center">{t.teacherAssessments.tableHeaderPeriod}</TableHead>
                  <TableHead className="text-center">{t.teacherAssessments.tableHeaderCompleted}</TableHead>
                  <TableHead className="text-center">{t.teacherAssessments.tableHeaderAvgScore}</TableHead>
@@ -185,16 +185,14 @@ export default function AssessmentsPage() {
              <TableBody>
                {assessments.map((assessment) => (
                  <TableRow key={assessment.id}>
-                   <TableCell className="font-medium text-center">
+                   <TableCell className="font-medium">
                      <Link href={`/teacher/assessment/${assessment.id}`} className="hover:underline text-primary">
-                       {assessment.title}
+                       {`${assessment.title} (${getTargetAudienceText(assessment.targetStudentIds)})`}
                      </Link>
+                     <p className="text-sm text-muted-foreground">{assessment.topic}</p>
                    </TableCell>
                    <TableCell className="text-center">
                       <Badge variant="outline">{getAssessmentTypeText(assessment)}</Badge>
-                   </TableCell>
-                   <TableCell className="text-center">
-                      <Badge variant="outline">{getTargetAudienceText(assessment)}</Badge>
                    </TableCell>
                    <TableCell className="text-sm text-muted-foreground text-center">
                       {formatDateRange(assessment.startDate, assessment.endDate)}
