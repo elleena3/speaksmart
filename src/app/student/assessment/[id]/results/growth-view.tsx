@@ -186,8 +186,10 @@ export function GrowthView({ results, assessment, defaultTab }: GrowthViewProps)
                                     <Loader2 className="h-8 w-8 animate-spin" />
                                 </div>
                             ) : (
-                                <div className="p-4 bg-muted/50 rounded-lg whitespace-pre-wrap font-body text-base leading-relaxed">
-                                    {growthFeedback?.growthFeedback}
+                                <div 
+                                    className="p-4 bg-muted/50 rounded-lg whitespace-pre-wrap font-body text-sm leading-relaxed"
+                                    dangerouslySetInnerHTML={{ __html: growthFeedback?.growthFeedback || '' }}
+                                >
                                 </div>
                             )}
                         </CardContent>

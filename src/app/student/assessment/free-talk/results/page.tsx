@@ -197,19 +197,10 @@ export default function FreeTalkResultsPage() {
     useEffect(() => {
         if(authLoading || !user || !assessmentId) return;
         
-        const sessionDataRaw = sessionStorage.getItem(SESSION_STORAGE_KEY);
-        if (sessionDataRaw) {
-            const sessionData = JSON.parse(sessionDataRaw);
-            if (sessionData.assessment.id === assessmentId) {
-                processDialogueSubmission(sessionData);
-                // After processing, the listener below will pick up the result.
-                // We do NOT start a separate listener here.
-            }
-        }
-
-        const handleSnapshot = async (snapshot: any) => {
+        // Define snapshot and error handlers here so they are not redefined on each render.
+        async function handleSnapshot(snapshot: any) {
              if (snapshot.empty) {
-                const assessmentRef = doc(db, 'assessments', assessmentId);
+                const assessmentRef = doc(db, 'assessments', assessmentId as string);
                 const assessmentSnap = await getDoc(assessmentRef);
                 if (assessmentSnap.exists()) {
                     setAssessment({id: assessmentSnap.id, ...assessmentSnap.data()} as TeacherAssessment);
@@ -225,7 +216,7 @@ export default function FreeTalkResultsPage() {
             dbResults.sort((a, b) => (a.createdAt || 0) - (a.createdAt || 0));
 
             if (!assessment) {
-                const assessmentRef = doc(db, 'assessments', assessmentId);
+                const assessmentRef = doc(db, 'assessments', assessmentId as string);
                 const assessmentSnap = await getDoc(assessmentRef);
                 if (assessmentSnap.exists()) {
                     setAssessment({id: assessmentSnap.id, ...assessmentSnap.data()} as TeacherAssessment);
@@ -249,17 +240,35 @@ export default function FreeTalkResultsPage() {
                 setStatus('error');
                 setErrorInfo({ message: latestResult.aiFeedback || '알 수 없는 오류가 발생했습니다.' });
             } else if (status === 'loading') {
-                // If we are still loading, but there's an incomplete result, it means we are analyzing
                 setStatus('analyzing');
             }
-        };
+        }
 
-        const handleError = (err: any) => {
+        function handleError(err: any) {
             console.error("Error listening to result:", err);
             setErrorInfo({ message: "결과를 실시간으로 업데이트하는 중 오류가 발생했습니다."});
             setStatus("error");
-        };
+        }
 
+        // Check for a new submission first.
+        const sessionDataRaw = sessionStorage.getItem(SESSION_STORAGE_KEY);
+        if (sessionDataRaw) {
+            const sessionData = JSON.parse(sessionDataRaw);
+            if (sessionData.assessment.id === assessmentId) {
+                // New submission exists. Process it and then start listening.
+                processDialogueSubmission(sessionData).then(() => {
+                    const q = query(
+                        collection(db, "results"),
+                        where("assessmentId", "==", assessmentId),
+                        where("studentId", "==", user.uid)
+                    );
+                    onSnapshot(q, handleSnapshot, handleError);
+                });
+                return; // Don't set up the listener twice.
+            }
+        }
+
+        // If no new submission, just listen for existing results.
         const q = query(
             collection(db, "results"),
             where("assessmentId", "==", assessmentId),
@@ -269,7 +278,7 @@ export default function FreeTalkResultsPage() {
 
         return () => unsubscribe();
         
-    }, [assessmentId, user, authLoading]);
+    }, [assessmentId, user, authLoading, processDialogueSubmission, assessment]);
 
 
     if (status === "loading" || authLoading) {

@@ -192,18 +192,40 @@ export default function AssessmentResultsPage() {
   useEffect(() => {
     if (authLoading || !user || !id) return;
 
+    // Check for a new submission first.
     const sessionDataRaw = sessionStorage.getItem(SESSION_STORAGE_KEY);
     if (sessionDataRaw) {
         const sessionData = JSON.parse(sessionDataRaw);
         if (sessionData.assessmentId === id) {
-            processMonologueSubmission(sessionData);
-            // The listener below will handle the result.
+            // New submission exists. Process it and then start listening for results.
+            processMonologueSubmission(sessionData).then(() => {
+                // Now that processing is kicked off, start listening.
+                const q = query(
+                    collection(db, "results"),
+                    where("assessmentId", "==", id),
+                    where("studentId", "==", user.uid)
+                );
+                return onSnapshot(q, handleSnapshot, handleError);
+            });
+            return; // Don't set up the listener twice.
         }
     }
 
-    const handleSnapshot = async (snapshot: any) => {
+    // If no new submission, just listen for existing results.
+    const q = query(
+        collection(db, "results"),
+        where("assessmentId", "==", id),
+        where("studentId", "==", user.uid)
+    );
+    const unsubscribe = onSnapshot(q, handleSnapshot, handleError);
+
+    return () => unsubscribe();
+    
+    // Define snapshot and error handlers inside useEffect or as standalone functions
+    // to avoid re-creation on every render, ensuring they are declared before use.
+    async function handleSnapshot(snapshot: any) {
         if (snapshot.empty) {
-            const assessmentRef = doc(db, 'assessments', id);
+            const assessmentRef = doc(db, 'assessments', id as string);
             const assessmentSnap = await getDoc(assessmentRef);
             if (assessmentSnap.exists()) {
                 setAssessment({id: assessmentSnap.id, ...assessmentSnap.data()} as TeacherAssessment);
@@ -219,7 +241,7 @@ export default function AssessmentResultsPage() {
         dbResults.sort((a, b) => (a.createdAt || 0) - (a.createdAt || 0));
         
         if (!assessment) {
-            const assessmentRef = doc(db, 'assessments', id);
+            const assessmentRef = doc(db, 'assessments', id as string);
             const assessmentSnap = await getDoc(assessmentRef);
             if (assessmentSnap.exists()) {
                 setAssessment({id: assessmentSnap.id, ...assessmentSnap.data()} as TeacherAssessment);
@@ -237,23 +259,15 @@ export default function AssessmentResultsPage() {
         } else if (status === 'loading') {
             setStatus('analyzing');
         }
-    };
+    }
     
-    const handleError = (err: any) => {
+    function handleError(err: any) {
         console.error("Error listening to result:", err);
         setErrorInfo({ message: "결과를 실시간으로 업데이트하는 중 오류가 발생했습니다."});
         setStatus("error");
-    };
-    
-    const q = query(
-        collection(db, "results"),
-        where("assessmentId", "==", id),
-        where("studentId", "==", user.uid)
-    );
-    const unsubscribe = onSnapshot(q, handleSnapshot, handleError);
-    
-    return () => unsubscribe();
-  }, [id, user, authLoading]);
+    }
+
+  }, [id, user, authLoading, processMonologueSubmission, assessment]);
   
   if (status === "loading" || authLoading) {
     return (
