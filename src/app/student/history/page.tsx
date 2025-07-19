@@ -68,11 +68,14 @@ export default function HistoryPage() {
             const allResults: EnrichedResult[] = [];
             resultsSnapshot.forEach(doc => {
                 const result = { id: doc.id, ...doc.data() } as StudentResult;
+                // Check if the parent assessment still exists
                 const assessment = assessmentsMap.get(result.assessmentId);
-                allResults.push({
-                    ...result,
-                    assessmentType: assessment?.assessmentType || 'monologue',
-                });
+                if (assessment) {
+                    allResults.push({
+                        ...result,
+                        assessmentType: assessment.assessmentType || 'monologue',
+                    });
+                }
             });
             
             // Sort by creation date descending
