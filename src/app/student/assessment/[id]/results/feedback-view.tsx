@@ -7,13 +7,15 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
-import { Send, ThumbsUp, ThumbsDown, MessageSquareQuote, Loader2, FileText, Target, Repeat } from "lucide-react"
+import { Send, ThumbsUp, ThumbsDown, MessageSquareQuote, Loader2, FileText, Target, Repeat, DraftingCompass } from "lucide-react"
 import { type StudentResult, type TeacherAssessment } from "@/lib/types"
 import { Progress } from "@/components/ui/progress"
 import { db } from "@/lib/firebase"
 import { doc, updateDoc } from "firebase/firestore"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
+import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Legend } from "recharts"
+
 
 type FeedbackViewProps = {
   result: StudentResult
@@ -30,7 +32,6 @@ export function FeedbackView({ result, assessment, isLatestAttempt }: FeedbackVi
 
   const {
     id: resultId,
-    assessmentTitle,
     aiFeedback,
     studentTranscript,
     studentRecordingUrl,
@@ -38,7 +39,28 @@ export function FeedbackView({ result, assessment, isLatestAttempt }: FeedbackVi
     pronunciationFeedback,
     contentScore,
     studentRawFeedback,
+    rubricScores
   } = localResult;
+  
+  const isRubricUsed = !!rubricScores;
+  const rubricSubjects = ['유창성', '발음', '문법', '어휘'];
+
+  const radarChartData = isRubricUsed ? rubricSubjects.map(subject => {
+      const entry: { [key: string]: string | number } = { subject };
+      const key = `attempt1`;
+      if (rubricScores) {
+          switch(subject) {
+              case '유창성': entry[key] = rubricScores.fluency; break;
+              case '발음': entry[key] = rubricScores.pronunciation; break;
+              case '문법': entry[key] = rubricScores.grammar; break;
+              case '어휘': entry[key] = rubricScores.vocabulary; break;
+          }
+      } else {
+           entry[key] = 0;
+      }
+      return entry;
+  }) : [];
+
 
   const handleSubmitFeedback = async () => {
     if (!teacherFeedback.trim()) {
@@ -145,6 +167,32 @@ export function FeedbackView({ result, assessment, isLatestAttempt }: FeedbackVi
           </CardContent>
         </Card>
 
+        {isRubricUsed && (
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2"><DraftingCompass />루브릭 영역별 분석</CardTitle>
+                    <CardDescription>루브릭 항목별 점수입니다. (5점 만점)</CardDescription>
+                </CardHeader>
+                <CardContent className="h-80">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarChartData}>
+                            <PolarGrid />
+                            <PolarAngleAxis dataKey="subject" />
+                            <PolarRadiusAxis angle={30} domain={[0, 5]} tickCount={6} />
+                            <Radar 
+                              name="이번 시도"
+                              dataKey="attempt1" 
+                              stroke="hsl(var(--chart-1))" 
+                              fill="hsl(var(--chart-1))" 
+                              fillOpacity={0.4} 
+                            />
+                            <Legend />
+                        </RadarChart>
+                    </ResponsiveContainer>
+                </CardContent>
+            </Card>
+        )}
+
         <Card>
             <CardHeader>
               <div className="flex items-center gap-3">
@@ -156,11 +204,7 @@ export function FeedbackView({ result, assessment, isLatestAttempt }: FeedbackVi
               </div>
             </CardHeader>
             <CardContent>
-              <div className="p-4 bg-muted/50 rounded-lg font-body text-base leading-relaxed markdown-content">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                  {aiFeedback}
-                </ReactMarkdown>
-              </div>
+              <div className="p-4 bg-muted/50 rounded-lg font-body text-base leading-relaxed markdown-content" dangerouslySetInnerHTML={{ __html: aiFeedback.replace(/\n/g, '<br />') }} />
             </CardContent>
             <CardFooter className="flex-col items-start gap-4">
                 <p className="text-sm font-medium">이 피드백이 도움이 되었나요?</p>
