@@ -108,8 +108,7 @@ export default function AssessmentResultsPage() {
   const [analysisStep, setAnalysisStep] = useState<AnalysisStep | null>(null);
   const [status, setStatus] = useState<PageStatus>("loading");
   const [errorInfo, setErrorInfo] = useState<{ message: string } | null>(null);
-  const { toast } = useToast();
-
+  
   const processMonologueSubmission = useCallback(async (sessionData: MonologueSessionData) => {
     if (!user) return;
     
@@ -135,6 +134,7 @@ export default function AssessmentResultsPage() {
             studentRecordingUrl: studentRecordingUrl,
         };
         await setDoc(resultRef, initialData, { merge: true });
+        
         await updateDoc(resultRef, { status: "텍스트 변환 중" });
         setAnalysisStep("transcribe");
         
@@ -145,6 +145,7 @@ export default function AssessmentResultsPage() {
             studentName: user.displayName || "Student",
             assessmentTitle: assessmentDetails.title,
             evaluationModel: assessmentDetails.evaluationModel,
+            useRubric: assessmentDetails.useRubric || false,
         });
 
         setAnalysisStep("analyze");
@@ -192,13 +193,23 @@ export default function AssessmentResultsPage() {
 
   useEffect(() => {
     if (authLoading || !user || !id) return;
-    
+
     const sessionDataRaw = sessionStorage.getItem(SESSION_STORAGE_KEY);
-    if(sessionDataRaw) {
-        const sessionData = JSON.parse(sessionDataRaw);
-        if (sessionData.assessmentId === id) {
-            processMonologueSubmission(sessionData);
-        }
+    if (sessionDataRaw) {
+      const sessionData = JSON.parse(sessionDataRaw);
+      if (sessionData.assessmentId === id) {
+        // This is a new submission, process it and then set up the listener.
+        processMonologueSubmission(sessionData).then(() => {
+           const q = query(
+                collection(db, "results"),
+                where("assessmentId", "==", id),
+                where("studentId", "==", user.uid)
+            );
+            const unsubscribe = onSnapshot(q, handleSnapshot, handleError);
+            return () => unsubscribe();
+        });
+        return; 
+      }
     }
 
     const handleSnapshot = async (snapshot: any) => {
@@ -269,7 +280,8 @@ export default function AssessmentResultsPage() {
         setErrorInfo({ message: "결과를 실시간으로 업데이트하는 중 오류가 발생했습니다."});
         setStatus("error");
     };
-
+    
+    // This is for viewing existing results.
     const q = query(
         collection(db, "results"),
         where("assessmentId", "==", id),
@@ -278,7 +290,7 @@ export default function AssessmentResultsPage() {
     const unsubscribe = onSnapshot(q, handleSnapshot, handleError);
     
     return () => unsubscribe();
-  }, [id, user, authLoading, processMonologueSubmission]);
+  }, [id, user, authLoading]);
   
   if (status === "loading" || authLoading) {
     return (

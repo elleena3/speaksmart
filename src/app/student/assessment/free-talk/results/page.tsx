@@ -143,6 +143,7 @@ export default function FreeTalkResultsPage() {
             };
             
             await setDoc(resultRef, initialData, { merge: true });
+            
             await updateDoc(resultRef, { status: "내용 및 발음 분석 중..." });
             setAnalysisStep("analyze");
             
@@ -155,6 +156,7 @@ export default function FreeTalkResultsPage() {
                 studentName: user.displayName || "Student",
                 assessmentTitle: assessment.title.replace(/ - 복사본(\s\d+)?$/, ''),
                 evaluationModel: assessment.evaluationModel,
+                useRubric: assessment.useRubric || false,
             });
             
             await updateDoc(resultRef, { status: "리포트 생성 중..." });
@@ -202,7 +204,16 @@ export default function FreeTalkResultsPage() {
         if (sessionDataRaw) {
             const sessionData = JSON.parse(sessionDataRaw);
             if (sessionData.assessment.id === assessmentId) {
-                processDialogueSubmission(sessionData);
+                processDialogueSubmission(sessionData).then(() => {
+                     const q = query(
+                        collection(db, "results"),
+                        where("assessmentId", "==", assessmentId),
+                        where("studentId", "==", user.uid)
+                    );
+                    const unsubscribe = onSnapshot(q, handleSnapshot, handleError);
+                    return () => unsubscribe();
+                });
+                return;
             }
         }
 
@@ -288,7 +299,7 @@ export default function FreeTalkResultsPage() {
 
         return () => unsubscribe();
         
-    }, [assessmentId, user, authLoading, processDialogueSubmission, assessment, status]);
+    }, [assessmentId, user, authLoading]);
 
 
     if (status === "loading" || authLoading) {

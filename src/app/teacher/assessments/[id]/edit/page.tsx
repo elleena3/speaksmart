@@ -12,7 +12,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, CalendarIcon, ChevronsUpDown, Check } from "lucide-react";
+import { Loader2, CalendarIcon, ChevronsUpDown, Check, Info } from "lucide-react";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -22,6 +22,7 @@ import { useLanguage } from "@/context/language-context";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { scenarios, type TeacherAssessment, femaleVoices, maleVoices, allVoices, evaluationModels, voiceDescriptions, type AiVoice } from "@/lib/types";
 import { useAuth, mockStudents } from "@/context/auth-context";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
@@ -53,6 +54,7 @@ export default function EditAssessmentPage() {
     recordingTimeLimit: z.coerce.number().int().min(0).optional(),
     aiVoice: z.enum(allVoices).optional().default('achernar'),
     evaluationModel: z.enum(evaluationModels).optional().default('gemini-2.5-flash-lite-preview-06-17'),
+    useRubric: z.boolean().default(false),
   }).superRefine((data, ctx) => {
     const isFreeTalk = data.assessmentType === 'dialogue' && data.scenario === 'free-talk';
 
@@ -68,7 +70,7 @@ export default function EditAssessmentPage() {
       }
     }
     
-    if (data.assessmentType === 'monologue' && !data.expectedFormat) {
+    if (data.assessmentType === 'monologue' && !data.expectedFormat && !data.useRubric) {
         ctx.addIssue({ code: z.ZodIssueCode.custom, message: t.teacherAssessmentForm.errors.expectedFormatRequired, path: ['expectedFormat'] });
     }
 
@@ -95,6 +97,7 @@ export default function EditAssessmentPage() {
       recordingTimeLimit: 0,
       aiVoice: 'achernar',
       evaluationModel: 'gemini-2.5-flash-lite-preview-06-17',
+      useRubric: false,
     },
   });
 
@@ -102,6 +105,7 @@ export default function EditAssessmentPage() {
   const targetType = form.watch("targetType");
   const scenario = form.watch("scenario");
   const isFreeTalkDialogue = assessmentType === 'dialogue' && scenario === 'free-talk';
+  const useRubric = form.watch("useRubric");
 
   const fetchAssessment = useCallback(async () => {
     if (!user || !assessmentId) return;
@@ -118,6 +122,7 @@ export default function EditAssessmentPage() {
               targetType: Array.isArray(data.targetStudentIds) ? 'specific' : 'all',
               aiVoice: data.aiVoice || 'achernar',
               evaluationModel: data.evaluationModel || 'gemini-2.5-flash-lite-preview-06-17',
+              useRubric: data.useRubric || false,
             });
         } else {
             toast({ title: "오류", description: "평가를 찾을 수 없거나 수정할 권한이 없습니다.", variant: "destructive" });
@@ -158,7 +163,7 @@ export default function EditAssessmentPage() {
             submissionValues.prompt = values.prompt || t.teacherAssessmentForm.freeTalkDefaults.prompt;
         }
         
-        if (submissionValues.assessmentType === 'dialogue' && !submissionValues.expectedFormat) {
+        if ((submissionValues.assessmentType === 'dialogue' || submissionValues.useRubric) && !submissionValues.expectedFormat) {
             submissionValues.expectedFormat = "발음, 문법, 단어, 문장 등을 평가 주제에 맞게 종합적으로 판단.";
         }
 
@@ -544,12 +549,13 @@ export default function EditAssessmentPage() {
               name="expectedFormat"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>{t.teacherAssessmentForm.expectedFormatLabel} {assessmentType === 'dialogue' && `(${t.teacherAssessmentForm.optional})`}</FormLabel>
+                  <FormLabel>{t.teacherAssessmentForm.expectedFormatLabel} {(assessmentType === 'dialogue' || useRubric) && `(${t.teacherAssessmentForm.optional})`}</FormLabel>
                   <FormControl>
                     <Textarea
                       placeholder={assessmentType === 'dialogue' ? '발음, 문법, 단어, 문장 등을 평가 주제에 맞게 종합적으로 판단.' : t.teacherAssessmentForm.expectedFormatPlaceholder}
                       rows={4}
                       {...field}
+                      disabled={useRubric}
                     />
                   </FormControl>
                   <FormDescription>{t.teacherAssessmentForm.expectedFormatDescription}</FormDescription>
@@ -558,6 +564,42 @@ export default function EditAssessmentPage() {
               )}
             />
             
+             <FormField
+              control={form.control}
+              name="useRubric"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                  <div className="space-y-0.5">
+                    <FormLabel className="text-base">
+                      영어 회화 평가 루브릭 적용
+                    </FormLabel>
+                    <FormDescription>
+                      표준화된 루브릭을 사용하여 AI 평가의 일관성과 정확성을 높입니다.
+                    </FormDescription>
+                  </div>
+                  <div className="flex items-center space-x-4">
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button variant="ghost" size="sm"><Info className="mr-2 h-4 w-4"/> 자세히 보기</Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-4xl h-[90vh]">
+                        <DialogHeader>
+                          <DialogTitle>영어 회화 능력 평가 루브릭</DialogTitle>
+                        </DialogHeader>
+                        <iframe src="/rubric.html" className="w-full h-full border-0" title="영어 회화 능력 평가 루브릭"></iframe>
+                      </DialogContent>
+                    </Dialog>
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                  </div>
+                </FormItem>
+              )}
+            />
+
             {assessmentType === 'monologue' && (
               <FormField
                 control={form.control}

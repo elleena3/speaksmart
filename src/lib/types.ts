@@ -70,6 +70,7 @@ export type TeacherAssessment = {
   expectedFormat?: string;
   recordingTimeLimit?: number; // Optional recording time limit in minutes
   targetStudentIds: string[] | 'all'; // 'all' or array of student UIDs
+  useRubric?: boolean; // New field for rubric option
   // For Firestore timestamp
   createdAt: number;
 };

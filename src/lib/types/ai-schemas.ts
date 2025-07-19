@@ -75,6 +75,7 @@ export const GenerateMonologueAnalysisInputSchema = z.object({
   studentName: z.string().describe('The name of the student.'),
   assessmentTitle: z.string().describe('The title of the assessment.'),
   evaluationModel: z.enum(evaluationModels).optional(),
+  useRubric: z.boolean().optional().describe('Whether to use the standardized rubric for evaluation.'),
 });
 export type GenerateMonologueAnalysisInput = z.infer<typeof GenerateMonologueAnalysisInputSchema>;
 
@@ -89,6 +90,7 @@ export const GenerateDialogueAnalysisInputSchema = z.object({
   studentName: z.string().describe('The name of the student.'),
   assessmentTitle: z.string().describe('The title of the assessment.'),
   evaluationModel: z.enum(evaluationModels).optional(),
+  useRubric: z.boolean().optional().describe('Whether to use the standardized rubric for evaluation.'),
 });
 export type GenerateDialogueAnalysisInput = z.infer<typeof GenerateDialogueAnalysisInputSchema>;
 
