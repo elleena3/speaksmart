@@ -4,7 +4,7 @@
 import { FeedbackView } from "./feedback-view"
 import { GrowthView } from "./growth-view"
 import { useParams, useRouter, notFound, useSearchParams } from 'next/navigation';
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { type StudentResult, type ResultStatus, type TeacherAssessment } from "@/lib/types";
 import { useAuth } from "@/context/auth-context";
 import { Loader2, AlertTriangle, CheckCircle2, UploadCloud, AudioLines, FileScan, Sparkles } from "lucide-react";
@@ -108,9 +108,12 @@ export default function AssessmentResultsPage() {
   const [status, setStatus] = useState<PageStatus>("loading");
   const [errorInfo, setErrorInfo] = useState<{ message: string } | null>(null);
   
+  const isProcessing = useRef(false);
+
   const processMonologueSubmission = useCallback(async (sessionData: MonologueSessionData) => {
-    if (!user) return;
+    if (!user || isProcessing.current) return;
     
+    isProcessing.current = true;
     setStatus("analyzing");
     setErrorInfo(null);
     const { assessmentDetails, studentRecordingUrl } = sessionData;
@@ -186,15 +189,34 @@ export default function AssessmentResultsPage() {
       });
     } finally {
         sessionStorage.removeItem(SESSION_STORAGE_KEY);
+        isProcessing.current = false;
+        // Force a reload to fetch the new state cleanly
+        router.replace(`/student/assessment/${id}/results?t=${new Date().getTime()}`);
     }
-  }, [user]);
+  }, [user, id, router]);
 
   useEffect(() => {
     if (authLoading || !user || !id) return;
 
+    // Check for new submission data first.
     const sessionDataRaw = sessionStorage.getItem(SESSION_STORAGE_KEY);
+    if (sessionDataRaw && !isProcessing.current) {
+        const sessionData = JSON.parse(sessionDataRaw);
+        if (sessionData.assessmentId === id) {
+            processMonologueSubmission(sessionData);
+            return; // Stop further execution until processing is done.
+        }
+    }
     
+    const q = query(
+        collection(db, "results"),
+        where("assessmentId", "==", id),
+        where("studentId", "==", user.uid)
+    );
+
     const handleSnapshot = async (snapshot: any) => {
+        if (isProcessing.current) return;
+
         if (snapshot.empty) {
             const assessmentRef = doc(db, 'assessments', id as string);
             const assessmentSnap = await getDoc(assessmentRef);
@@ -222,14 +244,12 @@ export default function AssessmentResultsPage() {
         setResults(dbResults);
         const latestResult = dbResults[dbResults.length - 1];
         
-        // This logic now correctly handles state transition from analyzing to completed.
         if (latestResult && latestResult.status === '채점 완료') {
             setStatus("completed");
         } else if (latestResult && latestResult.status === '오류') {
             setStatus('error');
             setErrorInfo({ message: latestResult.aiFeedback || '알 수 없는 오류가 발생했습니다.' });
         } else {
-            // It's still analyzing
             setStatus('analyzing');
         }
     }
@@ -240,32 +260,8 @@ export default function AssessmentResultsPage() {
         setStatus("error");
     }
 
-    if (sessionDataRaw) {
-        const sessionData = JSON.parse(sessionDataRaw);
-        if (sessionData.assessmentId === id) {
-            // New submission exists. Process it.
-            // The listener will be set up AFTER processing is done to avoid race conditions.
-            processMonologueSubmission(sessionData).then(() => {
-                // Now that processing is kicked off, start listening.
-                const q = query(
-                    collection(db, "results"),
-                    where("assessmentId", "==", id),
-                    where("studentId", "==", user.uid)
-                );
-                const unsubscribe = onSnapshot(q, handleSnapshot, handleError);
-                return () => unsubscribe();
-            });
-        }
-    } else {
-        // If no new submission, just listen for existing results.
-        const q = query(
-            collection(db, "results"),
-            where("assessmentId", "==", id),
-            where("studentId", "==", user.uid)
-        );
-        const unsubscribe = onSnapshot(q, handleSnapshot, handleError);
-        return () => unsubscribe();
-    }
+    const unsubscribe = onSnapshot(q, handleSnapshot, handleError);
+    return () => unsubscribe();
   }, [id, user, authLoading, processMonologueSubmission, assessment]);
   
   if (status === "loading" || authLoading) {

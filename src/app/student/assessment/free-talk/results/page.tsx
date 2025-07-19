@@ -4,7 +4,7 @@
 import { FreeTalkFeedbackView } from "./free-talk-feedback-view";
 import { GrowthView } from "../../[id]/results/growth-view";
 import { useRouter, notFound, useSearchParams } from 'next/navigation';
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { type StudentResult, type ResultStatus, type TeacherAssessment, type ConversationTurn } from "@/lib/types";
 import { useAuth } from "@/context/auth-context";
 import { Loader2, AlertTriangle, CheckCircle2, UploadCloud, FileScan, Sparkles } from "lucide-react";
@@ -105,9 +105,11 @@ export default function FreeTalkResultsPage() {
     const [errorInfo, setErrorInfo] = useState<{ message: string } | null>(null);
     
     const assessmentId = searchParams.get('id');
+    const isProcessing = useRef(false);
 
     const processDialogueSubmission = useCallback(async (sessionData: DialogueSessionData) => {
-        if (!user) return;
+        if (!user || isProcessing.current) return;
+        isProcessing.current = true;
         setStatus("analyzing");
         setErrorInfo(null);
 
@@ -191,25 +193,45 @@ export default function FreeTalkResultsPage() {
             }
         } finally {
             sessionStorage.removeItem(SESSION_STORAGE_KEY);
+            isProcessing.current = false;
+            // Force a reload to fetch the new state cleanly
+            router.replace(`/student/assessment/free-talk/results?id=${assessmentId}&t=${new Date().getTime()}`);
         }
-    }, [user]);
+    }, [user, assessmentId, router]);
 
     useEffect(() => {
         if(authLoading || !user || !assessmentId) return;
-        
+
+        // Check for new submission data first.
         const sessionDataRaw = sessionStorage.getItem(SESSION_STORAGE_KEY);
+        if (sessionDataRaw && !isProcessing.current) {
+            const sessionData = JSON.parse(sessionDataRaw);
+            if (sessionData.assessment.id === assessmentId) {
+                processDialogueSubmission(sessionData);
+                return; // Stop further execution until processing is done.
+            }
+        }
+        
+        const q = query(
+            collection(db, "results"),
+            where("assessmentId", "==", assessmentId),
+            where("studentId", "==", user.uid)
+        );
 
         const handleSnapshot = async (snapshot: any) => {
-             if (snapshot.empty && !sessionStorage.getItem(SESSION_STORAGE_KEY)) {
+            if (isProcessing.current) return;
+
+             if (snapshot.empty) {
                 const assessmentRef = doc(db, 'assessments', assessmentId as string);
                 const assessmentSnap = await getDoc(assessmentRef);
                 if (assessmentSnap.exists()) {
                     setAssessment({id: assessmentSnap.id, ...assessmentSnap.data()} as TeacherAssessment);
-                    setResults([]);
-                    setStatus("completed");
                 } else if (assessmentId !== "free-talk-practice") {
                     notFound();
+                    return;
                 }
+                setResults([]);
+                setStatus("completed");
                 return;
             }
 
@@ -240,8 +262,8 @@ export default function FreeTalkResultsPage() {
             } else if (latestResult && latestResult.status === '오류') {
                 setStatus('error');
                 setErrorInfo({ message: latestResult.aiFeedback || '알 수 없는 오류가 발생했습니다.' });
-            } else if (!sessionStorage.getItem(SESSION_STORAGE_KEY)) {
-                 setStatus('analyzing');
+            } else {
+                setStatus('analyzing');
             }
         }
 
@@ -251,32 +273,10 @@ export default function FreeTalkResultsPage() {
             setStatus("error");
         }
 
-        if (sessionDataRaw) {
-            const sessionData = JSON.parse(sessionDataRaw);
-            if (sessionData.assessment.id === assessmentId) {
-                // New submission exists. Process it, then start listening.
-                processDialogueSubmission(sessionData).then(() => {
-                    const q = query(
-                        collection(db, "results"),
-                        where("assessmentId", "==", assessmentId),
-                        where("studentId", "==", user.uid)
-                    );
-                    const unsubscribe = onSnapshot(q, handleSnapshot, handleError);
-                    return () => unsubscribe();
-                });
-            }
-        } else {
-            // If no new submission, just listen for existing results.
-            const q = query(
-                collection(db, "results"),
-                where("assessmentId", "==", assessmentId),
-                where("studentId", "==", user.uid)
-            );
-            const unsubscribe = onSnapshot(q, handleSnapshot, handleError);
-            return () => unsubscribe();
-        }
+        const unsubscribe = onSnapshot(q, handleSnapshot, handleError);
+        return () => unsubscribe();
         
-    }, [assessmentId, user, authLoading, processDialogueSubmission, assessment]);
+    }, [assessmentId, user, authLoading, processDialogueSubmission, assessment, router]);
 
 
     if (status === "loading" || authLoading) {

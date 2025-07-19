@@ -204,7 +204,11 @@ export function FeedbackView({ result, assessment, isLatestAttempt }: FeedbackVi
               </div>
             </CardHeader>
             <CardContent>
-              <div className="p-4 bg-muted/50 rounded-lg font-body text-base leading-relaxed markdown-content" dangerouslySetInnerHTML={{ __html: aiFeedback.replace(/\n/g, '<br />') }} />
+              <div className="p-4 bg-muted/50 rounded-lg font-body text-base leading-relaxed markdown-content">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {aiFeedback}
+                  </ReactMarkdown>
+              </div>
             </CardContent>
             <CardFooter className="flex-col items-start gap-4">
                 <p className="text-sm font-medium">이 피드백이 도움이 되었나요?</p>
