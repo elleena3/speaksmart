@@ -103,22 +103,17 @@ export default function FreeTalkResultsPage() {
     const [assessment, setAssessment] = useState<TeacherAssessment | null>(null);
     const [status, setStatus] = useState<PageStatus>("loading");
     const [analysisStep, setAnalysisStep] = useState<AnalysisStep | null>(null);
-    const [errorInfo, setErrorInfo] = useState<{ message: string, resultId?: string, sessionData?: DialogueSessionData } | null>(null);
+    const [errorInfo, setErrorInfo] = useState<{ message: string } | null>(null);
     const { toast } = useToast();
     
     const assessmentId = searchParams.get('id');
 
-    const processDialogueSubmission = useCallback(async (sessionData: DialogueSessionData, existingResultId?: string) => {
+    const processDialogueSubmission = useCallback(async (sessionData: DialogueSessionData) => {
         if (!user) return;
         setStatus("analyzing");
         setErrorInfo(null);
 
-        let resultRef;
-        if (existingResultId) {
-            resultRef = doc(db, "results", existingResultId);
-        } else {
-            resultRef = doc(collection(db, "results"));
-        }
+        const resultRef = doc(collection(db, "results"));
 
         try {
             const { assessment, studentRecordingUrl, conversationHistory } = sessionData;
@@ -191,7 +186,7 @@ export default function FreeTalkResultsPage() {
             } else {
                 errorMessage = `AI 분석 중 오류가 발생했습니다. 문제가 지속되면 관리자에게 문의하세요.`;
             }
-            setErrorInfo({ message: errorMessage, resultId: resultRef.id, sessionData });
+            setErrorInfo({ message: errorMessage });
             setStatus("error");
             if (resultRef) {
                 await updateDoc(resultRef, { status: '오류', aiFeedback: errorMessage });
@@ -199,16 +194,7 @@ export default function FreeTalkResultsPage() {
         } finally {
             sessionStorage.removeItem(SESSION_STORAGE_KEY);
         }
-    }, [user, toast]);
-
-    const handleRetry = () => {
-        if (errorInfo?.sessionData) {
-            processDialogueSubmission(errorInfo.sessionData, errorInfo.resultId);
-        } else {
-            toast({ title: "재시도 정보 없음", description: "재시도할 수 있는 정보가 없습니다.", variant: "destructive"});
-        }
-    }
-
+    }, [user]);
 
     useEffect(() => {
         if(authLoading || !user || !assessmentId) return;
@@ -216,6 +202,7 @@ export default function FreeTalkResultsPage() {
         const storedDataString = sessionStorage.getItem(SESSION_STORAGE_KEY);
         if (storedDataString) {
             processDialogueSubmission(JSON.parse(storedDataString));
+            return;
         }
 
         const q = query(
@@ -238,8 +225,18 @@ export default function FreeTalkResultsPage() {
             }
 
             const dbResults: StudentResult[] = [];
+            let hasError = false;
+            let latestErrorResult: StudentResult | null = null;
+            
             snapshot.forEach(doc => {
-                dbResults.push({ id: doc.id, ...doc.data() } as StudentResult);
+                const result = { id: doc.id, ...doc.data() } as StudentResult;
+                dbResults.push(result);
+                if (result.status === '오류') {
+                    hasError = true;
+                    if (!latestErrorResult || (result.createdAt > latestErrorResult.createdAt)) {
+                        latestErrorResult = result;
+                    }
+                }
             });
             
             dbResults.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
@@ -258,18 +255,16 @@ export default function FreeTalkResultsPage() {
             }
             setResults(dbResults);
             
-            const latestResult = dbResults[dbResults.length - 1];
-            if(latestResult?.status === '오류'){
+            if(hasError && latestErrorResult){
                 setStatus('error');
-                
                 setErrorInfo({ 
-                    message: latestResult.aiFeedback || '오류가 발생했습니다.', 
-                    resultId: latestResult.id,
+                    message: latestErrorResult.aiFeedback || '알 수 없는 오류가 발생했습니다.', 
                 });
             } else if (!stillProcessing) {
               setStatus("completed");
             } else {
               setStatus("analyzing");
+              const latestResult = dbResults[dbResults.length - 1];
               const latestStatus = latestResult.status as ResultStatus;
               if (latestStatus.includes('분석')) {
                 setAnalysisStep('analyze');
@@ -287,7 +282,7 @@ export default function FreeTalkResultsPage() {
 
         return () => unsubscribe();
         
-    }, [user, authLoading, assessmentId, assessment]);
+    }, [assessmentId, user, authLoading, processDialogueSubmission]);
 
 
     if (status === "loading" || authLoading) {
@@ -315,11 +310,7 @@ export default function FreeTalkResultsPage() {
                   <CardTitle className="text-destructive">분석 오류</CardTitle>
                   <CardDescription className="text-destructive-foreground">{errorInfo?.message || "AI가 답변을 분석하는 데 실패했습니다. 다시 시도해주세요."}</CardDescription>
               </CardHeader>
-              <CardContent className="flex gap-2">
-                <Button onClick={handleRetry} disabled={!errorInfo?.sessionData}>
-                    <RefreshCw className="mr-2 h-4 w-4" />
-                    재분석 시도
-                </Button>
+              <CardContent>
                 <Button variant="secondary" onClick={() => router.push(`/student/assessment/free-talk?id=${assessmentIdOnError}`)}>
                     대화로 돌아가기
                 </Button>

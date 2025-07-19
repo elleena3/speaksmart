@@ -107,10 +107,10 @@ export default function AssessmentResultsPage() {
   const [assessment, setAssessment] = useState<TeacherAssessment | null>(null);
   const [analysisStep, setAnalysisStep] = useState<AnalysisStep | null>(null);
   const [status, setStatus] = useState<PageStatus>("loading");
-  const [errorInfo, setErrorInfo] = useState<{ message: string, resultId?: string, sessionData?: MonologueSessionData } | null>(null);
+  const [errorInfo, setErrorInfo] = useState<{ message: string } | null>(null);
   const { toast } = useToast();
 
-  const processMonologueSubmission = useCallback(async (sessionData: MonologueSessionData, existingResultId?: string) => {
+  const processMonologueSubmission = useCallback(async (sessionData: MonologueSessionData) => {
     if (!user) return;
     
     setStatus("analyzing");
@@ -124,12 +124,7 @@ export default function AssessmentResultsPage() {
         return;
     }
     
-    let resultRef;
-    if (existingResultId) {
-        resultRef = doc(db, "results", existingResultId);
-    } else {
-        resultRef = doc(collection(db, "results"));
-    }
+    const resultRef = doc(collection(db, "results"));
     
     try {
         setAnalysisStep("upload");
@@ -193,7 +188,7 @@ export default function AssessmentResultsPage() {
       } else {
           errorMessage = `AI 분석 중 오류가 발생했습니다. 문제가 지속되면 관리자에게 문의하세요.`;
       }
-      setErrorInfo({ message: errorMessage, resultId: resultRef.id, sessionData });
+      setErrorInfo({ message: errorMessage });
       setStatus("error");
       await updateDoc(resultRef, { 
           status: '오류', 
@@ -202,16 +197,7 @@ export default function AssessmentResultsPage() {
     } finally {
         sessionStorage.removeItem(SESSION_STORAGE_KEY);
     }
-  }, [id, user, toast]);
-
-  const handleRetry = () => {
-    if (errorInfo?.sessionData) {
-        processMonologueSubmission(errorInfo.sessionData, errorInfo.resultId);
-    } else {
-        toast({ title: "재시도 정보 없음", description: "재시도할 수 있는 정보가 없습니다.", variant: "destructive"});
-    }
-  }
-
+  }, [id, user]);
 
   useEffect(() => {
     if (authLoading || !user || !id) return;
@@ -220,7 +206,7 @@ export default function AssessmentResultsPage() {
     const sessionDataRaw = sessionStorage.getItem(SESSION_STORAGE_KEY);
     if(sessionDataRaw) {
         processMonologueSubmission(JSON.parse(sessionDataRaw));
-        // IMPORTANT: We do not return here anymore, we let the listener handle UI updates.
+        return; // IMPORTANT: Prevent the listener from running on initial submission.
     }
     
     // 2. Set up listener for existing and new results for this user/assessment.
@@ -235,7 +221,7 @@ export default function AssessmentResultsPage() {
             const assessmentRef = doc(db, 'assessments', id);
             const assessmentSnap = await getDoc(assessmentRef);
             if (assessmentSnap.exists()) {
-                setAssessment(assessmentSnap.data() as TeacherAssessment);
+                setAssessment({id: assessmentSnap.id, ...assessmentSnap.data()} as TeacherAssessment);
                 setStatus("completed"); 
             } else {
                 notFound();
@@ -244,8 +230,18 @@ export default function AssessmentResultsPage() {
         }
 
         const dbResults: StudentResult[] = [];
+        let hasError = false;
+        let latestErrorResult: StudentResult | null = null;
+
         snapshot.forEach(doc => {
-            dbResults.push({ id: doc.id, ...doc.data() } as StudentResult);
+            const result = { id: doc.id, ...doc.data() } as StudentResult;
+            dbResults.push(result);
+            if (result.status === '오류') {
+                hasError = true;
+                if (!latestErrorResult || (result.createdAt > latestErrorResult.createdAt)) {
+                    latestErrorResult = result;
+                }
+            }
         });
         
         dbResults.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
@@ -265,17 +261,16 @@ export default function AssessmentResultsPage() {
 
         setResults(dbResults);
         
-        const latestResult = dbResults[dbResults.length - 1];
-        if (latestResult?.status === '오류') {
+        if (hasError && latestErrorResult) {
             setStatus('error');
             setErrorInfo({ 
-                message: latestResult.aiFeedback || '오류가 발생했습니다.', 
-                resultId: latestResult.id,
+                message: latestErrorResult.aiFeedback || '알 수 없는 오류가 발생했습니다.', 
             });
         } else if (!stillProcessing) {
           setStatus("completed");
         } else {
           setStatus("analyzing");
+          const latestResult = dbResults[dbResults.length - 1];
           const latestStatus = latestResult.status as ResultStatus;
           if(latestStatus.includes('텍스트')){
             setAnalysisStep('transcribe')
@@ -294,7 +289,7 @@ export default function AssessmentResultsPage() {
     });
     
     return () => unsubscribe();
-  }, [id, user, authLoading, router, assessment]);
+  }, [id, user, authLoading, processMonologueSubmission]);
   
   if (status === "loading" || authLoading) {
     return (
@@ -320,11 +315,7 @@ export default function AssessmentResultsPage() {
                 <CardTitle className="text-destructive">분석 오류</CardTitle>
                 <CardDescription className="text-destructive-foreground">{errorInfo?.message || "AI가 답변을 분석하는 데 실패했습니다. 다시 시도해주세요."}</CardDescription>
             </CardHeader>
-            <CardContent className="flex gap-2">
-                <Button onClick={handleRetry} disabled={!errorInfo?.sessionData}>
-                    <RefreshCw className="mr-2 h-4 w-4" />
-                    재분석 시도
-                </Button>
+            <CardContent>
                 <Button variant="secondary" onClick={() => router.push(`/student/assessment/${id}`)}>
                     평가로 돌아가기
                 </Button>
