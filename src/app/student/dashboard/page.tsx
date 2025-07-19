@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import Link from "next/link"
 import { type TeacherAssessment, type StudentResult } from "@/lib/types"
-import { CheckCircle2, MessageCircle, Mic, Loader2, AlertCircle, UploadCloud } from "lucide-react"
+import { CheckCircle2, MessageCircle, Mic, Loader2, AlertCircle, TrendingUp } from "lucide-react"
 import { useLanguage } from "@/context/language-context"
 import { useAuth } from "@/context/auth-context"
 import { useToast } from "@/hooks/use-toast"
@@ -20,12 +20,14 @@ type CombinedAssessment = TeacherAssessment & {
     resultStatus?: '채점 완료' | '채점 중' | '오류' | null;
     resultId?: string;
     resultCreatedAt?: number;
+    completedAttemptsCount: number;
 };
 
 function AssessmentCard({ assessment, t }: { assessment: CombinedAssessment, t: any }) {
   const isCompleted = assessment.resultStatus === '채점 완료';
   const isGrading = assessment.resultStatus === '채점 중';
   const hasError = assessment.resultStatus === '오류';
+  const hasMultipleAttempts = assessment.completedAttemptsCount > 1;
 
   const getStatusText = () => {
     if (hasError) return "오류 발생";
@@ -44,14 +46,18 @@ function AssessmentCard({ assessment, t }: { assessment: CombinedAssessment, t: 
   const getIcon = () => {
     if (hasError) return <AlertCircle className="h-5 w-5" />;
     if (isGrading) return <Loader2 className="h-5 w-5 animate-spin" />;
-    if (isCompleted) return <CheckCircle2 className="h-5 w-5" />;
+    if (isCompleted) {
+        return hasMultipleAttempts ? <TrendingUp className="h-5 w-5"/> : <CheckCircle2 className="h-5 w-5" />;
+    }
     return assessment.assessmentType === 'dialogue' ? <MessageCircle className="h-5 w-5" /> : <Mic className="h-5 w-5" />;
   }
   
   const getButtonText = () => {
       if (hasError) return "결과 보기";
       if (isGrading) return "채점 현황 보기";
-      if (isCompleted) return t.studentDashboard.viewResults;
+      if (isCompleted) {
+          return hasMultipleAttempts ? "종합 결과 보기" : t.studentDashboard.viewResults;
+      }
       return t.studentDashboard.startAssessment;
   }
 
@@ -100,7 +106,6 @@ export default function StudentDashboard() {
     if (!user) return;
     setIsLoading(true);
     try {
-        // Fetch all assessments and all results for the student in parallel
         const assessmentsQuery = query(collection(db, "assessments"), orderBy("createdAt", "desc"));
         const resultsQuery = query(collection(db, "results"), where("studentId", "==", user.uid));
         
@@ -108,21 +113,29 @@ export default function StudentDashboard() {
             getDocs(assessmentsQuery),
             getDocs(resultsQuery),
         ]);
-
-        const studentResultsMap = new Map<string, { status: StudentResult['status'], id: string, createdAt: number }>();
+        
+        const resultsByAssessment = new Map<string, StudentResult[]>();
         resultsSnapshot.forEach(doc => {
-            const resultData = doc.data() as StudentResult;
-            studentResultsMap.set(resultData.assessmentId, { status: resultData.status, id: doc.id, createdAt: resultData.createdAt });
+            const result = { id: doc.id, ...doc.data() } as StudentResult;
+            const existing = resultsByAssessment.get(result.assessmentId) || [];
+            resultsByAssessment.set(result.assessmentId, [...existing, result]);
         });
         
         const allAssessments = assessmentsSnapshot.docs.map(doc => {
             const assessment = { id: doc.id, ...doc.data() } as TeacherAssessment;
-            const resultInfo = studentResultsMap.get(assessment.id);
+            const studentResults = resultsByAssessment.get(assessment.id) || [];
+            
+            studentResults.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+            const latestResult = studentResults[0];
+
+            const completedAttemptsCount = studentResults.filter(r => r.status === '채점 완료').length;
+
             return {
                 ...assessment,
-                resultStatus: resultInfo ? resultInfo.status : null,
-                resultId: resultInfo ? resultInfo.id : undefined,
-                resultCreatedAt: resultInfo ? resultInfo.createdAt : undefined,
+                resultStatus: latestResult ? latestResult.status : null,
+                resultId: latestResult ? latestResult.id : undefined,
+                resultCreatedAt: latestResult ? latestResult.createdAt : undefined,
+                completedAttemptsCount: completedAttemptsCount,
             };
         });
 
@@ -136,28 +149,24 @@ export default function StudentDashboard() {
             return false;
         });
 
-        // Apply custom sorting logic
         filteredAssessments.sort((a, b) => {
             const aIsCompleted = a.resultStatus === '채점 완료';
             const bIsCompleted = b.resultStatus === '채점 완료';
 
-            // 1. Group by completion status (uncompleted first)
             if (aIsCompleted !== bIsCompleted) {
                 return aIsCompleted ? 1 : -1;
             }
 
-            // 2. Sort within groups
-            if (!aIsCompleted) { // Sorting for uncompleted assessments
+            if (!aIsCompleted) { 
                 const aEndDate = a.endDate ? new Date(a.endDate).getTime() : Infinity;
                 const bEndDate = b.endDate ? new Date(b.endDate).getTime() : Infinity;
 
                 if (aEndDate !== bEndDate) {
-                    return aEndDate - bEndDate; // Sort by end date ascending (soonest first)
+                    return aEndDate - bEndDate;
                 }
-                return (b.createdAt || 0) - (a.createdAt || 0); // Then by creation date descending (newest first)
-            } else { // Sorting for completed assessments
-                // Sort by completion date ascending (oldest first)
-                return (a.resultCreatedAt || 0) - (b.resultCreatedAt || 0);
+                return (b.createdAt || 0) - (a.createdAt || 0);
+            } else { 
+                return (b.resultCreatedAt || 0) - (a.resultCreatedAt || 0);
             }
         });
         
