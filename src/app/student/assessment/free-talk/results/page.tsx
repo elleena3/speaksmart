@@ -7,7 +7,7 @@ import { useRouter, notFound, useSearchParams } from 'next/navigation';
 import { useEffect, useState, useCallback } from "react";
 import { type StudentResult, type ResultStatus, type TeacherAssessment, type ConversationTurn } from "@/lib/types";
 import { useAuth } from "@/context/auth-context";
-import { Loader2, AlertTriangle, CheckCircle2, UploadCloud, FileScan, Sparkles, RefreshCw } from "lucide-react";
+import { Loader2, AlertTriangle, CheckCircle2, UploadCloud, FileScan, Sparkles } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { db } from "@/lib/firebase";
@@ -212,12 +212,13 @@ export default function FreeTalkResultsPage() {
         );
         
         const unsubscribe = onSnapshot(q, async (snapshot) => {
-             if (snapshot.empty && !sessionStorage.getItem(SESSION_STORAGE_KEY)) {
+             if (snapshot.empty) {
                 const assessmentRef = doc(db, 'assessments', assessmentId);
                 const assessmentSnap = await getDoc(assessmentRef);
                 if (assessmentSnap.exists()) {
                     setAssessment({id: assessmentSnap.id, ...assessmentSnap.data()} as TeacherAssessment);
-                    setStatus("completed"); // Show "no results" message
+                    setResults([]);
+                    setStatus("completed");
                 } else if (assessmentId !== "free-talk-practice") {
                     notFound();
                 }
@@ -225,24 +226,12 @@ export default function FreeTalkResultsPage() {
             }
 
             const dbResults: StudentResult[] = [];
-            let hasError = false;
-            let latestErrorResult: StudentResult | null = null;
-            
             snapshot.forEach(doc => {
-                const result = { id: doc.id, ...doc.data() } as StudentResult;
-                dbResults.push(result);
-                if (result.status === '오류') {
-                    hasError = true;
-                    if (!latestErrorResult || (result.createdAt > latestErrorResult.createdAt)) {
-                        latestErrorResult = result;
-                    }
-                }
+                dbResults.push({ id: doc.id, ...doc.data() } as StudentResult);
             });
             
-            dbResults.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+            dbResults.sort((a, b) => (a.createdAt || 0) - (a.createdAt || 0));
 
-            const stillProcessing = dbResults.some(r => r.status !== '채점 완료' && r.status !== '오류');
-            
             if (!assessment) {
                 const assessmentRef = doc(db, 'assessments', assessmentId);
                 const assessmentSnap = await getDoc(assessmentRef);
@@ -255,16 +244,15 @@ export default function FreeTalkResultsPage() {
             }
             setResults(dbResults);
             
-            if(hasError && latestErrorResult){
+            const latestResult = dbResults[dbResults.length - 1];
+            
+            if (latestResult.status === '오류') {
                 setStatus('error');
                 setErrorInfo({ 
-                    message: latestErrorResult.aiFeedback || '알 수 없는 오류가 발생했습니다.', 
+                    message: latestResult.aiFeedback || '알 수 없는 오류가 발생했습니다.', 
                 });
-            } else if (!stillProcessing) {
-              setStatus("completed");
-            } else {
+            } else if (latestResult.status !== '채점 완료') {
               setStatus("analyzing");
-              const latestResult = dbResults[dbResults.length - 1];
               const latestStatus = latestResult.status as ResultStatus;
               if (latestStatus.includes('분석')) {
                 setAnalysisStep('analyze');
@@ -273,6 +261,8 @@ export default function FreeTalkResultsPage() {
               } else {
                 setAnalysisStep('upload');
               }
+            } else {
+              setStatus("completed");
             }
         }, (err) => {
             console.error("Error listening to result:", err);

@@ -7,7 +7,7 @@ import { useParams, useRouter, notFound, useSearchParams } from 'next/navigation
 import { useEffect, useState, useCallback } from "react";
 import { type StudentResult, type ResultStatus, type TeacherAssessment } from "@/lib/types";
 import { useAuth } from "@/context/auth-context";
-import { Loader2, AlertTriangle, CheckCircle2, UploadCloud, AudioLines, FileScan, Sparkles, RefreshCw } from "lucide-react";
+import { Loader2, AlertTriangle, CheckCircle2, UploadCloud, AudioLines, FileScan, Sparkles } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { db } from "@/lib/firebase";
@@ -145,6 +145,8 @@ export default function AssessmentResultsPage() {
         setAnalysisStep("transcribe");
         await updateDoc(resultRef, { status: "텍스트 변환 중" });
 
+        setAnalysisStep("analyze");
+        await updateDoc(resultRef, { status: "내용 및 발음 분석 중..." });
         const analysisResult = await generateMonologueAnalysis({
             studentRecordingUrl: studentRecordingUrl,
             activityPrompt: assessmentDetails.prompt,
@@ -154,9 +156,6 @@ export default function AssessmentResultsPage() {
             evaluationModel: assessmentDetails.evaluationModel,
         });
 
-        setAnalysisStep("analyze");
-        await updateDoc(resultRef, { status: "내용 및 발음 분석 중..." });
-        
         setAnalysisStep("report");
         await updateDoc(resultRef, { status: "리포트 생성 중" });
 
@@ -202,14 +201,12 @@ export default function AssessmentResultsPage() {
   useEffect(() => {
     if (authLoading || !user || !id) return;
     
-    // 1. Check for session data first. This means a new submission just happened.
     const sessionDataRaw = sessionStorage.getItem(SESSION_STORAGE_KEY);
     if(sessionDataRaw) {
         processMonologueSubmission(JSON.parse(sessionDataRaw));
-        return; // IMPORTANT: Prevent the listener from running on initial submission.
+        return;
     }
     
-    // 2. Set up listener for existing and new results for this user/assessment.
     const q = query(
         collection(db, "results"),
         where("assessmentId", "==", id),
@@ -217,11 +214,12 @@ export default function AssessmentResultsPage() {
     );
 
     const unsubscribe = onSnapshot(q, async (snapshot) => {
-        if (snapshot.empty && !sessionStorage.getItem(SESSION_STORAGE_KEY)) {
+        if (snapshot.empty) {
             const assessmentRef = doc(db, 'assessments', id);
             const assessmentSnap = await getDoc(assessmentRef);
             if (assessmentSnap.exists()) {
                 setAssessment({id: assessmentSnap.id, ...assessmentSnap.data()} as TeacherAssessment);
+                setResults([]);
                 setStatus("completed"); 
             } else {
                 notFound();
@@ -230,24 +228,12 @@ export default function AssessmentResultsPage() {
         }
 
         const dbResults: StudentResult[] = [];
-        let hasError = false;
-        let latestErrorResult: StudentResult | null = null;
-
         snapshot.forEach(doc => {
-            const result = { id: doc.id, ...doc.data() } as StudentResult;
-            dbResults.push(result);
-            if (result.status === '오류') {
-                hasError = true;
-                if (!latestErrorResult || (result.createdAt > latestErrorResult.createdAt)) {
-                    latestErrorResult = result;
-                }
-            }
+            dbResults.push({ id: doc.id, ...doc.data() } as StudentResult);
         });
         
         dbResults.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
 
-        const stillProcessing = dbResults.some(r => r.status !== '채점 완료' && r.status !== '오류');
-        
         if (!assessment) {
             const assessmentRef = doc(db, 'assessments', id);
             const assessmentSnap = await getDoc(assessmentRef);
@@ -258,29 +244,29 @@ export default function AssessmentResultsPage() {
                 return;
             }
         }
-
-        setResults(dbResults);
         
-        if (hasError && latestErrorResult) {
+        setResults(dbResults);
+        const latestResult = dbResults[dbResults.length - 1];
+        
+        if (latestResult.status === '오류') {
             setStatus('error');
             setErrorInfo({ 
-                message: latestErrorResult.aiFeedback || '알 수 없는 오류가 발생했습니다.', 
+                message: latestResult.aiFeedback || '알 수 없는 오류가 발생했습니다.', 
             });
-        } else if (!stillProcessing) {
-          setStatus("completed");
+        } else if (latestResult.status !== '채점 완료') {
+            setStatus("analyzing");
+            const latestStatus = latestResult.status as ResultStatus;
+            if(latestStatus.includes('텍스트')){
+                setAnalysisStep('transcribe')
+            } else if (latestStatus.includes('분석')) {
+                setAnalysisStep('analyze')
+            } else if (latestStatus.includes('리포트')) {
+                setAnalysisStep('report')
+            } else {
+                setAnalysisStep('upload');
+            }
         } else {
-          setStatus("analyzing");
-          const latestResult = dbResults[dbResults.length - 1];
-          const latestStatus = latestResult.status as ResultStatus;
-          if(latestStatus.includes('텍스트')){
-            setAnalysisStep('transcribe')
-          } else if (latestStatus.includes('분석')) {
-            setAnalysisStep('analyze')
-          } else if (latestStatus.includes('리포트')) {
-            setAnalysisStep('report')
-          } else {
-            setAnalysisStep('upload');
-          }
+            setStatus("completed");
         }
     }, (err) => {
         console.error("Error listening to result:", err);
