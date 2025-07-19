@@ -201,6 +201,9 @@ const createPrompt = (modelName: z.infer<typeof evaluationModels[number]>) => ({
 ## 💬 총평 (Overall Comment)
 [사용자의 전반적인 회화 능력에 대한 총평과 격려의 메시지를 1~2문장으로 작성해 주세요.]
 
+## 📊 종합 점수 (Overall Score)
+**[평가한 4개 항목(유창성, 발음, 문법, 어휘)의 점수 평균을 100점 만점으로 환산한 최종 점수를 "최종 점수는 100점 만점에 00점입니다." 형식으로 여기에 표시해 주세요. 예를 들어, 4개 항목 평균이 3점이면 60점입니다.]**
+
 ## 📊 항목별 상세 분석 (Detailed Analysis)
 
 ### 🗣️ 유창성 (Fluency)
