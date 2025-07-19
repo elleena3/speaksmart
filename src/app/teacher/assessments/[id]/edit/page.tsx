@@ -52,7 +52,7 @@ export default function EditAssessmentPage() {
     targetStudentIds: z.union([z.literal('all'), z.array(z.string())]),
     scenario: z.enum(scenarios).optional(),
     recordingTimeLimit: z.coerce.number().int().min(0).optional(),
-    aiVoice: z.enum(allVoices).optional().default('achernar'),
+    aiVoice: z.enum(allVoices).optional().default('algenib'),
     evaluationModel: z.enum(evaluationModels).optional().default('gemini-2.5-flash-lite-preview-06-17'),
     useRubric: z.boolean().default(false),
   }).superRefine((data, ctx) => {
@@ -95,7 +95,7 @@ export default function EditAssessmentPage() {
       targetStudentIds: "all",
       scenario: "free-talk",
       recordingTimeLimit: 0,
-      aiVoice: 'achernar',
+      aiVoice: 'algenib',
       evaluationModel: 'gemini-2.5-flash-lite-preview-06-17',
       useRubric: false,
     },
@@ -120,7 +120,7 @@ export default function EditAssessmentPage() {
               startDate: data.startDate ? new Date(data.startDate) : undefined,
               endDate: data.endDate ? new Date(data.endDate) : undefined,
               targetType: Array.isArray(data.targetStudentIds) ? 'specific' : 'all',
-              aiVoice: data.aiVoice || 'achernar',
+              aiVoice: data.aiVoice || 'algenib',
               evaluationModel: data.evaluationModel || 'gemini-2.5-flash-lite-preview-06-17',
               useRubric: data.useRubric || false,
             });
@@ -316,12 +316,13 @@ export default function EditAssessmentPage() {
                       <PopoverTrigger asChild>
                         <FormControl>
                           <Button
+                            type="button"
                             variant="outline"
                             role="combobox"
                             className={cn("w-full justify-between", !field.value && "text-muted-foreground")}
                           >
                             {field.value
-                              ? `${field.value} (${voiceDescriptions[field.value as AiVoice]})`
+                              ? `${voiceDescriptions[field.value as AiVoice]}`
                               : t.teacherAssessmentForm.voicePlaceholder}
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
@@ -334,6 +335,7 @@ export default function EditAssessmentPage() {
                                 <div className="flex flex-col space-y-1">
                                 {femaleVoices.map((voice) => (
                                     <Button
+                                        type="button"
                                         key={voice}
                                         variant="ghost"
                                         className="w-full justify-start text-left"
@@ -345,8 +347,7 @@ export default function EditAssessmentPage() {
                                         <div className="flex items-center">
                                             <Check className={cn("mr-2 h-4 w-4", field.value === voice ? "opacity-100" : "opacity-0")} />
                                             <div>
-                                                <p className="font-medium">{voice}</p>
-                                                <p className="text-xs text-muted-foreground">{voiceDescriptions[voice]}</p>
+                                                <p className="font-medium">{voiceDescriptions[voice]}</p>
                                             </div>
                                         </div>
                                     </Button>
@@ -358,6 +359,7 @@ export default function EditAssessmentPage() {
                                <div className="flex flex-col space-y-1">
                                 {maleVoices.map((voice) => (
                                     <Button
+                                        type="button"
                                         key={voice}
                                         variant="ghost"
                                         className="w-full justify-start text-left"
@@ -369,8 +371,7 @@ export default function EditAssessmentPage() {
                                         <div className="flex items-center">
                                              <Check className={cn("mr-2 h-4 w-4", field.value === voice ? "opacity-100" : "opacity-0")} />
                                              <div>
-                                                <p className="font-medium">{voice}</p>
-                                                <p className="text-xs text-muted-foreground">{voiceDescriptions[voice]}</p>
+                                                <p className="font-medium">{voiceDescriptions[voice]}</p>
                                             </div>
                                         </div>
                                     </Button>
@@ -580,7 +581,7 @@ export default function EditAssessmentPage() {
                   <div className="flex items-center space-x-4">
                     <Dialog>
                       <DialogTrigger asChild>
-                        <Button variant="ghost" size="sm"><Info className="mr-2 h-4 w-4"/> 자세히 보기</Button>
+                        <Button type="button" variant="ghost" size="sm"><Info className="mr-2 h-4 w-4"/> 자세히 보기</Button>
                       </DialogTrigger>
                       <DialogContent className="max-w-4xl h-[90vh]">
                         <DialogHeader>
@@ -634,6 +635,7 @@ export default function EditAssessmentPage() {
                             <PopoverTrigger asChild>
                             <FormControl>
                                 <Button
+                                type="button"
                                 variant={"outline"}
                                 className={cn(
                                     "w-full pl-3 text-left font-normal",
@@ -675,6 +677,7 @@ export default function EditAssessmentPage() {
                             <PopoverTrigger asChild>
                             <FormControl>
                                 <Button
+                                type="button"
                                 variant={"outline"}
                                 className={cn(
                                     "w-full pl-3 text-left font-normal",

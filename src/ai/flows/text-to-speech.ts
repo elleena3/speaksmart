@@ -132,7 +132,7 @@ async function toWav(
 }
 
 // Function to convert text to speech
-async function textToSpeech(text: string, voiceName: string = 'achernar'): Promise<string> {
+async function textToSpeech(text: string, voiceName: string = 'algenib'): Promise<string> {
     const ttsResponse = await withRetry(() => ai.generate({
         model: googleAI.model('gemini-2.5-flash-preview-tts'),
         config: {
@@ -203,7 +203,7 @@ const converseWithStudentFlow = ai.defineFlow(
       scenario: scenario || 'free-talk',
       scenarioPrompt: scenarioPrompt,
       conversationHistory: conversationHistory,
-      aiVoice: aiVoice || 'achernar',
+      aiVoice: aiVoice || 'algenib',
     }));
 
     aiResponseText = output?.aiResponseText || "";

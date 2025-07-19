@@ -48,7 +48,7 @@ export default function NewAssessmentPage() {
     targetStudentIds: z.array(z.string()).optional(),
     scenario: z.enum(scenarios).optional(),
     recordingTimeLimit: z.coerce.number().int().min(0).optional(),
-    aiVoice: z.enum(allVoices).optional().default('achernar'),
+    aiVoice: z.enum(allVoices).optional().default('algenib'),
     evaluationModel: z.enum(evaluationModels).optional().default('gemini-2.5-flash-lite-preview-06-17'),
     useRubric: z.boolean().default(false),
   }).superRefine((data, ctx) => {
@@ -91,7 +91,7 @@ export default function NewAssessmentPage() {
       targetStudentIds: [],
       scenario: "free-talk",
       recordingTimeLimit: 0,
-      aiVoice: "achernar",
+      aiVoice: "algenib",
       evaluationModel: "gemini-2.5-flash-lite-preview-06-17",
       useRubric: false,
     },
@@ -278,7 +278,7 @@ export default function NewAssessmentPage() {
                             className={cn("w-full justify-between", !field.value && "text-muted-foreground")}
                           >
                             {field.value
-                              ? `${field.value} (${voiceDescriptions[field.value as AiVoice]})`
+                              ? `${voiceDescriptions[field.value as AiVoice]}`
                               : t.teacherAssessmentForm.voicePlaceholder}
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
@@ -302,8 +302,7 @@ export default function NewAssessmentPage() {
                                         <div className="flex items-center">
                                             <Check className={cn("mr-2 h-4 w-4", field.value === voice ? "opacity-100" : "opacity-0")} />
                                             <div>
-                                                <p className="font-medium">{voice}</p>
-                                                <p className="text-xs text-muted-foreground">{voiceDescriptions[voice]}</p>
+                                                <p className="font-medium">{voiceDescriptions[voice]}</p>
                                             </div>
                                         </div>
                                     </Button>
@@ -326,8 +325,7 @@ export default function NewAssessmentPage() {
                                         <div className="flex items-center">
                                              <Check className={cn("mr-2 h-4 w-4", field.value === voice ? "opacity-100" : "opacity-0")} />
                                              <div>
-                                                <p className="font-medium">{voice}</p>
-                                                <p className="text-xs text-muted-foreground">{voiceDescriptions[voice]}</p>
+                                                <p className="font-medium">{voiceDescriptions[voice]}</p>
                                             </div>
                                         </div>
                                     </Button>
@@ -535,7 +533,7 @@ export default function NewAssessmentPage() {
                   <div className="flex items-center space-x-4">
                     <Dialog>
                       <DialogTrigger asChild>
-                        <Button variant="ghost" size="sm"><Info className="mr-2 h-4 w-4"/> 자세히 보기</Button>
+                        <Button type="button" variant="ghost" size="sm"><Info className="mr-2 h-4 w-4"/> 자세히 보기</Button>
                       </DialogTrigger>
                       <DialogContent className="max-w-4xl h-[90vh]">
                         <DialogHeader>
@@ -588,6 +586,7 @@ export default function NewAssessmentPage() {
                             <PopoverTrigger asChild>
                             <FormControl>
                                 <Button
+                                type="button"
                                 variant={"outline"}
                                 className={cn(
                                     "w-full pl-3 text-left font-normal",
@@ -629,6 +628,7 @@ export default function NewAssessmentPage() {
                             <PopoverTrigger asChild>
                             <FormControl>
                                 <Button
+                                type="button"
                                 variant={"outline"}
                                 className={cn(
                                     "w-full pl-3 text-left font-normal",

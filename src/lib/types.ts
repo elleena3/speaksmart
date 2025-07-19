@@ -4,28 +4,28 @@ import { type ConversationTurn } from "@/lib/types/ai-schemas";
 export const scenarios = ["free-talk", "ordering-food", "airport-check-in", "shopping"] as const;
 export type Scenario = (typeof scenarios)[number];
 
-// UPDATED to supported TTS voice names
-export const femaleVoices = ["achernar", "laomedeia", "schedar", "callirrhoe", "autonoe", "erinome"] as const;
-export const maleVoices = ["algenib", "gacrux", "iapetus", "orus", "puck", "zubenelgenubi"] as const;
+// Google Cloud TTS Voice list updated for accuracy
+export const femaleVoices = ["laomedeia", "callirrhoe", "autonoe", "erinome"] as const;
+export const maleVoices = ["achernar", "algenib", "gacrux", "iapetus", "orus", "puck", "schedar", "zubenelgenubi"] as const;
 export const allVoices = [...femaleVoices, ...maleVoices] as const;
 export type AiVoice = (typeof allVoices)[number];
 
-// UPDATED to supported TTS voice names and simple descriptions
+// Descriptions updated for accuracy
 export const voiceDescriptions: Record<AiVoice, string> = {
     // Female
-    achernar: "명료하고 전문적인 톤",
-    laomedeia: "부드럽고 차분한 톤",
-    schedar: "따뜻하고 친근한 톤",
-    callirrhoe: "안정적이고 신뢰감 있는 톤",
-    autonoe: "활기차고 밝은 톤",
-    erinome: "깊고 성숙한 톤",
+    laomedeia: "부드럽고 차분한 톤 (여성)",
+    callirrhoe: "안정적이고 신뢰감 있는 톤 (여성)",
+    autonoe: "활기차고 밝은 톤 (여성)",
+    erinome: "깊고 성숙한 톤 (여성)",
     // Male
-    algenib: "중립적이고 표준적인 톤",
-    gacrux: "부드럽고 감성적인 톤",
-    iapetus: "깊고 권위 있는 톤",
-    orus: "활기차고 설득력 있는 톤",
-    puck: "명료하고 교육적인 톤",
-    zubenelgenubi: "밝고 긍정적인 톤",
+    achernar: "명료하고 전문적인 톤 (남성)",
+    algenib: "중립적이고 표준적인 톤 (남성)",
+    gacrux: "부드럽고 감성적인 톤 (남성)",
+    iapetus: "깊고 권위 있는 톤 (남성)",
+    orus: "활기차고 설득력 있는 톤 (남성)",
+    puck: "명료하고 교육적인 톤 (남성)",
+    schedar: "따뜻하고 친근한 톤 (남성)",
+    zubenelgenubi: "밝고 긍정적인 톤 (남성)",
 };
 
 export const evaluationModels = ["gemini-2.5-flash-lite-preview-06-17", "gemini-2.5-flash", "gemini-2.0-flash"] as const;
