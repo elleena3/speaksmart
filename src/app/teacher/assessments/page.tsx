@@ -194,7 +194,7 @@ export default function AssessmentsPage() {
                       <Badge variant="outline">{getAssessmentTypeText(assessment)}</Badge>
                    </TableCell>
                    <TableCell className="text-center">
-                      <Badge variant="secondary">{getTargetAudienceText(assessment)}</Badge>
+                      <Badge variant="outline">{getTargetAudienceText(assessment)}</Badge>
                    </TableCell>
                    <TableCell className="text-sm text-muted-foreground text-center">
                       {formatDateRange(assessment.startDate, assessment.endDate)}
