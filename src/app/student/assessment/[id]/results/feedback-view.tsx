@@ -12,6 +12,8 @@ import { type StudentResult, type TeacherAssessment } from "@/lib/types"
 import { Progress } from "@/components/ui/progress"
 import { db } from "@/lib/firebase"
 import { doc, updateDoc } from "firebase/firestore"
+import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
 
 type FeedbackViewProps = {
   result: StudentResult
@@ -51,7 +53,6 @@ export function FeedbackView({ result, assessment, isLatestAttempt }: FeedbackVi
     
     try {
       const resultRef = doc(db, "results", resultId);
-      // 학생의 원본 피드백만 즉시 저장
       await updateDoc(resultRef, {
         studentRawFeedback: teacherFeedback,
       });
@@ -60,7 +61,6 @@ export function FeedbackView({ result, assessment, isLatestAttempt }: FeedbackVi
         title: "피드백이 제출되었습니다!",
         description: "개선에 도움을 주셔서 감사합니다."
       })
-      // UI를 즉시 업데이트
       setLocalResult(prev => ({ ...prev, studentRawFeedback: teacherFeedback }));
       setTeacherFeedback("");
 
@@ -156,8 +156,10 @@ export function FeedbackView({ result, assessment, isLatestAttempt }: FeedbackVi
               </div>
             </CardHeader>
             <CardContent>
-              <div className="p-4 bg-muted/50 rounded-lg whitespace-pre-wrap font-body text-base leading-relaxed">
-                {aiFeedback}
+              <div className="p-4 bg-muted/50 rounded-lg font-body text-base leading-relaxed markdown-content">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {aiFeedback}
+                </ReactMarkdown>
               </div>
             </CardContent>
             <CardFooter className="flex-col items-start gap-4">
