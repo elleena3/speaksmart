@@ -87,9 +87,34 @@ export default function AssessmentsPage() {
     }
   }
 
+  const deleteAssessmentAndResults = async (assessmentIds: string[]) => {
+    const batch = writeBatch(db);
+    const resultsCollection = collection(db, 'results');
+
+    // For each assessment, find and delete its results
+    for (const id of assessmentIds) {
+        // Delete the assessment itself
+        const assessmentRef = doc(db, "assessments", id);
+        batch.delete(assessmentRef);
+
+        // Query for related results
+        const resultsQuery = query(resultsCollection, where('assessmentId', '==', id));
+        const resultsSnapshot = await getDocs(resultsQuery);
+
+        // Add each result to the batch delete
+        resultsSnapshot.forEach(resultDoc => {
+            batch.delete(resultDoc.ref);
+        });
+    }
+
+    // Commit the batch
+    await batch.commit();
+  }
+
+
   const handleDelete = async (assessmentId: string) => {
     try {
-        await deleteDoc(doc(db, "assessments", assessmentId));
+        await deleteAssessmentAndResults([assessmentId]);
         toast({
             title: t.teacherAssessments.deleteToast.title,
             description: t.teacherAssessments.deleteToast.description,
@@ -104,13 +129,7 @@ export default function AssessmentsPage() {
   const handleBulkDelete = async () => {
     setIsDeleting(true);
     try {
-      const batch = writeBatch(db);
-      selectedRowIds.forEach(id => {
-          const docRef = doc(db, "assessments", id);
-          batch.delete(docRef);
-      });
-      await batch.commit();
-
+      await deleteAssessmentAndResults(selectedRowIds);
       toast({
           title: "삭제 완료",
           description: `${selectedRowIds.length}개의 평가가 성공적으로 삭제되었습니다.`,
