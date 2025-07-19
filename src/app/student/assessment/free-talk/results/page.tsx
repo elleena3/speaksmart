@@ -104,7 +104,6 @@ export default function FreeTalkResultsPage() {
     const [status, setStatus] = useState<PageStatus>("loading");
     const [analysisStep, setAnalysisStep] = useState<AnalysisStep | null>(null);
     const [errorInfo, setErrorInfo] = useState<{ message: string } | null>(null);
-    const { toast } = useToast();
     
     const assessmentId = searchParams.get('id');
 
@@ -129,6 +128,7 @@ export default function FreeTalkResultsPage() {
                 .join(' ');
             
             const initialData: Partial<StudentResult> = {
+                id: resultRef.id,
                 studentId: user.uid,
                 assessmentId: assessment.id,
                 assessmentTitle: assessment.title,
@@ -137,7 +137,7 @@ export default function FreeTalkResultsPage() {
                 avatarUrl: user.photoURL || '',
                 createdAt: Date.now(),
                 date: new Date().toISOString(),
-                status: "분석 중",
+                status: "파일 업로드 중...",
                 studentRecordingUrl: studentRecordingUrl,
                 studentTranscript: fullConversationTranscript, 
             };
@@ -199,9 +199,18 @@ export default function FreeTalkResultsPage() {
     useEffect(() => {
         if(authLoading || !user || !assessmentId) return;
         
-        const storedDataString = sessionStorage.getItem(SESSION_STORAGE_KEY);
-        if (storedDataString) {
-            processDialogueSubmission(JSON.parse(storedDataString));
+        const sessionDataRaw = sessionStorage.getItem(SESSION_STORAGE_KEY);
+        if (sessionDataRaw) {
+            const sessionData = JSON.parse(sessionDataRaw);
+            processDialogueSubmission(sessionData).then(() => {
+                const q = query(
+                    collection(db, "results"),
+                    where("assessmentId", "==", assessmentId),
+                    where("studentId", "==", user.uid)
+                );
+                const unsubscribe = onSnapshot(q, handleSnapshot, handleError);
+                return () => unsubscribe();
+            });
             return;
         }
 
@@ -211,7 +220,7 @@ export default function FreeTalkResultsPage() {
             where("studentId", "==", user.uid)
         );
         
-        const unsubscribe = onSnapshot(q, async (snapshot) => {
+        const handleSnapshot = async (snapshot: any) => {
              if (snapshot.empty) {
                 const assessmentRef = doc(db, 'assessments', assessmentId);
                 const assessmentSnap = await getDoc(assessmentRef);
@@ -226,7 +235,7 @@ export default function FreeTalkResultsPage() {
             }
 
             const dbResults: StudentResult[] = [];
-            snapshot.forEach(doc => {
+            snapshot.forEach((doc: any) => {
                 dbResults.push({ id: doc.id, ...doc.data() } as StudentResult);
             });
             
@@ -264,11 +273,15 @@ export default function FreeTalkResultsPage() {
             } else {
               setStatus("completed");
             }
-        }, (err) => {
+        };
+
+        const handleError = (err: any) => {
             console.error("Error listening to result:", err);
             setErrorInfo({ message: "결과를 실시간으로 업데이트하는 중 오류가 발생했습니다."});
             setStatus("error");
-        });
+        };
+
+        const unsubscribe = onSnapshot(q, handleSnapshot, handleError);
 
         return () => unsubscribe();
         

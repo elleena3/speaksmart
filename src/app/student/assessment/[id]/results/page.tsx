@@ -11,7 +11,7 @@ import { Loader2, AlertTriangle, CheckCircle2, UploadCloud, AudioLines, FileScan
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { db } from "@/lib/firebase";
-import { collection, query, where, onSnapshot, doc, setDoc, updateDoc, getDocs, getDoc } from "firebase/firestore";
+import { collection, query, where, onSnapshot, doc, setDoc, updateDoc, getDocs, getDoc, serverTimestamp } from "firebase/firestore";
 import { generateMonologueAnalysis } from "@/ai/flows/generate-monologue-analysis-flow";
 import { useToast } from "@/hooks/use-toast";
 import { Progress } from "@/components/ui/progress";
@@ -117,18 +117,13 @@ export default function AssessmentResultsPage() {
     setErrorInfo(null);
     const { assessmentId, studentRecordingUrl, assessmentDetails } = sessionData;
     
-    if (assessmentId !== id) {
-        sessionStorage.removeItem(SESSION_STORAGE_KEY);
-        setStatus("error");
-        setErrorInfo({ message: "세션 정보가 현재 평가와 일치하지 않습니다."});
-        return;
-    }
-    
+    // Create a new document reference for this submission
     const resultRef = doc(collection(db, "results"));
     
     try {
         setAnalysisStep("upload");
         const initialData: Partial<StudentResult> = {
+            id: resultRef.id,
             studentId: user.uid,
             assessmentId: assessmentDetails.id,
             assessmentTitle: assessmentDetails.title,
@@ -137,16 +132,16 @@ export default function AssessmentResultsPage() {
             avatarUrl: user.photoURL || '',
             createdAt: Date.now(),
             date: new Date().toISOString(),
-            status: "텍스트 변환 중",
+            status: "파일 업로드 중...",
             studentRecordingUrl: studentRecordingUrl,
         };
         await setDoc(resultRef, initialData, { merge: true });
-        
         setAnalysisStep("transcribe");
         await updateDoc(resultRef, { status: "텍스트 변환 중" });
 
         setAnalysisStep("analyze");
         await updateDoc(resultRef, { status: "내용 및 발음 분석 중..." });
+        
         const analysisResult = await generateMonologueAnalysis({
             studentRecordingUrl: studentRecordingUrl,
             activityPrompt: assessmentDetails.prompt,
@@ -196,24 +191,37 @@ export default function AssessmentResultsPage() {
     } finally {
         sessionStorage.removeItem(SESSION_STORAGE_KEY);
     }
-  }, [id, user]);
+  }, [user]);
 
   useEffect(() => {
     if (authLoading || !user || !id) return;
     
+    // Check for a new submission first.
     const sessionDataRaw = sessionStorage.getItem(SESSION_STORAGE_KEY);
     if(sessionDataRaw) {
-        processMonologueSubmission(JSON.parse(sessionDataRaw));
-        return;
+        // If there's a new submission, process it and then set up the listener.
+        const sessionData = JSON.parse(sessionDataRaw);
+        processMonologueSubmission(sessionData).then(() => {
+            // After processing, immediately start listening for the final result.
+            const q = query(
+                collection(db, "results"),
+                where("assessmentId", "==", id),
+                where("studentId", "==", user.uid)
+            );
+            const unsubscribe = onSnapshot(q, handleSnapshot, handleError);
+            return () => unsubscribe();
+        });
+        return; // Don't set up the listener twice.
     }
     
+    // If no new submission, just listen for existing results.
     const q = query(
         collection(db, "results"),
         where("assessmentId", "==", id),
         where("studentId", "==", user.uid)
     );
 
-    const unsubscribe = onSnapshot(q, async (snapshot) => {
+    const handleSnapshot = async (snapshot: any) => {
         if (snapshot.empty) {
             const assessmentRef = doc(db, 'assessments', id);
             const assessmentSnap = await getDoc(assessmentRef);
@@ -228,7 +236,7 @@ export default function AssessmentResultsPage() {
         }
 
         const dbResults: StudentResult[] = [];
-        snapshot.forEach(doc => {
+        snapshot.forEach((doc: any) => {
             dbResults.push({ id: doc.id, ...doc.data() } as StudentResult);
         });
         
@@ -268,14 +276,18 @@ export default function AssessmentResultsPage() {
         } else {
             setStatus("completed");
         }
-    }, (err) => {
+    };
+
+    const handleError = (err: any) => {
         console.error("Error listening to result:", err);
         setErrorInfo({ message: "결과를 실시간으로 업데이트하는 중 오류가 발생했습니다."});
         setStatus("error");
-    });
+    };
+
+    const unsubscribe = onSnapshot(q, handleSnapshot, handleError);
     
     return () => unsubscribe();
-  }, [id, user, authLoading, processMonologueSubmission]);
+  }, [id, user, authLoading]);
   
   if (status === "loading" || authLoading) {
     return (
