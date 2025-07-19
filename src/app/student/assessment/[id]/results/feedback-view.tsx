@@ -8,7 +8,6 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
 import { Send, ThumbsUp, ThumbsDown, MessageSquareQuote, Loader2, FileText, Target, Repeat } from "lucide-react"
-import { summarizeStudentFeedback } from "@/ai/flows/summarize-student-feedback"
 import { type StudentResult, type TeacherAssessment } from "@/lib/types"
 import { Progress } from "@/components/ui/progress"
 import { db } from "@/lib/firebase"
@@ -24,6 +23,7 @@ export function FeedbackView({ result, assessment, isLatestAttempt }: FeedbackVi
   const [teacherFeedback, setTeacherFeedback] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [satisfaction, setSatisfaction] = useState<"good" | "bad" | null>(null);
+  const [localResult, setLocalResult] = useState(result);
   const { toast } = useToast()
 
   const {
@@ -36,7 +36,7 @@ export function FeedbackView({ result, assessment, isLatestAttempt }: FeedbackVi
     pronunciationFeedback,
     contentScore,
     studentRawFeedback,
-  } = result;
+  } = localResult;
 
   const handleSubmitFeedback = async () => {
     if (!teacherFeedback.trim()) {
@@ -48,24 +48,20 @@ export function FeedbackView({ result, assessment, isLatestAttempt }: FeedbackVi
       return
     }
     setIsSubmitting(true)
-    toast({ title: "피드백을 요약하여 제출하는 중..." })
     
     try {
-      const { summary } = await summarizeStudentFeedback({ feedbackText: teacherFeedback });
-
       const resultRef = doc(db, "results", resultId);
+      // 학생의 원본 피드백만 즉시 저장
       await updateDoc(resultRef, {
-        studentFeedbackSummary: summary,
-        studentRawFeedback: teacherFeedback, // 원본 피드백 저장
+        studentRawFeedback: teacherFeedback,
       });
       
       toast({
         title: "피드백이 제출되었습니다!",
         description: "개선에 도움을 주셔서 감사합니다."
       })
-      // Optimistically update local state to show the submitted feedback
-      result.studentRawFeedback = teacherFeedback;
-      result.studentFeedbackSummary = summary;
+      // UI를 즉시 업데이트
+      setLocalResult(prev => ({ ...prev, studentRawFeedback: teacherFeedback }));
       setTeacherFeedback("");
 
     } catch(error) {
@@ -112,41 +108,41 @@ export function FeedbackView({ result, assessment, isLatestAttempt }: FeedbackVi
         </Card>
         
         <Card>
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <Target className="w-8 h-8 text-primary shrink-0" />
-                <div>
-                  <CardTitle className="text-2xl">상세 분석</CardTitle>
-                  <CardDescription>AI가 분석한 내용/발음 정확도와 피드백입니다.</CardDescription>
-                </div>
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <Target className="w-8 h-8 text-primary shrink-0" />
+              <div>
+                <CardTitle className="text-2xl">상세 분석</CardTitle>
+                <CardDescription>AI가 분석한 내용/발음 정확도와 피드백입니다.</CardDescription>
               </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-                {contentScore !== undefined && (
-                    <div className="w-full">
-                       <div className="flex justify-between mb-1">
-                          <span className="text-base font-medium text-primary">내용 점수</span>
-                          <span className="text-sm font-medium text-primary">{contentScore}%</span>
-                      </div>
-                      <Progress value={contentScore} className="h-2" />
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+              {contentScore !== undefined && (
+                  <div className="w-full">
+                      <div className="flex justify-between mb-1">
+                        <span className="text-base font-medium text-primary">내용 점수</span>
+                        <span className="text-sm font-medium text-primary">{contentScore}%</span>
                     </div>
-                )}
-                {pronunciationScore !== undefined && (
-                    <div className="w-full">
-                       <div className="flex justify-between mb-1">
-                          <span className="text-base font-medium text-primary">발음 점수</span>
-                          <span className="text-sm font-medium text-primary">{pronunciationScore}%</span>
-                      </div>
-                      <Progress value={pronunciationScore} className="h-2" />
+                    <Progress value={contentScore} className="h-2" />
+                  </div>
+              )}
+              {pronunciationScore !== undefined && (
+                  <div className="w-full">
+                      <div className="flex justify-between mb-1">
+                        <span className="text-base font-medium text-primary">발음 점수</span>
+                        <span className="text-sm font-medium text-primary">{pronunciationScore}%</span>
                     </div>
-                )}
-                {pronunciationFeedback && (
-                    <div className="p-4 bg-muted/50 rounded-lg whitespace-pre-wrap font-body text-base leading-relaxed">
-                      <h4 className="font-semibold mb-2">발음 피드백</h4>
-                      {pronunciationFeedback}
-                    </div>
-                )}
-            </CardContent>
+                    <Progress value={pronunciationScore} className="h-2" />
+                  </div>
+              )}
+              {pronunciationFeedback && (
+                  <div className="p-4 bg-muted/50 rounded-lg whitespace-pre-wrap font-body text-base leading-relaxed">
+                    <h4 className="font-semibold mb-2">발음 피드백</h4>
+                    {pronunciationFeedback}
+                  </div>
+              )}
+          </CardContent>
         </Card>
 
         <Card>

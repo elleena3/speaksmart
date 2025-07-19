@@ -14,6 +14,7 @@ import { useAuth } from "@/context/auth-context";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
+import { summarizeStudentFeedback } from "@/ai/flows/summarize-student-feedback";
 
 
 export default function StudentResultPage() {
@@ -42,7 +43,22 @@ export default function StudentResultPage() {
             notFound();
             return;
         }
-        const resultData = { id: resultSnap.id, ...resultSnap.data() } as StudentResult;
+        let resultData = { id: resultSnap.id, ...resultSnap.data() } as StudentResult;
+        
+        // Check if summary is needed
+        if (resultData.studentRawFeedback && !resultData.studentFeedbackSummary) {
+          try {
+            toast({ title: "학생 피드백 요약 중...", description: "AI가 학생의 피드백을 요약하고 있습니다." });
+            const { summary } = await summarizeStudentFeedback({ feedbackText: resultData.studentRawFeedback });
+            await updateDoc(resultRef, { studentFeedbackSummary: summary });
+            resultData.studentFeedbackSummary = summary;
+            toast({ title: "요약 완료", description: "학생 피드백 요약이 완료되었습니다." });
+          } catch(e) {
+            console.error("Error summarizing on the fly:", e);
+            resultData.studentFeedbackSummary = "AI 요약 중 오류가 발생했습니다.";
+          }
+        }
+        
         setStudentResult(resultData);
 
         const assessmentRef = doc(db, "assessments", resultData.assessmentId);
@@ -159,7 +175,7 @@ export default function StudentResultPage() {
         currentY = addSection(isDialogue ? '전체 대화 기록' : '답변 내용', studentResult.studentTranscript || '기록 없음', currentY);
         currentY = addSection('교과과정 비고 초안', studentResult.curricularRemarks, currentY);
         currentY = addSection('선생님을 위한 조언', studentResult.teacherGuidance, currentY);
-        addSection('학생 피드백 요약', studentResult.studentFeedbackSummary, currentY);
+        addSection('학생 피드백 요약', studentResult.studentFeedbackSummary || "요약 정보 없음", currentY);
         
         const safeFileName = `report_${studentResult.studentId}_${assessmentId}.pdf`;
         docPDF.save(safeFileName);
@@ -204,9 +220,8 @@ export default function StudentResultPage() {
   if (!assessment || !studentResult) {
     return null; 
   }
-
-  const noFeedbackMessage = "학생이 평가에 대해 남긴 피드백이 없습니다.";
-  const hasFeedback = studentResult.studentFeedbackSummary && studentResult.studentFeedbackSummary !== noFeedbackMessage;
+  
+  const hasFeedback = studentResult.studentRawFeedback;
   const isDialogue = assessment.assessmentType === 'dialogue';
 
   return (
@@ -332,13 +347,22 @@ export default function StudentResultPage() {
 
              <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2"><User className="h-5 w-5 text-primary"/> 학생 피드백 요약</CardTitle>
-                 <CardDescription>이 평가 활동에 대한 학생의 AI 요약 피드백입니다.</CardDescription>
+                <CardTitle className="flex items-center gap-2"><User className="h-5 w-5 text-primary"/> 학생 피드백</CardTitle>
+                 <CardDescription>이 평가 활동에 대한 학생의 피드백 원문과 AI 요약본입니다.</CardDescription>
               </CardHeader>
-              <CardContent>
-                 <div className="text-sm text-muted-foreground p-4 bg-muted/50 rounded-lg italic">
-                    {hasFeedback ? studentResult.studentFeedbackSummary : "피드백 없음"}
-                 </div>
+              <CardContent className="space-y-4">
+                <div>
+                  <h4 className="font-semibold text-sm mb-2">학생 피드백 원문</h4>
+                  <div className="text-sm text-muted-foreground p-4 bg-muted/50 rounded-lg">
+                      {hasFeedback ? studentResult.studentRawFeedback : "피드백 없음"}
+                  </div>
+                </div>
+                <div>
+                   <h4 className="font-semibold text-sm mb-2">AI 요약</h4>
+                  <div className="text-sm text-muted-foreground p-4 bg-muted/50 rounded-lg italic">
+                      {hasFeedback ? studentResult.studentFeedbackSummary : "피드백 없음"}
+                  </div>
+                </div>
               </CardContent>
             </Card>
         </div>

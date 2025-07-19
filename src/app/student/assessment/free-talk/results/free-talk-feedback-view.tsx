@@ -8,7 +8,6 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
 import { Send, ThumbsUp, ThumbsDown, MessageSquareQuote, Loader2, FileText, Target, Repeat, Bot, User } from "lucide-react"
-import { summarizeStudentFeedback } from "@/ai/flows/summarize-student-feedback"
 import { type StudentResult, type TeacherAssessment } from "@/lib/types"
 import { Progress } from "@/components/ui/progress"
 import { db } from "@/lib/firebase"
@@ -24,6 +23,7 @@ export function FreeTalkFeedbackView({ result, assessment, isLatestAttempt }: Fe
   const [teacherFeedback, setTeacherFeedback] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [satisfaction, setSatisfaction] = useState<"good" | "bad" | null>(null);
+  const [localResult, setLocalResult] = useState(result);
   const { toast } = useToast()
 
   const {
@@ -35,7 +35,7 @@ export function FreeTalkFeedbackView({ result, assessment, isLatestAttempt }: Fe
     pronunciationFeedback,
     contentScore,
     studentRawFeedback,
-  } = result;
+  } = localResult;
 
   const handleSubmitFeedback = async () => {
     if (!teacherFeedback.trim()) {
@@ -47,24 +47,20 @@ export function FreeTalkFeedbackView({ result, assessment, isLatestAttempt }: Fe
       return
     }
     setIsSubmitting(true)
-    toast({ title: "피드백을 요약하여 제출하는 중..." })
     
     try {
-      const { summary } = await summarizeStudentFeedback({ feedbackText: teacherFeedback });
-
       const resultRef = doc(db, "results", resultId);
+      // 학생의 원본 피드백만 즉시 저장
       await updateDoc(resultRef, {
-        studentFeedbackSummary: summary,
-        studentRawFeedback: teacherFeedback, // 원본 피드백 저장
+        studentRawFeedback: teacherFeedback,
       });
       
       toast({
         title: "피드백이 제출되었습니다!",
         description: "개선에 도움을 주셔서 감사합니다."
       })
-      // Optimistically update local state to show the submitted feedback
-      result.studentRawFeedback = teacherFeedback;
-      result.studentFeedbackSummary = summary;
+      // UI를 즉시 업데이트
+      setLocalResult(prev => ({ ...prev, studentRawFeedback: teacherFeedback }));
       setTeacherFeedback("");
 
     } catch(error) {
