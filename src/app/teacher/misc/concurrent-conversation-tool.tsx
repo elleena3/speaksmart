@@ -107,7 +107,7 @@ export function ConcurrentConversationTool() {
         setRecordedBlob(blob);
         setSessionState("finished");
         stream.getTracks().forEach(track => track.stop());
-        audioContext.close();
+        audioContext.close().catch(e => console.warn("AudioContext could not be closed:", e));
       };
       
       mediaRecorderRef.current.start();
@@ -215,12 +215,14 @@ export function ConcurrentConversationTool() {
       case "finished":
         return (
             <div className="flex gap-2">
-                <a href={URL.createObjectURL(recordedBlob!)} download={`conversation-${new Date().toISOString()}.webm`}>
-                    <Button size="lg" className="w-full">
-                        <Download className="mr-2 h-5 w-5" />
-                        녹음 파일 다운로드
-                    </Button>
-                </a>
+                {recordedBlob && (
+                    <a href={URL.createObjectURL(recordedBlob)} download={`conversation-${new Date().toISOString()}.webm`}>
+                        <Button size="lg" className="w-full">
+                            <Download className="mr-2 h-5 w-5" />
+                            녹음 파일 다운로드
+                        </Button>
+                    </a>
+                )}
                 <Button size="lg" onClick={handleReset} variant="outline" className="w-full">
                     <RefreshCw className="mr-2 h-5 w-5" />
                     새로 시작
@@ -303,4 +305,3 @@ export function ConcurrentConversationTool() {
     </div>
   );
 }
-
