@@ -158,11 +158,11 @@ export default function HistoryPage() {
             <TableHeader>
                 <TableRow>
                     <TableHead className="w-[40%] text-center">{t.studentHistory.assessment}</TableHead>
-                    <TableHead className="text-center whitespace-nowrap">평가 유형</TableHead>
-                    <TableHead className="text-center whitespace-nowrap">완료 날짜</TableHead>
-                    <TableHead className="text-center whitespace-nowrap">내용 점수</TableHead>
-                    <TableHead className="text-center whitespace-nowrap">발음 점수</TableHead>
-                    <TableHead className="text-center pr-4">결과 보기</TableHead>
+                    <TableHead className="text-center whitespace-nowrap">{t.studentHistory.assessmentType}</TableHead>
+                    <TableHead className="text-center whitespace-nowrap">{t.studentHistory.completionDate}</TableHead>
+                    <TableHead className="text-center whitespace-nowrap">{t.studentHistory.contentScore}</TableHead>
+                    <TableHead className="text-center whitespace-nowrap">{t.studentHistory.pronunciationScore}</TableHead>
+                    <TableHead className="text-center pr-4">{t.studentHistory.action}</TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody>
@@ -200,7 +200,7 @@ export default function HistoryPage() {
                                         <Link href={getResultLink(group.latestAttempt, true, group.totalAttempts)}>
                                             <Button variant="secondary" size="sm">
                                                 {group.totalAttempts > 1 ? <TrendingUp className="mr-2 h-4 w-4" /> : null}
-                                                {group.totalAttempts > 1 ? "종합 분석 보기" : "결과 보기"}
+                                                {group.totalAttempts > 1 ? "종합 분석 보기" : t.studentHistory.action}
                                             </Button>
                                         </Link>
                                     </TableCell>
@@ -226,7 +226,7 @@ export default function HistoryPage() {
                                         </TableCell>
                                         <TableCell className="text-center pr-4">
                                             <Link href={getResultLink(attempt, false, group.totalAttempts)}>
-                                                <Button variant="ghost" size="sm">결과 보기</Button>
+                                                <Button variant="ghost" size="sm">{t.studentHistory.action}</Button>
                                             </Link>
                                         </TableCell>
                                     </TableRow>
@@ -237,7 +237,7 @@ export default function HistoryPage() {
                 ) : (
                     <TableRow>
                         <TableCell colSpan={6} className="h-24 text-center">
-                            완료된 평가가 없습니다.
+                            {t.studentHistory.noResults}
                         </TableCell>
                     </TableRow>
                 )}
