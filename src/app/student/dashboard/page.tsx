@@ -14,6 +14,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { cn } from "@/lib/utils"
 
 
 type CombinedAssessment = TeacherAssessment & {
@@ -62,7 +63,12 @@ function AssessmentCard({ assessment, t }: { assessment: CombinedAssessment, t: 
   }
 
   const getLink = () => {
-    if (isCompleted || isGrading || hasError) return `/student/assessment/${assessment.id}/results`;
+    const resultsPath = assessment.assessmentType === 'dialogue'
+      ? `/student/assessment/free-talk/results?id=${assessment.id}`
+      : `/student/assessment/${assessment.id}/results`;
+      
+    if (isCompleted || isGrading || hasError) return resultsPath;
+    
     if (assessment.assessmentType === 'dialogue') {
       return `/student/assessment/free-talk?id=${assessment.id}`;
     }
@@ -71,7 +77,10 @@ function AssessmentCard({ assessment, t }: { assessment: CombinedAssessment, t: 
 
 
   return (
-    <Card className="flex flex-col hover:shadow-md transition-shadow">
+    <Card className={cn(
+        "flex flex-col hover:shadow-md transition-shadow",
+        isCompleted && "border-slate-200 opacity-80"
+      )}>
       <CardHeader>
         <div className="flex justify-between items-start">
           <CardTitle className="text-xl break-keep">{assessment.title}</CardTitle>
@@ -84,7 +93,7 @@ function AssessmentCard({ assessment, t }: { assessment: CombinedAssessment, t: 
       <CardContent className="flex-grow" />
       <CardFooter>
         <Link href={getLink()} passHref className="w-full">
-          <Button className="w-full">
+          <Button className="w-full" variant={isCompleted ? 'secondary' : 'default'}>
             {getIcon()}
             <span className="ml-2">{getButtonText()}</span>
           </Button>
