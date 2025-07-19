@@ -92,7 +92,7 @@ export function GrowthView({ results, assessment, defaultTab }: GrowthViewProps)
 
     return (
         <Tabs defaultValue={defaultTab || `attempt-${results.length}`} className="w-full">
-            <TabsList className="grid w-full grid-cols-2 md:grid-cols-4">
+            <TabsList className="flex flex-wrap h-auto">
                 <TabsTrigger value="overview">종합 분석</TabsTrigger>
                 {results.map((result, index) => (
                     <TabsTrigger key={result.id} value={`attempt-${index + 1}`}>{index + 1}차 시도</TabsTrigger>
