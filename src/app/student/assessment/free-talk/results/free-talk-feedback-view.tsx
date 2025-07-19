@@ -33,7 +33,8 @@ export function FreeTalkFeedbackView({ result, assessment, isLatestAttempt }: Fe
     studentRecordingUrl,
     pronunciationScore,
     pronunciationFeedback,
-    contentScore
+    contentScore,
+    studentRawFeedback,
   } = result;
 
   const handleSubmitFeedback = async () => {
@@ -53,16 +54,19 @@ export function FreeTalkFeedbackView({ result, assessment, isLatestAttempt }: Fe
 
       const resultRef = doc(db, "results", resultId);
       await updateDoc(resultRef, {
-        studentFeedbackSummary: summary
+        studentFeedbackSummary: summary,
+        studentRawFeedback: teacherFeedback, // 원본 피드백 저장
       });
       
       toast({
         title: "피드백이 제출되었습니다!",
         description: "개선에 도움을 주셔서 감사합니다."
       })
-      setTeacherFeedback("");
-      // Optimistically update local state if needed, though a re-fetch would be more robust
+      // Optimistically update local state to show the submitted feedback
+      result.studentRawFeedback = teacherFeedback;
       result.studentFeedbackSummary = summary;
+      setTeacherFeedback("");
+
     } catch(error) {
         console.error("Error submitting feedback:", error);
         toast({
@@ -132,45 +136,43 @@ export function FreeTalkFeedbackView({ result, assessment, isLatestAttempt }: Fe
             </CardContent>
         </Card>
         
-        {(pronunciationScore !== undefined && pronunciationFeedback) || contentScore !== undefined ? (
-          <Card>
-              <CardHeader>
-                <div className="flex items-center gap-3">
-                  <Target className="w-8 h-8 text-primary shrink-0" />
-                  <div>
-                    <CardTitle className="text-2xl">상세 분석</CardTitle>
-                    <CardDescription>AI가 분석한 내용/발음 정확도와 피드백입니다.</CardDescription>
-                  </div>
+        <Card>
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <Target className="w-8 h-8 text-primary shrink-0" />
+                <div>
+                  <CardTitle className="text-2xl">상세 분석</CardTitle>
+                  <CardDescription>AI가 분석한 내용/발음 정확도와 피드백입니다.</CardDescription>
                 </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                  {contentScore !== undefined && (
-                      <div className="w-full">
-                         <div className="flex justify-between mb-1">
-                            <span className="text-base font-medium text-primary">내용 점수</span>
-                            <span className="text-sm font-medium text-primary">{contentScore}%</span>
-                        </div>
-                        <Progress value={contentScore} className="h-2" />
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                {contentScore !== undefined && (
+                    <div className="w-full">
+                       <div className="flex justify-between mb-1">
+                          <span className="text-base font-medium text-primary">내용 점수</span>
+                          <span className="text-sm font-medium text-primary">{contentScore}%</span>
                       </div>
-                  )}
-                  {pronunciationScore !== undefined && (
-                      <div className="w-full">
-                         <div className="flex justify-between mb-1">
-                            <span className="text-base font-medium text-primary">발음 점수</span>
-                            <span className="text-sm font-medium text-primary">{pronunciationScore}%</span>
-                        </div>
-                        <Progress value={pronunciationScore} className="h-2" />
+                      <Progress value={contentScore} className="h-2" />
+                    </div>
+                )}
+                {pronunciationScore !== undefined && (
+                    <div className="w-full">
+                       <div className="flex justify-between mb-1">
+                          <span className="text-base font-medium text-primary">발음 점수</span>
+                          <span className="text-sm font-medium text-primary">{pronunciationScore}%</span>
                       </div>
-                  )}
-                  {pronunciationFeedback && (
-                      <div className="p-4 bg-muted/50 rounded-lg whitespace-pre-wrap font-body text-base leading-relaxed">
-                        <h4 className="font-semibold mb-2">발음 피드백</h4>
-                        {pronunciationFeedback}
-                      </div>
-                  )}
-              </CardContent>
-          </Card>
-        ) : null}
+                      <Progress value={pronunciationScore} className="h-2" />
+                    </div>
+                )}
+                {pronunciationFeedback && (
+                    <div className="p-4 bg-muted/50 rounded-lg whitespace-pre-wrap font-body text-base leading-relaxed">
+                      <h4 className="font-semibold mb-2">발음 피드백</h4>
+                      {pronunciationFeedback}
+                    </div>
+                )}
+            </CardContent>
+        </Card>
 
         <Card>
             <CardHeader>
@@ -220,22 +222,34 @@ export function FreeTalkFeedbackView({ result, assessment, isLatestAttempt }: Fe
         <Card>
           <CardHeader>
             <CardTitle>교사에게 보내는 피드백</CardTitle>
-            <CardDescription>이 평가 활동에 대해 어떻게 생각하는지 교사에게 알려주세요.</CardDescription>
+            <CardDescription>
+                {studentRawFeedback 
+                ? "아래는 교사에게 보낸 나의 피드백입니다." 
+                : "이 평가 활동에 대해 어떻게 생각하는지 교사에게 알려주세요."}
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <Textarea 
-              placeholder="예: 주제는 흥미로웠지만 시간이 좀 짧았습니다."
-              value={teacherFeedback}
-              onChange={(e) => setTeacherFeedback(e.target.value)}
-              rows={6}
-            />
+             {studentRawFeedback ? (
+              <div className="p-4 bg-muted/50 rounded-lg whitespace-pre-wrap font-body text-sm leading-relaxed italic">
+                {studentRawFeedback}
+              </div>
+            ) : (
+              <Textarea 
+                placeholder="예: 주제는 흥미로웠지만 시간이 좀 짧았습니다."
+                value={teacherFeedback}
+                onChange={(e) => setTeacherFeedback(e.target.value)}
+                rows={6}
+              />
+            )}
           </CardContent>
-          <CardFooter>
-            <Button className="w-full" onClick={handleSubmitFeedback} disabled={isSubmitting}>
-              {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-              {isSubmitting ? "제출 중..." : "피드백 보내기"}
-            </Button>
-          </CardFooter>
+          {!studentRawFeedback && (
+            <CardFooter>
+              <Button className="w-full" onClick={handleSubmitFeedback} disabled={isSubmitting}>
+                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+                {isSubmitting ? "제출 중..." : "피드백 보내기"}
+              </Button>
+            </CardFooter>
+          )}
         </Card>
       </div>
     </div>

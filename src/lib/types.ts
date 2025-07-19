@@ -103,6 +103,7 @@ export type StudentResult = {
   aiFeedback: string;
   curricularRemarks: string;
   studentFeedbackSummary: string;
+  studentRawFeedback?: string; // 원본 피드백 저장
   teacherGuidance: string;
   studentTranscript?: string;
   studentRecordingUrl?: string; // Changed from DataUri to URL
