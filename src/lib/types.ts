@@ -92,6 +92,14 @@ export type ResultStatus =
   | "리포트 생성 중";
 
 
+export type RubricScores = {
+    fluency: number;
+    pronunciation: number;
+    grammar: number;
+    vocabulary: number;
+    interaction?: number; // Optional for monologue
+};
+
 export type StudentResult = {
   id: string; // Firestore document ID
   studentId: string; // Student's UID
@@ -113,4 +121,5 @@ export type StudentResult = {
   teacherUid: string; // To query results by teacher
   createdAt: number;
   contentScore: number;
+  rubricScores?: RubricScores;
 }

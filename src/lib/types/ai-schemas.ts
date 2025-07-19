@@ -40,6 +40,13 @@ export type ConverseWithStudentOutput = z.infer<typeof ConverseWithStudentOutput
 // ##############################################################
 // ##                SCHEMAS FOR ANALYSIS FLOWS                ##
 // ##############################################################
+export const RubricScoresSchema = z.object({
+    fluency: z.number(),
+    pronunciation: z.number(),
+    grammar: z.number(),
+    vocabulary: z.number(),
+    interaction: z.number().optional(),
+});
 
 // Internal schemas for sub-prompts, used by both flows
 export const ContentAnalysisOutputSchema = z.object({
@@ -62,6 +69,7 @@ export const CombinedAnalysisOutputSchema = z.object({
     curricularRemarks: z.string(),
     pronunciationScore: z.number(),
     pronunciationFeedback: z.string(),
+    rubricScores: RubricScoresSchema.optional(),
 });
 
 

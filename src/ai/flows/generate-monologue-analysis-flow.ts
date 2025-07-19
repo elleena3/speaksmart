@@ -18,7 +18,7 @@ import {
   CombinedAnalysisOutputSchema,
   type GenerateMonologueAnalysisInput,
 } from '@/lib/types/ai-schemas';
-import { evaluationModels } from '@/lib/types';
+import { evaluationModels, type RubricScores } from '@/lib/types';
 
 // Helper function for retrying API calls on overload
 async function withRetry<T>(fn: () => Promise<T>, retries = 2, delay = 1500): Promise<T> {
@@ -119,7 +119,7 @@ const createPrompt = (modelName: z.infer<typeof evaluationModels[number]>) => ({
 ### 지시사항 (Instructions)
 아래에 제공될 **[사용자 발화 내용]**을 분석합니다.
 
-이어지는 **[평가 기준 루브릭]**을 절대적인 기준으로 삼아, 5가지 평가 항목 각각에 대해 1점에서 5점까지의 점수를 부여합니다.
+이어지는 **[평가 기준 루브릭]**을 절대적인 기준으로 삼아, 4가지 평가 항목(유창성, 발음, 문법, 어휘) 각각에 대해 1점에서 5점까지의 점수를 부여합니다. '내용 이해 및 상호작용' 항목은 1점으로 고정합니다.
 
 각 항목별로 왜 해당 점수를 부여했는지에 대한 구체적인 근거를 사용자의 발화 내용에서 찾아 제시합니다.
 
@@ -134,64 +134,35 @@ const createPrompt = (modelName: z.infer<typeof evaluationModels[number]>) => ({
 아래의 평가 기준을 반드시 준수하여 각 항목을 평가하시오. 각 항목은 고유한 평가 기준을 가지며, 점수별 설명에 따라 정확하게 평가해야 합니다.
 
 [평가 항목: 유창성 (Fluency)]
-
 5점 (최상): 원어민과 가까운 속도와 리듬으로 매우 자연스럽게 말함. 의미 전달을 위한 자연스러운 멈춤 외에는 머뭇거림이 거의 없음.
-
 4점 (상): 큰 막힘 없이 안정적인 속도로 말함. 가끔 단어나 표현을 찾기 위해 잠시 멈추지만, 대화의 흐름을 방해하지 않음.
-
 3점 (중): 비교적 이해 가능한 속도로 말하지만, 단어나 문법을 생각하느라 머뭇거리거나 부자연스러운 멈춤이 눈에 띔.
-
 2점 (하): 매우 느리고 자주 끊어지며 말함. 긴 문장을 만드는 데 어려움을 겪고, 대화를 이어가기 힘듦.
-
 1점 (최하): 단어 단위로 말하거나, 외워 둔 극히 짧은 문장만 구사 가능.
 
 [평가 항목: 발음 및 억양 (Pronunciation & Intonation)]
-
 5점 (최상): 발음이 매우 명확하고, 문장의 의미에 맞게 자연스러운 억양과 강세를 사용함. 원어민이 듣기에 전혀 무리가 없음.
-
 4점 (상): 대부분의 발음이 정확하여 쉽게 이해할 수 있음. 약간의 모국어 억양이 남아있지만, 의사소통에 거의 영향을 주지 않음.
-
 3점 (중): 일부 단어의 발음이 부정확하여 가끔 재확인이 필요함. 억양이 단조롭거나 부자연스러워 의미 전달이 제한될 수 있음.
-
 2점 (하): 부정확한 발음이 많아 듣는 사람이 이해하기 위해 상당한 노력을 기울여야 함.
-
 1점 (최하): 발음을 거의 이해할 수 없어 의사소통이 매우 어려움.
 
 [평가 항목: 문법 (Grammar)]
-
 5점 (최상): 복잡한 문장 구조를 포함하여 다양한 문법을 거의 실수 없이 정확하게 사용함.
-
 4점 (상): 일상적인 문법 구조를 대부분 정확하게 사용함. 복잡한 문장에서 가끔 실수가 보이지만, 의미를 해치지는 않음.
-
 3점 (중): 기본적인 문장 구조는 사용하나, 시제, 수일치, 전치사 등에서 반복적인 실수가 나타남.
-
 2점 (하): 문법 지식이 매우 제한적이며, 기본적인 문장 구성에도 오류가 많아 의미가 왜곡되는 경우가 잦음.
-
 1점 (최하): 문장을 거의 구성하지 못함.
 
 [평가 항목: 어휘 (Vocabulary)]
-
 5점 (최상): 주제에 맞게 폭넓고 수준 높은 어휘를 정확하게 사용함. 관용적인 표현도 적절히 활용함.
-
 4점 (상): 주제에 대해 논의하기에 충분한 어휘를 구사하며, 모르는 단어는 다른 표현으로 설명할 수 있음.
-
 3점 (중): 일상적이고 기본적인 어휘는 구사하나, 어휘의 폭이 좁아 반복적인 단어를 사용하거나 부적절한 단어를 선택하는 경우가 있음.
-
 2점 (하): 매우 제한적인 어휘만 알고 있어 표현에 한계가 명확함. 단어를 찾느라 대화가 자주 끊김.
-
 1점 (최하): 극소수의 기본 단어만 알고 있음.
 
 [평가 항목: 내용 이해 및 상호작용 (Comprehension & Interaction)]
-
-5점 (최상): 미묘한 뉘앙스나 유머까지 포함하여 상대방의 말을 완벽하게 이해함. 대화의 흐름을 주도하고, 적극적으로 질문하며 깊이 있는 상호작용을 함.
-
-4점 (상): 대부분의 말을 어려움 없이 이해하고 대화 주제에 맞게 적절히 반응함. 대화를 이어가기 위한 질문을 할 수 있음.
-
-3점 (중): 간단하고 천천히 말하는 문장은 이해하나, 길거나 빠른 문장은 이해에 어려움을 겪고 되묻는 경우가 잦음. 수동적으로 답변하는 경향이 있음.
-
-2점 (하): 아주 간단한 질문만 이해하고, 대화에 거의 참여하지 못함. 동문서답을 하거나 반응이 없는 경우가 많음.
-
-1점 (최하): 상대방의 말을 거의 이해하지 못하여 상호작용이 불가능함.
+이 항목은 대화형 시나리오에서만 평가합니다. 혼자 말하기 과제였으므로 이 항목은 1점으로 고정하고, 피드백은 '평가 대상 아님'으로 작성합니다.
 
 ### 출력 형식
 [중요] 아래의 마크다운 구조와 스타일을 반드시 준수하여 리포트 형식으로 결과를 생성해 주세요.
@@ -269,6 +240,7 @@ const generateMonologueAnalysisFlow = ai.defineFlow(
             contentScore: 0,
             pronunciationScore: 0,
             pronunciationFeedback: '학생의 음성이 없어 발음 분석을 할 수 없습니다.',
+            rubricScores: { fluency: 0, pronunciation: 0, grammar: 0, vocabulary: 0, interaction: 0 },
         }
     }
     
@@ -283,12 +255,20 @@ const generateMonologueAnalysisFlow = ai.defineFlow(
         const grammarMatch = rubricText.match(/✍️ 문법 \(Grammar\)\s*-\s*📈 점수:\s*(\d)/);
         const vocabularyMatch = rubricText.match(/📚 어휘 \(Vocabulary\)\s*-\s*📈 점수:\s*(\d)/);
 
-        const fluencyScore = fluencyMatch ? parseInt(fluencyMatch[1]) * 20 : 0;
-        const pronunciationScore = pronunciationMatch ? parseInt(pronunciationMatch[1]) * 20 : 0;
-        const grammarScore = grammarMatch ? parseInt(grammarMatch[1]) * 20 : 0;
-        const vocabularyScore = vocabularyMatch ? parseInt(vocabularyMatch[1]) * 20 : 0;
+        const fluencyScoreRaw = fluencyMatch ? parseInt(fluencyMatch[1], 10) : 0;
+        const pronunciationScoreRaw = pronunciationMatch ? parseInt(pronunciationMatch[1], 10) : 0;
+        const grammarScoreRaw = grammarMatch ? parseInt(grammarMatch[1], 10) : 0;
+        const vocabularyScoreRaw = vocabularyMatch ? parseInt(vocabularyMatch[1], 10) : 0;
         
-        const contentScore = Math.round((fluencyScore + grammarScore + vocabularyScore) / 3);
+        const rubricScores: RubricScores = {
+          fluency: fluencyScoreRaw,
+          pronunciation: pronunciationScoreRaw,
+          grammar: grammarScoreRaw,
+          vocabulary: vocabularyScoreRaw,
+        };
+        
+        const contentScore = Math.round(((fluencyScoreRaw + grammarScoreRaw + vocabularyScoreRaw) / 3) * 20);
+        const pronunciationScore = pronunciationScoreRaw * 20;
 
         return {
             studentTranscript,
@@ -296,8 +276,9 @@ const generateMonologueAnalysisFlow = ai.defineFlow(
             pronunciationScore: pronunciationScore,
             aiFeedback: rubricText, // The whole rubric report is the feedback now.
             teacherGuidance: "루브릭 기반 평가를 사용했습니다. 학생의 강점과 약점을 항목별로 확인하고, 개선점에 제시된 활동을 지도해주세요.",
-            curricularRemarks: `'${input.assessmentTitle}' 평가에서 루브릭 기반으로 유창성(${fluencyScore}점), 문법(${grammarScore}점), 어휘(${vocabularyScore}점) 영역에서 종합 ${contentScore}점, 발음 영역에서 ${pronunciationScore}점을 받는 등 준수한 성취를 보임.`,
+            curricularRemarks: `'${input.assessmentTitle}' 평가에서 루브릭 기반으로 유창성(${fluencyScoreRaw}점), 문법(${grammarScoreRaw}점), 어휘(${vocabularyScoreRaw}점) 영역에서 종합 ${contentScore}점, 발음 영역에서 ${pronunciationScore}점을 받는 등 준수한 성취를 보임.`,
             pronunciationFeedback: `루브릭 기반 발음 점수는 ${pronunciationScore}점입니다. 상세 내용은 종합 분석 리포트를 참고하세요.`,
+            rubricScores,
         };
     }
 

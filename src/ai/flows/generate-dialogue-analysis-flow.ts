@@ -18,7 +18,7 @@ import {
   CombinedAnalysisOutputSchema,
   type GenerateDialogueAnalysisInput,
 } from '@/lib/types/ai-schemas';
-import { evaluationModels } from '@/lib/types';
+import { evaluationModels, type RubricScores } from '@/lib/types';
 
 // Helper function for retrying API calls on overload
 async function withRetry<T>(fn: () => Promise<T>, retries = 2, delay = 1500): Promise<T> {
@@ -257,6 +257,7 @@ const generateDialogueAnalysisFlow = ai.defineFlow(
             contentScore: 0,
             pronunciationScore: 0,
             pronunciationFeedback: '학생의 음성이 없어 발음 분석을 할 수 없습니다.',
+            rubricScores: { fluency: 0, pronunciation: 0, grammar: 0, vocabulary: 0, interaction: 0 },
         }
     }
     
@@ -270,13 +271,22 @@ const generateDialogueAnalysisFlow = ai.defineFlow(
         const vocabularyMatch = rubricText.match(/📚 어휘 \(Vocabulary\)\s*-\s*📈 점수:\s*(\d)/);
         const interactionMatch = rubricText.match(/🤝 내용 이해 및 상호작용 \(Comprehension & Interaction\)\s*-\s*📈 점수:\s*(\d)/);
         
-        const fluencyScore = fluencyMatch ? parseInt(fluencyMatch[1]) * 20 : 0;
-        const pronunciationScore = pronunciationMatch ? parseInt(pronunciationMatch[1]) * 20 : 0;
-        const grammarScore = grammarMatch ? parseInt(grammarMatch[1]) * 20 : 0;
-        const vocabularyScore = vocabularyMatch ? parseInt(vocabularyMatch[1]) * 20 : 0;
-        const interactionScore = interactionMatch ? parseInt(interactionMatch[1]) * 20 : 0;
+        const fluencyScoreRaw = fluencyMatch ? parseInt(fluencyMatch[1], 10) : 0;
+        const pronunciationScoreRaw = pronunciationMatch ? parseInt(pronunciationMatch[1], 10) : 0;
+        const grammarScoreRaw = grammarMatch ? parseInt(grammarMatch[1], 10) : 0;
+        const vocabularyScoreRaw = vocabularyMatch ? parseInt(vocabularyMatch[1], 10) : 0;
+        const interactionScoreRaw = interactionMatch ? parseInt(interactionMatch[1], 10) : 0;
+        
+        const rubricScores: RubricScores = {
+            fluency: fluencyScoreRaw,
+            pronunciation: pronunciationScoreRaw,
+            grammar: grammarScoreRaw,
+            vocabulary: vocabularyScoreRaw,
+            interaction: interactionScoreRaw,
+        };
 
-        const contentScore = Math.round((fluencyScore + grammarScore + vocabularyScore + interactionScore) / 4);
+        const contentScore = Math.round(((fluencyScoreRaw + grammarScoreRaw + vocabularyScoreRaw + interactionScoreRaw) / 4) * 20);
+        const pronunciationScore = pronunciationScoreRaw * 20;
 
         return {
             studentTranscript: input.fullConversationTranscript,
@@ -284,8 +294,9 @@ const generateDialogueAnalysisFlow = ai.defineFlow(
             pronunciationScore: pronunciationScore,
             aiFeedback: rubricText,
             teacherGuidance: "루브릭 기반 평가를 사용했습니다. 학생의 강점과 약점을 항목별로 확인하고, 개선점에 제시된 활동을 지도해주세요.",
-            curricularRemarks: `'${input.assessmentTitle}' 대화형 평가에서 루브릭 기반으로 종합 ${contentScore}점, 발음 ${pronunciationScore}점을 받는 등 준수한 성취를 보임. 특히 상호작용(${interactionScore}점) 능력이 돋보임.`,
+            curricularRemarks: `'${input.assessmentTitle}' 대화형 평가에서 루브릭 기반으로 종합 ${contentScore}점, 발음 ${pronunciationScore}점을 받는 등 준수한 성취를 보임. 특히 상호작용(${interactionScoreRaw * 20}점) 능력이 돋보임.`,
             pronunciationFeedback: `루브릭 기반 발음 점수는 ${pronunciationScore}점입니다. 상세 내용은 종합 분석 리포트를 참고하세요.`,
+            rubricScores,
         };
     }
 
