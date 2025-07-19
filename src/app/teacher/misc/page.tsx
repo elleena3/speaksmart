@@ -1,9 +1,9 @@
 
 "use client"
 
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Loader2, FileText, Target, Mic, Bot, BookOpen, Sparkles, ScanText, KeyRound, AlertTriangle } from "lucide-react";
+import { Loader2, FileText, Target, Mic, Bot, BookOpen, Sparkles, ScanText, KeyRound, AlertTriangle, MessageCircle, MicVocal } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
@@ -13,6 +13,8 @@ import { Progress } from "@/components/ui/progress";
 import { RealtimeConversationTool } from "./realtime-conversation-tool";
 import { ReadAloudTool } from "./read-aloud-tool";
 import { HandwritingAnalyzerTool } from "./handwriting-analyzer-tool";
+import { ConcurrentConversationTool } from "./concurrent-conversation-tool";
+
 
 // This component now handles the entire result creation and feedback display process.
 export default function MiscPage() {
@@ -97,13 +99,25 @@ export default function MiscPage() {
 
                 <Card className="lg:col-span-2">
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><Bot className="h-6 w-6"/> AI 원어민 선생님과 대화하기</CardTitle>
+                        <CardTitle className="flex items-center gap-2"><MessageCircle className="h-6 w-6"/> AI 원어민 선생님과 대화하기</CardTitle>
                         <CardDescription>
-                            실시간으로 AI와 영어 회화를 연습하고, 어떤 주제로든 질문해보세요. AI가 당신의 영어 수준에 맞춰 대화해 줄 것입니다.
+                            실시간으로 AI와 영어 회화를 연습하고, 어떤 주제로든 질문해보세요. AI가 당신의 영어 수준에 맞춰 대화해 줄 것입니다. (사용자 음성만 녹음)
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
                        <RealtimeConversationTool />
+                    </CardContent>
+                </Card>
+
+                 <Card className="lg:col-span-2">
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2"><MicVocal className="h-6 w-6"/> AI 원어민 선생님과 대화하기 2</CardTitle>
+                        <CardDescription>
+                           전체 대화(AI 음성 + 사용자 음성)를 녹음하는 기능입니다. '녹음 시작'을 누르면 AI와 사용자의 모든 음성이 하나의 파일로 저장됩니다.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                       <ConcurrentConversationTool />
                     </CardContent>
                 </Card>
 
@@ -350,5 +364,3 @@ function PronunciationAnalyzerTool() {
     </AudioProcessor>
   );
 }
-
-    

@@ -20,6 +20,7 @@ import '@/ai/flows/generate-dialogue-analysis-flow';
 
 // New flow for the Misc page's real-time conversation tool
 import '@/ai/flows/create-native-teacher-flow';
+import '@/ai/flows/create-concurrent-teacher-flow'; // New flow for concurrent recording tool
 
 // New flow for the Misc page's read-aloud tool
 import '@/ai/flows/analyze-read-aloud-flow';
