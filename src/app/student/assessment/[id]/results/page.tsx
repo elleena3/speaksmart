@@ -196,63 +196,11 @@ export default function AssessmentResultsPage() {
     if (sessionDataRaw) {
         const sessionData = JSON.parse(sessionDataRaw);
         if (sessionData.assessmentId === id) {
-            processMonologueSubmission(sessionData).then(() => {
-                // After processing, set up the listener to get the final result
-                const handleSnapshot = async (snapshot: any) => {
-                    if (snapshot.empty && status !== 'analyzing') {
-                        const assessmentRef = doc(db, 'assessments', id);
-                        const assessmentSnap = await getDoc(assessmentRef);
-                        if (assessmentSnap.exists()) {
-                            setAssessment({id: assessmentSnap.id, ...assessmentSnap.data()} as TeacherAssessment);
-                            setResults([]);
-                            setStatus("completed"); 
-                        } else {
-                            notFound();
-                        }
-                        return;
-                    }
-
-                    const dbResults: StudentResult[] = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
-                    dbResults.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
-                    
-                    if (!assessment && dbResults.length > 0) {
-                        const assessmentRef = doc(db, 'assessments', id);
-                        const assessmentSnap = await getDoc(assessmentRef);
-                        if (assessmentSnap.exists()) {
-                            setAssessment({id: assessmentSnap.id, ...assessmentSnap.data()} as TeacherAssessment);
-                        }
-                    }
-                    
-                    setResults(dbResults);
-                    const latestResult = dbResults[dbResults.length - 1];
-                    
-                    if (latestResult.status === '채점 완료') {
-                        setStatus("completed");
-                    } else if (latestResult.status === '오류') {
-                        setStatus('error');
-                        setErrorInfo({ message: latestResult.aiFeedback || '알 수 없는 오류가 발생했습니다.' });
-                    }
-                };
-                
-                const handleError = (err: any) => {
-                    console.error("Error listening to result:", err);
-                    setErrorInfo({ message: "결과를 실시간으로 업데이트하는 중 오류가 발생했습니다."});
-                    setStatus("error");
-                };
-
-                const q = query(
-                    collection(db, "results"),
-                    where("assessmentId", "==", id),
-                    where("studentId", "==", user.uid)
-                );
-                const unsubscribe = onSnapshot(q, handleSnapshot, handleError);
-                return () => unsubscribe();
-            });
-            return; // Don't set up the listener twice.
+            processMonologueSubmission(sessionData);
+            // The listener below will handle the result.
         }
     }
 
-    // This is for viewing existing results.
     const handleSnapshot = async (snapshot: any) => {
         if (snapshot.empty) {
             const assessmentRef = doc(db, 'assessments', id);
@@ -268,21 +216,27 @@ export default function AssessmentResultsPage() {
         }
 
         const dbResults: StudentResult[] = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
-        dbResults.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
-
+        dbResults.sort((a, b) => (a.createdAt || 0) - (a.createdAt || 0));
+        
         if (!assessment) {
             const assessmentRef = doc(db, 'assessments', id);
             const assessmentSnap = await getDoc(assessmentRef);
             if (assessmentSnap.exists()) {
                 setAssessment({id: assessmentSnap.id, ...assessmentSnap.data()} as TeacherAssessment);
-            } else {
-                notFound();
-                return;
             }
         }
         
         setResults(dbResults);
-        setStatus("completed");
+        const latestResult = dbResults[dbResults.length - 1];
+        
+        if (latestResult && latestResult.status === '채점 완료') {
+            setStatus("completed");
+        } else if (latestResult && latestResult.status === '오류') {
+            setStatus('error');
+            setErrorInfo({ message: latestResult.aiFeedback || '알 수 없는 오류가 발생했습니다.' });
+        } else if (status === 'loading') {
+            setStatus('analyzing');
+        }
     };
     
     const handleError = (err: any) => {
@@ -299,7 +253,7 @@ export default function AssessmentResultsPage() {
     const unsubscribe = onSnapshot(q, handleSnapshot, handleError);
     
     return () => unsubscribe();
-  }, [id, user, authLoading, processMonologueSubmission, assessment]);
+  }, [id, user, authLoading]);
   
   if (status === "loading" || authLoading) {
     return (
