@@ -3,7 +3,7 @@
 
 /**
  * @fileOverview A comprehensive flow that analyzes a student's DIALOGUE English performance.
- * This flow takes pre-processed data (a combined audio file and full transcript) to perform analysis.
+ * This flow now handles the entire process from analysis to storing the final result in Firestore.
  *
  * - generateDialogueAnalysis - The main function to call for a full dialogue speaking assessment.
  */
@@ -18,7 +18,9 @@ import {
   CombinedAnalysisOutputSchema,
   type GenerateDialogueAnalysisInput,
 } from '@/lib/types/ai-schemas';
-import { evaluationModels, type RubricScores } from '@/lib/types';
+import { evaluationModels, type RubricScores, type StudentResult } from '@/lib/types';
+import { doc, updateDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 // Helper function for retrying API calls on overload
 async function withRetry<T>(fn: () => Promise<T>, retries = 2, delay = 1500): Promise<T> {
@@ -46,9 +48,36 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 2, delay = 1500): Pr
  * Main exported function to be called by the client for dialogue analysis.
  */
 export async function generateDialogueAnalysis(
-    input: GenerateDialogueAnalysisInput
-): Promise<z.infer<typeof CombinedAnalysisOutputSchema>> {
-  return generateDialogueAnalysisFlow(input);
+    input: GenerateDialogueAnalysisInput & { resultId: string }
+): Promise<void> {
+  const resultDocRef = doc(db, "results", input.resultId);
+
+  try {
+      console.log(`[Dialogue Flow] Starting analysis for result ID: ${input.resultId}`);
+      await updateDoc(resultDocRef, { status: "분석 중: analyze" });
+      
+      const analysisResult = await generateDialogueAnalysisFlow(input);
+
+      console.log(`[Dialogue Flow] Analysis complete. Updating document with final report for ${input.resultId}`);
+      await updateDoc(resultDocRef, { status: "분석 중: report" });
+      
+      const finalResultData: Partial<StudentResult> = {
+          ...analysisResult,
+          status: "채점 완료",
+      };
+      
+      await updateDoc(resultDocRef, finalResultData);
+      console.log(`[Dialogue Flow] Final result stored in ${input.resultId}. Status: '채점 완료'`);
+
+  } catch (e: any) {
+      console.error(`[Dialogue Flow] An error occurred during dialogue analysis for ${input.resultId}:`, e);
+      await updateDoc(resultDocRef, {
+          status: "오류",
+          aiFeedback: (e as Error).message || "알 수 없는 오류가 발생했습니다."
+      });
+      // Re-throw to let the caller know something went wrong.
+      throw e;
+  }
 }
 
 // Internal Sub-prompts

@@ -1,309 +1,93 @@
+
 "use client";
 
 import { FreeTalkFeedbackView } from "./free-talk-feedback-view";
 import { GrowthView } from "../../[id]/results/growth-view";
 import { useRouter, notFound, useSearchParams } from 'next/navigation';
-import { useEffect, useState, useCallback, useRef } from "react";
-import { type StudentResult, type ResultStatus, type TeacherAssessment, type ConversationTurn } from "@/lib/types";
+import { useEffect, useState } from "react";
+import { type StudentResult, type TeacherAssessment } from "@/lib/types";
 import { useAuth } from "@/context/auth-context";
-import { Loader2, AlertTriangle, CheckCircle2, UploadCloud, FileScan, Sparkles } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Loader2 } from "lucide-react";
 import { db } from "@/lib/firebase";
-import { collection, query, where, onSnapshot, doc, setDoc, updateDoc, getDocs, getDoc, addDoc } from "firebase/firestore";
-import { generateDialogueAnalysis } from "@/ai/flows/generate-dialogue-analysis-flow";
+import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
+import { Button } from "@/components/ui/button";
 
 const SESSION_STORAGE_KEY = 'freeTalkSessionData';
-
-type AnalysisStep = "analyze" | "report";
-type PageStatus = "loading" | "analyzing" | "completed" | "error";
-
-const analysisSteps: { key: AnalysisStep, text: string, icon: React.FC<any> }[] = [
-    { key: "analyze", text: "대화 내용 및 발음 분석", icon: FileScan },
-    { key: "report", text: "피드백 리포트 생성", icon: Sparkles },
-];
-
-
-function AnalysisProgressView({ currentStep }: { currentStep: AnalysisStep | null }) {
-
-    const getCurrentStepIndex = () => {
-        if (!currentStep) return -1;
-        return analysisSteps.findIndex(step => step.key === currentStep);
-    }
-    const currentStepIndex = getCurrentStepIndex();
-
-    return (
-        <Card className="w-full max-w-lg">
-            <CardHeader>
-                <CardTitle>AI 분석 진행 중</CardTitle>
-                <CardDescription>대화 내용을 분석하고 있습니다. 이 과정은 최대 1-2분 소요될 수 있습니다.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6 pt-6">
-                <ul className="space-y-4">
-                    {analysisSteps.map((step, index) => {
-                        const isCompleted = index < currentStepIndex;
-                        const isCurrent = index === currentStepIndex;
-                        
-                        return (
-                            <li key={step.key} className="flex items-center gap-4">
-                                <div className="flex-shrink-0">
-                                    {isCompleted ? (
-                                        <CheckCircle2 className="h-6 w-6 text-green-500" />
-                                    ) : isCurrent ? (
-                                        <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                                    ) : (
-                                        <step.icon className="h-6 w-6 text-muted-foreground" />
-                                    )}
-                                </div>
-                                <span className={`font-medium ${isCompleted ? 'text-green-600' : isCurrent ? 'text-primary' : 'text-muted-foreground'}`}>
-                                    {step.text}
-                                </span>
-                            </li>
-                        );
-                    })}
-                </ul>
-            </CardContent>
-        </Card>
-    );
-}
-
-type DialogueSessionData = {
-    studentRecordingUrl: string;
-    conversationHistory: ConversationTurn[];
-    assessment: TeacherAssessment;
-};
-
 
 export default function FreeTalkResultsPage() {
     const { user, loading: authLoading } = useAuth();
     const router = useRouter();
     const searchParams = useSearchParams();
+    
     const [results, setResults] = useState<StudentResult[]>([]);
     const [assessment, setAssessment] = useState<TeacherAssessment | null>(null);
-    const [status, setStatus] = useState<PageStatus>("loading");
-    const [analysisStep, setAnalysisStep] = useState<AnalysisStep | null>(null);
-    const [errorInfo, setErrorInfo] = useState<{ message: string } | null>(null);
+    const [status, setStatus] = useState<"loading" | "completed">("loading");
     
     const assessmentId = searchParams.get('id');
-    const isProcessing = useRef(false);
-
-    const processDialogueSubmission = useCallback(async (sessionData: DialogueSessionData) => {
-        if (!user || isProcessing.current) return;
-        isProcessing.current = true;
-        setStatus("analyzing");
-        setErrorInfo(null);
-        console.log("[Dialogue Analysis] Starting new analysis process.");
-
-        const resultRef = doc(collection(db, "results"));
-
-        try {
-            const { assessment, studentRecordingUrl, conversationHistory } = sessionData;
-            
-            setAnalysisStep("analyze");
-            await setDoc(resultRef, { 
-                studentId: user.uid,
-                assessmentId: assessment.id,
-                assessmentTitle: assessment.title,
-                teacherUid: assessment.uid,
-                name: user.displayName || "Student",
-                avatarUrl: user.photoURL || '',
-                createdAt: Date.now(),
-                date: new Date().toISOString(),
-                status: "분석 중: analyze",
-            }, { merge: true });
-            console.log(`[Dialogue Analysis] Created preliminary result doc ${resultRef.id} with status 'analyze'`);
-            
-            const fullConversationTranscript = conversationHistory
-                .map(turn => `${turn.role === 'user' ? '학생' : (assessment.aiVoice || 'AI')}: ${turn.text}`)
-                .join('\n');
-            const studentOnlyTranscript = conversationHistory
-                .filter(turn => turn.role === 'user')
-                .map(turn => turn.text)
-                .join(' ');
-            
-            const analysisResult = await generateDialogueAnalysis({
-                studentRecordingUrl: studentRecordingUrl,
-                studentTranscript: studentOnlyTranscript,
-                fullConversationTranscript: fullConversationTranscript,
-                activityPrompt: assessment.prompt,
-                expectedFormat: assessment.expectedFormat || "AI와의 자연스러운 대화 능력을 평가합니다.",
-                studentName: user.displayName || "Student",
-                assessmentTitle: assessment.title.replace(/ - 복사본(\s\d+)?$/, ''),
-                evaluationModel: assessment.evaluationModel,
-                useRubric: assessment.useRubric || false,
-            });
-            console.log("[Dialogue Analysis] AI flow completed successfully.");
-            
-            setAnalysisStep("report");
-            await updateDoc(resultRef, { status: "분석 중: report" });
-            console.log("[Dialogue Analysis] Updated status to 'report'");
-
-            const finalResultData: Partial<StudentResult> = {
-                ...analysisResult,
-                studentTranscript: fullConversationTranscript, 
-                studentRecordingUrl: studentRecordingUrl,
-                status: "채점 완료",
-            };
-            await updateDoc(resultRef, finalResultData);
-            console.log(`[Dialogue Analysis] Final result stored in ${resultRef.id}. Status: '채점 완료'`);
-            
-            if (assessment.id !== "free-talk-practice") {
-                const assessmentRef = doc(db, "assessments", assessment.id);
-                const allResultsQuery = query(collection(db, "results"), where("assessmentId", "==", assessment.id), where("status", "==", "채점 완료"));
-                const querySnapshot = await getDocs(allResultsQuery);
-                const scores = querySnapshot.docs.map(d => (d.data() as StudentResult).contentScore || 0);
-                const newSubmissionCount = querySnapshot.docs.length;
-                const newAverage = newSubmissionCount > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / newSubmissionCount) : 0;
-                await updateDoc(assessmentRef, { submissionCount: newSubmissionCount, averageScore: newAverage });
-                console.log(`[Dialogue Analysis] Updated assessment stats for ${assessment.id}.`);
-            }
-
-        } catch (e: any) {
-            console.error("[Dialogue Analysis] Error during analysis flow:", e);
-            let errorMessage = "AI 분석 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
-            if (e.message && (e.message.includes("overloaded") || e.message.includes("503"))) {
-                errorMessage = "AI 모델이 현재 과부하 상태입니다. 잠시 후 다시 시도하거나, 교사에게 문의하여 다른 AI 모델로 평가를 변경해달라고 요청할 수 있습니다.";
-            } else {
-                errorMessage = `AI 분석 중 오류가 발생했습니다. 문제가 지속되면 관리자에게 문의하세요.`;
-            }
-            setErrorInfo({ message: errorMessage });
-            setStatus("error");
-            if (resultRef) {
-                await updateDoc(resultRef, { status: '오류', aiFeedback: errorMessage });
-            }
-        } finally {
-            sessionStorage.removeItem(SESSION_STORAGE_KEY);
-            isProcessing.current = false;
-            console.log("[Dialogue Analysis] Analysis process finished.");
-        }
-    }, [user]);
 
     useEffect(() => {
         if(authLoading || !user || !assessmentId) return;
 
-        // Check for new submission data first.
+        // If processing page redirects here, it won't have sessionStorage data.
+        // This will now only fetch completed data.
         const sessionDataRaw = sessionStorage.getItem(SESSION_STORAGE_KEY);
-        if (sessionDataRaw && !isProcessing.current) {
-            const sessionData = JSON.parse(sessionDataRaw);
-            if (sessionData.assessment.id === assessmentId) {
-                processDialogueSubmission(sessionData);
-                return; // Stop further execution until processing is done.
-            }
+        if (sessionDataRaw) {
+            router.replace(`/student/assessment/free-talk/processing?id=${assessmentId}`);
+            return;
         }
         
-        const q = query(
-            collection(db, "results"),
-            where("assessmentId", "==", assessmentId),
-            where("studentId", "==", user.uid)
-        );
+        const fetchResults = async () => {
+            try {
+                const q = query(
+                    collection(db, "results"),
+                    where("assessmentId", "==", assessmentId),
+                    where("studentId", "==", user.uid),
+                    where("status", "==", "채점 완료")
+                );
 
-        const handleSnapshot = async (snapshot: any) => {
-            if (isProcessing.current) return;
+                const resultsSnapshot = await getDocs(q);
+                if (resultsSnapshot.empty) {
+                    // This can happen if user refreshes processing page, then comes here.
+                    // Guide them to dashboard as there's no result to show yet.
+                    router.replace(`/student/dashboard`); 
+                    return;
+                }
 
-             if (snapshot.empty) {
-                const assessmentRef = doc(db, 'assessments', assessmentId as string);
+                const dbResults: StudentResult[] = resultsSnapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
+                dbResults.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+                setResults(dbResults);
+                
+                const assessmentRef = doc(db, 'assessments', assessmentId);
                 const assessmentSnap = await getDoc(assessmentRef);
                 if (assessmentSnap.exists()) {
                     setAssessment({id: assessmentSnap.id, ...assessmentSnap.data()} as TeacherAssessment);
-                } else if (assessmentId !== "free-talk-practice") {
+                } else {
                     notFound();
                     return;
                 }
-                setResults([]);
                 setStatus("completed");
-                return;
+            } catch (err) {
+                console.error("[Dialogue Results Page] Error fetching results:", err);
+                router.replace(`/student/dashboard`); 
             }
+        };
+    
+        fetchResults();
 
-            const dbResults: StudentResult[] = snapshot.docs.map((doc:any) => ({ id: doc.id, ...doc.data() }));
-            dbResults.sort((a, b) => (a.createdAt || 0) - (a.createdAt || 0));
-
-            if (!assessment) {
-                const assessmentRef = doc(db, 'assessments', assessmentId as string);
-                const assessmentSnap = await getDoc(assessmentRef);
-                if (assessmentSnap.exists()) {
-                    setAssessment({id: assessmentSnap.id, ...assessmentSnap.data()} as TeacherAssessment);
-                } else if (assessmentId !== "free-talk-practice") {
-                    notFound();
-                    return;
-                } else {
-                    setAssessment({
-                      id: "free-talk-practice",
-                      title: "자유 대화 연습",
-                      assessmentType: "dialogue",
-                    } as any);
-                }
-            }
-            setResults(dbResults);
-            
-            const latestResult = dbResults[dbResults.length - 1];
-            if (latestResult) {
-                console.log(`[Dialogue Snapshot] Detected status change: ${latestResult.status}`);
-                if (latestResult.status === '채점 완료') {
-                    setStatus("completed");
-                } else if (latestResult.status === '오류') {
-                    setStatus('error');
-                    setErrorInfo({ message: latestResult.aiFeedback || '알 수 없는 오류가 발생했습니다.' });
-                } else if (latestResult.status.startsWith('분석 중')) {
-                     const stepKey = latestResult.status.split(':')[1]?.trim() as AnalysisStep;
-                     console.log(`[Dialogue Snapshot] Current step: ${stepKey}`);
-                     setAnalysisStep(stepKey || 'analyze');
-                     setStatus('analyzing');
-                } else {
-                    setStatus('analyzing'); // Fallback to analyzing
-                }
-            }
-        }
-
-        const handleError = (err: any) => {
-            console.error("[Dialogue Snapshot] Error listening to result:", err);
-            setErrorInfo({ message: "결과를 실시간으로 업데이트하는 중 오류가 발생했습니다."});
-            setStatus("error");
-        }
-
-        const unsubscribe = onSnapshot(q, handleSnapshot, handleError);
-        return () => unsubscribe();
-        
-    }, [assessmentId, user, authLoading, processDialogueSubmission, assessment]);
+    }, [assessmentId, user, authLoading, router]);
 
 
     if (status === "loading" || authLoading) {
         return (
             <div className="flex flex-col items-center justify-center text-center p-8 h-96">
                  <Loader2 className="h-12 w-12 animate-spin text-primary" />
-            </div>
-        );
-    }
-
-    if (status === "analyzing") {
-        return (
-            <div className="flex flex-col items-center justify-center text-center p-8 min-h-[30rem]">
-                <AnalysisProgressView currentStep={analysisStep} />
+                 <p className="mt-4 text-muted-foreground">결과를 불러오는 중...</p>
             </div>
         );
     }
   
-    if (status === 'error') {
-      const assessmentIdOnError = results[0]?.assessmentId || assessment?.id || 'dashboard';
-      const redirectPath = assessmentIdOnError === 'dashboard' ? '/student/dashboard' : `/student/assessment/free-talk?id=${assessmentIdOnError}`;
-      return (
-          <Card className="flex flex-col items-center justify-center text-center p-8 min-h-80 bg-destructive/10 border-destructive">
-              <CardHeader>
-                  <AlertTriangle className="h-12 w-12 text-destructive mx-auto mb-4" />
-                  <CardTitle className="text-destructive">분석 오류</CardTitle>
-                  <CardDescription className="text-destructive-foreground">{errorInfo?.message || "AI가 답변을 분석하는 데 실패했습니다. 다시 시도해주세요."}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button variant="secondary" onClick={() => router.push(redirectPath)}>
-                    대화로 돌아가기
-                </Button>
-              </CardContent>
-          </Card>
-      );
-    }
-
     if (status === 'completed' && assessment) {
-      const completedResults = results.filter(r => r.status === '채점 완료');
-      if (completedResults.length === 0) {
+      if (results.length === 0) {
         return (
            <div className="text-center p-8">
                <p>이 평가에 대한 제출된 결과가 없습니다. 평가를 먼저 완료해주세요.</p>
@@ -311,15 +95,14 @@ export default function FreeTalkResultsPage() {
            </div>
         );
       }
-      if (completedResults.length === 1) {
-        return <FreeTalkFeedbackView result={completedResults[0]} assessment={assessment} isLatestAttempt={true} />;
+      if (results.length === 1) {
+        return <FreeTalkFeedbackView result={results[0]} assessment={assessment} isLatestAttempt={true} />;
       }
-      if (completedResults.length > 1) {
+      if (results.length > 1) {
         const attemptNumber = searchParams.get('attempt');
-        return <GrowthView results={completedResults} assessment={assessment} defaultTab={`attempt-${attemptNumber || completedResults.length}`} />;
+        return <GrowthView results={results} assessment={assessment} defaultTab={`attempt-${attemptNumber || results.length}`} />;
       }
     }
 
     return null;
 }
-

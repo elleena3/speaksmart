@@ -10,8 +10,6 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { converseWithStudent } from "@/ai/flows/text-to-speech"
 import { type ConversationTurn } from "@/lib/types/ai-schemas";
 import { type TeacherAssessment } from "@/lib/types";
-import { storage } from "@/lib/firebase"
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import { useAuth } from "@/context/auth-context"
 
 const SESSION_STORAGE_KEY = 'freeTalkSessionData';
@@ -246,19 +244,23 @@ export function FreeTalkView({ assessment }: { assessment: TeacherAssessment }) 
     try {
         const combinedBlob = new Blob(studentAudioBlobsRef.current, { type: mimeType });
         
-        toast({ title: "대화 내용 업로드 중...", description: "결과 분석을 위해 파일을 업로드하고 있습니다." });
-        
-        const storageRef = ref(storage, `recordings/${user.uid}_${assessment.id}_${Date.now()}.webm`);
-        const snapshot = await uploadBytes(storageRef, combinedBlob);
-        const downloadURL = await getDownloadURL(snapshot.ref);
+        toast({ title: "대화 내용 처리 중...", description: "결과 분석 페이지로 이동합니다." });
 
-        sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({ 
-            studentRecordingUrl: downloadURL,
-            conversationHistory: conversation,
-            assessment: assessment, // Pass the entire assessment object
-        }));
+        const reader = new FileReader();
+        reader.readAsDataURL(combinedBlob);
+        reader.onloadend = () => {
+            const dataUri = reader.result as string;
+            sessionStorage.removeItem(SESSION_STORAGE_KEY);
+            
+            sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({ 
+                studentRecordingDataUri: dataUri,
+                conversationHistory: conversation,
+                assessment: assessment,
+            }));
+            
+            router.push(`/student/assessment/free-talk/processing?id=${assessment.id}`);
+        }
         
-        router.push(`/student/assessment/free-talk/results?id=${assessment.id}`);
     } catch (error) {
         console.error("Error finalizing session:", error);
         toast({ title: "종료 오류", description: "대화를 종료하고 저장하는 중 오류가 발생했습니다.", variant: "destructive"});
