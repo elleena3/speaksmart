@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { db } from "@/lib/firebase";
 import { collection, query, where, onSnapshot, doc, updateDoc, getDocs, addDoc } from "firebase/firestore";
-import { processAndAnalyzeMonologue } from "@/ai/flows/generate-monologue-analysis-flow";
+import { generateMonologueAnalysisFlow } from "@/ai/flows/generate-monologue-analysis-flow";
 
 const SESSION_STORAGE_KEY = 'monologueSessionData';
 
@@ -152,7 +152,7 @@ export default function ProcessingPage() {
             });
 
             // Call the main analysis flow
-            await processAndAnalyzeMonologue({
+            await generateMonologueAnalysisFlow({
                 resultId: resultDocRef.id,
                 studentRecordingDataUri: studentRecordingDataUri,
                 activityPrompt: assessmentDetails.prompt,
@@ -192,10 +192,14 @@ export default function ProcessingPage() {
             setErrorInfo({ message: errorMessage });
             setStatus("error");
             if (resultIdRef.current) {
-                await updateDoc(doc(db, "results", resultIdRef.current), { 
-                    status: '오류', 
-                    aiFeedback: errorMessage
-                });
+                try {
+                    await updateDoc(doc(db, "results", resultIdRef.current), { 
+                        status: '오류', 
+                        aiFeedback: errorMessage
+                    });
+                } catch (updateError) {
+                    console.error("[Processing Page] Error updating document to error state:", updateError);
+                }
             }
         } finally {
             sessionStorage.removeItem(SESSION_STORAGE_KEY);

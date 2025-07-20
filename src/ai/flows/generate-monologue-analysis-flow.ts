@@ -1,10 +1,11 @@
+
 'use server';
 
 /**
  * @fileOverview A comprehensive flow that analyzes a student's MONOLOGUE English performance.
  * It orchestrates transcription, content analysis, and pronunciation analysis in an efficient, parallel manner.
  *
- * - processAndAnalyzeMonologue - The main function to call for a full monologue speaking assessment.
+ * - generateMonologueAnalysisFlow - The main flow to call for a full monologue speaking assessment.
  */
 
 import { ai } from '@/ai/genkit';
@@ -35,14 +36,6 @@ const MonologueProcessingInputSchema = z.object({
   resultId: z.string().describe('The Firestore document ID for the result to update progress.'),
 });
 type MonologueProcessingInput = z.infer<typeof MonologueProcessingInputSchema>;
-
-
-// Main exported function to be called by the client
-export async function processAndAnalyzeMonologue(
-    input: MonologueProcessingInput
-): Promise<void> {
-  await generateMonologueAnalysisFlow(input);
-}
 
 
 // Helper function for retrying API calls on overload
@@ -232,132 +225,142 @@ const createPrompt = (modelName: z.infer<typeof evaluationModels[number]>) => ({
 
 
 // The Main Orchestration Flow
-const generateMonologueAnalysisFlow = ai.defineFlow(
+export const generateMonologueAnalysisFlow = ai.defineFlow(
   {
     name: 'generateMonologueAnalysisFlow',
     inputSchema: MonologueProcessingInputSchema,
-    outputSchema: CombinedAnalysisOutputSchema.extend({ studentRecordingUrl: z.string() }),
+    outputSchema: z.void(),
   },
   async (input) => {
     const model = input.evaluationModel || 'gemini-2.5-flash';
     const prompts = createPrompt(model);
     const resultDocRef = doc(db, "results", input.resultId);
 
-    // Step 1: Upload File to Storage first (can happen in parallel with first AI call)
-    await updateDoc(resultDocRef, { status: "분석 중: upload" });
-    console.log("[Flow] Step 1: Uploading audio file to Storage.");
-    const studentUid = input.studentName; 
-    const uploadPath = `recordings/${studentUid}_${input.assessmentTitle}_${Date.now()}.webm`;
-    const storageRef = ref(storage, uploadPath);
-    const uploadTask = uploadString(storageRef, input.studentRecordingDataUri, 'data_url');
-    
-    // Step 2: Transcribe the audio
-    await updateDoc(resultDocRef, { status: "분석 중: transcribe" });
-    console.log("[Flow] Step 2: Transcribing audio.");
-    const transcriptionResult = await withRetry(() => prompts.transcription({ studentRecordingUrl: input.studentRecordingDataUri }));
-    const studentTranscript = transcriptionResult.text;
+    try {
+      // Step 1: Upload File to Storage first (can happen in parallel with first AI call)
+      await updateDoc(resultDocRef, { status: "분석 중: upload" });
+      console.log("[Flow] Step 1: Uploading audio file to Storage.");
+      const studentUid = input.studentName; 
+      const uploadPath = `recordings/${studentUid}_${input.assessmentTitle}_${Date.now()}.webm`;
+      const storageRef = ref(storage, uploadPath);
+      const uploadTask = uploadString(storageRef, input.studentRecordingDataUri, 'data_url');
+      
+      // Step 2: Transcribe the audio
+      await updateDoc(resultDocRef, { status: "분석 중: transcribe" });
+      console.log("[Flow] Step 2: Transcribing audio.");
+      const transcriptionResult = await withRetry(() => prompts.transcription({ studentRecordingUrl: input.studentRecordingDataUri }));
+      const studentTranscript = transcriptionResult.text;
 
-    if (!studentTranscript || studentTranscript.trim() === "" || studentTranscript.includes('기록되지 않았습니다') || studentTranscript.includes('인식하지 못했습니다')) {
-        throw new Error('학생 답변을 인식하지 못했습니다. 마이크 상태를 확인하고 다시 시도해주세요.');
+      if (!studentTranscript || studentTranscript.trim() === "" || studentTranscript.includes('기록되지 않았습니다') || studentTranscript.includes('인식하지 못했습니다')) {
+          throw new Error('학생 답변을 인식하지 못했습니다. 마이크 상태를 확인하고 다시 시도해주세요.');
+      }
+      
+      // Wait for the upload to finish and get the URL
+      const uploadSnapshot = await uploadTask;
+      const downloadURL = await getDownloadURL(uploadSnapshot.ref);
+      console.log("[Flow] Audio uploaded, URL:", downloadURL);
+
+      // Step 3: Content & Pronunciation Analysis (in parallel)
+      await updateDoc(resultDocRef, { status: "분석 중: analyze" });
+      console.log("[Flow] Step 3: Starting content and pronunciation analysis in parallel.");
+      const analysisPromise = (async () => {
+          if (input.useRubric) {
+              return withRetry(() => prompts.rubric({ studentTranscript }));
+          } else {
+              const [contentResult, pronunciationResult] = await Promise.all([
+                  withRetry(() => prompts.content({
+                      studentTranscript,
+                      activityPrompt: input.activityPrompt,
+                      expectedFormat: input.expectedFormat,
+                      studentName: input.studentName,
+                      assessmentTitle: input.assessmentTitle,
+                  })),
+                  withRetry(() => prompts.pronunciation({
+                      studentRecordingUrl: input.studentRecordingDataUri,
+                      studentTranscript,
+                  }))
+              ]);
+              const contentOutput = contentResult.output;
+              const pronunciationOutput = pronunciationResult.output;
+              if (!contentOutput || !pronunciationOutput) {
+                  throw new Error("Failed to get a valid response from one or more analysis models.");
+              }
+              return { contentOutput, pronunciationOutput };
+          }
+      })();
+      
+      const analysisResult = await analysisPromise;
+      console.log("[Flow] Analysis complete.");
+      
+      // Step 4: Process results and generate final report object
+      await updateDoc(resultDocRef, { status: "분석 중: report" });
+      console.log("[Flow] Step 4: Generating final report.");
+      
+      let finalResult: z.infer<typeof CombinedAnalysisOutputSchema>;
+
+      if ('text' in analysisResult) { // This means it's a rubric result
+          const rubricText = analysisResult.text;
+          const fluencyMatch = rubricText.match(/🗣️ 유창성 \(Fluency\)\s*-\s*📈 점수:\s*(\d)/);
+          const pronunciationMatch = rubricText.match(/🎤 발음 및 억양 \(Pronunciation & Intonation\)\s*-\s*📈 점수:\s*(\d)/);
+          const grammarMatch = rubricText.match(/✍️ 문법 \(Grammar\)\s*-\s*📈 점수:\s*(\d)/);
+          const vocabularyMatch = rubricText.match(/📚 어휘 \(Vocabulary\)\s*-\s*📈 점수:\s*(\d)/);
+
+          const fluencyScoreRaw = fluencyMatch ? parseInt(fluencyMatch[1], 10) : 0;
+          const pronunciationScoreRaw = pronunciationMatch ? parseInt(pronunciationMatch[1], 10) : 0;
+          const grammarScoreRaw = grammarMatch ? parseInt(grammarMatch[1], 10) : 0;
+          const vocabularyScoreRaw = vocabularyMatch ? parseInt(vocabularyMatch[1], 10) : 0;
+          
+          const rubricScores: RubricScores = {
+            fluency: fluencyScoreRaw,
+            pronunciation: pronunciationScoreRaw,
+            grammar: grammarScoreRaw,
+            vocabulary: vocabularyScoreRaw,
+          };
+          
+          const contentScore = Math.round(((fluencyScoreRaw + grammarScoreRaw + vocabularyScoreRaw) / 3) * 20);
+          const pronunciationScore = pronunciationScoreRaw * 20;
+
+          finalResult = {
+              studentTranscript,
+              contentScore: contentScore,
+              pronunciationScore: pronunciationScore,
+              aiFeedback: rubricText,
+              teacherGuidance: "루브릭 기반 평가를 사용했습니다. 학생의 강점과 약점을 항목별로 확인하고, 개선점에 제시된 활동을 지도해주세요.",
+              curricularRemarks: `'${input.assessmentTitle}' 평가에서 루브릭 기반으로 유창성(${fluencyScoreRaw}점), 문법(${grammarScoreRaw}점), 어휘(${vocabularyScoreRaw}점) 영역에서 종합 ${contentScore}점, 발음 영역에서 ${pronunciationScore}점을 받는 등 준수한 성취를 보임.`,
+              pronunciationFeedback: `루브릭 기반 발음 점수는 ${pronunciationScore}점입니다. 상세 내용은 종합 분석 리포트를 참고하세요.`,
+              rubricScores,
+          };
+      } else {
+          const { contentOutput, pronunciationOutput } = analysisResult as { contentOutput: z.infer<typeof ContentAnalysisOutputSchema>, pronunciationOutput: z.infer<typeof PronunciationAnalysisOutputSchema> };
+          finalResult = {
+              studentTranscript,
+              contentScore: contentOutput.contentScore,
+              aiFeedback: contentOutput.aiFeedback,
+              teacherGuidance: contentOutput.teacherGuidance,
+              curricularRemarks: contentOutput.curricularRemarks,
+              pronunciationScore: pronunciationOutput.pronunciationScore,
+              pronunciationFeedback: pronunciationOutput.pronunciationFeedback,
+          };
+      }
+      
+      console.log("[Flow] Final report generated. Updating Firestore document.");
+      
+      // Update the main document with the final analysis and set status to complete
+      await updateDoc(resultDocRef, {
+          ...finalResult,
+          studentRecordingUrl: downloadURL,
+          status: "채점 완료"
+      });
+
+      console.log(`[Flow] Final result document ${input.resultId} updated. Status: '채점 완료'`);
+    } catch(e) {
+       console.error("[Flow] An error occurred in generateMonologueAnalysisFlow", e);
+       await updateDoc(resultDocRef, { 
+          status: '오류', 
+          aiFeedback: (e as Error).message || "알 수 없는 오류가 발생했습니다."
+       });
+       // Re-throw the error to be caught by the client-side caller if needed
+       throw e;
     }
-    
-    // Wait for the upload to finish and get the URL
-    const uploadSnapshot = await uploadTask;
-    const downloadURL = await getDownloadURL(uploadSnapshot.ref);
-    console.log("[Flow] Audio uploaded, URL:", downloadURL);
-
-    // Step 3: Content & Pronunciation Analysis (in parallel)
-    await updateDoc(resultDocRef, { status: "분석 중: analyze" });
-    console.log("[Flow] Step 3: Starting content and pronunciation analysis in parallel.");
-    const analysisPromise = (async () => {
-        if (input.useRubric) {
-            return withRetry(() => prompts.rubric({ studentTranscript }));
-        } else {
-            const [contentResult, pronunciationResult] = await Promise.all([
-                withRetry(() => prompts.content({
-                    studentTranscript,
-                    activityPrompt: input.activityPrompt,
-                    expectedFormat: input.expectedFormat,
-                    studentName: input.studentName,
-                    assessmentTitle: input.assessmentTitle,
-                })),
-                withRetry(() => prompts.pronunciation({
-                    studentRecordingUrl: input.studentRecordingDataUri,
-                    studentTranscript,
-                }))
-            ]);
-            const contentOutput = contentResult.output;
-            const pronunciationOutput = pronunciationResult.output;
-            if (!contentOutput || !pronunciationOutput) {
-                throw new Error("Failed to get a valid response from one or more analysis models.");
-            }
-            return { contentOutput, pronunciationOutput };
-        }
-    })();
-    
-    const analysisResult = await analysisPromise;
-    console.log("[Flow] Analysis complete.");
-    
-    // Step 4: Process results and generate final report object
-    await updateDoc(resultDocRef, { status: "분석 중: report" });
-    console.log("[Flow] Step 4: Generating final report.");
-    
-    let finalResult: z.infer<typeof CombinedAnalysisOutputSchema>;
-
-    if ('text' in analysisResult) { // This means it's a rubric result
-        const rubricText = analysisResult.text;
-        const fluencyMatch = rubricText.match(/🗣️ 유창성 \(Fluency\)\s*-\s*📈 점수:\s*(\d)/);
-        const pronunciationMatch = rubricText.match(/🎤 발음 및 억양 \(Pronunciation & Intonation\)\s*-\s*📈 점수:\s*(\d)/);
-        const grammarMatch = rubricText.match(/✍️ 문법 \(Grammar\)\s*-\s*📈 점수:\s*(\d)/);
-        const vocabularyMatch = rubricText.match(/📚 어휘 \(Vocabulary\)\s*-\s*📈 점수:\s*(\d)/);
-
-        const fluencyScoreRaw = fluencyMatch ? parseInt(fluencyMatch[1], 10) : 0;
-        const pronunciationScoreRaw = pronunciationMatch ? parseInt(pronunciationMatch[1], 10) : 0;
-        const grammarScoreRaw = grammarMatch ? parseInt(grammarMatch[1], 10) : 0;
-        const vocabularyScoreRaw = vocabularyMatch ? parseInt(vocabularyMatch[1], 10) : 0;
-        
-        const rubricScores: RubricScores = {
-          fluency: fluencyScoreRaw,
-          pronunciation: pronunciationScoreRaw,
-          grammar: grammarScoreRaw,
-          vocabulary: vocabularyScoreRaw,
-        };
-        
-        const contentScore = Math.round(((fluencyScoreRaw + grammarScoreRaw + vocabularyScoreRaw) / 3) * 20);
-        const pronunciationScore = pronunciationScoreRaw * 20;
-
-        finalResult = {
-            studentTranscript,
-            contentScore: contentScore,
-            pronunciationScore: pronunciationScore,
-            aiFeedback: rubricText,
-            teacherGuidance: "루브릭 기반 평가를 사용했습니다. 학생의 강점과 약점을 항목별로 확인하고, 개선점에 제시된 활동을 지도해주세요.",
-            curricularRemarks: `'${input.assessmentTitle}' 평가에서 루브릭 기반으로 유창성(${fluencyScoreRaw}점), 문법(${grammarScoreRaw}점), 어휘(${vocabularyScoreRaw}점) 영역에서 종합 ${contentScore}점, 발음 영역에서 ${pronunciationScore}점을 받는 등 준수한 성취를 보임.`,
-            pronunciationFeedback: `루브릭 기반 발음 점수는 ${pronunciationScore}점입니다. 상세 내용은 종합 분석 리포트를 참고하세요.`,
-            rubricScores,
-        };
-    } else {
-        const { contentOutput, pronunciationOutput } = analysisResult as { contentOutput: z.infer<typeof ContentAnalysisOutputSchema>, pronunciationOutput: z.infer<typeof PronunciationAnalysisOutputSchema> };
-        finalResult = {
-            studentTranscript,
-            contentScore: contentOutput.contentScore,
-            aiFeedback: contentOutput.aiFeedback,
-            teacherGuidance: contentOutput.teacherGuidance,
-            curricularRemarks: contentOutput.curricularRemarks,
-            pronunciationScore: pronunciationOutput.pronunciationScore,
-            pronunciationFeedback: pronunciationOutput.pronunciationFeedback,
-        };
-    }
-    
-    console.log("[Flow] Final report generated. Returning result.");
-    
-    // Update the main document with the final analysis and set status to complete
-    await updateDoc(resultDocRef, {
-        ...finalResult,
-        studentRecordingUrl: downloadURL,
-        status: "채점 완료"
-    });
-
-    console.log(`[Flow] Final result document ${input.resultId} updated. Status: '채점 완료'`);
   }
 );
