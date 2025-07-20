@@ -84,6 +84,7 @@ export const GenerateMonologueAnalysisInputSchema = z.object({
   assessmentTitle: z.string().describe('The title of the assessment.'),
   evaluationModel: z.enum(evaluationModels).optional(),
   useRubric: z.boolean().optional().describe('Whether to use the standardized rubric for evaluation.'),
+  onProgress: z.function(z.tuple([z.enum(['transcribe', 'analyze', 'report', 'upload'])])).optional().describe("Callback to report progress."),
 });
 export type GenerateMonologueAnalysisInput = z.infer<typeof GenerateMonologueAnalysisInputSchema>;
 

@@ -5,15 +5,14 @@ import { FeedbackView } from "./feedback-view"
 import { GrowthView } from "./growth-view"
 import { useParams, useRouter, notFound, useSearchParams } from 'next/navigation';
 import { useEffect, useState, useCallback, useRef } from "react";
-import { type StudentResult, type ResultStatus, type TeacherAssessment } from "@/lib/types";
+import { type StudentResult, type TeacherAssessment } from "@/lib/types";
 import { useAuth } from "@/context/auth-context";
 import { Loader2, AlertTriangle, CheckCircle2, UploadCloud, AudioLines, FileScan, Sparkles } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { db, storage } from "@/lib/firebase";
-import { collection, query, where, onSnapshot, doc, setDoc, updateDoc, getDocs, getDoc, serverTimestamp, addDoc } from "firebase/firestore";
+import { collection, query, where, onSnapshot, doc, updateDoc, getDocs, getDoc, serverTimestamp, addDoc } from "firebase/firestore";
 import { generateMonologueAnalysis } from "@/ai/flows/generate-monologue-analysis-flow";
-import { Progress } from "@/components/ui/progress";
 import { ref, uploadString, getDownloadURL } from "firebase/storage";
 
 const SESSION_STORAGE_KEY = 'monologueSessionData';
@@ -22,31 +21,13 @@ type AnalysisStep = "upload" | "transcribe" | "analyze" | "report";
 type PageStatus = "loading" | "analyzing" | "completed" | "error";
 
 const analysisSteps: { key: AnalysisStep, text: string, icon: React.FC<any> }[] = [
-    { key: "upload", text: "답변 파일 업로드", icon: UploadCloud },
     { key: "transcribe", text: "음성을 텍스트로 변환", icon: AudioLines },
     { key: "analyze", text: "내용 및 발음 분석", icon: FileScan },
     { key: "report", text: "리포트 생성", icon: Sparkles },
+    { key: "upload", text: "답변 파일 업로드", icon: UploadCloud },
 ];
 
 function AnalysisProgressView({ currentStep }: { currentStep: AnalysisStep | null }) {
-    const [progress, setProgress] = useState(0);
-    const estimatedTotalTime = 90000; // 90초 (1.5분)
-
-    useEffect(() => {
-        const interval = setInterval(() => {
-            setProgress(prev => {
-                if (prev >= 95) { // 95%에서 멈춰서 완료를 기다림
-                    clearInterval(interval);
-                    return 95;
-                }
-                return prev + 1;
-            });
-        }, estimatedTotalTime / 100); 
-
-        return () => clearInterval(interval);
-    }, []);
-
-
     const getCurrentStepIndex = () => {
         if (!currentStep) return -1;
         return analysisSteps.findIndex(step => step.key === currentStep);
@@ -59,8 +40,7 @@ function AnalysisProgressView({ currentStep }: { currentStep: AnalysisStep | nul
                 <CardTitle>AI 분석 진행 중</CardTitle>
                 <CardDescription>답변을 분석하고 있습니다. 이 과정은 최대 1-2분 소요될 수 있습니다.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-                <Progress value={progress} className="w-full h-2" />
+            <CardContent className="space-y-6 pt-6">
                 <ul className="space-y-4">
                     {analysisSteps.map((step, index) => {
                         const isCompleted = index < currentStepIndex;
@@ -117,7 +97,6 @@ export default function AssessmentResultsPage() {
     isProcessing.current = true;
     setStatus("analyzing");
     setErrorInfo(null);
-    setAnalysisStep("transcribe");
 
     const { assessmentDetails, studentRecordingDataUri } = sessionData;
     
@@ -130,10 +109,12 @@ export default function AssessmentResultsPage() {
         avatarUrl: user.photoURL || '',
         createdAt: Date.now(),
         date: new Date().toISOString(),
-        status: "텍스트 변환 중",
+        status: "분석 중", // Generic initial status
     });
 
     try {
+        // Step 1: Transcription and Analysis
+        setAnalysisStep("transcribe");
         const analysisResult = await generateMonologueAnalysis({
             studentRecordingUrl: studentRecordingDataUri,
             activityPrompt: assessmentDetails.prompt,
@@ -142,24 +123,30 @@ export default function AssessmentResultsPage() {
             assessmentTitle: assessmentDetails.title,
             evaluationModel: assessmentDetails.evaluationModel,
             useRubric: assessmentDetails.useRubric || false,
+            // Pass the callback to update the UI step during the flow
+            onProgress: (step) => {
+                if(step === 'analyze') setAnalysisStep('analyze');
+            }
         });
 
+        // Step 2: Report Generation (Updating Firestore)
         setAnalysisStep("report");
-        await updateDoc(resultDocRef, { status: "리포트 생성 중" });
+        await updateDoc(resultDocRef, {
+            ...analysisResult, // This includes transcript, scores, feedback etc.
+            status: "파일 업로드 중...", // Temporary status before final
+        });
         
+        // Step 3: File Upload
         setAnalysisStep("upload");
-        await updateDoc(resultDocRef, { status: "파일 업로드 중..." });
-        
         const storageRef = ref(storage, `recordings/${user.uid}_${assessmentDetails.id}_${Date.now()}.webm`);
         const snapshot = await uploadString(storageRef, studentRecordingDataUri, 'data_url');
         const downloadURL = await getDownloadURL(snapshot.ref);
 
-        const finalResultData: Partial<StudentResult> = {
-            ...analysisResult,
+        // Final Update with download URL and completed status
+        await updateDoc(resultDocRef, {
             studentRecordingUrl: downloadURL,
             status: '채점 완료',
-        };
-        await updateDoc(resultDocRef, finalResultData);
+        });
         
         // Update assessment aggregate data
         const assessmentRef = doc(db, "assessments", assessmentDetails.id);
@@ -193,7 +180,6 @@ export default function AssessmentResultsPage() {
     } finally {
         sessionStorage.removeItem(SESSION_STORAGE_KEY);
         isProcessing.current = false;
-        // Navigation is now handled by the onSnapshot listener detecting "채점 완료" status.
     }
   }, [user, id]);
 
@@ -201,13 +187,12 @@ export default function AssessmentResultsPage() {
   useEffect(() => {
     if (authLoading || !user || !id) return;
     
-    // This part is crucial: only process a new submission if it exists.
     const sessionDataRaw = sessionStorage.getItem(SESSION_STORAGE_KEY);
-    if (sessionDataRaw) {
+    if (sessionDataRaw && !isProcessing.current) {
         const sessionData = JSON.parse(sessionDataRaw);
         if (sessionData.assessmentId === id) {
             processMonologueSubmission(sessionData);
-            return; // Exit early to prevent snapshot listener from running prematurely.
+            return;
         }
     }
     
@@ -253,7 +238,7 @@ export default function AssessmentResultsPage() {
             setStatus('error');
             setErrorInfo({ message: latestResult.aiFeedback || '알 수 없는 오류가 발생했습니다.' });
         } else if (latestResult && !isProcessing.current) {
-             const staleStatuses = ["텍스트 변환 중", "내용 및 발음 분석 중...", "리포트 생성 중", "파일 업로드 중..."];
+             const staleStatuses = ["텍스트 변환 중", "내용 및 발음 분석 중...", "리포트 생성 중", "파일 업로드 중...", "분석 중"];
              if (staleStatuses.includes(latestResult.status)) {
                 setStatus('error');
                 setErrorInfo({ message: '이전 분석이 비정상적으로 종료되었습니다. 평가로 돌아가 다시 시도해주세요.'});

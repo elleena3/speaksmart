@@ -224,11 +224,13 @@ const generateMonologueAnalysisFlow = ai.defineFlow(
     outputSchema: CombinedAnalysisOutputSchema,
   },
   async (input) => {
-    const model = input.evaluationModel || 'gemini-2.5-flash';
+    const { onProgress, ...mainInput } = input;
+    const model = mainInput.evaluationModel || 'gemini-2.5-flash';
     const prompts = createPrompt(model);
 
     // Step 1: Transcribe the audio with retry logic.
-    const transcriptionResult = await withRetry(() => prompts.transcription({ studentRecordingUrl: input.studentRecordingUrl }));
+    onProgress?.('transcribe');
+    const transcriptionResult = await withRetry(() => prompts.transcription({ studentRecordingUrl: mainInput.studentRecordingUrl }));
     const studentTranscript = transcriptionResult.text;
 
     if (!studentTranscript || studentTranscript.trim() === "" || studentTranscript.includes('기록되지 않았습니다') || studentTranscript.includes('인식하지 못했습니다')) {
@@ -244,12 +246,14 @@ const generateMonologueAnalysisFlow = ai.defineFlow(
         }
     }
     
-    // Step 2: Check if rubric is used.
-    if (input.useRubric) {
+    // Step 2: Inform the client that analysis is starting
+    onProgress?.('analyze');
+
+    // Step 3: Check if rubric is used.
+    if (mainInput.useRubric) {
         const rubricResult = await withRetry(() => prompts.rubric({ studentTranscript }));
         const rubricText = rubricResult.text;
         
-        // Extract scores from markdown
         const fluencyMatch = rubricText.match(/🗣️ 유창성 \(Fluency\)\s*-\s*📈 점수:\s*(\d)/);
         const pronunciationMatch = rubricText.match(/🎤 발음 및 억양 \(Pronunciation & Intonation\)\s*-\s*📈 점수:\s*(\d)/);
         const grammarMatch = rubricText.match(/✍️ 문법 \(Grammar\)\s*-\s*📈 점수:\s*(\d)/);
@@ -274,26 +278,26 @@ const generateMonologueAnalysisFlow = ai.defineFlow(
             studentTranscript,
             contentScore: contentScore,
             pronunciationScore: pronunciationScore,
-            aiFeedback: rubricText, // The whole rubric report is the feedback now.
+            aiFeedback: rubricText,
             teacherGuidance: "루브릭 기반 평가를 사용했습니다. 학생의 강점과 약점을 항목별로 확인하고, 개선점에 제시된 활동을 지도해주세요.",
-            curricularRemarks: `'${input.assessmentTitle}' 평가에서 루브릭 기반으로 유창성(${fluencyScoreRaw}점), 문법(${grammarScoreRaw}점), 어휘(${vocabularyScoreRaw}점) 영역에서 종합 ${contentScore}점, 발음 영역에서 ${pronunciationScore}점을 받는 등 준수한 성취를 보임.`,
+            curricularRemarks: `'${mainInput.assessmentTitle}' 평가에서 루브릭 기반으로 유창성(${fluencyScoreRaw}점), 문법(${grammarScoreRaw}점), 어휘(${vocabularyScoreRaw}점) 영역에서 종합 ${contentScore}점, 발음 영역에서 ${pronunciationScore}점을 받는 등 준수한 성취를 보임.`,
             pronunciationFeedback: `루브릭 기반 발음 점수는 ${pronunciationScore}점입니다. 상세 내용은 종합 분석 리포트를 참고하세요.`,
             rubricScores,
         };
     }
 
 
-    // Step 3: If not using rubric, run original content and pronunciation analysis in PARALLEL.
+    // Step 4: If not using rubric, run original content and pronunciation analysis in PARALLEL.
     const [contentResult, pronunciationResult] = await Promise.all([
       withRetry(() => prompts.content({
         studentTranscript,
-        activityPrompt: input.activityPrompt,
-        expectedFormat: input.expectedFormat,
-        studentName: input.studentName,
-        assessmentTitle: input.assessmentTitle,
+        activityPrompt: mainInput.activityPrompt,
+        expectedFormat: mainInput.expectedFormat,
+        studentName: mainInput.studentName,
+        assessmentTitle: mainInput.assessmentTitle,
       })),
       withRetry(() => prompts.pronunciation({
-        studentRecordingUrl: input.studentRecordingUrl,
+        studentRecordingUrl: mainInput.studentRecordingUrl,
         studentTranscript,
       }))
     ]);
@@ -305,7 +309,7 @@ const generateMonologueAnalysisFlow = ai.defineFlow(
         throw new Error("Failed to get a valid response from one or more analysis models.");
     }
     
-    // Step 4: Combine and return all results to the client.
+    // Step 5: Combine and return all results to the client.
     return {
         studentTranscript,
         contentScore: contentOutput.contentScore,
