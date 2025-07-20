@@ -34,9 +34,32 @@ export default function AssessmentsPage() {
     if (!user) return;
     setIsLoading(true);
     try {
-        const q = query(collection(db, "assessments"), where("uid", "==", user.uid));
-        const querySnapshot = await getDocs(q);
-        const assessmentsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TeacherAssessment));
+        const assessmentsQuery = query(collection(db, "assessments"), where("uid", "==", user.uid));
+        
+        const resultsQuery = query(
+            collection(db, "results"),
+            where("teacherUid", "==", user.uid)
+        );
+
+        const [assessmentsSnapshot, resultsSnapshot] = await Promise.all([
+            getDocs(assessmentsQuery),
+            getDocs(resultsQuery)
+        ]);
+        
+        const assessmentsData = assessmentsSnapshot.docs.map(doc => {
+            const assessmentData = { id: doc.id, ...doc.data() } as TeacherAssessment;
+            
+            const relevantResults = resultsSnapshot.docs
+                .map(rDoc => rDoc.data())
+                .filter(r => r.assessmentId === assessmentData.id);
+
+            const uniqueStudentIds = new Set(relevantResults.map(r => r.studentId));
+            
+            assessmentData.submissionCount = uniqueStudentIds.size;
+            
+            return assessmentData;
+        });
+
         assessmentsData.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
         setAssessments(assessmentsData);
         setSelectedRowIds([]); // Reset selection after fetching

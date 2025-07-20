@@ -28,15 +28,39 @@ export default function TeacherDashboard() {
     setIsLoading(true);
 
     try {
-        const q = query(
+        const assessmentsQuery = query(
             collection(db, "assessments"), 
             where("uid", "==", user.uid),
             orderBy("createdAt", "desc"),
             limit(5)
         );
+        
+        const resultsQuery = query(
+            collection(db, "results"),
+            where("teacherUid", "==", user.uid)
+        );
 
-        const querySnapshot = await getDocs(q);
-        const assessmentsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TeacherAssessment));
+        const [assessmentsSnapshot, resultsSnapshot] = await Promise.all([
+            getDocs(assessmentsQuery),
+            getDocs(resultsQuery),
+        ]);
+        
+        const assessmentsData = assessmentsSnapshot.docs.map(doc => {
+            const assessmentData = { id: doc.id, ...doc.data() } as TeacherAssessment;
+            
+            // Filter results for the current assessment
+            const relevantResults = resultsSnapshot.docs
+                .map(rDoc => rDoc.data())
+                .filter(r => r.assessmentId === assessmentData.id);
+
+            // Get unique student IDs from the filtered results
+            const uniqueStudentIds = new Set(relevantResults.map(r => r.studentId));
+            
+            // Update submissionCount to be the number of unique students
+            assessmentData.submissionCount = uniqueStudentIds.size;
+            
+            return assessmentData;
+        });
         
         setAssessments(assessmentsData);
 
