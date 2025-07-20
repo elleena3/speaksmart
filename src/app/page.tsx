@@ -54,7 +54,7 @@ export default function Home() {
   
   const handleLogin = (e: React.FormEvent) => {
       e.preventDefault();
-      if (password === '0223') {
+      if (password === '0918') {
           setIsAuthenticated(true);
           setError('');
       } else {
