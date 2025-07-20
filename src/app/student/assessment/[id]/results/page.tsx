@@ -116,13 +116,13 @@ export default function AssessmentResultsPage() {
     
     isProcessing.current = true;
     setStatus("analyzing");
+    setAnalysisStep("transcribe");
     setErrorInfo(null);
+
     const { assessmentDetails, studentRecordingDataUri } = sessionData;
-    
     const resultRef = doc(collection(db, "results"));
     
     try {
-        setAnalysisStep("transcribe");
         const initialData: Partial<StudentResult> = {
             id: resultRef.id,
             studentId: user.uid,
@@ -137,8 +137,13 @@ export default function AssessmentResultsPage() {
         };
         await setDoc(resultRef, initialData, { merge: true });
         
-        await updateDoc(resultRef, { status: "내용 및 발음 분석 중..." });
-        setAnalysisStep("analyze");
+        // This is a more robust way to update the step inside the process
+        const updateStep = async (step: AnalysisStep, firestoreStatus: ResultStatus) => {
+            setAnalysisStep(step);
+            await updateDoc(resultRef, { status: firestoreStatus });
+        };
+
+        await updateStep("analyze", "내용 및 발음 분석 중...");
         
         const analysisResult = await generateMonologueAnalysis({
             studentRecordingUrl: studentRecordingDataUri,
@@ -150,11 +155,9 @@ export default function AssessmentResultsPage() {
             useRubric: assessmentDetails.useRubric || false,
         });
 
-        await updateDoc(resultRef, { status: "리포트 생성 중" });
-        setAnalysisStep("report");
+        await updateStep("report", "리포트 생성 중");
 
-        // Upload audio file to storage after analysis is complete
-        setAnalysisStep("upload");
+        await updateStep("upload", "답변 파일 업로드 중");
         const storageRef = ref(storage, `recordings/${user.uid}_${assessmentDetails.id}_${Date.now()}.webm`);
         const snapshot = await uploadString(storageRef, studentRecordingDataUri, 'data_url');
         const downloadURL = await getDownloadURL(snapshot.ref);
@@ -197,26 +200,23 @@ export default function AssessmentResultsPage() {
     } finally {
         sessionStorage.removeItem(SESSION_STORAGE_KEY);
         isProcessing.current = false;
-        // Force a reload to fetch the new state cleanly
         router.replace(`/student/assessment/${id}/results?t=${new Date().getTime()}`);
     }
-  }, [user, id, router]);
+  }, [user, id]);
 
   useEffect(() => {
     if (authLoading || !user || !id) return;
+    
+    if (isProcessing.current) return;
 
-    // Check for new submission data first. This is the highest priority.
     const sessionDataRaw = sessionStorage.getItem(SESSION_STORAGE_KEY);
     if (sessionDataRaw) {
         const sessionData = JSON.parse(sessionDataRaw);
-        if (sessionData.assessmentId === id && !isProcessing.current) {
+        if (sessionData.assessmentId === id) {
             processMonologueSubmission(sessionData);
-            return; // Stop further execution until processing is done.
+            return;
         }
     }
-    
-    // If we are currently processing, don't set up the Firestore listener.
-    if(isProcessing.current) return;
     
     const q = query(
         collection(db, "results"),
@@ -225,7 +225,6 @@ export default function AssessmentResultsPage() {
     );
 
     const handleSnapshot = async (snapshot: any) => {
-        // Double-check processing flag to avoid race conditions.
         if (isProcessing.current) return;
 
         if (snapshot.empty) {
@@ -234,7 +233,7 @@ export default function AssessmentResultsPage() {
             if (assessmentSnap.exists()) {
                 setAssessment({id: assessmentSnap.id, ...assessmentSnap.data()} as TeacherAssessment);
                 setResults([]);
-                setStatus("completed"); // No results yet, so show empty state on "completed" status.
+                setStatus("completed");
             } else {
                 notFound();
             }
@@ -261,8 +260,6 @@ export default function AssessmentResultsPage() {
             setStatus('error');
             setErrorInfo({ message: latestResult.aiFeedback || '알 수 없는 오류가 발생했습니다.' });
         } else if (latestResult && !isProcessing.current) {
-            // An incomplete result exists, and we are not processing it.
-            // This is an error state, likely from a previous failed attempt.
             setStatus('error');
             setErrorInfo({ message: '이전 분석이 비정상적으로 종료되었습니다. 평가로 돌아가 다시 시도해주세요.'});
         }
