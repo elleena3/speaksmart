@@ -266,8 +266,7 @@ const generateMonologueAnalysisFlow = ai.defineFlow(
     await updateDoc(resultDocRef, { status: "분석 중: analyze" });
     const analysisPromise = (async () => {
         if (input.useRubric) {
-            const rubricResult = await withRetry(() => prompts.rubric({ studentTranscript }));
-            return { rubricText: rubricResult.text };
+            return withRetry(() => prompts.rubric({ studentTranscript }));
         } else {
             const [contentResult, pronunciationResult] = await Promise.all([
                 withRetry(() => prompts.content({
@@ -291,7 +290,7 @@ const generateMonologueAnalysisFlow = ai.defineFlow(
         }
     })();
     
-    // Step 3: Upload file to Storage (in parallel with analysis)
+    // Step 3: While AI is analyzing, upload file to Storage
     await updateDoc(resultDocRef, { status: "분석 중: upload" });
     const studentUid = input.studentName; 
     const uploadPath = `recordings/${studentUid}_${input.assessmentTitle}_${Date.now()}.webm`;
@@ -305,8 +304,8 @@ const generateMonologueAnalysisFlow = ai.defineFlow(
     
     let finalResult: z.infer<typeof CombinedAnalysisOutputSchema>;
 
-    if ('rubricText' in analysisResult) {
-        const { rubricText } = analysisResult;
+    if ('text' in analysisResult) { // This means it's a rubric result
+        const rubricText = analysisResult.text;
         const fluencyMatch = rubricText.match(/🗣️ 유창성 \(Fluency\)\s*-\s*📈 점수:\s*(\d)/);
         const pronunciationMatch = rubricText.match(/🎤 발음 및 억양 \(Pronunciation & Intonation\)\s*-\s*📈 점수:\s*(\d)/);
         const grammarMatch = rubricText.match(/✍️ 문법 \(Grammar\)\s*-\s*📈 점수:\s*(\d)/);
@@ -339,7 +338,7 @@ const generateMonologueAnalysisFlow = ai.defineFlow(
             rubricScores,
         };
     } else {
-        const { contentOutput, pronunciationOutput } = analysisResult;
+        const { contentOutput, pronunciationOutput } = analysisResult as { contentOutput: z.infer<typeof ContentAnalysisOutputSchema>, pronunciationOutput: z.infer<typeof PronunciationAnalysisOutputSchema> };
         finalResult = {
             studentTranscript,
             studentRecordingUrl: downloadURL,
@@ -355,3 +354,5 @@ const generateMonologueAnalysisFlow = ai.defineFlow(
     return finalResult;
   }
 );
+
+    
