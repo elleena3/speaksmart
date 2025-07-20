@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState, useEffect } from "react";
@@ -190,7 +191,7 @@ export function GrowthView({ results, assessment, defaultTab }: GrowthViewProps)
                                     <Loader2 className="h-8 w-8 animate-spin" />
                                 </div>
                             ) : (
-                                <div className="p-4 bg-muted/50 rounded-lg whitespace-pre-wrap font-body text-sm leading-relaxed markdown-content">
+                                <div className="p-4 bg-muted/50 rounded-lg markdown-content">
                                     <ReactMarkdown remarkPlugins={[remarkGfm]}>
                                         {growthFeedback?.growthFeedback || ''}
                                     </ReactMarkdown>
