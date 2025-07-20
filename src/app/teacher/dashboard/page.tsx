@@ -30,9 +30,8 @@ export default function TeacherDashboard() {
     try {
         const assessmentsQuery = query(
             collection(db, "assessments"), 
-            where("uid", "==", user.uid),
-            orderBy("createdAt", "desc"),
-            limit(5)
+            where("uid", "==", user.uid)
+            // Removed orderBy and limit to fetch all and sort client-side
         );
         
         const resultsQuery = query(
@@ -48,21 +47,22 @@ export default function TeacherDashboard() {
         const assessmentsData = assessmentsSnapshot.docs.map(doc => {
             const assessmentData = { id: doc.id, ...doc.data() } as TeacherAssessment;
             
-            // Filter results for the current assessment
             const relevantResults = resultsSnapshot.docs
                 .map(rDoc => rDoc.data())
                 .filter(r => r.assessmentId === assessmentData.id);
 
-            // Get unique student IDs from the filtered results
             const uniqueStudentIds = new Set(relevantResults.map(r => r.studentId));
             
-            // Update submissionCount to be the number of unique students
             assessmentData.submissionCount = uniqueStudentIds.size;
             
             return assessmentData;
         });
         
-        setAssessments(assessmentsData);
+        // Sort client-side to handle missing createdAt fields
+        assessmentsData.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+        // Limit to the 5 most recent assessments after sorting
+        setAssessments(assessmentsData.slice(0, 5));
 
     } catch (error) {
         console.error("Error fetching assessments:", error);
