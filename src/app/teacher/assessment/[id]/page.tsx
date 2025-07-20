@@ -14,7 +14,7 @@ import { type TeacherAssessment, type StudentResult } from "@/lib/types";
 import { useLanguage } from "@/context/language-context";
 import { useAuth } from "@/context/auth-context";
 import { useToast } from "@/hooks/use-toast";
-import { collection, query, where, getDocs, doc, getDoc, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db } from "@/lib/firebase";
 import { format } from "date-fns";
 
@@ -50,13 +50,15 @@ export default function AssessmentSubmissionsPage() {
         const resultsQuery = query(
             collection(db, "results"), 
             where("teacherUid", "==", user.uid),
-            where("assessmentId", "==", assessmentId),
-            orderBy("createdAt", "desc")
+            where("assessmentId", "==", assessmentId)
         );
         const resultsSnapshot = await getDocs(resultsQuery);
         
         const resultsData = resultsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as StudentResult));
         
+        // Sort the data in the code after fetching
+        resultsData.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
         setStudentResults(resultsData);
 
     } catch (error) {
