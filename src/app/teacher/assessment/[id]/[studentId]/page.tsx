@@ -279,8 +279,14 @@ export default function StudentResultPage() {
                     </a>
                   </div>
                 )}
-                <div className="text-sm p-4 bg-muted/50 rounded-lg font-mono whitespace-pre-wrap max-h-96 overflow-y-auto">
-                    {studentResult.studentTranscript || "학생 답변이 기록되지 않았습니다."}
+                <div className="text-sm p-4 bg-muted/50 rounded-lg font-mono max-h-96 overflow-y-auto">
+                    {studentResult.studentTranscript ? (
+                        studentResult.studentTranscript.split('\n').map((line, index) => (
+                            <p key={index} className="mb-2 last:mb-0">{line}</p>
+                        ))
+                    ) : (
+                        <p className="italic">학생 답변이 기록되지 않았습니다.</p>
+                    )}
                 </div>
               </CardContent>
             </Card>
@@ -364,7 +370,7 @@ export default function StudentResultPage() {
                 <div>
                    <h4 className="font-semibold text-sm mb-2">AI 요약</h4>
                   <div className="text-sm text-muted-foreground p-4 bg-muted/50 rounded-lg italic">
-                      {hasFeedback ? studentResult.studentFeedbackSummary : "피드백 없음"}
+                      {hasFeedback ? studentResult.studentFeedbackSummary : "요약 정보 없음"}
                   </div>
                 </div>
               </CardContent>
