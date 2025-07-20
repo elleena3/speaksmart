@@ -17,14 +17,14 @@ import { FeedbackView } from "./feedback-view";
 
 const SESSION_STORAGE_KEY = 'monologueSessionData';
 
-type AnalysisStep = "transcribe" | "analyze" | "upload" | "report";
+type AnalysisStep = "transcribe" | "analyze" | "report" | "upload";
 type PageStatus = "loading" | "analyzing" | "completed" | "error";
 
 const analysisSteps: { key: AnalysisStep, text: string, icon: React.FC<any> }[] = [
     { key: "transcribe", text: "음성을 텍스트로 변환", icon: AudioLines },
     { key: "analyze", text: "내용 및 발음 분석", icon: FileScan },
-    { key: "upload", text: "답변 파일 저장", icon: UploadCloud },
-    { key: "report", text: "최종 리포트 생성", icon: Sparkles },
+    { key: "report", text: "리포트 생성", icon: Sparkles },
+    { key: "upload", text: "답변 파일 업로드", icon: UploadCloud },
 ];
 
 function AnalysisProgressView({ currentStep }: { currentStep: AnalysisStep | null }) {
@@ -114,6 +114,7 @@ export default function AssessmentResultsPage() {
 
     try {
         setAnalysisStep("transcribe");
+        // The generateMonologueAnalysis function now handles both transcription and analysis.
         const analysisPromise = generateMonologueAnalysis({
             studentRecordingUrl: studentRecordingDataUri,
             activityPrompt: assessmentDetails.prompt,
@@ -123,16 +124,20 @@ export default function AssessmentResultsPage() {
             evaluationModel: assessmentDetails.evaluationModel,
             useRubric: assessmentDetails.useRubric || false,
         });
+
+        // Set step to analyze after a short delay to show the "transcribe" step
+        setTimeout(() => setAnalysisStep("analyze"), 500);
         
-        setAnalysisStep("analyze"); 
-        const uploadPromise = uploadString(ref(storage, `recordings/${user.uid}_${assessmentDetails.id}_${Date.now()}.webm`), studentRecordingDataUri, 'data_url');
-        
-        const [analysisResult, uploadSnapshot] = await Promise.all([analysisPromise, uploadPromise]);
+        const analysisResult = await analysisPromise;
         
         setAnalysisStep("report");
+        const uploadPromise = uploadString(ref(storage, `recordings/${user.uid}_${assessmentDetails.id}_${Date.now()}.webm`), studentRecordingDataUri, 'data_url');
+        
+        const uploadSnapshot = await uploadPromise;
+        
+        setAnalysisStep("upload");
         const downloadURL = await getDownloadURL(uploadSnapshot.ref);
 
-        setAnalysisStep("upload");
         await updateDoc(resultDocRef, {
             ...analysisResult,
             studentRecordingUrl: downloadURL,
@@ -181,7 +186,6 @@ export default function AssessmentResultsPage() {
     if (sessionDataRaw) {
         const sessionData = JSON.parse(sessionDataRaw);
         if (sessionData.assessmentId === id && !isProcessing.current) {
-            sessionStorage.removeItem(SESSION_STORAGE_KEY);
             processMonologueSubmission(sessionData);
             return;
         }
