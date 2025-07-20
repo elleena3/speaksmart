@@ -15,6 +15,8 @@ import { db } from "@/lib/firebase";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { summarizeStudentFeedback } from "@/ai/flows/summarize-student-feedback";
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from "remark-gfm";
 
 
 export default function StudentResultPage() {
@@ -284,6 +286,41 @@ export default function StudentResultPage() {
             </Card>
 
             <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2"><Target className="h-5 w-5 text-primary"/> 성능 분석 결과</CardTitle>
+                  <CardDescription>AI가 분석한 학생의 내용 및 발음 정확도입니다.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                        <div className="w-full">
+                            <div className="flex justify-between mb-1">
+                                <span className="text-base font-medium text-primary">내용 점수</span>
+                                <span className="text-sm font-medium text-primary">{studentResult.contentScore ?? 0}%</span>
+                            </div>
+                            <Progress value={studentResult.contentScore} className="h-2" />
+                        </div>
+                        <div className="w-full">
+                            <div className="flex justify-between mb-1">
+                                <span className="text-base font-medium text-primary">발음 점수</span>
+                                <span className="text-sm font-medium text-primary">{studentResult.pronunciationScore ?? 0}%</span>
+                            </div>
+                            <Progress value={studentResult.pronunciationScore} className="h-2" />
+                        </div>
+                    </div>
+                    {studentResult.aiFeedback && (
+                        <div className="p-4 bg-muted/50 rounded-lg markdown-content">
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{studentResult.aiFeedback}</ReactMarkdown>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+
+            
+        </div>
+        
+        <div className="space-y-6">
+            
+            <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2"><BookText className="h-5 w-5 text-primary"/> 교과과정 비고</CardTitle>
                 <CardDescription>AI 생성 초안을 수정하고 저장할 수 있습니다.</CardDescription>
@@ -297,39 +334,6 @@ export default function StudentResultPage() {
                   {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Paperclip className="mr-2 h-4 w-4" />}
                   {isSaving ? "저장 중..." : "생활기록부에 저장"}
                 </Button>
-              </CardContent>
-            </Card>
-        </div>
-        
-        <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Target className="h-5 w-5 text-primary"/> 
-                  성능 분석 결과
-                </CardTitle>
-                <CardDescription>학생의 내용 및 발음 정확도와 AI의 상세 피드백입니다.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                      <div className="w-full">
-                          <div className="flex justify-between mb-1">
-                              <span className="text-base font-medium text-primary">내용 점수</span>
-                              <span className="text-sm font-medium text-primary">{studentResult.contentScore ?? 0}%</span>
-                          </div>
-                          <Progress value={studentResult.contentScore} className="h-2" />
-                      </div>
-                      <div className="w-full">
-                          <div className="flex justify-between mb-1">
-                              <span className="text-base font-medium text-primary">발음 점수</span>
-                              <span className="text-sm font-medium text-primary">{studentResult.pronunciationScore ?? 0}%</span>
-                          </div>
-                          <Progress value={studentResult.pronunciationScore} className="h-2" />
-                      </div>
-                  </div>
-                  <div className="text-sm text-muted-foreground p-4 bg-muted/50 rounded-lg whitespace-pre-wrap">
-                      {studentResult.pronunciationFeedback || "발음 분석 결과가 없습니다."}
-                  </div>
               </CardContent>
             </Card>
 

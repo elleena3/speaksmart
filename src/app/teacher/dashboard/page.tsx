@@ -13,7 +13,7 @@ import { type TeacherAssessment } from "@/lib/types"
 import { OverviewChart } from "./overview-chart"
 import { useLanguage } from "@/context/language-context"
 import { useAuth, mockStudents } from '@/context/auth-context';
-import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
 export default function TeacherDashboard() {
@@ -30,15 +30,15 @@ export default function TeacherDashboard() {
     try {
         const q = query(
             collection(db, "assessments"), 
-            where("uid", "==", user.uid)
+            where("uid", "==", user.uid),
+            orderBy("createdAt", "desc"),
+            limit(5)
         );
 
         const querySnapshot = await getDocs(q);
         const assessmentsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TeacherAssessment));
         
-        // Sort in code and take the latest 5
-        assessmentsData.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-        setAssessments(assessmentsData.slice(0, 5));
+        setAssessments(assessmentsData);
 
     } catch (error) {
         console.error("Error fetching assessments:", error);
