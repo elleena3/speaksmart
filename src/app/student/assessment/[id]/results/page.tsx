@@ -1,19 +1,19 @@
 
 "use client";
 
-import { FeedbackView } from "./feedback-view"
-import { GrowthView } from "./growth-view"
+import { GrowthView } from "./growth-view";
 import { useParams, useRouter, notFound, useSearchParams } from 'next/navigation';
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { type StudentResult, type TeacherAssessment } from "@/lib/types";
 import { useAuth } from "@/context/auth-context";
 import { Loader2, AlertTriangle, CheckCircle2, UploadCloud, AudioLines, FileScan, Sparkles } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { db, storage } from "@/lib/firebase";
-import { collection, query, where, onSnapshot, doc, updateDoc, getDocs, getDoc, serverTimestamp, addDoc } from "firebase/firestore";
+import { collection, query, where, onSnapshot, doc, updateDoc, getDocs, getDoc, addDoc } from "firebase/firestore";
 import { generateMonologueAnalysis } from "@/ai/flows/generate-monologue-analysis-flow";
 import { ref, uploadString, getDownloadURL } from "firebase/storage";
+import { FeedbackView } from "./feedback-view";
 
 const SESSION_STORAGE_KEY = 'monologueSessionData';
 
@@ -122,7 +122,6 @@ export default function AssessmentResultsPage() {
             assessmentTitle: assessmentDetails.title,
             evaluationModel: assessmentDetails.evaluationModel,
             useRubric: assessmentDetails.useRubric || false,
-            onProgress: (step) => setAnalysisStep(step)
         });
         
         setAnalysisStep("analyze"); 
@@ -130,10 +129,10 @@ export default function AssessmentResultsPage() {
         
         const [analysisResult, uploadSnapshot] = await Promise.all([analysisPromise, uploadPromise]);
         
-        setAnalysisStep("upload");
+        setAnalysisStep("report");
         const downloadURL = await getDownloadURL(uploadSnapshot.ref);
 
-        setAnalysisStep("report");
+        setAnalysisStep("upload");
         await updateDoc(resultDocRef, {
             ...analysisResult,
             studentRecordingUrl: downloadURL,
@@ -182,9 +181,8 @@ export default function AssessmentResultsPage() {
     if (sessionDataRaw) {
         const sessionData = JSON.parse(sessionDataRaw);
         if (sessionData.assessmentId === id && !isProcessing.current) {
-            sessionStorage.removeItem(SESSION_STORAGE_KEY); // Process only once
+            sessionStorage.removeItem(SESSION_STORAGE_KEY);
             processMonologueSubmission(sessionData);
-            // Don't set up the listener yet, let the processing finish first.
             return;
         }
     }
@@ -249,7 +247,7 @@ export default function AssessmentResultsPage() {
 
     const unsubscribe = onSnapshot(q, handleSnapshot, handleError);
     return () => unsubscribe();
-  }, [id, user, authLoading, assessment]);
+  }, [id, user, authLoading]);
   
   if (status === "loading" || authLoading) {
     return (
