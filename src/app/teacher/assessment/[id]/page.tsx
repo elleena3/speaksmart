@@ -59,11 +59,14 @@ export default function AssessmentSubmissionsPage() {
         const resultsData = resultsSnapshot.docs
           .map(doc => ({ id: doc.id, ...doc.data() } as StudentResult))
           .filter(result => {
-              // Keep if it matches the current teacher's UID
-              if (result.teacherUid === user.uid) return true;
-              // Keep legacy data if it has no teacherUid but belongs to the assessment
-              // This ensures old results are still visible
-              if (!result.teacherUid && currentAssessment.uid === user.uid) return true;
+              // Condition 1: Modern data with correct teacherUid
+              if (result.teacherUid && result.teacherUid === user.uid) {
+                  return true;
+              }
+              // Condition 2: Legacy data without teacherUid, fall back to assessment's owner
+              if (!result.teacherUid && currentAssessment.uid === user.uid) {
+                  return true;
+              }
               return false;
           });
         
