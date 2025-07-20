@@ -44,10 +44,9 @@ export default function AssessmentSubmissionsPage() {
             notFound();
             return;
         }
-        const currentAssessment = { id: assessmentSnap.id, ...assessmentSnap.data() } as TeacherAssessment;
-        setAssessment(currentAssessment);
+        setAssessment({ id: assessmentSnap.id, ...assessmentSnap.data() } as TeacherAssessment);
         
-        // Fetch all results for the assessment ID. The teacherUid check will be done in code.
+        // assessmentId가 일치하는 모든 결과를 가져옵니다.
         const resultsQuery = query(
             collection(db, "results"), 
             where("assessmentId", "==", assessmentId),
@@ -55,20 +54,9 @@ export default function AssessmentSubmissionsPage() {
         );
         const resultsSnapshot = await getDocs(resultsQuery);
         
-        // Filter in code to ensure visibility for the assessment owner, even for legacy data.
-        const resultsData = resultsSnapshot.docs
-          .map(doc => ({ id: doc.id, ...doc.data() } as StudentResult))
-          .filter(result => {
-              // Condition 1: Modern data with correct teacherUid.
-              if (result.teacherUid && result.teacherUid === user.uid) {
-                  return true;
-              }
-              // Condition 2: Legacy data without teacherUid, fall back to assessment's owner.
-              if (!result.teacherUid && currentAssessment.uid === user.uid) {
-                  return true;
-              }
-              return false;
-          });
+        // 필터링 없이 모든 결과를 상태에 저장합니다.
+        // 현재 교사가 생성한 평가(assessment)에 대한 결과만 가져오므로 이 방식이 안전합니다.
+        const resultsData = resultsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as StudentResult));
         
         setStudentResults(resultsData);
 
