@@ -107,7 +107,7 @@ export type GenerateDialogueAnalysisInput = z.infer<typeof GenerateDialogueAnaly
 // ##              SCHEMA FOR GROWTH FEEDBACK FLOW             ##
 // ##############################################################
 
-const ResultSummarySchema = z.object({
+export const ResultSummarySchema = z.object({
     attemptNumber: z.number().int(),
     contentScore: z.number().int(),
     pronunciationScore: z.number().int(),
@@ -116,14 +116,15 @@ const ResultSummarySchema = z.object({
 });
 
 export const GenerateGrowthFeedbackInputSchema = z.object({
-    previousAttempt: ResultSummarySchema.describe("The summary of the student's previous attempt."),
-    latestAttempt: ResultSummarySchema.describe("The summary of the student's most recent attempt."),
+    attempts: z.array(ResultSummarySchema).describe("An array of all the student's attempts, in chronological order."),
     assessmentTitle: z.string(),
 });
 export type GenerateGrowthFeedbackInput = z.infer<typeof GenerateGrowthFeedbackInputSchema>;
 
 export const GenerateGrowthFeedbackOutputSchema = z.object({
-    growthFeedback: z.string().describe('A comprehensive analysis of the student\'s growth between the two attempts, in Korean.'),
+    growthFeedback: z.string().describe('A comprehensive analysis of the student\'s growth across all attempts, in Korean and formatted for Markdown.'),
+    teacherGuidance: z.string().describe('Actionable guidance for the teacher based on the student\'s overall progress, in Korean.'),
+    curricularRemarks: z.string().describe('A draft of curricular remarks that summarizes the student\'s entire growth journey, in Korean.'),
 });
 export type GenerateGrowthFeedbackOutput = z.infer<typeof GenerateGrowthFeedbackOutputSchema>;
 

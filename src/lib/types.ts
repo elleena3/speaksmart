@@ -1,5 +1,6 @@
 
-import { type ConversationTurn } from "@/lib/types/ai-schemas";
+import { type ConversationTurn, type ResultSummarySchema } from "@/lib/types/ai-schemas";
+import { z } from 'zod';
 
 export const scenarios = ["free-talk", "ordering-food", "airport-check-in", "shopping"] as const;
 export type Scenario = (typeof scenarios)[number];
@@ -76,6 +77,7 @@ export type TeacherAssessment = {
 };
 
 export type { ConversationTurn };
+export type ResultSummary = z.infer<typeof ResultSummarySchema>;
 
 export type ConversationHistory = {
   history: ConversationTurn[];

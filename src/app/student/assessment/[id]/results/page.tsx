@@ -8,7 +8,7 @@ import { type StudentResult, type TeacherAssessment } from "@/lib/types";
 import { useAuth } from "@/context/auth-context";
 import { Loader2 } from "lucide-react";
 import { db } from "@/lib/firebase";
-import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, getDoc, orderBy } from "firebase/firestore";
 import { FeedbackView } from "./feedback-view";
 
 export default function AssessmentResultsPage() {
@@ -31,7 +31,8 @@ export default function AssessmentResultsPage() {
             collection(db, "results"),
             where("assessmentId", "==", id),
             where("studentId", "==", user.uid),
-            where("status", "==", "채점 완료")
+            where("status", "==", "채점 완료"),
+            orderBy("createdAt", "asc") // 오래된 순으로 정렬
         );
 
         const resultsSnapshot = await getDocs(q);
@@ -43,7 +44,6 @@ export default function AssessmentResultsPage() {
         }
 
         const dbResults: StudentResult[] = resultsSnapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
-        dbResults.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
         setResults(dbResults);
         
         const assessmentRef = doc(db, 'assessments', id as string);
@@ -80,7 +80,6 @@ export default function AssessmentResultsPage() {
       return (
          <div className="text-center p-8">
              <p>이 평가에 대한 완료된 결과가 없습니다.</p>
-             <Button onClick={() => router.push(`/student/assessment/${id}`)} className="mt-4">평가 시작하기</Button>
          </div>
       );
     }
