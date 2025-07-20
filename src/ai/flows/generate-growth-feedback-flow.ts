@@ -24,7 +24,7 @@ const growthFeedbackPrompt = ai.definePrompt({
   model: googleAI.model('gemini-2.5-flash'),
   input: { schema: GenerateGrowthFeedbackInputSchema },
   output: { schema: GenerateGrowthFeedbackOutputSchema },
-  prompt: `You are an encouraging and insightful AI English teacher. Your task is to analyze a student's progress between two attempts of the same speaking assessment. Provide constructive, comparative feedback in Korean.
+  prompt: `You are an encouraging and insightful AI English teacher. Your task is to analyze a student's progress between two attempts of the same speaking assessment. Provide constructive, comparative feedback in Korean, formatted in Markdown.
 
 Assessment Title: {{{assessmentTitle}}}
 
@@ -40,18 +40,28 @@ Assessment Title: {{{assessmentTitle}}}
 -   **Transcript:** "{{{latestAttempt.transcript}}}"
 -   **AI Feedback Given:** "{{{latestAttempt.aiFeedback}}}"
 
-Please perform the following steps to generate the 'growthFeedback':
-1.  **Acknowledge Overall Progress:** Start with an encouraging sentence acknowledging the student's effort in re-attempting the assessment.
-2.  **Analyze Improvements (나아진 점):**
-    -   Compare the scores. If scores have improved, mention it specifically (e.g., "내용 점수가 10점, 발음 점수가 5점 상승하며 크게 발전했어요!").
-    -   Compare the transcripts. Identify specific areas of improvement. Did they use more varied vocabulary? Were their sentences more complex or grammatically correct? Was their response more detailed or better structured? Provide specific examples from both transcripts to illustrate the improvement. For example: "이전 답변에서는 'very good'만 사용했지만, 이번에는 'fantastic', 'wonderful' 등 더 다양한 표현을 사용한 점이 돋보여요."
-3.  **Identify Areas for Further Improvement (더 발전할 부분):**
-    -   Even if they improved, what can they focus on next? Look at the latest AI feedback and transcript.
-    -   Identify any recurring mistakes or areas that still need work. Are there persistent pronunciation issues? Grammatical errors?
-    -   Provide clear, actionable advice. For example: "다음에는 'l'과 'r' 발음을 조금 더 구분해서 연습하면 훨씬 자연스럽게 들릴 거예요. 예를 들어, 'light'와 'right'를 여러 번 반복해서 녹음하고 들어보세요."
-4.  **Provide a Concluding Encouragement:** End with a positive and motivational message for their next attempt or future studies.
+Please perform the following steps to generate the 'growthFeedback' using Markdown for clear formatting.
 
-The final feedback should be well-structured, easy to read, and directly helpful for the student's learning journey. Use markdown for formatting (e.g., bolding for headers).`,
+1.  **Opening:** Start with a brief, encouraging sentence acknowledging the student's effort.
+
+2.  **Section: "나아진 점" (Improvements):**
+    -   Use the markdown heading: \`### ✨ 나아진 점\`.
+    -   Compare the scores. If scores have improved, mention it specifically.
+    -   Compare the transcripts. Identify specific areas of improvement using a bulleted list. Did they use more varied vocabulary? Were their sentences more complex or grammatically correct? Was their response more detailed or better structured?
+    -   Provide specific examples from both transcripts to illustrate the improvement. For example: \`- 이전 답변에서는 'very good'만 사용했지만, 이번에는 'fantastic', 'wonderful' 등 더 다양한 표현을 사용한 점이 돋보여요.\`
+
+3.  **Section: "더 발전할 부분" (Areas for Further Improvement):**
+    -   Use the markdown heading: \`### 🚀 더 발전할 부분\`.
+    -   Even if they improved, what can they focus on next? Look at the latest AI feedback and transcript.
+    -   Identify any recurring mistakes or areas that still need work using a bulleted list. Are there persistent pronunciation issues? Grammatical errors?
+    -   Provide clear, actionable advice. For example: \`- **(문법)** 'l'과 'r' 발음을 조금 더 구분해서 연습하면 훨씬 자연스럽게 들릴 거예요. 예를 들어, 'light'와 'right'를 여러 번 반복해서 녹음하고 들어보세요.\`
+
+4.  **Section: "총평 및 격려" (Overall Comment & Encouragement):**
+    -   Use the markdown heading: \`### 💡 총평 및 격려\`.
+    -   End with a positive and motivational summary message for their next attempt or future studies.
+
+The final feedback must be well-structured, easy to read, and directly helpful for the student's learning journey.
+`,
 });
 
 const generateGrowthFeedbackFlow = ai.defineFlow(
