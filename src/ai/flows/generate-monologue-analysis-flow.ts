@@ -5,20 +5,46 @@
  * @fileOverview A comprehensive flow that analyzes a student's MONOLOGUE English performance.
  * It orchestrates transcription, content analysis, and pronunciation analysis in an efficient, parallel manner.
  *
- * - generateMonologueAnalysis - The main function to call for a full monologue speaking assessment.
+ * - processAndAnalyzeMonologue - The main function to call for a full monologue speaking assessment.
  */
 
 import { ai } from '@/ai/genkit';
 import { googleAI } from '@genkit-ai/googleai';
 import { z } from 'zod';
 import {
-  GenerateMonologueAnalysisInputSchema,
   ContentAnalysisOutputSchema,
   PronunciationAnalysisOutputSchema,
   CombinedAnalysisOutputSchema,
-  type GenerateMonologueAnalysisInput,
 } from '@/lib/types/ai-schemas';
 import { evaluationModels, type RubricScores } from '@/lib/types';
+import { ref, uploadString, getDownloadURL } from "firebase/storage";
+import { db, storage } from "@/lib/firebase";
+import { doc, updateDoc } from 'firebase/firestore';
+
+
+// Input schema for the new, consolidated flow
+const MonologueProcessingInputSchema = z.object({
+  studentRecordingDataUri: z.string().describe(
+    "The student's voice recording as a data URI."
+  ),
+  activityPrompt: z.string().describe('The prompt or instructions for the speaking activity.'),
+  expectedFormat: z.string().describe('The expected format or key points of the response for grading.'),
+  studentName: z.string().describe('The name of the student.'),
+  assessmentTitle: z.string().describe('The title of the assessment.'),
+  evaluationModel: z.enum(evaluationModels).optional(),
+  useRubric: z.boolean().optional().describe('Whether to use the standardized rubric for evaluation.'),
+  resultId: z.string().describe('The Firestore document ID for the result to update progress.'),
+});
+type MonologueProcessingInput = z.infer<typeof MonologueProcessingInputSchema>;
+
+
+// Main exported function to be called by the client
+export async function processAndAnalyzeMonologue(
+    input: MonologueProcessingInput
+): Promise<z.infer<typeof CombinedAnalysisOutputSchema>> {
+  return generateMonologueAnalysisFlow(input);
+}
+
 
 // Helper function for retrying API calls on overload
 async function withRetry<T>(fn: () => Promise<T>, retries = 2, delay = 1500): Promise<T> {
@@ -42,17 +68,7 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 2, delay = 1500): Pr
   throw lastError;
 }
 
-/**
- * Main exported function to be called by the client for monologue analysis.
- */
-export async function generateMonologueAnalysis(
-    input: GenerateMonologueAnalysisInput
-): Promise<z.infer<typeof CombinedAnalysisOutputSchema>> {
-  return generateMonologueAnalysisFlow(input);
-}
-
-
-// Internal Sub-flows and Prompts
+// Internal Sub-prompts
 const createPrompt = (modelName: z.infer<typeof evaluationModels[number]>) => ({
     transcription: ai.definePrompt({
         name: `transcribeAudioPrompt_${modelName.replace(/[-.]/g, '_')}`,
@@ -216,19 +232,21 @@ const createPrompt = (modelName: z.infer<typeof evaluationModels[number]>) => ({
 });
 
 
-// 4. The Main Orchestration Flow
+// The Main Orchestration Flow
 const generateMonologueAnalysisFlow = ai.defineFlow(
   {
     name: 'generateMonologueAnalysisFlow',
-    inputSchema: GenerateMonologueAnalysisInputSchema,
+    inputSchema: MonologueProcessingInputSchema,
     outputSchema: CombinedAnalysisOutputSchema,
   },
   async (input) => {
     const model = input.evaluationModel || 'gemini-2.5-flash';
     const prompts = createPrompt(model);
+    const resultDocRef = doc(db, "results", input.resultId);
 
-    // Step 1: Transcribe the audio with retry logic.
-    const transcriptionResult = await withRetry(() => prompts.transcription({ studentRecordingUrl: input.studentRecordingUrl }));
+    // Step 1: Transcribe the audio
+    await updateDoc(resultDocRef, { status: "분석 중: transcribe" });
+    const transcriptionResult = await withRetry(() => prompts.transcription({ studentRecordingUrl: input.studentRecordingDataUri }));
     const studentTranscript = transcriptionResult.text;
 
     if (!studentTranscript || studentTranscript.trim() === "" || studentTranscript.includes('기록되지 않았습니다') || studentTranscript.includes('인식하지 못했습니다')) {
@@ -244,11 +262,51 @@ const generateMonologueAnalysisFlow = ai.defineFlow(
         }
     }
     
-    // Step 2: Check if rubric is used.
-    if (input.useRubric) {
-        const rubricResult = await withRetry(() => prompts.rubric({ studentTranscript }));
-        const rubricText = rubricResult.text;
-        
+    // Step 2: Content & Pronunciation Analysis (in parallel) & File Upload (in parallel)
+    await updateDoc(resultDocRef, { status: "분석 중: analyze" });
+    const analysisPromise = (async () => {
+        if (input.useRubric) {
+            const rubricResult = await withRetry(() => prompts.rubric({ studentTranscript }));
+            return { rubricText: rubricResult.text };
+        } else {
+            const [contentResult, pronunciationResult] = await Promise.all([
+                withRetry(() => prompts.content({
+                    studentTranscript,
+                    activityPrompt: input.activityPrompt,
+                    expectedFormat: input.expectedFormat,
+                    studentName: input.studentName,
+                    assessmentTitle: input.assessmentTitle,
+                })),
+                withRetry(() => prompts.pronunciation({
+                    studentRecordingUrl: input.studentRecordingDataUri,
+                    studentTranscript,
+                }))
+            ]);
+            const contentOutput = contentResult.output;
+            const pronunciationOutput = pronunciationResult.output;
+            if (!contentOutput || !pronunciationOutput) {
+                throw new Error("Failed to get a valid response from one or more analysis models.");
+            }
+            return { contentOutput, pronunciationOutput };
+        }
+    })();
+    
+    // Step 3: Upload file to Storage (in parallel with analysis)
+    await updateDoc(resultDocRef, { status: "분석 중: upload" });
+    const studentUid = input.studentName; 
+    const uploadPath = `recordings/${studentUid}_${input.assessmentTitle}_${Date.now()}.webm`;
+    const storageRef = ref(storage, uploadPath);
+    const uploadPromise = uploadString(storageRef, input.studentRecordingDataUri, 'data_url');
+    
+    // Step 4: Await all parallel tasks and process results
+    await updateDoc(resultDocRef, { status: "분석 중: report" });
+    const [analysisResult, uploadSnapshot] = await Promise.all([analysisPromise, uploadPromise]);
+    const downloadURL = await getDownloadURL(uploadSnapshot.ref);
+    
+    let finalResult: z.infer<typeof CombinedAnalysisOutputSchema>;
+
+    if ('rubricText' in analysisResult) {
+        const { rubricText } = analysisResult;
         const fluencyMatch = rubricText.match(/🗣️ 유창성 \(Fluency\)\s*-\s*📈 점수:\s*(\d)/);
         const pronunciationMatch = rubricText.match(/🎤 발음 및 억양 \(Pronunciation & Intonation\)\s*-\s*📈 점수:\s*(\d)/);
         const grammarMatch = rubricText.match(/✍️ 문법 \(Grammar\)\s*-\s*📈 점수:\s*(\d)/);
@@ -269,8 +327,9 @@ const generateMonologueAnalysisFlow = ai.defineFlow(
         const contentScore = Math.round(((fluencyScoreRaw + grammarScoreRaw + vocabularyScoreRaw) / 3) * 20);
         const pronunciationScore = pronunciationScoreRaw * 20;
 
-        return {
+        finalResult = {
             studentTranscript,
+            studentRecordingUrl: downloadURL,
             contentScore: contentScore,
             pronunciationScore: pronunciationScore,
             aiFeedback: rubricText,
@@ -279,40 +338,20 @@ const generateMonologueAnalysisFlow = ai.defineFlow(
             pronunciationFeedback: `루브릭 기반 발음 점수는 ${pronunciationScore}점입니다. 상세 내용은 종합 분석 리포트를 참고하세요.`,
             rubricScores,
         };
+    } else {
+        const { contentOutput, pronunciationOutput } = analysisResult;
+        finalResult = {
+            studentTranscript,
+            studentRecordingUrl: downloadURL,
+            contentScore: contentOutput.contentScore,
+            aiFeedback: contentOutput.aiFeedback,
+            teacherGuidance: contentOutput.teacherGuidance,
+            curricularRemarks: contentOutput.curricularRemarks,
+            pronunciationScore: pronunciationOutput.pronunciationScore,
+            pronunciationFeedback: pronunciationOutput.pronunciationFeedback,
+        };
     }
 
-
-    // Step 3: If not using rubric, run original content and pronunciation analysis in PARALLEL.
-    const [contentResult, pronunciationResult] = await Promise.all([
-      withRetry(() => prompts.content({
-        studentTranscript,
-        activityPrompt: input.activityPrompt,
-        expectedFormat: input.expectedFormat,
-        studentName: input.studentName,
-        assessmentTitle: input.assessmentTitle,
-      })),
-      withRetry(() => prompts.pronunciation({
-        studentRecordingUrl: input.studentRecordingUrl,
-        studentTranscript,
-      }))
-    ]);
-
-    const contentOutput = contentResult.output;
-    const pronunciationOutput = pronunciationResult.output;
-
-    if (!contentOutput || !pronunciationOutput) {
-        throw new Error("Failed to get a valid response from one or more analysis models.");
-    }
-    
-    // Step 4: Combine and return all results to the client.
-    return {
-        studentTranscript,
-        contentScore: contentOutput.contentScore,
-        aiFeedback: contentOutput.aiFeedback,
-        teacherGuidance: contentOutput.teacherGuidance,
-        curricularRemarks: contentOutput.curricularRemarks,
-        pronunciationScore: pronunciationOutput.pronunciationScore,
-        pronunciationFeedback: pronunciationOutput.pronunciationFeedback,
-    };
+    return finalResult;
   }
 );

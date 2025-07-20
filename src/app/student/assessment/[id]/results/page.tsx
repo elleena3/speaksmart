@@ -9,10 +9,9 @@ import { useAuth } from "@/context/auth-context";
 import { Loader2, AlertTriangle, CheckCircle2, UploadCloud, AudioLines, FileScan, Sparkles } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { db, storage } from "@/lib/firebase";
+import { db } from "@/lib/firebase";
 import { collection, query, where, onSnapshot, doc, updateDoc, getDocs, getDoc, addDoc } from "firebase/firestore";
-import { generateMonologueAnalysis } from "@/ai/flows/generate-monologue-analysis-flow";
-import { ref, uploadString, getDownloadURL } from "firebase/storage";
+import { processAndAnalyzeMonologue } from "@/ai/flows/generate-monologue-analysis-flow";
 import { FeedbackView } from "./feedback-view";
 
 const SESSION_STORAGE_KEY = 'monologueSessionData';
@@ -23,8 +22,8 @@ type PageStatus = "loading" | "analyzing" | "completed" | "error";
 const analysisSteps: { key: AnalysisStep, text: string, icon: React.FC<any> }[] = [
     { key: "transcribe", text: "음성을 텍스트로 변환", icon: AudioLines },
     { key: "analyze", text: "내용 및 발음 분석", icon: FileScan },
-    { key: "report", text: "리포트 생성", icon: Sparkles },
     { key: "upload", text: "답변 파일 업로드", icon: UploadCloud },
+    { key: "report", text: "리포트 생성", icon: Sparkles },
 ];
 
 function AnalysisProgressView({ currentStep }: { currentStep: AnalysisStep | null }) {
@@ -91,7 +90,74 @@ export default function AssessmentResultsPage() {
   
   const isProcessing = useRef(false);
 
-  const processMonologueSubmission = async (sessionData: MonologueSessionData) => {
+  useEffect(() => {
+    if (authLoading || !user || !id) return;
+    
+    // This is the main listener for result changes.
+    const q = query(
+        collection(db, "results"),
+        where("assessmentId", "==", id),
+        where("studentId", "==", user.uid)
+    );
+
+    const unsubscribe = onSnapshot(q, async (snapshot) => {
+        if (isProcessing.current) return;
+
+        const dbResults: StudentResult[] = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
+        dbResults.sort((a, b) => (a.createdAt || 0) - (a.createdAt || 0));
+        
+        const latestResult = dbResults.length > 0 ? dbResults[dbResults.length - 1] : null;
+
+        // Fetch assessment details if not already fetched
+        if (!assessment) {
+            const assessmentRef = doc(db, 'assessments', id as string);
+            const assessmentSnap = await getDoc(assessmentRef);
+            if (assessmentSnap.exists()) {
+                setAssessment({id: assessmentSnap.id, ...assessmentSnap.data()} as TeacherAssessment);
+            }
+        }
+        
+        setResults(dbResults);
+        
+        if (latestResult) {
+            if (latestResult.status === '채점 완료') {
+                setStatus("completed");
+                setAnalysisStep(null);
+            } else if (latestResult.status === '오류') {
+                setStatus('error');
+                setErrorInfo({ message: latestResult.aiFeedback || '알 수 없는 오류가 발생했습니다.' });
+            } else if (latestResult.status.startsWith('분석 중')) {
+                 setStatus('analyzing');
+                 const stepKey = latestResult.status.split(':')[1]?.trim() as AnalysisStep;
+                 setAnalysisStep(stepKey || 'transcribe');
+            } else {
+                 setStatus('error');
+                 setErrorInfo({ message: '이전 분석이 비정상적으로 종료되었습니다. 평가로 돌아가 다시 시도해주세요.'});
+            }
+        } else {
+             // No results found, check for a new submission in sessionStorage
+             const sessionDataRaw = sessionStorage.getItem(SESSION_STORAGE_KEY);
+             if (sessionDataRaw) {
+                 const sessionData = JSON.parse(sessionDataRaw);
+                 if (sessionData.assessmentId === id && !isProcessing.current) {
+                     startNewAnalysis(sessionData);
+                 } else {
+                    setStatus("completed"); // No results and no new submission.
+                 }
+             } else {
+                setStatus("completed"); // No results and no new submission.
+             }
+        }
+    }, (err) => {
+        console.error("Error listening to result:", err);
+        setErrorInfo({ message: "결과를 실시간으로 업데이트하는 중 오류가 발생했습니다."});
+        setStatus("error");
+    });
+    
+    return () => unsubscribe();
+  }, [id, user, authLoading, assessment]);
+
+  const startNewAnalysis = async (sessionData: MonologueSessionData) => {
     if (!user || isProcessing.current) return;
     
     isProcessing.current = true;
@@ -109,38 +175,23 @@ export default function AssessmentResultsPage() {
         avatarUrl: user.photoURL || '',
         createdAt: Date.now(),
         date: new Date().toISOString(),
-        status: "분석 중",
+        status: "분석 중: transcribe",
     });
 
     try {
-        setAnalysisStep("transcribe");
-        // The generateMonologueAnalysis function now handles both transcription and analysis.
-        const analysisPromise = generateMonologueAnalysis({
-            studentRecordingUrl: studentRecordingDataUri,
+        const analysisResult = await processAndAnalyzeMonologue({
+            studentRecordingDataUri: studentRecordingDataUri,
             activityPrompt: assessmentDetails.prompt,
             expectedFormat: assessmentDetails.expectedFormat || "",
             studentName: user.displayName || "Student",
             assessmentTitle: assessmentDetails.title,
             evaluationModel: assessmentDetails.evaluationModel,
             useRubric: assessmentDetails.useRubric || false,
+            resultId: resultDocRef.id,
         });
-
-        // Set step to analyze after a short delay to show the "transcribe" step
-        setTimeout(() => setAnalysisStep("analyze"), 500);
-        
-        const analysisResult = await analysisPromise;
-        
-        setAnalysisStep("report");
-        const uploadPromise = uploadString(ref(storage, `recordings/${user.uid}_${assessmentDetails.id}_${Date.now()}.webm`), studentRecordingDataUri, 'data_url');
-        
-        const uploadSnapshot = await uploadPromise;
-        
-        setAnalysisStep("upload");
-        const downloadURL = await getDownloadURL(uploadSnapshot.ref);
 
         await updateDoc(resultDocRef, {
             ...analysisResult,
-            studentRecordingUrl: downloadURL,
             status: '채점 완료',
         });
         
@@ -175,83 +226,9 @@ export default function AssessmentResultsPage() {
     } finally {
         sessionStorage.removeItem(SESSION_STORAGE_KEY);
         isProcessing.current = false;
+        // The onSnapshot listener will automatically handle the UI update.
     }
   };
-
-
-  useEffect(() => {
-    if (authLoading || !user || !id) return;
-    
-    const sessionDataRaw = sessionStorage.getItem(SESSION_STORAGE_KEY);
-    if (sessionDataRaw) {
-        const sessionData = JSON.parse(sessionDataRaw);
-        if (sessionData.assessmentId === id && !isProcessing.current) {
-            processMonologueSubmission(sessionData);
-            return;
-        }
-    }
-    
-    const q = query(
-        collection(db, "results"),
-        where("assessmentId", "==", id),
-        where("studentId", "==", user.uid)
-    );
-
-    const handleSnapshot = async (snapshot: any) => {
-        if (isProcessing.current) return;
-
-        if (snapshot.empty) {
-            const assessmentRef = doc(db, 'assessments', id as string);
-            const assessmentSnap = await getDoc(assessmentRef);
-            if (assessmentSnap.exists()) {
-                setAssessment({id: assessmentSnap.id, ...assessmentSnap.data()} as TeacherAssessment);
-                setResults([]);
-                setStatus("completed");
-            } else {
-                notFound();
-            }
-            return;
-        }
-
-        const dbResults: StudentResult[] = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
-        dbResults.sort((a, b) => (a.createdAt || 0) - (a.createdAt || 0));
-        
-        if (!assessment) {
-            const assessmentRef = doc(db, 'assessments', id as string);
-            const assessmentSnap = await getDoc(assessmentRef);
-            if (assessmentSnap.exists()) {
-                setAssessment({id: assessmentSnap.id, ...assessmentSnap.data()} as TeacherAssessment);
-            }
-        }
-        
-        setResults(dbResults);
-        const latestResult = dbResults[dbResults.length - 1];
-        
-        if (latestResult) {
-            if (latestResult.status === '채점 완료') {
-                setStatus("completed");
-                setAnalysisStep(null);
-            } else if (latestResult.status === '오류') {
-                setStatus('error');
-                setErrorInfo({ message: latestResult.aiFeedback || '알 수 없는 오류가 발생했습니다.' });
-            } else if (latestResult.status === '분석 중') {
-                setStatus('analyzing');
-            } else {
-                 setStatus('error');
-                 setErrorInfo({ message: '이전 분석이 비정상적으로 종료되었습니다. 평가로 돌아가 다시 시도해주세요.'});
-            }
-        }
-    }
-    
-    const handleError = (err: any) => {
-        console.error("Error listening to result:", err);
-        setErrorInfo({ message: "결과를 실시간으로 업데이트하는 중 오류가 발생했습니다."});
-        setStatus("error");
-    }
-
-    const unsubscribe = onSnapshot(q, handleSnapshot, handleError);
-    return () => unsubscribe();
-  }, [id, user, authLoading]);
   
   if (status === "loading" || authLoading) {
     return (
