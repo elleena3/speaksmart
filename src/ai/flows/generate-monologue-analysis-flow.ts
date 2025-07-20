@@ -223,11 +223,13 @@ const generateMonologueAnalysisFlow = ai.defineFlow(
     inputSchema: GenerateMonologueAnalysisInputSchema,
     outputSchema: CombinedAnalysisOutputSchema,
   },
-  async (input) => {
+  async (mainInput) => {
+    const { onProgress, ...input} = mainInput;
     const model = input.evaluationModel || 'gemini-2.5-flash';
     const prompts = createPrompt(model);
 
     // Step 1: Transcribe the audio with retry logic.
+    onProgress?.('transcribe');
     const transcriptionResult = await withRetry(() => prompts.transcription({ studentRecordingUrl: input.studentRecordingUrl }));
     const studentTranscript = transcriptionResult.text;
 
@@ -245,6 +247,7 @@ const generateMonologueAnalysisFlow = ai.defineFlow(
     }
     
     // Step 2: Check if rubric is used.
+    onProgress?.('analyze');
     if (input.useRubric) {
         const rubricResult = await withRetry(() => prompts.rubric({ studentTranscript }));
         const rubricText = rubricResult.text;

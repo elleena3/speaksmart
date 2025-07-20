@@ -91,7 +91,7 @@ export default function AssessmentResultsPage() {
   
   const isProcessing = useRef(false);
 
-  const processMonologueSubmission = useCallback(async (sessionData: MonologueSessionData) => {
+  const processMonologueSubmission = async (sessionData: MonologueSessionData) => {
     if (!user || isProcessing.current) return;
     
     isProcessing.current = true;
@@ -122,12 +122,11 @@ export default function AssessmentResultsPage() {
             assessmentTitle: assessmentDetails.title,
             evaluationModel: assessmentDetails.evaluationModel,
             useRubric: assessmentDetails.useRubric || false,
+            onProgress: (step) => setAnalysisStep(step)
         });
         
-        // While AI is analyzing, start uploading the file in parallel
         setAnalysisStep("analyze"); 
-        const storageRef = ref(storage, `recordings/${user.uid}_${assessmentDetails.id}_${Date.now()}.webm`);
-        const uploadPromise = uploadString(storageRef, studentRecordingDataUri, 'data_url');
+        const uploadPromise = uploadString(ref(storage, `recordings/${user.uid}_${assessmentDetails.id}_${Date.now()}.webm`), studentRecordingDataUri, 'data_url');
         
         const [analysisResult, uploadSnapshot] = await Promise.all([analysisPromise, uploadPromise]);
         
@@ -173,18 +172,19 @@ export default function AssessmentResultsPage() {
         sessionStorage.removeItem(SESSION_STORAGE_KEY);
         isProcessing.current = false;
     }
-  }, [user, id]);
+  };
 
 
   useEffect(() => {
     if (authLoading || !user || !id) return;
     
-    // Check for new submission data first.
     const sessionDataRaw = sessionStorage.getItem(SESSION_STORAGE_KEY);
-    if (sessionDataRaw && !isProcessing.current) {
+    if (sessionDataRaw) {
         const sessionData = JSON.parse(sessionDataRaw);
-        if (sessionData.assessmentId === id) {
+        if (sessionData.assessmentId === id && !isProcessing.current) {
+            sessionStorage.removeItem(SESSION_STORAGE_KEY); // Process only once
             processMonologueSubmission(sessionData);
+            // Don't set up the listener yet, let the processing finish first.
             return;
         }
     }
@@ -234,7 +234,7 @@ export default function AssessmentResultsPage() {
                 setErrorInfo({ message: latestResult.aiFeedback || '알 수 없는 오류가 발생했습니다.' });
             } else if (latestResult.status === '분석 중') {
                 setStatus('analyzing');
-            } else { // Handle legacy or stuck statuses
+            } else {
                  setStatus('error');
                  setErrorInfo({ message: '이전 분석이 비정상적으로 종료되었습니다. 평가로 돌아가 다시 시도해주세요.'});
             }
@@ -249,7 +249,7 @@ export default function AssessmentResultsPage() {
 
     const unsubscribe = onSnapshot(q, handleSnapshot, handleError);
     return () => unsubscribe();
-  }, [id, user, authLoading, processMonologueSubmission, assessment]);
+  }, [id, user, authLoading, assessment]);
   
   if (status === "loading" || authLoading) {
     return (
@@ -307,5 +307,3 @@ export default function AssessmentResultsPage() {
 
   return null;
 }
-
-    
