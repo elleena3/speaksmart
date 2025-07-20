@@ -270,7 +270,17 @@ const createPrompt = (modelName: z.infer<typeof evaluationModels[number]>) => ({
 const generateDialogueAnalysisFlow = ai.defineFlow(
   {
     name: 'generateDialogueAnalysisFlow',
-    inputSchema: GenerateDialogueAnalysisInputSchema,
+    inputSchema: GenerateDialogueAnalysisInputSchema.pick({
+      studentRecordingUrl: true,
+      studentTranscript: true,
+      fullConversationTranscript: true,
+      activityPrompt: true,
+      expectedFormat: true,
+      studentName: true,
+      assessmentTitle: true,
+      evaluationModel: true,
+      useRubric: true,
+    }),
     outputSchema: CombinedAnalysisOutputSchema,
   },
   async (input) => {

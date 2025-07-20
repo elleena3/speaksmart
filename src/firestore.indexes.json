@@ -84,16 +84,20 @@
       "queryScope": "COLLECTION",
       "fields": [
         {
-          "fieldPath": "teacherUid",
-          "order": "ASCENDING"
-        },
-        {
           "fieldPath": "assessmentId",
           "order": "ASCENDING"
         },
         {
+          "fieldPath": "studentId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
           "fieldPath": "createdAt",
-          "order": "DESCENDING"
+          "order": "ASCENDING"
         }
       ]
     }

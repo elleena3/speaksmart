@@ -99,6 +99,8 @@ export const GenerateDialogueAnalysisInputSchema = z.object({
   assessmentTitle: z.string().describe('The title of the assessment.'),
   evaluationModel: z.enum(evaluationModels).optional(),
   useRubric: z.boolean().optional().describe('Whether to use the standardized rubric for evaluation.'),
+  resultId: z.string().describe('The Firestore document ID for the result to update progress.'),
+  teacherUid: z.string().describe("The UID of the teacher who created the assessment."),
 });
 export type GenerateDialogueAnalysisInput = z.infer<typeof GenerateDialogueAnalysisInputSchema>;
 
