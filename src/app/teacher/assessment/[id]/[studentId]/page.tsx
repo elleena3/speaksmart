@@ -3,17 +3,17 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter, notFound } from "next/navigation";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Loader2, BookText } from "lucide-react"
-import { type TeacherAssessment, type StudentResult, type ResultSummary } from "@/lib/types";
+import { Loader2 } from "lucide-react"
+import { type TeacherAssessment, type StudentResult } from "@/lib/types";
 import { useAuth } from "@/context/auth-context";
 import { db } from "@/lib/firebase";
-import { doc, getDoc, collection, query, where, orderBy, getDocs } from "firebase/firestore";
+import { doc, getDoc, collection, getDocs, where } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { FreeTalkFeedbackView } from "@/app/student/assessment/free-talk/results/free-talk-feedback-view";
 import { FeedbackView } from "@/app/student/assessment/[id]/results/feedback-view";
-import { GrowthView } from "@/app/student/assessment/free-talk/results/growth-view";
+import { GrowthView } from "@/app/student/assessment/[id]/results/growth-view";
 
 
 export default function StudentResultPage() {
@@ -21,7 +21,7 @@ export default function StudentResultPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const [assessment, setAssessment] = useState<TeacherAssessment | null>(null);
-  const [results, setResults] = useState<StudentResult[]>([]);
+  const [result, setResult] = useState<StudentResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   
   const { toast } = useToast();
@@ -41,29 +41,27 @@ export default function StudentResultPage() {
             notFound();
             return;
         }
-        const assessmentData = { id: assessmentSnap.id, ...assessmentSnap.data() } as TeacherAssessment;
-        setAssessment(assessmentData);
+        setAssessment({ id: assessmentSnap.id, ...assessmentSnap.data() } as TeacherAssessment);
         
-        const q = query(
-            collection(db, "results"),
-            where("assessmentId", "==", assessmentId),
-            where("studentId", "==", studentId),
-            where("status", "==", "채점 완료"),
-            orderBy("createdAt", "asc")
-        );
-        const resultsSnapshot = await getDocs(q);
-
-        if (resultsSnapshot.empty) {
-            toast({ title: "결과 없음", description: "해당 학생의 완료된 평가 결과가 없습니다.", variant: "destructive" });
-            // Don't call notFound(), just show an empty state or message maybe.
-            // For now, it will just show loading. Let's fix this to show a proper message.
-            setIsLoading(false); // To stop loading
-            return;
+        const resultsQuery = collection(db, "results");
+        const q = where("assessmentId", "==", assessmentId);
+        const q2 = where("studentId", "==", studentId);
+        const querySnapshot = await getDocs(collection(db, "results"));
+        
+        let foundResult: StudentResult | null = null;
+        querySnapshot.forEach((doc) => {
+            const data = doc.data();
+            if (data.assessmentId === assessmentId && data.studentId === studentId) {
+                foundResult = { id: doc.id, ...data } as StudentResult;
+            }
+        });
+        
+        if (foundResult) {
+            setResult(foundResult);
+        } else {
+             toast({ title: "결과 없음", description: "해당 학생의 평가 결과가 없습니다.", variant: "destructive" });
+             // notFound();
         }
-
-        const fetchedResults = resultsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as StudentResult));
-        setResults(fetchedResults);
-        
     } catch (error) {
         console.error("Error fetching result data:", error);
         toast({ title: "오류", description: "결과를 불러오는 중 오류가 발생했습니다.", variant: "destructive" });
@@ -94,48 +92,36 @@ export default function StudentResultPage() {
     );
   }
 
-  if (!assessment) {
-    return null; 
+  if (!assessment || !result) {
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>결과 없음</CardTitle>
+                <CardDescription>이 학생은 아직 이 평가를 완료하지 않았습니다.</CardDescription>
+            </CardHeader>
+        </Card>
+    )
   }
-  
-  if (results.length === 0) {
-      return (
-          <Card>
-              <CardHeader>
-                  <CardTitle>결과 없음</CardTitle>
-                  <CardDescription>이 학생은 아직 이 평가를 완료하지 않았습니다.</CardDescription>
-              </CardHeader>
-          </Card>
-      )
-  }
-
-  const latestResult = results[results.length - 1];
 
   return (
     <div className="space-y-6">
         <Card>
             <CardHeader className="flex-row items-center gap-4 space-y-0">
                 <Avatar className="h-16 w-16">
-                    <AvatarImage src={latestResult.avatarUrl} alt={latestResult.name} data-ai-hint="person portrait" />
-                    <AvatarFallback>{latestResult.name.charAt(0)}</AvatarFallback>
+                    <AvatarImage src={result.avatarUrl} alt={result.name} data-ai-hint="person portrait" />
+                    <AvatarFallback>{result.name.charAt(0)}</AvatarFallback>
                 </Avatar>
                 <div className="flex-grow">
-                <CardTitle className="text-2xl">{latestResult.name} 학생 결과</CardTitle>
-                <CardDescription>평가: <span className="font-semibold">{assessment.title}</span> ({results.length}회 응시)</CardDescription>
+                <CardTitle className="text-2xl">{result.name} 학생 결과</CardTitle>
+                <CardDescription>평가: <span className="font-semibold">{assessment.title}</span></CardDescription>
                 </div>
             </CardHeader>
         </Card>
 
-        {results.length === 1 && (
-             assessment.assessmentType === 'dialogue' ? 
-             <FreeTalkFeedbackView result={latestResult} assessment={assessment} isLatestAttempt={true} /> : 
-             <FeedbackView result={latestResult} assessment={assessment} isLatestAttempt={true} />
-        )}
-
-        {results.length > 1 && (
-             <GrowthView results={results} assessment={assessment} defaultTab={`attempt-${results.length}`} />
-        )}
-
+        {assessment.assessmentType === 'dialogue' ? 
+            <FreeTalkFeedbackView result={result} assessment={assessment} isLatestAttempt={true} /> : 
+            <FeedbackView result={result} assessment={assessment} isLatestAttempt={true} />
+        }
     </div>
   );
 }
