@@ -26,7 +26,7 @@ export default function MiscPage() {
 
     const handleLogin = (e: React.FormEvent) => {
         e.preventDefault();
-        if (password === '1126') {
+        if (password === '0223') {
             setIsAuthenticated(true);
             setError('');
         } else {
