@@ -170,6 +170,7 @@ export default function DialogueProcessingPage() {
             // Call the main analysis flow
             await generateDialogueAnalysis({
                 resultId: resultDocRef.id,
+                teacherUid: assessment.uid,
                 studentRecordingUrl: downloadURL,
                 studentTranscript: studentOnlyTranscript,
                 fullConversationTranscript: fullConversationTranscript,

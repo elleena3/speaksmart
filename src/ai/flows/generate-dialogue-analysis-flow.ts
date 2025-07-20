@@ -48,7 +48,7 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 2, delay = 1500): Pr
  * Main exported function to be called by the client for dialogue analysis.
  */
 export async function generateDialogueAnalysis(
-    input: GenerateDialogueAnalysisInput & { resultId: string }
+    input: GenerateDialogueAnalysisInput & { resultId: string; teacherUid: string; }
 ): Promise<void> {
   const resultDocRef = doc(db, "results", input.resultId);
 
@@ -64,6 +64,7 @@ export async function generateDialogueAnalysis(
       const finalResultData: Partial<StudentResult> = {
           ...analysisResult,
           status: "채점 완료",
+          teacherUid: input.teacherUid,
       };
       
       await updateDoc(resultDocRef, finalResultData);

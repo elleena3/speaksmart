@@ -161,6 +161,7 @@ export default function ProcessingPage() {
                 assessmentTitle: assessmentDetails.title,
                 evaluationModel: assessmentDetails.evaluationModel,
                 useRubric: assessmentDetails.useRubric || false,
+                teacherUid: assessmentDetails.uid,
             });
 
             console.log("[Processing Page] AI flow completed successfully.");

@@ -34,6 +34,7 @@ const MonologueProcessingInputSchema = z.object({
   evaluationModel: z.enum(evaluationModels).optional(),
   useRubric: z.boolean().optional().describe('Whether to use the standardized rubric for evaluation.'),
   resultId: z.string().describe('The Firestore document ID for the result to update progress.'),
+  teacherUid: z.string().describe("The UID of the teacher who created the assessment."),
 });
 type MonologueProcessingInput = z.infer<typeof MonologueProcessingInputSchema>;
 
@@ -349,7 +350,8 @@ export const generateMonologueAnalysisFlow = ai.defineFlow(
       await updateDoc(resultDocRef, {
           ...finalResult,
           studentRecordingUrl: downloadURL,
-          status: "채점 완료"
+          status: "채점 완료",
+          teacherUid: input.teacherUid,
       });
 
       console.log(`[Flow] Final result document ${input.resultId} updated. Status: '채점 완료'`);

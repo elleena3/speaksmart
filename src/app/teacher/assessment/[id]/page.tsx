@@ -49,6 +49,7 @@ export default function AssessmentSubmissionsPage() {
         const resultsQuery = query(
             collection(db, "results"), 
             where("assessmentId", "==", assessmentId),
+            where("teacherUid", "==", user.uid),
             orderBy("createdAt", "desc")
         );
         const resultsSnapshot = await getDocs(resultsQuery);
