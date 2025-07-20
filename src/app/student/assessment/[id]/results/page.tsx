@@ -116,35 +116,18 @@ export default function AssessmentResultsPage() {
     
     isProcessing.current = true;
     setStatus("analyzing");
-    setAnalysisStep("transcribe");
     setErrorInfo(null);
 
     const { assessmentDetails, studentRecordingDataUri } = sessionData;
     const resultRef = doc(collection(db, "results"));
     
     try {
-        const initialData: Partial<StudentResult> = {
-            id: resultRef.id,
-            studentId: user.uid,
-            assessmentId: assessmentDetails.id,
-            assessmentTitle: assessmentDetails.title,
-            teacherUid: assessmentDetails.uid,
-            name: user.displayName || "Student",
-            avatarUrl: user.photoURL || '',
-            createdAt: Date.now(),
-            date: new Date().toISOString(),
-            status: "텍스트 변환 중",
-        };
-        await setDoc(resultRef, initialData, { merge: true });
-        
-        // This is a more robust way to update the step inside the process
-        const updateStep = async (step: AnalysisStep, firestoreStatus: ResultStatus) => {
-            setAnalysisStep(step);
-            await updateDoc(resultRef, { status: firestoreStatus });
-        };
+        setAnalysisStep("transcribe");
+        await updateDoc(resultRef, { status: "텍스트 변환 중" });
 
-        await updateStep("analyze", "내용 및 발음 분석 중...");
-        
+        setAnalysisStep("analyze");
+        await updateDoc(resultRef, { status: "내용 및 발음 분석 중..." });
+
         const analysisResult = await generateMonologueAnalysis({
             studentRecordingUrl: studentRecordingDataUri,
             activityPrompt: assessmentDetails.prompt,
@@ -155,9 +138,9 @@ export default function AssessmentResultsPage() {
             useRubric: assessmentDetails.useRubric || false,
         });
 
-        await updateStep("report", "리포트 생성 중");
-
-        await updateStep("upload", "답변 파일 업로드 중");
+        setAnalysisStep("report");
+        await updateDoc(resultRef, { status: "리포트 생성 중" });
+        
         const storageRef = ref(storage, `recordings/${user.uid}_${assessmentDetails.id}_${Date.now()}.webm`);
         const snapshot = await uploadString(storageRef, studentRecordingDataUri, 'data_url');
         const downloadURL = await getDownloadURL(snapshot.ref);
@@ -200,9 +183,10 @@ export default function AssessmentResultsPage() {
     } finally {
         sessionStorage.removeItem(SESSION_STORAGE_KEY);
         isProcessing.current = false;
-        router.replace(`/student/assessment/${id}/results?t=${new Date().getTime()}`);
+        router.replace(`/student/assessment/${id}/results?t=${new Date().getTime()}&attempt=${results.length + 1}`);
     }
-  }, [user, id]);
+  }, [user, id, results.length, router]);
+
 
   useEffect(() => {
     if (authLoading || !user || !id) return;
@@ -260,8 +244,11 @@ export default function AssessmentResultsPage() {
             setStatus('error');
             setErrorInfo({ message: latestResult.aiFeedback || '알 수 없는 오류가 발생했습니다.' });
         } else if (latestResult && !isProcessing.current) {
-            setStatus('error');
-            setErrorInfo({ message: '이전 분석이 비정상적으로 종료되었습니다. 평가로 돌아가 다시 시도해주세요.'});
+             const staleStatuses = ["텍스트 변환 중", "내용 및 발음 분석 중...", "리포트 생성 중"];
+             if (staleStatuses.includes(latestResult.status)) {
+                setStatus('error');
+                setErrorInfo({ message: '이전 분석이 비정상적으로 종료되었습니다. 평가로 돌아가 다시 시도해주세요.'});
+             }
         }
     }
     
