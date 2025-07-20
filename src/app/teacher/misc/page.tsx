@@ -14,10 +14,12 @@ import { RealtimeConversationTool } from "./realtime-conversation-tool";
 import { ReadAloudTool } from "./read-aloud-tool";
 import { HandwritingAnalyzerTool } from "./handwriting-analyzer-tool";
 import { ConcurrentConversationTool } from "./concurrent-conversation-tool";
+import { useLanguage } from "@/context/language-context";
 
 
 // This component now handles the entire result creation and feedback display process.
 export default function MiscPage() {
+    const { t } = useLanguage();
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
@@ -28,7 +30,7 @@ export default function MiscPage() {
             setIsAuthenticated(true);
             setError('');
         } else {
-            setError('비밀번호가 올바르지 않습니다.');
+            setError(t.teacherMisc.incorrectPasswordError);
             setPassword('');
         }
     };
@@ -39,10 +41,10 @@ export default function MiscPage() {
                 <Card className="w-full max-w-sm">
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
-                           <KeyRound className="h-6 w-6"/> 접근 확인
+                           <KeyRound className="h-6 w-6"/> {t.teacherMisc.accessTitle}
                         </CardTitle>
                         <CardDescription>
-                            이 페이지에 접근하려면 비밀번호를 입력하세요.
+                            {t.teacherMisc.accessDescription}
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -51,7 +53,7 @@ export default function MiscPage() {
                                 type="password"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
-                                placeholder="비밀번호"
+                                placeholder={t.teacherMisc.passwordPlaceholder}
                                 autoFocus
                             />
                             {error && (
@@ -61,7 +63,7 @@ export default function MiscPage() {
                                 </div>
                             )}
                             <Button type="submit" className="w-full">
-                                확인
+                                {t.teacherMisc.confirmButton}
                             </Button>
                         </form>
                     </CardContent>
@@ -73,15 +75,15 @@ export default function MiscPage() {
     return (
         <div className="space-y-6">
             <div>
-                <h2 className="text-2xl font-bold tracking-tight">기타 도구</h2>
-                <p className="text-muted-foreground">AI 모델의 성능을 테스트하기 위한 간단한 도구들입니다.</p>
+                <h2 className="text-2xl font-bold tracking-tight">{t.teacherMisc.title}</h2>
+                <p className="text-muted-foreground">{t.teacherMisc.description}</p>
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
                 <Card>
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><FileText className="h-6 w-6"/> WebM 음성-텍스트 변환 도구</CardTitle>
+                        <CardTitle className="flex items-center gap-2"><FileText className="h-6 w-6"/> WebM {t.teacherMisc.transcriberTool.title}</CardTitle>
                         <CardDescription>
-                        WebM 오디오 파일을 업로드하거나 직접 녹음하여 여러 모델의 음성-텍스트 변환(STT) 결과를 비교 테스트합니다.
+                            {t.teacherMisc.transcriberTool.description}
                         </CardDescription>
                     </CardHeader>
                     <TranscriberTool />
@@ -89,9 +91,9 @@ export default function MiscPage() {
 
                 <Card>
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><Target className="h-6 w-6"/> 영어 발음 분석 도구</CardTitle>
+                        <CardTitle className="flex items-center gap-2"><Target className="h-6 w-6"/> {t.teacherMisc.pronunciationAnalyzerTool.title}</CardTitle>
                         <CardDescription>
-                            WebM 오디오 파일을 업로드하거나 직접 녹음하여 여러 AI 모델의 발음, 억양, 유창성에 대한 피드백과 점수를 비교해보세요.
+                            {t.teacherMisc.pronunciationAnalyzerTool.description}
                         </CardDescription>
                     </CardHeader>
                     <PronunciationAnalyzerTool />
@@ -99,9 +101,9 @@ export default function MiscPage() {
 
                 <Card className="lg:col-span-2">
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><MessageCircle className="h-6 w-6"/> AI 원어민 선생님과 대화하기</CardTitle>
+                        <CardTitle className="flex items-center gap-2"><MessageCircle className="h-6 w-6"/> {t.teacherMisc.realtimeConversationTool.title}</CardTitle>
                         <CardDescription>
-                            실시간으로 AI와 영어 회화를 연습하고, 어떤 주제로든 질문해보세요. AI가 당신의 영어 수준에 맞춰 대화해 줄 것입니다. (사용자 음성만 녹음)
+                            {t.teacherMisc.realtimeConversationTool.description}
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -111,9 +113,9 @@ export default function MiscPage() {
 
                  <Card className="lg:col-span-2">
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><MicVocal className="h-6 w-6"/> AI 원어민 선생님과 대화하기 2</CardTitle>
+                        <CardTitle className="flex items-center gap-2"><MicVocal className="h-6 w-6"/> {t.teacherMisc.concurrentConversationTool.title}</CardTitle>
                         <CardDescription>
-                           전체 대화(AI 음성 + 사용자 음성)를 녹음하는 기능입니다. '녹음 시작'을 누르면 AI와 사용자의 모든 음성이 하나의 파일로 저장됩니다.
+                           {t.teacherMisc.concurrentConversationTool.description}
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -123,9 +125,9 @@ export default function MiscPage() {
 
                  <Card className="lg:col-span-2">
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><BookOpen className="h-6 w-6"/> Read Aloud 연습 도구</CardTitle>
+                        <CardTitle className="flex items-center gap-2"><BookOpen className="h-6 w-6"/> {t.teacherMisc.readAloudTool.title}</CardTitle>
                         <CardDescription>
-                            제공된 지문을 따라 읽고 AI에게 발음, 정확도, 유창성 피드백을 받아보세요. 직접 텍스트를 입력하여 테스트할 수도 있습니다.
+                            {t.teacherMisc.readAloudTool.description}
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -135,10 +137,10 @@ export default function MiscPage() {
 
                 <Card className="lg:col-span-2">
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><ScanText className="h-6 w-6"/> AI 자필 분석 도구</CardTitle>
+                        <CardTitle className="flex items-center gap-2"><ScanText className="h-6 w-6"/> {t.teacherMisc.handwritingAnalyzerTool.title}</CardTitle>
                         <CardDescription>
-                            학생의 자필 영어 사진을 업로드하여 AI에게 글씨체 교정 피드백을 받아보세요. 
-                            <span className="block text-xs mt-1 text-blue-500">참고: 이미지 위에 직접 피드백을 오버레이하는 더 정밀한 기능은 Google Cloud Vision API를 통해 구현할 수 있습니다.</span>
+                            {t.teacherMisc.handwritingAnalyzerTool.description}
+                            <span className="block text-xs mt-1 text-blue-500">{t.teacherMisc.handwritingAnalyzerTool.note}</span>
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -172,6 +174,7 @@ function AudioProcessor({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const { toast } = useToast();
+  const { t } = useLanguage();
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
@@ -180,8 +183,8 @@ function AudioProcessor({
             setFile(selectedFile);
         } else {
             toast({
-                title: "잘못된 파일 형식",
-                description: ".webm 파일만 업로드할 수 있습니다.",
+                title: t.teacherMisc.errors.invalidFileTitle,
+                description: t.teacherMisc.errors.invalidFileDescription,
                 variant: "destructive",
             });
             event.target.value = ''; // Reset file input
@@ -199,14 +202,14 @@ function AudioProcessor({
     };
     reader.onerror = (error) => {
       console.error("File reading error:", error);
-      toast({ title: "파일 읽기 오류", description: "파일을 읽는 중 문제가 발생했습니다.", variant: "destructive" });
+      toast({ title: t.teacherMisc.errors.fileReadErrorTitle, description: t.teacherMisc.errors.fileReadErrorDescription, variant: "destructive" });
       setIsProcessing(false);
     };
   };
 
   const handleAnalyzeClick = async () => {
     if (!file) {
-      toast({ title: "파일 없음", description: "먼저 webm 파일을 선택하거나 녹음해주세요.", variant: "destructive" });
+      toast({ title: t.teacherMisc.errors.noFileTitle, description: t.teacherMisc.errors.noFileDescription, variant: "destructive" });
       return;
     }
     setIsProcessing(true);
@@ -234,7 +237,7 @@ function AudioProcessor({
       setRecordingState('recording');
     } catch (err) {
       console.error("Microphone access error:", err);
-      toast({ title: "마이크 접근 오류", description: "마이크 권한을 허용해주세요.", variant: "destructive" });
+      toast({ title: t.teacherMisc.errors.micAccessErrorTitle, description: t.teacherMisc.errors.micAccessErrorDescription, variant: "destructive" });
     }
   };
 
@@ -248,30 +251,30 @@ function AudioProcessor({
   return (
     <CardContent className="space-y-4 pt-6">
       <div className="grid gap-2">
-        <label htmlFor="file-upload" className="text-sm font-medium">오디오 파일 선택 또는 녹음</label>
+        <label htmlFor="file-upload" className="text-sm font-medium">{t.teacherMisc.audioProcessor.label}</label>
         <div className="flex gap-2">
             <Input id="file-upload" type="file" accept="audio/webm" onChange={handleFileChange} className="flex-grow" />
             {recordingState === 'idle' ? (
                 <Button onClick={handleStartRecording} variant="outline" className="shrink-0">
-                    <Mic className="mr-2 h-4 w-4" /> 녹음
+                    <Mic className="mr-2 h-4 w-4" /> {t.teacherMisc.audioProcessor.recordButton}
                 </Button>
             ) : (
                 <Button onClick={handleStopRecording} variant="destructive" className="shrink-0">
-                    <Loader2 className="mr-2 h-4 w-4 animate-pulse" /> 중지
+                    <Loader2 className="mr-2 h-4 w-4 animate-pulse" /> {t.teacherMisc.audioProcessor.stopButton}
                 </Button>
             )}
         </div>
-        {file && <p className="text-sm text-muted-foreground">선택된 파일: {file.name.startsWith('blob:') ? `녹음된 오디오 (${(file.size/1024).toFixed(1)} KB)` : file.name}</p>}
+        {file && <p className="text-sm text-muted-foreground">{t.teacherMisc.audioProcessor.selectedFileText.replace('{fileName}', file.name.startsWith('blob:') ? `${t.teacherMisc.audioProcessor.recordedAudio} (${(file.size/1024).toFixed(1)} KB)` : file.name)}</p>}
       </div>
       <Button onClick={handleAnalyzeClick} disabled={isProcessing || !file} className="w-full">
         {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <AnalyzeIcon className="mr-2 h-4 w-4" />}
-        {isProcessing ? "처리 중..." : analyzeButtonText}
+        {isProcessing ? t.teacherMisc.audioProcessor.processingButton : analyzeButtonText}
       </Button>
       <div className="space-y-4">
         {isProcessing && (
             <div className="text-center p-4">
                 <Loader2 className="h-6 w-6 animate-spin mx-auto" />
-                <p className="mt-2 text-sm text-muted-foreground">AI 모델들이 병렬로 처리 중입니다...</p>
+                <p className="mt-2 text-sm text-muted-foreground">{t.teacherMisc.audioProcessor.processingMessage}</p>
             </div>
         )}
         {children}
@@ -284,25 +287,26 @@ function AudioProcessor({
 function TranscriberTool() {
   const [transcripts, setTranscripts] = useState<TranscriptionResult[]>([]);
   const { toast } = useToast();
+  const { t } = useLanguage();
 
   const handleAnalyze = async (dataUri: string) => {
     setTranscripts([]);
-    toast({ title: "변환 시작", description: "모델별 텍스트 변환을 시작합니다." });
+    toast({ title: t.teacherMisc.transcriberTool.toastStartTitle, description: t.teacherMisc.transcriberTool.toastStartDescription });
     try {
       const results = await transcribeFile(dataUri);
       setTranscripts(results);
-      toast({ title: "변환 완료", description: "모든 모델의 변환이 완료되었습니다." });
+      toast({ title: t.teacherMisc.transcriberTool.toastCompleteTitle, description: t.teacherMisc.transcriberTool.toastCompleteDescription });
     } catch (error: any) {
       console.error("Transcription error:", error);
-      toast({ title: "텍스트 변환 오류", description: error.message || "AI 분석 중 오류가 발생했습니다.", variant: "destructive" });
+      toast({ title: t.teacherMisc.errors.analysisErrorTitle, description: error.message || t.teacherMisc.errors.unknownError, variant: "destructive" });
     }
   };
 
   return (
-    <AudioProcessor onAnalyze={handleAnalyze} analyzeButtonText="모델별 텍스트로 변환" analyzeButtonIcon={FileText}>
+    <AudioProcessor onAnalyze={handleAnalyze} analyzeButtonText={t.teacherMisc.transcriberTool.buttonText} analyzeButtonIcon={FileText}>
         {transcripts.length > 0 && (
             <div className="grid grid-cols-1 gap-4">
-              <h3 className="text-lg font-semibold border-b pb-2">모델별 변환 결과</h3>
+              <h3 className="text-lg font-semibold border-b pb-2">{t.teacherMisc.transcriberTool.resultsTitle}</h3>
               {transcripts.map((result, index) => (
                 <div key={index} className="grid gap-2">
                   <label htmlFor={`transcript-output-${index}`} className="text-sm font-medium font-mono">{result.model}</label>
@@ -318,25 +322,26 @@ function TranscriberTool() {
 function PronunciationAnalyzerTool() {
   const [analysisResults, setAnalysisResults] = useState<PronunciationAnalysisResult[]>([]);
   const { toast } = useToast();
+  const { t } = useLanguage();
 
   const handleAnalyze = async (dataUri: string) => {
     setAnalysisResults([]);
-    toast({ title: "분석 시작", description: "모델별 발음 분석을 병렬로 시작합니다." });
+    toast({ title: t.teacherMisc.pronunciationAnalyzerTool.toastStartTitle, description: t.teacherMisc.pronunciationAnalyzerTool.toastStartDescription });
     try {
         const results = await analyzePronunciation(dataUri);
         setAnalysisResults(results);
-        toast({ title: "분석 완료", description: "모든 모델의 분석이 완료되었습니다." });
+        toast({ title: t.teacherMisc.pronunciationAnalyzerTool.toastCompleteTitle, description: t.teacherMisc.pronunciationAnalyzerTool.toastCompleteDescription });
     } catch (e) {
          console.error("Pronunciation analysis error:", e);
-         toast({ title: "발음 분석 오류", description: (e as Error).message || "AI 분석 중 오류가 발생했습니다.", variant: "destructive" });
+         toast({ title: t.teacherMisc.errors.analysisErrorTitle, description: (e as Error).message || t.teacherMisc.errors.unknownError, variant: "destructive" });
     }
   };
 
   return (
-    <AudioProcessor onAnalyze={handleAnalyze} analyzeButtonText="모델별 발음 분석" analyzeButtonIcon={Target}>
+    <AudioProcessor onAnalyze={handleAnalyze} analyzeButtonText={t.teacherMisc.pronunciationAnalyzerTool.buttonText} analyzeButtonIcon={Target}>
         {analysisResults.length > 0 && (
             <div className="grid grid-cols-1 gap-4">
-            <h3 className="text-lg font-semibold border-b pb-2">모델별 분석 결과</h3>
+            <h3 className="text-lg font-semibold border-b pb-2">{t.teacherMisc.pronunciationAnalyzerTool.resultsTitle}</h3>
             {analysisResults.map((result, index) => (
                 <Card key={index}>
                 <CardHeader>
@@ -345,7 +350,7 @@ function PronunciationAnalyzerTool() {
                 <CardContent className="space-y-4">
                     <div className="w-full">
                         <div className="flex justify-between mb-1">
-                            <span className="text-sm font-medium text-primary">발음 점수</span>
+                            <span className="text-sm font-medium text-primary">{t.studentHistory.pronunciationScore}</span>
                             <span className="text-sm font-medium text-primary">{result.pronunciationScore}%</span>
                         </div>
                         <Progress value={result.pronunciationScore} className="h-2" />
@@ -364,5 +369,3 @@ function PronunciationAnalyzerTool() {
     </AudioProcessor>
   );
 }
-
-    

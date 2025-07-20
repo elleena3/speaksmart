@@ -215,6 +215,73 @@ export const translations = {
             feedbackReceivedLabel: "피드백 수신",
             feedbackReceivedDescription: "학생이 평가에 대한 피드백을 제공하면 알림을 받습니다."
         }
+    },
+    teacherMisc: {
+      title: "기타 도구",
+      description: "AI 모델의 성능을 테스트하기 위한 간단한 도구들입니다.",
+      accessTitle: "접근 확인",
+      accessDescription: "이 페이지에 접근하려면 비밀번호를 입력하세요.",
+      passwordPlaceholder: "비밀번호",
+      confirmButton: "확인",
+      incorrectPasswordError: "비밀번호가 올바르지 않습니다.",
+      transcriberTool: {
+        title: "음성-텍스트 변환 도구",
+        description: "WebM 오디오 파일을 업로드하거나 직접 녹음하여 여러 모델의 음성-텍스트 변환(STT) 결과를 비교 테스트합니다.",
+        buttonText: "모델별 텍스트로 변환",
+        resultsTitle: "모델별 변환 결과",
+        toastStartTitle: "변환 시작",
+        toastStartDescription: "모델별 텍스트 변환을 시작합니다.",
+        toastCompleteTitle: "변환 완료",
+        toastCompleteDescription: "모든 모델의 변환이 완료되었습니다.",
+      },
+      pronunciationAnalyzerTool: {
+        title: "영어 발음 분석 도구",
+        description: "WebM 오디오 파일을 업로드하거나 직접 녹음하여 여러 AI 모델의 발음, 억양, 유창성에 대한 피드백과 점수를 비교해보세요.",
+        buttonText: "모델별 발음 분석",
+        resultsTitle: "모델별 분석 결과",
+        toastStartTitle: "분석 시작",
+        toastStartDescription: "모델별 발음 분석을 병렬로 시작합니다.",
+        toastCompleteTitle: "분석 완료",
+        toastCompleteDescription: "모든 모델의 분석이 완료되었습니다.",
+      },
+      realtimeConversationTool: {
+        title: "AI 원어민 선생님과 대화하기",
+        description: "실시간으로 AI와 영어 회화를 연습하고, 어떤 주제로든 질문해보세요. AI가 당신의 영어 수준에 맞춰 대화해 줄 것입니다. (사용자 음성만 녹음)",
+      },
+      concurrentConversationTool: {
+          title: "AI 원어민 선생님과 대화하기 2",
+          description: "전체 대화(AI 음성 + 사용자 음성)를 녹음하는 기능입니다. '녹음 시작'을 누르면 AI와 사용자의 모든 음성이 하나의 파일로 저장됩니다.",
+      },
+      readAloudTool: {
+        title: "Read Aloud 연습 도구",
+        description: "제공된 지문을 따라 읽고 AI에게 발음, 정확도, 유창성 피드백을 받아보세요. 직접 텍스트를 입력하여 테스트할 수도 있습니다.",
+      },
+      handwritingAnalyzerTool: {
+          title: "AI 자필 분석 도구",
+          description: "학생의 자필 영어 사진을 업로드하여 AI에게 글씨체 교정 피드백을 받아보세요.",
+          note: "참고: 이미지 위에 직접 피드백을 오버레이하는 더 정밀한 기능은 Google Cloud Vision API를 통해 구현할 수 있습니다."
+      },
+      audioProcessor: {
+        label: "오디오 파일 선택 또는 녹음",
+        recordButton: "녹음",
+        stopButton: "중지",
+        selectedFileText: "선택된 파일: {fileName}",
+        recordedAudio: "녹음된 오디오",
+        processingButton: "처리 중...",
+        processingMessage: "AI 모델들이 병렬로 처리 중입니다...",
+      },
+      errors: {
+        invalidFileTitle: "잘못된 파일 형식",
+        invalidFileDescription: ".webm 파일만 업로드할 수 있습니다.",
+        fileReadErrorTitle: "파일 읽기 오류",
+        fileReadErrorDescription: "파일을 읽는 중 문제가 발생했습니다.",
+        noFileTitle: "파일 없음",
+        noFileDescription: "먼저 webm 파일을 선택하거나 녹음해주세요.",
+        micAccessErrorTitle: "마이크 접근 오류",
+        micAccessErrorDescription: "마이크 권한을 허용해주세요.",
+        analysisErrorTitle: "분석 오류",
+        unknownError: "알 수 없는 오류가 발생했습니다.",
+      }
     }
   },
   en: {
@@ -432,6 +499,73 @@ export const translations = {
             feedbackReceivedLabel: "Feedback Received",
             feedbackReceivedDescription: "Get notified when a student provides feedback on an assessment."
         }
+    },
+    teacherMisc: {
+      title: "Miscellaneous Tools",
+      description: "Simple tools for testing the performance of AI models.",
+      accessTitle: "Access Confirmation",
+      accessDescription: "Please enter the password to access this page.",
+      passwordPlaceholder: "Password",
+      confirmButton: "Confirm",
+      incorrectPasswordError: "Incorrect password.",
+      transcriberTool: {
+        title: "Speech-to-Text Tool",
+        description: "Upload or record a WebM audio file to compare Speech-to-Text (STT) results from various models.",
+        buttonText: "Transcribe with Models",
+        resultsTitle: "Transcription Results by Model",
+        toastStartTitle: "Starting Transcription",
+        toastStartDescription: "Beginning model-specific text transcription.",
+        toastCompleteTitle: "Transcription Complete",
+        toastCompleteDescription: "Transcription from all models is complete.",
+      },
+      pronunciationAnalyzerTool: {
+        title: "English Pronunciation Analyzer",
+        description: "Upload or record a WebM audio file to compare feedback and scores on pronunciation, intonation, and fluency from different AI models.",
+        buttonText: "Analyze Pronunciation with Models",
+        resultsTitle: "Analysis Results by Model",
+        toastStartTitle: "Starting Analysis",
+        toastStartDescription: "Beginning parallel pronunciation analysis by model.",
+        toastCompleteTitle: "Analysis Complete",
+        toastCompleteDescription: "Analysis from all models is complete.",
+      },
+      realtimeConversationTool: {
+        title: "Converse with AI Native Teacher",
+        description: "Practice English conversation with an AI in real-time and ask about any topic. The AI will adapt to your English proficiency level. (Records user voice only)",
+      },
+      concurrentConversationTool: {
+          title: "Converse with AI Native Teacher 2",
+          description: "This feature records the entire conversation (both AI and user audio). Press 'Start Recording' to begin recording all audio into a single file.",
+      },
+      readAloudTool: {
+        title: "Read Aloud Practice Tool",
+        description: "Read the provided text aloud and receive feedback on your pronunciation, accuracy, and fluency from the AI. You can also input your own text to test.",
+      },
+      handwritingAnalyzerTool: {
+          title: "AI Handwriting Analyzer",
+          description: "Upload a photo of a student's English handwriting to receive AI feedback for improving their penmanship.",
+          note: "Note: A more precise feature to overlay feedback directly on the image can be implemented using the Google Cloud Vision API."
+      },
+      audioProcessor: {
+        label: "Select audio file or record",
+        recordButton: "Record",
+        stopButton: "Stop",
+        selectedFileText: "Selected file: {fileName}",
+        recordedAudio: "Recorded audio",
+        processingButton: "Processing...",
+        processingMessage: "AI models are processing in parallel...",
+      },
+      errors: {
+        invalidFileTitle: "Invalid File Type",
+        invalidFileDescription: "Please upload a .webm file.",
+        fileReadErrorTitle: "File Read Error",
+        fileReadErrorDescription: "There was a problem reading the file.",
+        noFileTitle: "No File",
+        noFileDescription: "Please select or record a webm file first.",
+        micAccessErrorTitle: "Microphone Access Error",
+        micAccessErrorDescription: "Please allow microphone permissions.",
+        analysisErrorTitle: "Analysis Error",
+        unknownError: "An unknown error occurred.",
+      }
     }
   },
 };
