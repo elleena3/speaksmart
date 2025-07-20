@@ -17,14 +17,14 @@ import { ref, uploadString, getDownloadURL } from "firebase/storage";
 
 const SESSION_STORAGE_KEY = 'monologueSessionData';
 
-type AnalysisStep = "transcribe" | "analyze" | "report" | "upload";
+type AnalysisStep = "transcribe" | "analyze" | "upload" | "report";
 type PageStatus = "loading" | "analyzing" | "completed" | "error";
 
 const analysisSteps: { key: AnalysisStep, text: string, icon: React.FC<any> }[] = [
     { key: "transcribe", text: "음성을 텍스트로 변환", icon: AudioLines },
     { key: "analyze", text: "내용 및 발음 분석", icon: FileScan },
-    { key: "report", text: "리포트 생성", icon: Sparkles },
-    { key: "upload", text: "답변 파일 업로드", icon: UploadCloud },
+    { key: "upload", text: "답변 파일 저장", icon: UploadCloud },
+    { key: "report", text: "최종 리포트 생성", icon: Sparkles },
 ];
 
 function AnalysisProgressView({ currentStep }: { currentStep: AnalysisStep | null }) {
@@ -96,7 +96,6 @@ export default function AssessmentResultsPage() {
     
     isProcessing.current = true;
     setStatus("analyzing");
-    setAnalysisStep("transcribe");
     setErrorInfo(null);
 
     const { assessmentDetails, studentRecordingDataUri } = sessionData;
@@ -110,12 +109,12 @@ export default function AssessmentResultsPage() {
         avatarUrl: user.photoURL || '',
         createdAt: Date.now(),
         date: new Date().toISOString(),
-        status: "텍스트 변환 중",
+        status: "분석 중",
     });
 
     try {
-        // Step 1 & 2: Transcription and Content/Pronunciation Analysis in one flow
-        const analysisResult = await generateMonologueAnalysis({
+        setAnalysisStep("transcribe");
+        const analysisPromise = generateMonologueAnalysis({
             studentRecordingUrl: studentRecordingDataUri,
             activityPrompt: assessmentDetails.prompt,
             expectedFormat: assessmentDetails.expectedFormat || "",
@@ -124,27 +123,24 @@ export default function AssessmentResultsPage() {
             evaluationModel: assessmentDetails.evaluationModel,
             useRubric: assessmentDetails.useRubric || false,
         });
+        
+        // While AI is analyzing, start uploading the file in parallel
+        setAnalysisStep("analyze"); 
+        const storageRef = ref(storage, `recordings/${user.uid}_${assessmentDetails.id}_${Date.now()}.webm`);
+        const uploadPromise = uploadString(storageRef, studentRecordingDataUri, 'data_url');
+        
+        const [analysisResult, uploadSnapshot] = await Promise.all([analysisPromise, uploadPromise]);
+        
+        setAnalysisStep("upload");
+        const downloadURL = await getDownloadURL(uploadSnapshot.ref);
 
-        // Step 3: Report Generation (Updating Firestore with analysis results)
         setAnalysisStep("report");
         await updateDoc(resultDocRef, {
             ...analysisResult,
-            status: "리포트 생성 중",
-        });
-        
-        // Step 4: File Upload to Storage
-        setAnalysisStep("upload");
-        const storageRef = ref(storage, `recordings/${user.uid}_${assessmentDetails.id}_${Date.now()}.webm`);
-        const snapshot = await uploadString(storageRef, studentRecordingDataUri, 'data_url');
-        const downloadURL = await getDownloadURL(snapshot.ref);
-
-        // Final Update with download URL and completed status
-        await updateDoc(resultDocRef, {
             studentRecordingUrl: downloadURL,
             status: '채점 완료',
         });
         
-        // Update assessment aggregate data
         const assessmentRef = doc(db, "assessments", assessmentDetails.id);
         const resultsCollection = collection(db, "results");
         const q = query(resultsCollection, where("assessmentId", "==", assessmentDetails.id), where("status", "==", "채점 완료"));
@@ -165,7 +161,7 @@ export default function AssessmentResultsPage() {
       if (e.message && (e.message.includes("overloaded") || e.message.includes("503"))) {
           errorMessage = "AI 모델이 과부하 상태입니다. 잠시 후 다시 시도하거나, 교사에게 문의하여 다른 AI 모델로 평가를 변경해달라고 요청할 수 있습니다.";
       } else {
-          errorMessage = `AI 분석 중 오류가 발생했습니다. 문제가 지속되면 관리자에게 문의하세요.`;
+          errorMessage = `AI 분석 중 오류가 발생했습니다: ${e.message}`;
       }
       setErrorInfo({ message: errorMessage });
       setStatus("error");
@@ -183,6 +179,7 @@ export default function AssessmentResultsPage() {
   useEffect(() => {
     if (authLoading || !user || !id) return;
     
+    // Check for new submission data first.
     const sessionDataRaw = sessionStorage.getItem(SESSION_STORAGE_KEY);
     if (sessionDataRaw && !isProcessing.current) {
         const sessionData = JSON.parse(sessionDataRaw);
@@ -235,22 +232,15 @@ export default function AssessmentResultsPage() {
             } else if (latestResult.status === '오류') {
                 setStatus('error');
                 setErrorInfo({ message: latestResult.aiFeedback || '알 수 없는 오류가 발생했습니다.' });
-            } else if (latestResult.status === '텍스트 변환 중') {
+            } else if (latestResult.status === '분석 중') {
                 setStatus('analyzing');
-                setAnalysisStep('transcribe');
-            } else if (latestResult.status === '리포트 생성 중') {
-                setStatus('analyzing');
-                setAnalysisStep('report');
-            } else if (staleStatuses.includes(latestResult.status)) {
-                 // Handle cases where the process might have been stuck
-                setStatus('error');
-                setErrorInfo({ message: '이전 분석이 비정상적으로 종료되었습니다. 평가로 돌아가 다시 시도해주세요.'});
+            } else { // Handle legacy or stuck statuses
+                 setStatus('error');
+                 setErrorInfo({ message: '이전 분석이 비정상적으로 종료되었습니다. 평가로 돌아가 다시 시도해주세요.'});
             }
         }
     }
     
-    const staleStatuses = ["분석 중", "파일 업로드 중...", "내용 및 발음 분석 중...", "리포트 생성 중", "업로드"];
-
     const handleError = (err: any) => {
         console.error("Error listening to result:", err);
         setErrorInfo({ message: "결과를 실시간으로 업데이트하는 중 오류가 발생했습니다."});
@@ -271,7 +261,7 @@ export default function AssessmentResultsPage() {
   
   if (status === "analyzing") {
     return (
-      <div className="flex flex-col items-center justify-center text-center p-8 h-96">
+      <div className="flex flex-col items-center justify-center text-center p-8 min-h-[30rem]">
         <AnalysisProgressView currentStep={analysisStep} />
       </div>
     );
@@ -317,3 +307,5 @@ export default function AssessmentResultsPage() {
 
   return null;
 }
+
+    
