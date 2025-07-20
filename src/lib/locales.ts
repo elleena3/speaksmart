@@ -66,7 +66,9 @@ export const translations = {
       delete: "삭제",
       openMenu: "메뉴 열기",
       noScore: "해당 없음",
-      viewAllAssessments: "모든 평가 보기"
+      viewAllAssessments: "모든 평가 보기",
+      noAssessments: "생성된 평가가 없습니다.",
+      noResults: "결과 없음",
     },
     teacherAssessments: {
       title: "평가 관리",
@@ -281,7 +283,9 @@ export const translations = {
         delete: "Delete",
         openMenu: "Open menu",
         noScore: "N/A",
-        viewAllAssessments: "View All Assessments"
+        viewAllAssessments: "View All Assessments",
+        noAssessments: "No assessments created.",
+        noResults: "No results",
     },
     teacherAssessments: {
       title: "Assessment Management",

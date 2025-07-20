@@ -157,14 +157,14 @@ export default function TeacherDashboard() {
                           </Button>
                        </Link>
                     ) : (
-                      <span className="text-xs text-muted-foreground">결과 없음</span>
+                      <span className="text-xs text-muted-foreground">{t.teacherDashboard.noResults}</span>
                     )}
                   </TableCell>
                 </TableRow>
               )) : (
                 <TableRow>
                   <TableCell colSpan={4} className="h-24 text-center">
-                    생성된 평가가 없습니다.
+                    {t.teacherDashboard.noAssessments}
                   </TableCell>
                 </TableRow>
               )}
