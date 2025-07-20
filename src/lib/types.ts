@@ -88,10 +88,10 @@ export type ResultStatus =
   | "채점 완료" 
   | "오류" 
   | "분석 중"
-  | "파일 업로드 중..."
-  | "텍스트 변환 중"
-  | "내용 및 발음 분석 중..."
-  | "리포트 생성 중";
+  | "분석 중: upload"
+  | "분석 중: transcribe"
+  | "분석 중: analyze"
+  | "분석 중: report";
 
 
 export type RubricScores = {

@@ -13,7 +13,7 @@ import { Loader2, User, ArrowRight, CheckCircle, XCircle } from "lucide-react"
 import { type TeacherAssessment, type StudentResult } from "@/lib/types";
 import { useAuth, mockStudents } from "@/context/auth-context";
 import { useToast } from "@/hooks/use-toast";
-import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, orderBy } from 'firebase/firestore';
 import { db } from "@/lib/firebase";
 import { format } from "date-fns";
 
@@ -62,7 +62,12 @@ export default function AssessmentSubmissionsPage() {
         const resultsMap = new Map<string, StudentResult>();
         resultsSnapshot.forEach(doc => {
             const result = { id: doc.id, ...doc.data() } as StudentResult;
-            resultsMap.set(result.studentId, result);
+            
+            // Handle multiple attempts: only keep the latest one for the summary view
+            const existingResult = resultsMap.get(result.studentId);
+            if (!existingResult || (result.createdAt || 0) > (existingResult.createdAt || 0)) {
+                resultsMap.set(result.studentId, result);
+            }
         });
 
         const targetStudents = assessmentData.targetStudentIds === 'all'
@@ -162,7 +167,7 @@ export default function AssessmentSubmissionsPage() {
                     <TableCell>{result?.contentScore ? `${result.contentScore}%` : "N/A"}</TableCell>
                     <TableCell>{result?.createdAt ? format(new Date(result.createdAt), 'yyyy-MM-dd') : 'N/A'}</TableCell>
                     <TableCell className="text-right">
-                       {result && <Link href={`/teacher/assessment/${assessmentId}/${result.id}`}>
+                       {result && <Link href={`/teacher/assessment/${assessmentId}/${student.uid}`}>
                          <Button variant="outline" size="sm">
                            결과 보기 <ArrowRight className="ml-2 h-4 w-4" />
                          </Button>

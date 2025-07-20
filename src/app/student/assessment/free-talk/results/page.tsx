@@ -2,14 +2,14 @@
 "use client";
 
 import { FreeTalkFeedbackView } from "./free-talk-feedback-view";
-import { GrowthView } from "../../[id]/results/growth-view";
+import { GrowthView } from "./growth-view";
 import { useRouter, notFound, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from "react";
 import { type StudentResult, type TeacherAssessment } from "@/lib/types";
 import { useAuth } from "@/context/auth-context";
 import { Loader2 } from "lucide-react";
 import { db } from "@/lib/firebase";
-import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, getDoc, orderBy } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 
 const SESSION_STORAGE_KEY = 'freeTalkSessionData';
@@ -27,14 +27,6 @@ export default function FreeTalkResultsPage() {
 
     useEffect(() => {
         if(authLoading || !user || !assessmentId) return;
-
-        // If processing page redirects here, it won't have sessionStorage data.
-        // This will now only fetch completed data.
-        const sessionDataRaw = sessionStorage.getItem(SESSION_STORAGE_KEY);
-        if (sessionDataRaw) {
-            router.replace(`/student/assessment/free-talk/processing?id=${assessmentId}`);
-            return;
-        }
         
         const fetchResults = async () => {
             try {
@@ -42,19 +34,17 @@ export default function FreeTalkResultsPage() {
                     collection(db, "results"),
                     where("assessmentId", "==", assessmentId),
                     where("studentId", "==", user.uid),
-                    where("status", "==", "채점 완료")
+                    where("status", "==", "채점 완료"),
+                    orderBy("createdAt", "asc")
                 );
 
                 const resultsSnapshot = await getDocs(q);
                 if (resultsSnapshot.empty) {
-                    // This can happen if user refreshes processing page, then comes here.
-                    // Guide them to dashboard as there's no result to show yet.
                     router.replace(`/student/dashboard`); 
                     return;
                 }
 
                 const dbResults: StudentResult[] = resultsSnapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
-                dbResults.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
                 setResults(dbResults);
                 
                 const assessmentRef = doc(db, 'assessments', assessmentId);
