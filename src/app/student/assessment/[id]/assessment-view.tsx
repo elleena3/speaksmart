@@ -175,18 +175,15 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
         reader.readAsDataURL(audioBlob);
         reader.onloadend = () => {
             const dataUri = reader.result as string;
-            // Remove any previous session data to ensure this new submission is processed
             sessionStorage.removeItem(SESSION_STORAGE_KEY);
             
-            // Store all necessary data in session storage for the results page
             sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({
                 assessmentId: assessmentDetails.id,
-                studentRecordingDataUri: dataUri, // Pass the audio as Data URI
-                studentRecordingBlob: audioBlob, // Pass the blob for upload later
+                studentRecordingDataUri: dataUri,
                 assessmentDetails: assessmentDetails, 
             }));
     
-            router.push(`/student/assessment/${assessmentDetails.id}/results`);
+            router.push(`/student/assessment/${assessmentDetails.id}/processing`);
         };
         reader.onerror = (error) => {
              console.error("Error converting blob to data URI:", error);
@@ -197,7 +194,7 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
     } catch (error) {
         console.error("Error submitting audio:", error);
         toast({ title: "제출 오류", description: "답변을 제출하는 중 오류가 발생했습니다.", variant: "destructive" });
-        setRecordingState("recorded"); // Allow user to try again
+        setRecordingState("recorded");
     }
   }
   

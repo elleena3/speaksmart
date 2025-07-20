@@ -1,78 +1,15 @@
+
 "use client";
 
 import { GrowthView } from "./growth-view";
 import { useParams, useRouter, notFound, useSearchParams } from 'next/navigation';
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { type StudentResult, type TeacherAssessment } from "@/lib/types";
 import { useAuth } from "@/context/auth-context";
-import { Loader2, AlertTriangle, CheckCircle2, UploadCloud, AudioLines, FileScan, Sparkles } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Loader2 } from "lucide-react";
 import { db } from "@/lib/firebase";
-import { collection, query, where, onSnapshot, doc, updateDoc, getDocs, getDoc, addDoc } from "firebase/firestore";
-import { processAndAnalyzeMonologue } from "@/ai/flows/generate-monologue-analysis-flow";
+import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
 import { FeedbackView } from "./feedback-view";
-
-const SESSION_STORAGE_KEY = 'monologueSessionData';
-
-type AnalysisStep = "upload" | "transcribe" | "analyze" | "report";
-type PageStatus = "loading" | "analyzing" | "completed" | "error";
-
-const analysisSteps: { key: AnalysisStep, text: string, icon: React.FC<any> }[] = [
-    { key: "upload", text: "답변 파일 업로드", icon: UploadCloud },
-    { key: "transcribe", text: "음성을 텍스트로 변환", icon: AudioLines },
-    { key: "analyze", text: "내용 및 발음 분석", icon: FileScan },
-    { key: "report", text: "리포트 생성", icon: Sparkles },
-];
-
-function AnalysisProgressView({ currentStep }: { currentStep: AnalysisStep | null }) {
-    const getCurrentStepIndex = () => {
-        if (!currentStep) return -1;
-        return analysisSteps.findIndex(step => step.key === currentStep);
-    }
-    const currentStepIndex = getCurrentStepIndex();
-
-    return (
-        <Card className="w-full max-w-lg">
-            <CardHeader>
-                <CardTitle>AI 분석 진행 중</CardTitle>
-                <CardDescription>답변을 분석하고 있습니다. 이 과정은 최대 1-2분 소요될 수 있습니다.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6 pt-6">
-                <ul className="space-y-4">
-                    {analysisSteps.map((step, index) => {
-                        const isCompleted = index < currentStepIndex;
-                        const isCurrent = index === currentStepIndex;
-                        
-                        return (
-                            <li key={step.key} className="flex items-center gap-4">
-                                <div className="flex-shrink-0">
-                                    {isCompleted ? (
-                                        <CheckCircle2 className="h-6 w-6 text-green-500" />
-                                    ) : isCurrent ? (
-                                        <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                                    ) : (
-                                        <step.icon className="h-6 w-6 text-muted-foreground" />
-                                    )}
-                                </div>
-                                <span className={`font-medium ${isCompleted ? 'text-green-600' : isCurrent ? 'text-primary' : 'text-muted-foreground'}`}>
-                                    {step.text}
-                                </span>
-                            </li>
-                        );
-                    })}
-                </ul>
-            </CardContent>
-        </Card>
-    );
-}
-
-type MonologueSessionData = {
-    assessmentId: string, 
-    studentRecordingDataUri: string, 
-    assessmentDetails: TeacherAssessment
-};
-
 
 export default function AssessmentResultsPage() {
   const { user, loading: authLoading } = useAuth();
@@ -83,212 +20,80 @@ export default function AssessmentResultsPage() {
   
   const [results, setResults] = useState<StudentResult[]>([]);
   const [assessment, setAssessment] = useState<TeacherAssessment | null>(null);
-  const [analysisStep, setAnalysisStep] = useState<AnalysisStep | null>(null);
-  const [status, setStatus] = useState<PageStatus>("loading");
-  const [errorInfo, setErrorInfo] = useState<{ message: string } | null>(null);
+  const [status, setStatus] = useState<"loading" | "completed">("loading");
   
-  const isProcessing = useRef(false);
-
-  const startNewAnalysis = useCallback(async (sessionData: MonologueSessionData) => {
-    if (!user || isProcessing.current) return;
-    
-    isProcessing.current = true;
-    setStatus("analyzing");
-    setErrorInfo(null);
-    console.log("[Monologue Analysis] Starting new analysis process.");
-
-    const { assessmentDetails, studentRecordingDataUri } = sessionData;
-    
-    // Create a preliminary document in Firestore to get an ID
-    const resultDocRef = await addDoc(collection(db, "results"), {
-        studentId: user.uid,
-        assessmentId: assessmentDetails.id,
-        assessmentTitle: assessmentDetails.title,
-        teacherUid: assessmentDetails.uid,
-        name: user.displayName || "Student",
-        avatarUrl: user.photoURL || '',
-        createdAt: Date.now(),
-        date: new Date().toISOString(),
-        status: "분석 중: upload", // Initial status
-    });
-    console.log(`[Monologue Analysis] Created preliminary result document: ${resultDocRef.id}`);
-
-    try {
-        await processAndAnalyzeMonologue({
-            resultId: resultDocRef.id,
-            studentRecordingDataUri: studentRecordingDataUri,
-            activityPrompt: assessmentDetails.prompt,
-            expectedFormat: assessmentDetails.expectedFormat || "",
-            studentName: user.displayName || "Student",
-            assessmentTitle: assessmentDetails.title,
-            evaluationModel: assessmentDetails.evaluationModel,
-            useRubric: assessmentDetails.useRubric || false,
-        });
-
-        console.log("[Monologue Analysis] AI flow completed successfully.");
-
-        // Update the overall assessment stats
-        const assessmentRef = doc(db, "assessments", assessmentDetails.id);
-        const resultsCollection = collection(db, "results");
-        const q = query(resultsCollection, where("assessmentId", "==", assessmentDetails.id), where("status", "==", "채점 완료"));
-
-        const querySnapshot = await getDocs(q);
-        const scores = querySnapshot.docs.map(d => (d.data() as StudentResult).contentScore || 0);
-        const newSubmissionCount = querySnapshot.docs.length;
-        const newAverage = newSubmissionCount > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / newSubmissionCount) : 0;
-        
-        await updateDoc(assessmentRef, {
-            submissionCount: newSubmissionCount,
-            averageScore: newAverage
-        });
-        console.log(`[Monologue Analysis] Updated assessment stats for ${assessmentDetails.id}.`);
-        
-    } catch (e: any) {
-      console.error("[Monologue Analysis] Error during analysis flow:", e);
-      let errorMessage = "AI 분석 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
-      if (e.message && (e.message.includes("overloaded") || e.message.includes("503"))) {
-          errorMessage = "AI 모델이 과부하 상태입니다. 잠시 후 다시 시도하거나, 교사에게 문의하여 다른 AI 모델로 평가를 변경해달라고 요청할 수 있습니다.";
-      } else {
-          errorMessage = `AI 분석 중 오류가 발생했습니다: ${e.message}`;
-      }
-      setErrorInfo({ message: errorMessage });
-      setStatus("error");
-      await updateDoc(resultDocRef, { 
-          status: '오류', 
-          aiFeedback: errorMessage
-      });
-    } finally {
-        sessionStorage.removeItem(SESSION_STORAGE_KEY);
-        isProcessing.current = false;
-        console.log("[Monologue Analysis] Analysis process finished.");
-        // The onSnapshot listener will automatically handle the UI update to "completed".
-    }
-  }, [user]);
-
   useEffect(() => {
     if (authLoading || !user || !id) return;
     
-    // Check for a new submission in sessionStorage first.
-    const sessionDataRaw = sessionStorage.getItem(SESSION_STORAGE_KEY);
-    if (sessionDataRaw) {
-        const sessionData = JSON.parse(sessionDataRaw);
-        if (sessionData.assessmentId === id && !isProcessing.current) {
-            startNewAnalysis(sessionData);
+    const fetchResults = async () => {
+      try {
+        const q = query(
+            collection(db, "results"),
+            where("assessmentId", "==", id),
+            where("studentId", "==", user.uid),
+            where("status", "==", "채점 완료")
+        );
+
+        const resultsSnapshot = await getDocs(q);
+
+        if (resultsSnapshot.empty) {
+          console.warn("No completed results found for this assessment.");
+          router.replace(`/student/dashboard`); 
+          return;
         }
-    }
 
-    // This is the main listener for result changes.
-    const q = query(
-        collection(db, "results"),
-        where("assessmentId", "==", id),
-        where("studentId", "==", user.uid)
-    );
-
-    const unsubscribe = onSnapshot(q, async (snapshot) => {
-        if (isProcessing.current) return;
-
-        const dbResults: StudentResult[] = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
+        const dbResults: StudentResult[] = resultsSnapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
         dbResults.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
-        
-        const latestResult = dbResults.length > 0 ? dbResults[dbResults.length - 1] : null;
-
-        if (!assessment) {
-            const assessmentRef = doc(db, 'assessments', id as string);
-            const assessmentSnap = await getDoc(assessmentRef);
-            if (assessmentSnap.exists()) {
-                setAssessment({id: assessmentSnap.id, ...assessmentSnap.data()} as TeacherAssessment);
-            }
-        }
-        
         setResults(dbResults);
         
-        if (latestResult) {
-            console.log(`[Monologue Snapshot] Detected status change: ${latestResult.status}`);
-            if (latestResult.status === '채점 완료') {
-                setStatus("completed");
-                setAnalysisStep(null);
-            } else if (latestResult.status === '오류') {
-                setStatus('error');
-                setErrorInfo({ message: latestResult.aiFeedback || '알 수 없는 오류가 발생했습니다.' });
-            } else if (latestResult.status.startsWith('분석 중')) {
-                 const stepKey = latestResult.status.split(':')[1]?.trim() as AnalysisStep;
-                 console.log(`[Monologue Snapshot] Current step: ${stepKey}`);
-                 setAnalysisStep(stepKey || 'upload');
-                 setStatus('analyzing');
-            } else {
-                 setStatus('error');
-                 setErrorInfo({ message: '이전 분석이 비정상적으로 종료되었습니다. 평가로 돌아가 다시 시도해주세요.'});
-            }
+        const assessmentRef = doc(db, 'assessments', id as string);
+        const assessmentSnap = await getDoc(assessmentRef);
+        if (assessmentSnap.exists()) {
+            setAssessment({id: assessmentSnap.id, ...assessmentSnap.data()} as TeacherAssessment);
         } else {
-             const sessionDataExists = !!sessionStorage.getItem(SESSION_STORAGE_KEY);
-             if (!sessionDataExists) {
-                setStatus("completed"); 
-             }
+            notFound();
+            return;
         }
-    }, (err) => {
-        console.error("[Monologue Snapshot] Error listening to result:", err);
-        setErrorInfo({ message: "결과를 실시간으로 업데이트하는 중 오류가 발생했습니다."});
-        setStatus("error");
-    });
+
+        setStatus("completed");
+      } catch (err) {
+          console.error("[Results Page] Error fetching results:", err);
+          router.replace(`/student/dashboard`); 
+      }
+    };
     
-    return () => unsubscribe();
-  }, [id, user, authLoading, assessment, startNewAnalysis]);
+    fetchResults();
+
+  }, [id, user, authLoading, router]);
   
   if (status === "loading" || authLoading) {
     return (
       <div className="flex flex-col items-center justify-center text-center p-8 h-96">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="mt-4 text-muted-foreground">결과를 불러오는 중...</p>
       </div>
     );
   }
   
-  if (status === "analyzing") {
-    return (
-      <div className="flex flex-col items-center justify-center text-center p-8 min-h-[30rem]">
-        <AnalysisProgressView currentStep={analysisStep} />
-      </div>
-    );
-  }
-
-  if (status === 'error') {
-    return (
-        <Card className="flex flex-col items-center justify-center text-center p-8 min-h-80 bg-destructive/10 border-destructive">
-            <CardHeader>
-                <AlertTriangle className="h-12 w-12 text-destructive mx-auto mb-4" />
-                <CardTitle className="text-destructive">분석 오류</CardTitle>
-                <CardDescription className="text-destructive-foreground">{errorInfo?.message || "AI가 답변을 분석하는 데 실패했습니다. 다시 시도해주세요."}</CardDescription>
-            </CardHeader>
-            <CardContent>
-                <Button variant="secondary" onClick={() => router.push(`/student/assessment/${id}`)}>
-                    평가로 돌아가기
-                </Button>
-            </CardContent>
-        </Card>
-    );
-  }
-
   if (status === 'completed' && assessment) {
-    const completedResults = results.filter(r => r.status === '채점 완료');
-    if (completedResults.length === 0) {
+    if (results.length === 0) {
       return (
          <div className="text-center p-8">
-             <p>이 평가에 대한 제출된 결과가 없습니다. 평가를 먼저 완료해주세요.</p>
+             <p>이 평가에 대한 완료된 결과가 없습니다.</p>
              <Button onClick={() => router.push(`/student/assessment/${id}`)} className="mt-4">평가 시작하기</Button>
          </div>
       );
     }
     
-    if (completedResults.length === 1) {
-      return <FeedbackView result={completedResults[0]} assessment={assessment} isLatestAttempt={true} />;
+    if (results.length === 1) {
+      return <FeedbackView result={results[0]} assessment={assessment} isLatestAttempt={true} />;
     }
 
-    if (completedResults.length > 1) {
+    if (results.length > 1) {
       const attemptNumber = searchParams.get('attempt');
-      return <GrowthView results={completedResults} assessment={assessment} defaultTab={`attempt-${attemptNumber || completedResults.length}`} />;
+      return <GrowthView results={results} assessment={assessment} defaultTab={`attempt-${attemptNumber || results.length}`} />;
     }
   }
 
   return null;
 }
-
-    
