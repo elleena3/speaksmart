@@ -44,16 +44,28 @@ export default function AssessmentSubmissionsPage() {
             notFound();
             return;
         }
-        setAssessment({ id: assessmentSnap.id, ...assessmentSnap.data() } as TeacherAssessment);
+        const currentAssessment = { id: assessmentSnap.id, ...assessmentSnap.data() } as TeacherAssessment;
+        setAssessment(currentAssessment);
         
+        // Fetch all results for the assessment, regardless of teacherUid first
         const resultsQuery = query(
             collection(db, "results"), 
             where("assessmentId", "==", assessmentId),
-            where("teacherUid", "==", user.uid),
             orderBy("createdAt", "desc")
         );
         const resultsSnapshot = await getDocs(resultsQuery);
-        const resultsData = resultsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as StudentResult));
+        
+        // Filter in code to handle legacy data without teacherUid
+        const resultsData = resultsSnapshot.docs
+          .map(doc => ({ id: doc.id, ...doc.data() } as StudentResult))
+          .filter(result => {
+              // Keep if it matches the current teacher's UID
+              if (result.teacherUid === user.uid) return true;
+              // Keep legacy data if it has no teacherUid but belongs to the assessment
+              // This ensures old results are still visible
+              if (!result.teacherUid && currentAssessment.uid === user.uid) return true;
+              return false;
+          });
         
         setStudentResults(resultsData);
 
