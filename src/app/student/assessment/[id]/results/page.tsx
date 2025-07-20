@@ -205,15 +205,18 @@ export default function AssessmentResultsPage() {
   useEffect(() => {
     if (authLoading || !user || !id) return;
 
-    // Check for new submission data first.
+    // Check for new submission data first. This is the highest priority.
     const sessionDataRaw = sessionStorage.getItem(SESSION_STORAGE_KEY);
-    if (sessionDataRaw && !isProcessing.current) {
+    if (sessionDataRaw) {
         const sessionData = JSON.parse(sessionDataRaw);
-        if (sessionData.assessmentId === id) {
+        if (sessionData.assessmentId === id && !isProcessing.current) {
             processMonologueSubmission(sessionData);
             return; // Stop further execution until processing is done.
         }
     }
+    
+    // If we are currently processing, don't set up the Firestore listener.
+    if(isProcessing.current) return;
     
     const q = query(
         collection(db, "results"),
@@ -222,6 +225,7 @@ export default function AssessmentResultsPage() {
     );
 
     const handleSnapshot = async (snapshot: any) => {
+        // Double-check processing flag to avoid race conditions.
         if (isProcessing.current) return;
 
         if (snapshot.empty) {
@@ -230,7 +234,7 @@ export default function AssessmentResultsPage() {
             if (assessmentSnap.exists()) {
                 setAssessment({id: assessmentSnap.id, ...assessmentSnap.data()} as TeacherAssessment);
                 setResults([]);
-                setStatus("completed"); 
+                setStatus("completed"); // No results yet, so show empty state on "completed" status.
             } else {
                 notFound();
             }
@@ -257,9 +261,10 @@ export default function AssessmentResultsPage() {
             setStatus('error');
             setErrorInfo({ message: latestResult.aiFeedback || '알 수 없는 오류가 발생했습니다.' });
         } else if (latestResult && !isProcessing.current) {
-            // If there's an incomplete result and we are not processing, it's likely an orphaned record. Treat as error.
+            // An incomplete result exists, and we are not processing it.
+            // This is an error state, likely from a previous failed attempt.
             setStatus('error');
-            setErrorInfo({ message: '이전 분석이 비정상적으로 종료되었습니다. 다시 시도해주세요.'});
+            setErrorInfo({ message: '이전 분석이 비정상적으로 종료되었습니다. 평가로 돌아가 다시 시도해주세요.'});
         }
     }
     
