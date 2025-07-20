@@ -31,34 +31,27 @@ export default function TeacherDashboard() {
         const assessmentsQuery = query(
             collection(db, "assessments"), 
             where("uid", "==", user.uid)
-            // Removed orderBy and limit to fetch all and sort client-side
         );
         
-        const resultsQuery = query(
-            collection(db, "results"),
-            where("teacherUid", "==", user.uid)
-        );
-
-        const [assessmentsSnapshot, resultsSnapshot] = await Promise.all([
-            getDocs(assessmentsQuery),
-            getDocs(resultsQuery),
-        ]);
+        const assessmentsSnapshot = await getDocs(assessmentsQuery);
         
-        const assessmentsData = assessmentsSnapshot.docs.map(doc => {
+        let assessmentsData: TeacherAssessment[] = [];
+        for (const doc of assessmentsSnapshot.docs) {
             const assessmentData = { id: doc.id, ...doc.data() } as TeacherAssessment;
             
-            const relevantResults = resultsSnapshot.docs
-                .map(rDoc => rDoc.data())
-                .filter(r => r.assessmentId === assessmentData.id);
-
-            const uniqueStudentIds = new Set(relevantResults.map(r => r.studentId));
+            // For each assessment, get its results to calculate submissionCount
+            const resultsQuery = query(
+                collection(db, "results"),
+                where("assessmentId", "==", assessmentData.id)
+            );
+            const resultsSnapshot = await getDocs(resultsQuery);
+            const uniqueStudentIds = new Set(resultsSnapshot.docs.map(rDoc => rDoc.data().studentId));
             
             assessmentData.submissionCount = uniqueStudentIds.size;
-            
-            return assessmentData;
-        });
+            assessmentsData.push(assessmentData);
+        }
         
-        // Sort client-side to handle missing createdAt fields
+        // Sort client-side to handle missing createdAt fields safely
         assessmentsData.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 
         // Limit to the 5 most recent assessments after sorting
