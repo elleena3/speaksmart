@@ -120,7 +120,7 @@ export default function ProcessingPage() {
                 studentId: user.uid,
                 assessmentId: assessmentDetails.id,
                 assessmentTitle: assessmentDetails.title,
-                teacherUid: assessmentDetails.uid,
+                teacherUid: assessmentDetails.uid, // <-- Ensure teacherUid is set initially
                 name: user.displayName || "Student",
                 avatarUrl: user.photoURL || '',
                 createdAt: Date.now(),
@@ -151,7 +151,7 @@ export default function ProcessingPage() {
                 }
             });
 
-            // Call the main analysis flow
+            // Call the main analysis flow, passing teacherUid explicitly
             await generateMonologueAnalysisFlow({
                 resultId: resultDocRef.id,
                 studentRecordingDataUri: studentRecordingDataUri,

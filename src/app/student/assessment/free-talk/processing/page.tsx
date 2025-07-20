@@ -120,7 +120,7 @@ export default function DialogueProcessingPage() {
                 studentId: user.uid,
                 assessmentId: assessment.id,
                 assessmentTitle: assessment.title,
-                teacherUid: assessment.uid,
+                teacherUid: assessment.uid, // <-- Ensure teacherUid is set initially
                 name: user.displayName || "Student",
                 avatarUrl: user.photoURL || '',
                 createdAt: Date.now(),
@@ -167,7 +167,7 @@ export default function DialogueProcessingPage() {
                 .map(turn => turn.text)
                 .join(' ');
             
-            // Call the main analysis flow
+            // Call the main analysis flow, passing teacherUid explicitly
             await generateDialogueAnalysis({
                 resultId: resultDocRef.id,
                 teacherUid: assessment.uid,
