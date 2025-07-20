@@ -1,4 +1,3 @@
-
 "use client";
 
 import { GrowthView } from "./growth-view";
@@ -16,13 +15,13 @@ import { FeedbackView } from "./feedback-view";
 
 const SESSION_STORAGE_KEY = 'monologueSessionData';
 
-type AnalysisStep = "transcribe" | "analyze" | "upload" | "report";
+type AnalysisStep = "upload" | "transcribe" | "analyze" | "report";
 type PageStatus = "loading" | "analyzing" | "completed" | "error";
 
 const analysisSteps: { key: AnalysisStep, text: string, icon: React.FC<any> }[] = [
+    { key: "upload", text: "답변 파일 업로드", icon: UploadCloud },
     { key: "transcribe", text: "음성을 텍스트로 변환", icon: AudioLines },
     { key: "analyze", text: "내용 및 발음 분석", icon: FileScan },
-    { key: "upload", text: "답변 파일 업로드", icon: UploadCloud },
     { key: "report", text: "리포트 생성", icon: Sparkles },
 ];
 
@@ -96,6 +95,7 @@ export default function AssessmentResultsPage() {
     isProcessing.current = true;
     setStatus("analyzing");
     setErrorInfo(null);
+    console.log("[Monologue Analysis] Starting new analysis process.");
 
     const { assessmentDetails, studentRecordingDataUri } = sessionData;
     
@@ -109,11 +109,13 @@ export default function AssessmentResultsPage() {
         avatarUrl: user.photoURL || '',
         createdAt: Date.now(),
         date: new Date().toISOString(),
-        status: "분석 중: transcribe", // Initial status
+        status: "분석 중: upload", // Initial status
     });
+    console.log(`[Monologue Analysis] Created preliminary result document: ${resultDocRef.id}`);
 
     try {
-        const analysisResult = await processAndAnalyzeMonologue({
+        await processAndAnalyzeMonologue({
+            resultId: resultDocRef.id,
             studentRecordingDataUri: studentRecordingDataUri,
             activityPrompt: assessmentDetails.prompt,
             expectedFormat: assessmentDetails.expectedFormat || "",
@@ -121,15 +123,10 @@ export default function AssessmentResultsPage() {
             assessmentTitle: assessmentDetails.title,
             evaluationModel: assessmentDetails.evaluationModel,
             useRubric: assessmentDetails.useRubric || false,
-            resultId: resultDocRef.id,
         });
 
-        // Update the document with the full analysis result
-        await updateDoc(resultDocRef, {
-            ...analysisResult,
-            status: '채점 완료',
-        });
-        
+        console.log("[Monologue Analysis] AI flow completed successfully.");
+
         // Update the overall assessment stats
         const assessmentRef = doc(db, "assessments", assessmentDetails.id);
         const resultsCollection = collection(db, "results");
@@ -144,9 +141,10 @@ export default function AssessmentResultsPage() {
             submissionCount: newSubmissionCount,
             averageScore: newAverage
         });
+        console.log(`[Monologue Analysis] Updated assessment stats for ${assessmentDetails.id}.`);
         
     } catch (e: any) {
-      console.error("Error generating analysis:", e);
+      console.error("[Monologue Analysis] Error during analysis flow:", e);
       let errorMessage = "AI 분석 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
       if (e.message && (e.message.includes("overloaded") || e.message.includes("503"))) {
           errorMessage = "AI 모델이 과부하 상태입니다. 잠시 후 다시 시도하거나, 교사에게 문의하여 다른 AI 모델로 평가를 변경해달라고 요청할 수 있습니다.";
@@ -162,6 +160,7 @@ export default function AssessmentResultsPage() {
     } finally {
         sessionStorage.removeItem(SESSION_STORAGE_KEY);
         isProcessing.current = false;
+        console.log("[Monologue Analysis] Analysis process finished.");
         // The onSnapshot listener will automatically handle the UI update to "completed".
     }
   }, [user]);
@@ -189,7 +188,7 @@ export default function AssessmentResultsPage() {
         if (isProcessing.current) return;
 
         const dbResults: StudentResult[] = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
-        dbResults.sort((a, b) => (a.createdAt || 0) - (a.createdAt || 0));
+        dbResults.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
         
         const latestResult = dbResults.length > 0 ? dbResults[dbResults.length - 1] : null;
 
@@ -204,6 +203,7 @@ export default function AssessmentResultsPage() {
         setResults(dbResults);
         
         if (latestResult) {
+            console.log(`[Monologue Snapshot] Detected status change: ${latestResult.status}`);
             if (latestResult.status === '채점 완료') {
                 setStatus("completed");
                 setAnalysisStep(null);
@@ -211,9 +211,10 @@ export default function AssessmentResultsPage() {
                 setStatus('error');
                 setErrorInfo({ message: latestResult.aiFeedback || '알 수 없는 오류가 발생했습니다.' });
             } else if (latestResult.status.startsWith('분석 중')) {
-                 setStatus('analyzing');
                  const stepKey = latestResult.status.split(':')[1]?.trim() as AnalysisStep;
-                 setAnalysisStep(stepKey || 'transcribe');
+                 console.log(`[Monologue Snapshot] Current step: ${stepKey}`);
+                 setAnalysisStep(stepKey || 'upload');
+                 setStatus('analyzing');
             } else {
                  setStatus('error');
                  setErrorInfo({ message: '이전 분석이 비정상적으로 종료되었습니다. 평가로 돌아가 다시 시도해주세요.'});
@@ -225,7 +226,7 @@ export default function AssessmentResultsPage() {
              }
         }
     }, (err) => {
-        console.error("Error listening to result:", err);
+        console.error("[Monologue Snapshot] Error listening to result:", err);
         setErrorInfo({ message: "결과를 실시간으로 업데이트하는 중 오류가 발생했습니다."});
         setStatus("error");
     });

@@ -1,4 +1,3 @@
-
 'use server';
 
 /**
@@ -41,8 +40,8 @@ type MonologueProcessingInput = z.infer<typeof MonologueProcessingInputSchema>;
 // Main exported function to be called by the client
 export async function processAndAnalyzeMonologue(
     input: MonologueProcessingInput
-): Promise<z.infer<typeof CombinedAnalysisOutputSchema>> {
-  return generateMonologueAnalysisFlow(input);
+): Promise<void> {
+  await generateMonologueAnalysisFlow(input);
 }
 
 
@@ -55,7 +54,7 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 2, delay = 1500): Pr
     } catch (error: any) {
       lastError = error;
       if (error.message && (error.message.includes('overloaded') || error.message.includes('503'))) {
-        console.warn(`Attempt ${i + 1} failed due to model overload. Retrying in ${delay}ms...`);
+        console.warn(`[withRetry] Attempt ${i + 1} failed due to model overload. Retrying in ${delay}ms...`);
         if (i < retries) {
           await new Promise(resolve => setTimeout(resolve, delay));
         }
@@ -237,33 +236,39 @@ const generateMonologueAnalysisFlow = ai.defineFlow(
   {
     name: 'generateMonologueAnalysisFlow',
     inputSchema: MonologueProcessingInputSchema,
-    outputSchema: CombinedAnalysisOutputSchema,
+    outputSchema: CombinedAnalysisOutputSchema.extend({ studentRecordingUrl: z.string() }),
   },
   async (input) => {
     const model = input.evaluationModel || 'gemini-2.5-flash';
     const prompts = createPrompt(model);
     const resultDocRef = doc(db, "results", input.resultId);
 
-    // Step 1: Transcribe the audio
+    // Step 1: Upload File to Storage first (can happen in parallel with first AI call)
+    await updateDoc(resultDocRef, { status: "분석 중: upload" });
+    console.log("[Flow] Step 1: Uploading audio file to Storage.");
+    const studentUid = input.studentName; 
+    const uploadPath = `recordings/${studentUid}_${input.assessmentTitle}_${Date.now()}.webm`;
+    const storageRef = ref(storage, uploadPath);
+    const uploadTask = uploadString(storageRef, input.studentRecordingDataUri, 'data_url');
+    
+    // Step 2: Transcribe the audio
     await updateDoc(resultDocRef, { status: "분석 중: transcribe" });
+    console.log("[Flow] Step 2: Transcribing audio.");
     const transcriptionResult = await withRetry(() => prompts.transcription({ studentRecordingUrl: input.studentRecordingDataUri }));
     const studentTranscript = transcriptionResult.text;
 
     if (!studentTranscript || studentTranscript.trim() === "" || studentTranscript.includes('기록되지 않았습니다') || studentTranscript.includes('인식하지 못했습니다')) {
-        return {
-            studentTranscript: studentTranscript || '학생 답변을 인식하지 못했습니다.',
-            aiFeedback: '학생의 답변을 인식하지 못했습니다. 마이크 상태를 확인하고 다시 시도해주세요.',
-            teacherGuidance: '학생의 답변을 인식할 수 없어 조언을 생성할 수 없습니다.',
-            curricularRemarks: '학생의 답변이 없어 비고 작성이 불가능합니다.',
-            contentScore: 0,
-            pronunciationScore: 0,
-            pronunciationFeedback: '학생의 음성이 없어 발음 분석을 할 수 없습니다.',
-            rubricScores: { fluency: 0, pronunciation: 0, grammar: 0, vocabulary: 0, interaction: 0 },
-        }
+        throw new Error('학생 답변을 인식하지 못했습니다. 마이크 상태를 확인하고 다시 시도해주세요.');
     }
     
-    // Step 2: Content & Pronunciation Analysis (in parallel) & File Upload (in parallel)
+    // Wait for the upload to finish and get the URL
+    const uploadSnapshot = await uploadTask;
+    const downloadURL = await getDownloadURL(uploadSnapshot.ref);
+    console.log("[Flow] Audio uploaded, URL:", downloadURL);
+
+    // Step 3: Content & Pronunciation Analysis (in parallel)
     await updateDoc(resultDocRef, { status: "분석 중: analyze" });
+    console.log("[Flow] Step 3: Starting content and pronunciation analysis in parallel.");
     const analysisPromise = (async () => {
         if (input.useRubric) {
             return withRetry(() => prompts.rubric({ studentTranscript }));
@@ -290,17 +295,12 @@ const generateMonologueAnalysisFlow = ai.defineFlow(
         }
     })();
     
-    // Step 3: While AI is analyzing, upload file to Storage
-    await updateDoc(resultDocRef, { status: "분석 중: upload" });
-    const studentUid = input.studentName; 
-    const uploadPath = `recordings/${studentUid}_${input.assessmentTitle}_${Date.now()}.webm`;
-    const storageRef = ref(storage, uploadPath);
-    const uploadPromise = uploadString(storageRef, input.studentRecordingDataUri, 'data_url');
+    const analysisResult = await analysisPromise;
+    console.log("[Flow] Analysis complete.");
     
-    // Step 4: Await all parallel tasks and process results
+    // Step 4: Process results and generate final report object
     await updateDoc(resultDocRef, { status: "분석 중: report" });
-    const [analysisResult, uploadSnapshot] = await Promise.all([analysisPromise, uploadPromise]);
-    const downloadURL = await getDownloadURL(uploadSnapshot.ref);
+    console.log("[Flow] Step 4: Generating final report.");
     
     let finalResult: z.infer<typeof CombinedAnalysisOutputSchema>;
 
@@ -328,7 +328,6 @@ const generateMonologueAnalysisFlow = ai.defineFlow(
 
         finalResult = {
             studentTranscript,
-            studentRecordingUrl: downloadURL,
             contentScore: contentScore,
             pronunciationScore: pronunciationScore,
             aiFeedback: rubricText,
@@ -341,7 +340,6 @@ const generateMonologueAnalysisFlow = ai.defineFlow(
         const { contentOutput, pronunciationOutput } = analysisResult as { contentOutput: z.infer<typeof ContentAnalysisOutputSchema>, pronunciationOutput: z.infer<typeof PronunciationAnalysisOutputSchema> };
         finalResult = {
             studentTranscript,
-            studentRecordingUrl: downloadURL,
             contentScore: contentOutput.contentScore,
             aiFeedback: contentOutput.aiFeedback,
             teacherGuidance: contentOutput.teacherGuidance,
@@ -350,9 +348,16 @@ const generateMonologueAnalysisFlow = ai.defineFlow(
             pronunciationFeedback: pronunciationOutput.pronunciationFeedback,
         };
     }
+    
+    console.log("[Flow] Final report generated. Returning result.");
+    
+    // Update the main document with the final analysis and set status to complete
+    await updateDoc(resultDocRef, {
+        ...finalResult,
+        studentRecordingUrl: downloadURL,
+        status: "채점 완료"
+    });
 
-    return finalResult;
+    console.log(`[Flow] Final result document ${input.resultId} updated. Status: '채점 완료'`);
   }
 );
-
-    

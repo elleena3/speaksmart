@@ -1,4 +1,3 @@
-
 "use client";
 
 import { FreeTalkFeedbackView } from "./free-talk-feedback-view";
@@ -11,39 +10,21 @@ import { Loader2, AlertTriangle, CheckCircle2, UploadCloud, FileScan, Sparkles }
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { db } from "@/lib/firebase";
-import { collection, query, where, onSnapshot, doc, setDoc, updateDoc, getDocs, getDoc } from "firebase/firestore";
+import { collection, query, where, onSnapshot, doc, setDoc, updateDoc, getDocs, getDoc, addDoc } from "firebase/firestore";
 import { generateDialogueAnalysis } from "@/ai/flows/generate-dialogue-analysis-flow";
-import { Progress } from "@/components/ui/progress";
 
 const SESSION_STORAGE_KEY = 'freeTalkSessionData';
 
-type AnalysisStep = "upload" | "analyze" | "report";
+type AnalysisStep = "analyze" | "report";
 type PageStatus = "loading" | "analyzing" | "completed" | "error";
 
 const analysisSteps: { key: AnalysisStep, text: string, icon: React.FC<any> }[] = [
-    { key: "upload", text: "대화 내용 업로드", icon: UploadCloud },
-    { key: "analyze", text: "내용 및 발음 분석", icon: FileScan },
+    { key: "analyze", text: "대화 내용 및 발음 분석", icon: FileScan },
     { key: "report", text: "피드백 리포트 생성", icon: Sparkles },
 ];
 
 
 function AnalysisProgressView({ currentStep }: { currentStep: AnalysisStep | null }) {
-    const [progress, setProgress] = useState(0);
-    const estimatedTotalTime = 90000; // 90초 (1.5분)
-
-    useEffect(() => {
-        const interval = setInterval(() => {
-            setProgress(prev => {
-                if (prev >= 95) { // 95%에서 멈춰서 완료를 기다림
-                    clearInterval(interval);
-                    return 95;
-                }
-                return prev + 1;
-            });
-        }, estimatedTotalTime / 100); 
-
-        return () => clearInterval(interval);
-    }, []);
 
     const getCurrentStepIndex = () => {
         if (!currentStep) return -1;
@@ -57,8 +38,7 @@ function AnalysisProgressView({ currentStep }: { currentStep: AnalysisStep | nul
                 <CardTitle>AI 분석 진행 중</CardTitle>
                 <CardDescription>대화 내용을 분석하고 있습니다. 이 과정은 최대 1-2분 소요될 수 있습니다.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-                <Progress value={progress} className="w-full h-2" />
+            <CardContent className="space-y-6 pt-6">
                 <ul className="space-y-4">
                     {analysisSteps.map((step, index) => {
                         const isCompleted = index < currentStepIndex;
@@ -112,24 +92,15 @@ export default function FreeTalkResultsPage() {
         isProcessing.current = true;
         setStatus("analyzing");
         setErrorInfo(null);
+        console.log("[Dialogue Analysis] Starting new analysis process.");
 
         const resultRef = doc(collection(db, "results"));
 
         try {
             const { assessment, studentRecordingUrl, conversationHistory } = sessionData;
             
-            setAnalysisStep("upload");
-            
-            const fullConversationTranscript = conversationHistory
-                .map(turn => `${turn.role === 'user' ? '학생' : (assessment.aiVoice || 'AI')}: ${turn.text}`)
-                .join('\n');
-            const studentOnlyTranscript = conversationHistory
-                .filter(turn => turn.role === 'user')
-                .map(turn => turn.text)
-                .join(' ');
-            
-            const initialData: Partial<StudentResult> = {
-                id: resultRef.id,
+            setAnalysisStep("analyze");
+            await setDoc(resultRef, { 
                 studentId: user.uid,
                 assessmentId: assessment.id,
                 assessmentTitle: assessment.title,
@@ -138,14 +109,17 @@ export default function FreeTalkResultsPage() {
                 avatarUrl: user.photoURL || '',
                 createdAt: Date.now(),
                 date: new Date().toISOString(),
-                status: "파일 업로드 중...",
-                studentRecordingUrl: studentRecordingUrl,
-                studentTranscript: fullConversationTranscript, 
-            };
+                status: "분석 중: analyze",
+            }, { merge: true });
+            console.log(`[Dialogue Analysis] Created preliminary result doc ${resultRef.id} with status 'analyze'`);
             
-            await setDoc(resultRef, initialData, { merge: true });
-            
-            setAnalysisStep("analyze");
+            const fullConversationTranscript = conversationHistory
+                .map(turn => `${turn.role === 'user' ? '학생' : (assessment.aiVoice || 'AI')}: ${turn.text}`)
+                .join('\n');
+            const studentOnlyTranscript = conversationHistory
+                .filter(turn => turn.role === 'user')
+                .map(turn => turn.text)
+                .join(' ');
             
             const analysisResult = await generateDialogueAnalysis({
                 studentRecordingUrl: studentRecordingUrl,
@@ -158,15 +132,20 @@ export default function FreeTalkResultsPage() {
                 evaluationModel: assessment.evaluationModel,
                 useRubric: assessment.useRubric || false,
             });
+            console.log("[Dialogue Analysis] AI flow completed successfully.");
             
             setAnalysisStep("report");
+            await updateDoc(resultRef, { status: "분석 중: report" });
+            console.log("[Dialogue Analysis] Updated status to 'report'");
 
             const finalResultData: Partial<StudentResult> = {
                 ...analysisResult,
                 studentTranscript: fullConversationTranscript, 
+                studentRecordingUrl: studentRecordingUrl,
                 status: "채점 완료",
             };
             await updateDoc(resultRef, finalResultData);
+            console.log(`[Dialogue Analysis] Final result stored in ${resultRef.id}. Status: '채점 완료'`);
             
             if (assessment.id !== "free-talk-practice") {
                 const assessmentRef = doc(db, "assessments", assessment.id);
@@ -176,10 +155,11 @@ export default function FreeTalkResultsPage() {
                 const newSubmissionCount = querySnapshot.docs.length;
                 const newAverage = newSubmissionCount > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / newSubmissionCount) : 0;
                 await updateDoc(assessmentRef, { submissionCount: newSubmissionCount, averageScore: newAverage });
+                console.log(`[Dialogue Analysis] Updated assessment stats for ${assessment.id}.`);
             }
 
         } catch (e: any) {
-            console.error("Error generating feedback:", e);
+            console.error("[Dialogue Analysis] Error during analysis flow:", e);
             let errorMessage = "AI 분석 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
             if (e.message && (e.message.includes("overloaded") || e.message.includes("503"))) {
                 errorMessage = "AI 모델이 현재 과부하 상태입니다. 잠시 후 다시 시도하거나, 교사에게 문의하여 다른 AI 모델로 평가를 변경해달라고 요청할 수 있습니다.";
@@ -194,10 +174,9 @@ export default function FreeTalkResultsPage() {
         } finally {
             sessionStorage.removeItem(SESSION_STORAGE_KEY);
             isProcessing.current = false;
-            // Force a reload to fetch the new state cleanly
-            router.replace(`/student/assessment/free-talk/results?id=${assessmentId}&t=${new Date().getTime()}`);
+            console.log("[Dialogue Analysis] Analysis process finished.");
         }
-    }, [user, assessmentId, router]);
+    }, [user]);
 
     useEffect(() => {
         if(authLoading || !user || !assessmentId) return;
@@ -257,18 +236,26 @@ export default function FreeTalkResultsPage() {
             setResults(dbResults);
             
             const latestResult = dbResults[dbResults.length - 1];
-            if (latestResult && latestResult.status === '채점 완료') {
-                setStatus("completed");
-            } else if (latestResult && latestResult.status === '오류') {
-                setStatus('error');
-                setErrorInfo({ message: latestResult.aiFeedback || '알 수 없는 오류가 발생했습니다.' });
-            } else {
-                setStatus('analyzing');
+            if (latestResult) {
+                console.log(`[Dialogue Snapshot] Detected status change: ${latestResult.status}`);
+                if (latestResult.status === '채점 완료') {
+                    setStatus("completed");
+                } else if (latestResult.status === '오류') {
+                    setStatus('error');
+                    setErrorInfo({ message: latestResult.aiFeedback || '알 수 없는 오류가 발생했습니다.' });
+                } else if (latestResult.status.startsWith('분석 중')) {
+                     const stepKey = latestResult.status.split(':')[1]?.trim() as AnalysisStep;
+                     console.log(`[Dialogue Snapshot] Current step: ${stepKey}`);
+                     setAnalysisStep(stepKey || 'analyze');
+                     setStatus('analyzing');
+                } else {
+                    setStatus('analyzing'); // Fallback to analyzing
+                }
             }
         }
 
         const handleError = (err: any) => {
-            console.error("Error listening to result:", err);
+            console.error("[Dialogue Snapshot] Error listening to result:", err);
             setErrorInfo({ message: "결과를 실시간으로 업데이트하는 중 오류가 발생했습니다."});
             setStatus("error");
         }
@@ -276,7 +263,7 @@ export default function FreeTalkResultsPage() {
         const unsubscribe = onSnapshot(q, handleSnapshot, handleError);
         return () => unsubscribe();
         
-    }, [assessmentId, user, authLoading, processDialogueSubmission, assessment, router]);
+    }, [assessmentId, user, authLoading, processDialogueSubmission, assessment]);
 
 
     if (status === "loading" || authLoading) {
@@ -289,7 +276,7 @@ export default function FreeTalkResultsPage() {
 
     if (status === "analyzing") {
         return (
-            <div className="flex flex-col items-center justify-center text-center p-8 h-96">
+            <div className="flex flex-col items-center justify-center text-center p-8 min-h-[30rem]">
                 <AnalysisProgressView currentStep={analysisStep} />
             </div>
         );
@@ -335,3 +322,4 @@ export default function FreeTalkResultsPage() {
 
     return null;
 }
+
