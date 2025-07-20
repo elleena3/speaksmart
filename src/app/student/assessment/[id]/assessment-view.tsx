@@ -9,8 +9,6 @@ import { useToast } from "@/hooks/use-toast"
 import { type TeacherAssessment } from "@/lib/types"
 import { useAuth } from "@/context/auth-context"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { storage } from "@/lib/firebase"
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
 
 type RecordingState = "idle" | "countdown" | "recording" | "recorded" | "submitting";
 
@@ -171,26 +169,34 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
     setRecordingState("submitting");
 
     try {
-        toast({ title: "답변 업로드 중...", description: "파일을 업로드하고 분석 페이지로 이동합니다." });
+        toast({ title: "답변 처리 중...", description: "AI 분석 페이지로 이동합니다." });
         
-        // Remove any previous session data to ensure this new submission is processed
-        sessionStorage.removeItem(SESSION_STORAGE_KEY);
-
-        const storageRef = ref(storage, `recordings/${user.uid}_${assessmentDetails.id}_${Date.now()}.webm`);
-        const snapshot = await uploadBytes(storageRef, audioBlob);
-        const downloadURL = await getDownloadURL(snapshot.ref);
-
-        sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({
-            assessmentId: assessmentDetails.id,
-            studentRecordingUrl: downloadURL,
-            assessmentDetails: assessmentDetails, 
-        }));
-
-        router.push(`/student/assessment/${assessmentDetails.id}/results`);
+        const reader = new FileReader();
+        reader.readAsDataURL(audioBlob);
+        reader.onloadend = () => {
+            const dataUri = reader.result as string;
+            // Remove any previous session data to ensure this new submission is processed
+            sessionStorage.removeItem(SESSION_STORAGE_KEY);
+            
+            // Store all necessary data in session storage for the results page
+            sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({
+                assessmentId: assessmentDetails.id,
+                studentRecordingDataUri: dataUri, // Pass the audio as Data URI
+                studentRecordingBlob: audioBlob, // Pass the blob for upload later
+                assessmentDetails: assessmentDetails, 
+            }));
+    
+            router.push(`/student/assessment/${assessmentDetails.id}/results`);
+        };
+        reader.onerror = (error) => {
+             console.error("Error converting blob to data URI:", error);
+             toast({ title: "파일 처리 오류", description: "녹음 파일을 처리하는 중 오류가 발생했습니다.", variant: "destructive" });
+             setRecordingState("recorded");
+        };
 
     } catch (error) {
         console.error("Error submitting audio:", error);
-        toast({ title: "제출 오류", description: "답변을 업로드하는 중 오류가 발생했습니다.", variant: "destructive" });
+        toast({ title: "제출 오류", description: "답변을 제출하는 중 오류가 발생했습니다.", variant: "destructive" });
         setRecordingState("recorded"); // Allow user to try again
     }
   }
@@ -320,10 +326,10 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
         <div className="w-full max-w-xs">
             <Button size="lg" disabled className="w-full">
                 <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                업로드 중...
+                처리 중...
             </Button>
         </div>
-        <p className="text-sm text-muted-foreground">답변을 서버로 전송하고 있습니다.</p>
+        <p className="text-sm text-muted-foreground">AI 분석 페이지로 이동합니다.</p>
     </>
   );
 

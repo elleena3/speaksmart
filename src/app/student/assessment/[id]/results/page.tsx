@@ -10,10 +10,11 @@ import { useAuth } from "@/context/auth-context";
 import { Loader2, AlertTriangle, CheckCircle2, UploadCloud, AudioLines, FileScan, Sparkles } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { db } from "@/lib/firebase";
+import { db, storage } from "@/lib/firebase";
 import { collection, query, where, onSnapshot, doc, setDoc, updateDoc, getDocs, getDoc } from "firebase/firestore";
 import { generateMonologueAnalysis } from "@/ai/flows/generate-monologue-analysis-flow";
 import { Progress } from "@/components/ui/progress";
+import { ref, uploadString, getDownloadURL } from "firebase/storage";
 
 const SESSION_STORAGE_KEY = 'monologueSessionData';
 
@@ -90,7 +91,7 @@ function AnalysisProgressView({ currentStep }: { currentStep: AnalysisStep | nul
 
 type MonologueSessionData = {
     assessmentId: string, 
-    studentRecordingUrl: string, 
+    studentRecordingDataUri: string, 
     assessmentDetails: TeacherAssessment
 };
 
@@ -116,12 +117,12 @@ export default function AssessmentResultsPage() {
     isProcessing.current = true;
     setStatus("analyzing");
     setErrorInfo(null);
-    const { assessmentDetails, studentRecordingUrl } = sessionData;
+    const { assessmentDetails, studentRecordingDataUri } = sessionData;
     
     const resultRef = doc(collection(db, "results"));
     
     try {
-        setAnalysisStep("upload");
+        setAnalysisStep("transcribe");
         const initialData: Partial<StudentResult> = {
             id: resultRef.id,
             studentId: user.uid,
@@ -132,16 +133,15 @@ export default function AssessmentResultsPage() {
             avatarUrl: user.photoURL || '',
             createdAt: Date.now(),
             date: new Date().toISOString(),
-            status: "파일 업로드 중...",
-            studentRecordingUrl: studentRecordingUrl,
+            status: "텍스트 변환 중",
         };
         await setDoc(resultRef, initialData, { merge: true });
         
-        await updateDoc(resultRef, { status: "텍스트 변환 중" });
-        setAnalysisStep("transcribe");
+        await updateDoc(resultRef, { status: "내용 및 발음 분석 중..." });
+        setAnalysisStep("analyze");
         
         const analysisResult = await generateMonologueAnalysis({
-            studentRecordingUrl: studentRecordingUrl,
+            studentRecordingUrl: studentRecordingDataUri,
             activityPrompt: assessmentDetails.prompt,
             expectedFormat: assessmentDetails.expectedFormat || "",
             studentName: user.displayName || "Student",
@@ -153,8 +153,15 @@ export default function AssessmentResultsPage() {
         await updateDoc(resultRef, { status: "리포트 생성 중" });
         setAnalysisStep("report");
 
+        // Upload audio file to storage after analysis is complete
+        setAnalysisStep("upload");
+        const storageRef = ref(storage, `recordings/${user.uid}_${assessmentDetails.id}_${Date.now()}.webm`);
+        const snapshot = await uploadString(storageRef, studentRecordingDataUri, 'data_url');
+        const downloadURL = await getDownloadURL(snapshot.ref);
+
         const finalResultData: Partial<StudentResult> = {
             ...analysisResult,
+            studentRecordingUrl: downloadURL,
             status: '채점 완료',
         };
         await updateDoc(resultRef, finalResultData);
@@ -249,8 +256,10 @@ export default function AssessmentResultsPage() {
         } else if (latestResult && latestResult.status === '오류') {
             setStatus('error');
             setErrorInfo({ message: latestResult.aiFeedback || '알 수 없는 오류가 발생했습니다.' });
-        } else {
-            setStatus('analyzing');
+        } else if (latestResult && !isProcessing.current) {
+            // If there's an incomplete result and we are not processing, it's likely an orphaned record. Treat as error.
+            setStatus('error');
+            setErrorInfo({ message: '이전 분석이 비정상적으로 종료되었습니다. 다시 시도해주세요.'});
         }
     }
     
