@@ -26,6 +26,10 @@ export const translations = {
             todo: "할 일",
             graded: "채점 완료",
             practice: "연습",
+        },
+        noAssessments: {
+          title: "할당된 평가 없음",
+          description: "현재 참여할 수 있는 평가가 없습니다."
         }
     },
     studentHistory: {
@@ -237,6 +241,10 @@ export const translations = {
             todo: "To Do",
             graded: "Graded",
             practice: "Practice",
+        },
+        noAssessments: {
+            title: "No Assessments Assigned",
+            description: "There are currently no assessments available for you to take."
         }
     },
     studentHistory: {

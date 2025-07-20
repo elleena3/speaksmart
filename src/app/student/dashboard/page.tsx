@@ -225,8 +225,8 @@ export default function StudentDashboard() {
           <AssessmentCard key={assessment.id} assessment={assessment} t={t} />
         )) : (
             <div className="col-span-full text-center py-12 border-2 border-dashed rounded-lg">
-                <h3 className="text-lg font-medium text-muted-foreground">할당된 평가 없음</h3>
-                <p className="text-sm text-muted-foreground mt-1">현재 참여할 수 있는 평가가 없습니다.</p>
+                <h3 className="text-lg font-medium text-muted-foreground">{t.studentDashboard.noAssessments.title}</h3>
+                <p className="text-sm text-muted-foreground mt-1">{t.studentDashboard.noAssessments.description}</p>
             </div>
         )}
       </div>
