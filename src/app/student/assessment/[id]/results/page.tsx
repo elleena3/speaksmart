@@ -17,7 +17,7 @@ import { ref, uploadString, getDownloadURL } from "firebase/storage";
 
 const SESSION_STORAGE_KEY = 'monologueSessionData';
 
-type AnalysisStep = "upload" | "transcribe" | "analyze" | "report";
+type AnalysisStep = "transcribe" | "analyze" | "report" | "upload";
 type PageStatus = "loading" | "analyzing" | "completed" | "error";
 
 const analysisSteps: { key: AnalysisStep, text: string, icon: React.FC<any> }[] = [
@@ -96,6 +96,7 @@ export default function AssessmentResultsPage() {
     
     isProcessing.current = true;
     setStatus("analyzing");
+    setAnalysisStep("transcribe");
     setErrorInfo(null);
 
     const { assessmentDetails, studentRecordingDataUri } = sessionData;
@@ -109,12 +110,11 @@ export default function AssessmentResultsPage() {
         avatarUrl: user.photoURL || '',
         createdAt: Date.now(),
         date: new Date().toISOString(),
-        status: "분석 중", // Generic initial status
+        status: "텍스트 변환 중",
     });
 
     try {
-        // Step 1: Transcription and Analysis
-        setAnalysisStep("transcribe");
+        // Step 1 & 2: Transcription and Content/Pronunciation Analysis in one flow
         const analysisResult = await generateMonologueAnalysis({
             studentRecordingUrl: studentRecordingDataUri,
             activityPrompt: assessmentDetails.prompt,
@@ -123,20 +123,16 @@ export default function AssessmentResultsPage() {
             assessmentTitle: assessmentDetails.title,
             evaluationModel: assessmentDetails.evaluationModel,
             useRubric: assessmentDetails.useRubric || false,
-            // Pass the callback to update the UI step during the flow
-            onProgress: (step) => {
-                if(step === 'analyze') setAnalysisStep('analyze');
-            }
         });
 
-        // Step 2: Report Generation (Updating Firestore)
+        // Step 3: Report Generation (Updating Firestore with analysis results)
         setAnalysisStep("report");
         await updateDoc(resultDocRef, {
-            ...analysisResult, // This includes transcript, scores, feedback etc.
-            status: "파일 업로드 중...", // Temporary status before final
+            ...analysisResult,
+            status: "리포트 생성 중",
         });
         
-        // Step 3: File Upload
+        // Step 4: File Upload to Storage
         setAnalysisStep("upload");
         const storageRef = ref(storage, `recordings/${user.uid}_${assessmentDetails.id}_${Date.now()}.webm`);
         const snapshot = await uploadString(storageRef, studentRecordingDataUri, 'data_url');
@@ -232,20 +228,29 @@ export default function AssessmentResultsPage() {
         setResults(dbResults);
         const latestResult = dbResults[dbResults.length - 1];
         
-        if (latestResult && latestResult.status === '채점 완료') {
-            setStatus("completed");
-        } else if (latestResult && latestResult.status === '오류') {
-            setStatus('error');
-            setErrorInfo({ message: latestResult.aiFeedback || '알 수 없는 오류가 발생했습니다.' });
-        } else if (latestResult && !isProcessing.current) {
-             const staleStatuses = ["텍스트 변환 중", "내용 및 발음 분석 중...", "리포트 생성 중", "파일 업로드 중...", "분석 중"];
-             if (staleStatuses.includes(latestResult.status)) {
+        if (latestResult) {
+            if (latestResult.status === '채점 완료') {
+                setStatus("completed");
+                setAnalysisStep(null);
+            } else if (latestResult.status === '오류') {
+                setStatus('error');
+                setErrorInfo({ message: latestResult.aiFeedback || '알 수 없는 오류가 발생했습니다.' });
+            } else if (latestResult.status === '텍스트 변환 중') {
+                setStatus('analyzing');
+                setAnalysisStep('transcribe');
+            } else if (latestResult.status === '리포트 생성 중') {
+                setStatus('analyzing');
+                setAnalysisStep('report');
+            } else if (staleStatuses.includes(latestResult.status)) {
+                 // Handle cases where the process might have been stuck
                 setStatus('error');
                 setErrorInfo({ message: '이전 분석이 비정상적으로 종료되었습니다. 평가로 돌아가 다시 시도해주세요.'});
-             }
+            }
         }
     }
     
+    const staleStatuses = ["분석 중", "파일 업로드 중...", "내용 및 발음 분석 중...", "리포트 생성 중", "업로드"];
+
     const handleError = (err: any) => {
         console.error("Error listening to result:", err);
         setErrorInfo({ message: "결과를 실시간으로 업데이트하는 중 오류가 발생했습니다."});

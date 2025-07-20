@@ -224,13 +224,11 @@ const generateMonologueAnalysisFlow = ai.defineFlow(
     outputSchema: CombinedAnalysisOutputSchema,
   },
   async (input) => {
-    const { onProgress, ...mainInput } = input;
-    const model = mainInput.evaluationModel || 'gemini-2.5-flash';
+    const model = input.evaluationModel || 'gemini-2.5-flash';
     const prompts = createPrompt(model);
 
     // Step 1: Transcribe the audio with retry logic.
-    onProgress?.('transcribe');
-    const transcriptionResult = await withRetry(() => prompts.transcription({ studentRecordingUrl: mainInput.studentRecordingUrl }));
+    const transcriptionResult = await withRetry(() => prompts.transcription({ studentRecordingUrl: input.studentRecordingUrl }));
     const studentTranscript = transcriptionResult.text;
 
     if (!studentTranscript || studentTranscript.trim() === "" || studentTranscript.includes('기록되지 않았습니다') || studentTranscript.includes('인식하지 못했습니다')) {
@@ -246,11 +244,8 @@ const generateMonologueAnalysisFlow = ai.defineFlow(
         }
     }
     
-    // Step 2: Inform the client that analysis is starting
-    onProgress?.('analyze');
-
-    // Step 3: Check if rubric is used.
-    if (mainInput.useRubric) {
+    // Step 2: Check if rubric is used.
+    if (input.useRubric) {
         const rubricResult = await withRetry(() => prompts.rubric({ studentTranscript }));
         const rubricText = rubricResult.text;
         
@@ -280,24 +275,24 @@ const generateMonologueAnalysisFlow = ai.defineFlow(
             pronunciationScore: pronunciationScore,
             aiFeedback: rubricText,
             teacherGuidance: "루브릭 기반 평가를 사용했습니다. 학생의 강점과 약점을 항목별로 확인하고, 개선점에 제시된 활동을 지도해주세요.",
-            curricularRemarks: `'${mainInput.assessmentTitle}' 평가에서 루브릭 기반으로 유창성(${fluencyScoreRaw}점), 문법(${grammarScoreRaw}점), 어휘(${vocabularyScoreRaw}점) 영역에서 종합 ${contentScore}점, 발음 영역에서 ${pronunciationScore}점을 받는 등 준수한 성취를 보임.`,
+            curricularRemarks: `'${input.assessmentTitle}' 평가에서 루브릭 기반으로 유창성(${fluencyScoreRaw}점), 문법(${grammarScoreRaw}점), 어휘(${vocabularyScoreRaw}점) 영역에서 종합 ${contentScore}점, 발음 영역에서 ${pronunciationScore}점을 받는 등 준수한 성취를 보임.`,
             pronunciationFeedback: `루브릭 기반 발음 점수는 ${pronunciationScore}점입니다. 상세 내용은 종합 분석 리포트를 참고하세요.`,
             rubricScores,
         };
     }
 
 
-    // Step 4: If not using rubric, run original content and pronunciation analysis in PARALLEL.
+    // Step 3: If not using rubric, run original content and pronunciation analysis in PARALLEL.
     const [contentResult, pronunciationResult] = await Promise.all([
       withRetry(() => prompts.content({
         studentTranscript,
-        activityPrompt: mainInput.activityPrompt,
-        expectedFormat: mainInput.expectedFormat,
-        studentName: mainInput.studentName,
-        assessmentTitle: mainInput.assessmentTitle,
+        activityPrompt: input.activityPrompt,
+        expectedFormat: input.expectedFormat,
+        studentName: input.studentName,
+        assessmentTitle: input.assessmentTitle,
       })),
       withRetry(() => prompts.pronunciation({
-        studentRecordingUrl: mainInput.studentRecordingUrl,
+        studentRecordingUrl: input.studentRecordingUrl,
         studentTranscript,
       }))
     ]);
@@ -309,7 +304,7 @@ const generateMonologueAnalysisFlow = ai.defineFlow(
         throw new Error("Failed to get a valid response from one or more analysis models.");
     }
     
-    // Step 5: Combine and return all results to the client.
+    // Step 4: Combine and return all results to the client.
     return {
         studentTranscript,
         contentScore: contentOutput.contentScore,
