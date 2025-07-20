@@ -1,7 +1,7 @@
 
 "use client";
 
-import { GrowthView } from "./growth-view";
+import { GrowthView } from "../../free-talk/results/growth-view";
 import { useParams, useRouter, notFound, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from "react";
 import { type StudentResult, type TeacherAssessment } from "@/lib/types";
@@ -64,7 +64,7 @@ export default function AssessmentResultsPage() {
     
     fetchResults();
 
-  }, [id, user, authLoading, router]);
+  }, [id, user, authLoading, router, notFound]);
   
   if (status === "loading" || authLoading) {
     return (
