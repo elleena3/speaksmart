@@ -4,6 +4,13 @@ export const translations = {
     language: {
         title: "언어"
     },
+    mainPage: {
+        accessTitle: "접근 확인",
+        accessDescription: "이 페이지는 현재 테스트 중입니다. 사용하고 싶다면 비밀번호를 입력해주세요.",
+        passwordPlaceholder: "비밀번호",
+        confirmButton: "확인",
+        incorrectPasswordError: "비밀번호가 올바르지 않습니다."
+    },
     nav: {
       dashboard: "대시보드",
       myResults: "내 결과",
@@ -287,6 +294,13 @@ export const translations = {
   en: {
     language: {
         title: "Language"
+    },
+    mainPage: {
+        accessTitle: "Access Confirmation",
+        accessDescription: "This page is currently under testing. Please enter the password to proceed.",
+        passwordPlaceholder: "Password",
+        confirmButton: "Confirm",
+        incorrectPasswordError: "Incorrect password."
     },
     nav: {
       dashboard: "Dashboard",

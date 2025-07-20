@@ -3,14 +3,14 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Globe, Users, School, Loader2 } from "lucide-react";
+import { Globe, Users, School, Loader2, KeyRound, AlertTriangle } from "lucide-react";
 import { Logo } from "@/components/icons";
 import { useLanguage } from "@/context/language-context";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
+import { Input } from "@/components/ui/input";
 
 
 export default function Home() {
@@ -18,6 +18,10 @@ export default function Home() {
   const { loginAs } = useAuth();
   const router = useRouter();
   const [loadingRole, setLoadingRole] = useState<string | null>(null);
+
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
 
   const content = {
     ko: {
@@ -47,6 +51,73 @@ export default function Home() {
       footer: `© ${new Date().getFullYear()} SpeakSmart Assessment Tool. Yomangjin AI All rights reserved.`
     }
   };
+  
+  const handleLogin = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (password === '1126') {
+          setIsAuthenticated(true);
+          setError('');
+      } else {
+          setError(t.mainPage.incorrectPasswordError);
+          setPassword('');
+      }
+  };
+
+
+  if (!isAuthenticated) {
+      return (
+           <main className="flex min-h-screen flex-col items-center justify-center bg-background p-4 md:p-8 relative">
+                <div className="absolute top-4 right-4">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm">
+                          <Globe className="mr-2 h-4 w-4" />
+                          <span>{t.language.title}</span>
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => setLanguage('ko')} disabled={language === 'ko'}>
+                          한국어
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setLanguage('en')} disabled={language === 'en'}>
+                          English
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
+                <Card className="w-full max-w-sm">
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                           <KeyRound className="h-6 w-6"/> {t.mainPage.accessTitle}
+                        </CardTitle>
+                        <CardDescription>
+                           {t.mainPage.accessDescription}
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <form onSubmit={handleLogin} className="space-y-4">
+                            <Input
+                                type="password"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                placeholder={t.mainPage.passwordPlaceholder}
+                                autoFocus
+                            />
+                            {error && (
+                                <div className="flex items-center text-sm font-medium text-destructive">
+                                    <AlertTriangle className="h-4 w-4 mr-2" />
+                                    {error}
+                                </div>
+                            )}
+                            <Button type="submit" className="w-full">
+                                {t.mainPage.confirmButton}
+                            </Button>
+                        </form>
+                    </CardContent>
+                </Card>
+           </main>
+      )
+  }
 
   const handleNavigation = (role: string) => {
     setLoadingRole(role);
