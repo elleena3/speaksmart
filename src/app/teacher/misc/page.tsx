@@ -81,7 +81,7 @@ export default function MiscPage() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
                 <Card>
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><FileText className="h-6 w-6"/> WebM {t.teacherMisc.transcriberTool.title}</CardTitle>
+                        <CardTitle className="flex items-center gap-2"><FileText className="h-6 w-6"/> {t.teacherMisc.transcriberTool.title}</CardTitle>
                         <CardDescription>
                             {t.teacherMisc.transcriberTool.description}
                         </CardDescription>

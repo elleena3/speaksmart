@@ -509,7 +509,7 @@ export const translations = {
       confirmButton: "Confirm",
       incorrectPasswordError: "Incorrect password.",
       transcriberTool: {
-        title: "Speech-to-Text Tool",
+        title: "WebM Speech-to-Text Tool",
         description: "Upload or record a WebM audio file to compare Speech-to-Text (STT) results from various models.",
         buttonText: "Transcribe with Models",
         resultsTitle: "Transcription Results by Model",
