@@ -47,7 +47,7 @@ export default function AssessmentSubmissionsPage() {
         const currentAssessment = { id: assessmentSnap.id, ...assessmentSnap.data() } as TeacherAssessment;
         setAssessment(currentAssessment);
         
-        // Fetch all results for the assessment ID.
+        // Fetch all results for the assessment ID. The teacherUid check will be done in code.
         const resultsQuery = query(
             collection(db, "results"), 
             where("assessmentId", "==", assessmentId),
