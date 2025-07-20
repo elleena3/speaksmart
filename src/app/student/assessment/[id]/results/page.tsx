@@ -11,7 +11,7 @@ import { Loader2, AlertTriangle, CheckCircle2, UploadCloud, AudioLines, FileScan
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { db, storage } from "@/lib/firebase";
-import { collection, query, where, onSnapshot, doc, setDoc, updateDoc, getDocs, getDoc } from "firebase/firestore";
+import { collection, query, where, onSnapshot, doc, setDoc, updateDoc, getDocs, getDoc, serverTimestamp, addDoc } from "firebase/firestore";
 import { generateMonologueAnalysis } from "@/ai/flows/generate-monologue-analysis-flow";
 import { Progress } from "@/components/ui/progress";
 import { ref, uploadString, getDownloadURL } from "firebase/storage";
@@ -117,17 +117,23 @@ export default function AssessmentResultsPage() {
     isProcessing.current = true;
     setStatus("analyzing");
     setErrorInfo(null);
+    setAnalysisStep("transcribe");
 
     const { assessmentDetails, studentRecordingDataUri } = sessionData;
-    const resultRef = doc(collection(db, "results"));
     
+    const resultDocRef = await addDoc(collection(db, "results"), {
+        studentId: user.uid,
+        assessmentId: assessmentDetails.id,
+        assessmentTitle: assessmentDetails.title,
+        teacherUid: assessmentDetails.uid,
+        name: user.displayName || "Student",
+        avatarUrl: user.photoURL || '',
+        createdAt: Date.now(),
+        date: new Date().toISOString(),
+        status: "텍스트 변환 중",
+    });
+
     try {
-        setAnalysisStep("transcribe");
-        await updateDoc(resultRef, { status: "텍스트 변환 중" });
-
-        setAnalysisStep("analyze");
-        await updateDoc(resultRef, { status: "내용 및 발음 분석 중..." });
-
         const analysisResult = await generateMonologueAnalysis({
             studentRecordingUrl: studentRecordingDataUri,
             activityPrompt: assessmentDetails.prompt,
@@ -139,7 +145,10 @@ export default function AssessmentResultsPage() {
         });
 
         setAnalysisStep("report");
-        await updateDoc(resultRef, { status: "리포트 생성 중" });
+        await updateDoc(resultDocRef, { status: "리포트 생성 중" });
+        
+        setAnalysisStep("upload");
+        await updateDoc(resultDocRef, { status: "파일 업로드 중..." });
         
         const storageRef = ref(storage, `recordings/${user.uid}_${assessmentDetails.id}_${Date.now()}.webm`);
         const snapshot = await uploadString(storageRef, studentRecordingDataUri, 'data_url');
@@ -150,8 +159,9 @@ export default function AssessmentResultsPage() {
             studentRecordingUrl: downloadURL,
             status: '채점 완료',
         };
-        await updateDoc(resultRef, finalResultData);
+        await updateDoc(resultDocRef, finalResultData);
         
+        // Update assessment aggregate data
         const assessmentRef = doc(db, "assessments", assessmentDetails.id);
         const resultsCollection = collection(db, "results");
         const q = query(resultsCollection, where("assessmentId", "==", assessmentDetails.id), where("status", "==", "채점 완료"));
@@ -176,29 +186,28 @@ export default function AssessmentResultsPage() {
       }
       setErrorInfo({ message: errorMessage });
       setStatus("error");
-      await updateDoc(resultRef, { 
+      await updateDoc(resultDocRef, { 
           status: '오류', 
           aiFeedback: errorMessage
       });
     } finally {
         sessionStorage.removeItem(SESSION_STORAGE_KEY);
         isProcessing.current = false;
-        router.replace(`/student/assessment/${id}/results?t=${new Date().getTime()}&attempt=${results.length + 1}`);
+        // Navigation is now handled by the onSnapshot listener detecting "채점 완료" status.
     }
-  }, [user, id, results.length, router]);
+  }, [user, id]);
 
 
   useEffect(() => {
     if (authLoading || !user || !id) return;
     
-    if (isProcessing.current) return;
-
+    // This part is crucial: only process a new submission if it exists.
     const sessionDataRaw = sessionStorage.getItem(SESSION_STORAGE_KEY);
     if (sessionDataRaw) {
         const sessionData = JSON.parse(sessionDataRaw);
         if (sessionData.assessmentId === id) {
             processMonologueSubmission(sessionData);
-            return;
+            return; // Exit early to prevent snapshot listener from running prematurely.
         }
     }
     
@@ -244,7 +253,7 @@ export default function AssessmentResultsPage() {
             setStatus('error');
             setErrorInfo({ message: latestResult.aiFeedback || '알 수 없는 오류가 발생했습니다.' });
         } else if (latestResult && !isProcessing.current) {
-             const staleStatuses = ["텍스트 변환 중", "내용 및 발음 분석 중...", "리포트 생성 중"];
+             const staleStatuses = ["텍스트 변환 중", "내용 및 발음 분석 중...", "리포트 생성 중", "파일 업로드 중..."];
              if (staleStatuses.includes(latestResult.status)) {
                 setStatus('error');
                 setErrorInfo({ message: '이전 분석이 비정상적으로 종료되었습니다. 평가로 돌아가 다시 시도해주세요.'});
