@@ -1,6 +1,7 @@
 
 "use client";
 
+import { FeedbackView } from "./feedback-view";
 import { GrowthView } from "./growth-view";
 import { useParams, useRouter, notFound, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from "react";
@@ -9,7 +10,6 @@ import { useAuth } from "@/context/auth-context";
 import { Loader2 } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { collection, query, where, getDocs, doc, getDoc, orderBy } from "firebase/firestore";
-import { FeedbackView } from "./feedback-view";
 
 export default function AssessmentResultsPage() {
   const { user, loading: authLoading } = useAuth();
@@ -27,23 +27,27 @@ export default function AssessmentResultsPage() {
     
     const fetchResults = async () => {
       try {
+        // Simplified query to avoid composite index requirement
         const q = query(
             collection(db, "results"),
             where("assessmentId", "==", id),
-            where("studentId", "==", user.uid),
-            where("status", "==", "채점 완료"),
-            orderBy("createdAt", "asc") // 오래된 순으로 정렬
+            where("studentId", "==", user.uid)
         );
 
         const resultsSnapshot = await getDocs(q);
+        
+        // Filter and sort in client-side code
+        const dbResults: StudentResult[] = resultsSnapshot.docs
+            .map((doc: any) => ({ id: doc.id, ...doc.data() }))
+            .filter((result: StudentResult) => result.status === "채점 완료")
+            .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)); // Sort ascending (oldest first)
 
-        if (resultsSnapshot.empty) {
+        if (dbResults.length === 0) {
           console.warn("No completed results found for this assessment.");
           router.replace(`/student/dashboard`); 
           return;
         }
-
-        const dbResults: StudentResult[] = resultsSnapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
+        
         setResults(dbResults);
         
         const assessmentRef = doc(db, 'assessments', id as string);
@@ -90,6 +94,7 @@ export default function AssessmentResultsPage() {
 
     if (results.length > 1) {
       const attemptNumber = searchParams.get('attempt');
+      // The GrowthView component still exists but will use the old logic for now
       return <GrowthView results={results} assessment={assessment} defaultTab={`attempt-${attemptNumber || results.length}`} />;
     }
   }

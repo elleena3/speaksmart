@@ -9,7 +9,7 @@ import { Loader2 } from "lucide-react"
 import { type TeacherAssessment, type StudentResult } from "@/lib/types";
 import { useAuth } from "@/context/auth-context";
 import { db } from "@/lib/firebase";
-import { doc, getDoc, collection, getDocs, where, query, orderBy } from "firebase/firestore";
+import { doc, getDoc, collection, getDocs, where, query } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { FreeTalkFeedbackView } from "@/app/student/assessment/free-talk/results/free-talk-feedback-view";
 import { FeedbackView } from "@/app/student/assessment/[id]/results/feedback-view";
@@ -47,17 +47,19 @@ export default function StudentResultPage() {
         const q = query(
             resultsCollection,
             where("assessmentId", "==", assessmentId),
-            where("studentId", "==", studentId),
-            where("status", "==", "채점 완료"),
-            orderBy("createdAt", "asc")
+            where("studentId", "==", studentId)
         );
         const querySnapshot = await getDocs(q);
         
-        if (querySnapshot.empty) {
+        const fetchedResults = querySnapshot.docs
+            .map(doc => ({ id: doc.id, ...doc.data() } as StudentResult))
+            .filter(result => result.status === '채점 완료')
+            .sort((a,b) => (a.createdAt || 0) - (b.createdAt || 0));
+
+        if (fetchedResults.length === 0) {
              toast({ title: "결과 없음", description: "해당 학생의 평가 결과가 없습니다.", variant: "destructive" });
              setResults([]);
         } else {
-             const fetchedResults = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as StudentResult));
              setResults(fetchedResults);
         }
 

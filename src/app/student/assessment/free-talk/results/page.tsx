@@ -9,10 +9,8 @@ import { type StudentResult, type TeacherAssessment } from "@/lib/types";
 import { useAuth } from "@/context/auth-context";
 import { Loader2 } from "lucide-react";
 import { db } from "@/lib/firebase";
-import { collection, query, where, getDocs, doc, getDoc, orderBy } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
-
-const SESSION_STORAGE_KEY = 'freeTalkSessionData';
 
 export default function FreeTalkResultsPage() {
     const { user, loading: authLoading } = useAuth();
@@ -30,21 +28,26 @@ export default function FreeTalkResultsPage() {
         
         const fetchResults = async () => {
             try {
+                // Simplified query
                 const q = query(
                     collection(db, "results"),
                     where("assessmentId", "==", assessmentId),
-                    where("studentId", "==", user.uid),
-                    where("status", "==", "채점 완료"),
-                    orderBy("createdAt", "asc")
+                    where("studentId", "==", user.uid)
                 );
 
                 const resultsSnapshot = await getDocs(q);
-                if (resultsSnapshot.empty) {
+                
+                // Filter and sort client-side
+                const dbResults: StudentResult[] = resultsSnapshot.docs
+                    .map((doc: any) => ({ id: doc.id, ...doc.data() }))
+                    .filter(result => result.status === '채점 완료')
+                    .sort((a,b) => (a.createdAt || 0) - (b.createdAt || 0));
+
+                if (dbResults.length === 0) {
                     router.replace(`/student/dashboard`); 
                     return;
                 }
 
-                const dbResults: StudentResult[] = resultsSnapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
                 setResults(dbResults);
                 
                 const assessmentRef = doc(db, 'assessments', assessmentId);
