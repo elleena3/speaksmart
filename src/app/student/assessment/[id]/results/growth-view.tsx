@@ -74,29 +74,26 @@ export function GrowthView({ results, assessment, defaultTab }: GrowthViewProps)
             const fetchGrowthFeedback = async () => {
                 setIsLoadingFeedback(true);
                 try {
-                    const previousAttempt = results[results.length - 2];
-                    const latestAttempt = results[results.length - 1];
+                    const attempts: ResultSummary[] = results.map((r, index) => ({
+                      attemptNumber: index + 1,
+                      contentScore: r.contentScore ?? 0,
+                      pronunciationScore: r.pronunciationScore ?? 0,
+                      transcript: r.studentTranscript ?? "",
+                      aiFeedback: r.aiFeedback ?? "",
+                    }));
+
                     const feedback = await generateGrowthFeedback({
-                        previousAttempt: {
-                            attemptNumber: results.length - 1,
-                            contentScore: previousAttempt.contentScore ?? 0,
-                            pronunciationScore: previousAttempt.pronunciationScore ?? 0,
-                            transcript: previousAttempt.studentTranscript ?? "",
-                            aiFeedback: previousAttempt.aiFeedback ?? "",
-                        },
-                        latestAttempt: {
-                            attemptNumber: results.length,
-                            contentScore: latestAttempt.contentScore ?? 0,
-                            pronunciationScore: latestAttempt.pronunciationScore ?? 0,
-                            transcript: latestAttempt.studentTranscript ?? "",
-                            aiFeedback: latestAttempt.aiFeedback ?? "",
-                        },
+                        attempts: attempts,
                         assessmentTitle: assessment.title,
                     });
                     setGrowthFeedback(feedback);
                 } catch (error) {
                     console.error("Error generating growth feedback:", error);
-                    setGrowthFeedback({ growthFeedback: "성장 피드백을 생성하는 중 오류가 발생했습니다." });
+                     setGrowthFeedback({ 
+                        growthFeedback: "성장 피드백을 생성하는 중 오류가 발생했습니다.",
+                        teacherGuidance: "교사 조언을 생성하는 중 오류가 발생했습니다.",
+                        curricularRemarks: "교과과정 비고를 생성하는 중 오류가 발생했습니다."
+                     });
                 } finally {
                     setIsLoadingFeedback(false);
                 }
@@ -179,8 +176,8 @@ export function GrowthView({ results, assessment, defaultTab }: GrowthViewProps)
                 {results.length > 1 && (
                     <Card>
                         <CardHeader>
-                            <CardTitle className="flex items-center gap-2"><Sparkles />AI 성장 피드백</CardTitle>
-                            <CardDescription>이전 시도와 최신 시도를 비교한 AI의 분석입니다.</CardDescription>
+                            <CardTitle className="flex items-center gap-2"><Sparkles />AI 종합 성장 피드백</CardTitle>
+                            <CardDescription>모든 시도를 종합하여 AI가 분석한 학생의 성장 과정입니다.</CardDescription>
                         </CardHeader>
                         <CardContent>
                             {isLoadingFeedback ? (
@@ -197,6 +194,32 @@ export function GrowthView({ results, assessment, defaultTab }: GrowthViewProps)
                         </CardContent>
                     </Card>
                 )}
+                 {results.length > 1 && growthFeedback && !isLoadingFeedback && (
+                    <>
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2"><BookText />교사를 위한 종합 조언</CardTitle>
+                                <CardDescription>학생의 전체 성장 과정을 바탕으로 한 AI의 지도 조언입니다.</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="p-4 bg-muted/50 rounded-lg whitespace-pre-wrap font-body text-sm leading-relaxed">
+                                    {growthFeedback.teacherGuidance}
+                                </div>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2"><Activity />교과 과정 비고 (종합)</CardTitle>
+                                <CardDescription>학생의 성장 과정을 종합하여 생성된 생활기록부 비고 초안입니다.</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="p-4 bg-muted/50 rounded-lg whitespace-pre-wrap font-body text-sm leading-relaxed">
+                                    {growthFeedback.curricularRemarks}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </>
+                 )}
                  <Card>
                     <CardHeader>
                       <CardTitle>다시 해보기</CardTitle>

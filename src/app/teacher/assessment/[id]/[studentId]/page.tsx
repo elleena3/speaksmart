@@ -9,7 +9,7 @@ import { Loader2 } from "lucide-react"
 import { type TeacherAssessment, type StudentResult } from "@/lib/types";
 import { useAuth } from "@/context/auth-context";
 import { db } from "@/lib/firebase";
-import { doc, getDoc, collection, getDocs, where } from "firebase/firestore";
+import { doc, getDoc, collection, getDocs, where, query, orderBy } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { FreeTalkFeedbackView } from "@/app/student/assessment/free-talk/results/free-talk-feedback-view";
 import { FeedbackView } from "@/app/student/assessment/[id]/results/feedback-view";
@@ -21,7 +21,7 @@ export default function StudentResultPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const [assessment, setAssessment] = useState<TeacherAssessment | null>(null);
-  const [result, setResult] = useState<StudentResult | null>(null);
+  const [results, setResults] = useState<StudentResult[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
   const { toast } = useToast();
@@ -43,25 +43,24 @@ export default function StudentResultPage() {
         }
         setAssessment({ id: assessmentSnap.id, ...assessmentSnap.data() } as TeacherAssessment);
         
-        const resultsQuery = collection(db, "results");
-        const q = where("assessmentId", "==", assessmentId);
-        const q2 = where("studentId", "==", studentId);
-        const querySnapshot = await getDocs(collection(db, "results"));
+        const resultsCollection = collection(db, "results");
+        const q = query(
+            resultsCollection,
+            where("assessmentId", "==", assessmentId),
+            where("studentId", "==", studentId),
+            where("status", "==", "채점 완료"),
+            orderBy("createdAt", "asc")
+        );
+        const querySnapshot = await getDocs(q);
         
-        let foundResult: StudentResult | null = null;
-        querySnapshot.forEach((doc) => {
-            const data = doc.data();
-            if (data.assessmentId === assessmentId && data.studentId === studentId) {
-                foundResult = { id: doc.id, ...data } as StudentResult;
-            }
-        });
-        
-        if (foundResult) {
-            setResult(foundResult);
-        } else {
+        if (querySnapshot.empty) {
              toast({ title: "결과 없음", description: "해당 학생의 평가 결과가 없습니다.", variant: "destructive" });
-             // notFound();
+             setResults([]);
+        } else {
+             const fetchedResults = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as StudentResult));
+             setResults(fetchedResults);
         }
+
     } catch (error) {
         console.error("Error fetching result data:", error);
         toast({ title: "오류", description: "결과를 불러오는 중 오류가 발생했습니다.", variant: "destructive" });
@@ -92,7 +91,7 @@ export default function StudentResultPage() {
     );
   }
 
-  if (!assessment || !result) {
+  if (!assessment || results.length === 0) {
     return (
         <Card>
             <CardHeader>
@@ -102,26 +101,31 @@ export default function StudentResultPage() {
         </Card>
     )
   }
+  
+  const studentInfo = results[0];
 
   return (
     <div className="space-y-6">
         <Card>
             <CardHeader className="flex-row items-center gap-4 space-y-0">
                 <Avatar className="h-16 w-16">
-                    <AvatarImage src={result.avatarUrl} alt={result.name} data-ai-hint="person portrait" />
-                    <AvatarFallback>{result.name.charAt(0)}</AvatarFallback>
+                    <AvatarImage src={studentInfo.avatarUrl} alt={studentInfo.name} data-ai-hint="person portrait" />
+                    <AvatarFallback>{studentInfo.name.charAt(0)}</AvatarFallback>
                 </Avatar>
                 <div className="flex-grow">
-                <CardTitle className="text-2xl">{result.name} 학생 결과</CardTitle>
+                <CardTitle className="text-2xl">{studentInfo.name} 학생 결과</CardTitle>
                 <CardDescription>평가: <span className="font-semibold">{assessment.title}</span></CardDescription>
                 </div>
             </CardHeader>
         </Card>
 
-        {assessment.assessmentType === 'dialogue' ? 
-            <FreeTalkFeedbackView result={result} assessment={assessment} isLatestAttempt={true} /> : 
-            <FeedbackView result={result} assessment={assessment} isLatestAttempt={true} />
-        }
+        {results.length > 1 ? (
+           <GrowthView results={results} assessment={assessment} />
+        ) : assessment.assessmentType === 'dialogue' ? (
+            <FreeTalkFeedbackView result={results[0]} assessment={assessment} isLatestAttempt={true} />
+        ) : (
+            <FeedbackView result={results[0]} assessment={assessment} isLatestAttempt={true} />
+        )}
     </div>
   );
 }
