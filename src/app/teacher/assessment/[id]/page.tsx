@@ -46,16 +46,15 @@ export default function AssessmentSubmissionsPage() {
         }
         setAssessment({ id: assessmentSnap.id, ...assessmentSnap.data() } as TeacherAssessment);
         
-        // assessmentId가 일치하는 모든 결과를 가져옵니다.
+        // This query now uses the index for teacherUid and createdAt.
         const resultsQuery = query(
             collection(db, "results"), 
+            where("teacherUid", "==", user.uid),
             where("assessmentId", "==", assessmentId),
             orderBy("createdAt", "desc")
         );
         const resultsSnapshot = await getDocs(resultsQuery);
         
-        // 필터링 없이 모든 결과를 상태에 저장합니다.
-        // 현재 교사가 생성한 평가(assessment)에 대한 결과만 가져오므로 이 방식이 안전합니다.
         const resultsData = resultsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as StudentResult));
         
         setStudentResults(resultsData);
