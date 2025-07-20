@@ -6,17 +6,13 @@ import { useParams, useRouter, notFound } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
-import { Loader2, Paperclip, Download, User, Activity, BookText, FileText, Target, Mic } from "lucide-react"
+import { Loader2, BookText, FileText, Target } from "lucide-react"
 import { type TeacherAssessment, type StudentResult } from "@/lib/types";
-import { Progress } from "@/components/ui/progress";
 import { useAuth } from "@/context/auth-context";
 import { db } from "@/lib/firebase";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc, collection, query, where, orderBy, getDocs } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { summarizeStudentFeedback } from "@/ai/flows/summarize-student-feedback";
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from "remark-gfm";
 import { FreeTalkFeedbackView } from "@/app/student/assessment/free-talk/results/free-talk-feedback-view";
 import { FeedbackView } from "@/app/student/assessment/[id]/results/feedback-view";
 import { GrowthView } from "@/app/student/assessment/[id]/results/growth-view";
@@ -29,8 +25,6 @@ export default function StudentResultPage() {
   const [assessment, setAssessment] = useState<TeacherAssessment | null>(null);
   const [results, setResults] = useState<StudentResult[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isDownloading, setIsDownloading] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
 
   const assessmentId = Array.isArray(params.id) ? params.id[0] : params.id;
@@ -68,18 +62,20 @@ export default function StudentResultPage() {
         const fetchedResults = resultsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as StudentResult));
 
         // Check for summaries on the latest result
-        const latestResult = fetchedResults[fetchedResults.length - 1];
-        if (latestResult.studentRawFeedback && !latestResult.studentFeedbackSummary) {
-          try {
-            toast({ title: "학생 피드백 요약 중...", description: "AI가 학생의 피드백을 요약하고 있습니다." });
-            const { summary } = await summarizeStudentFeedback({ feedbackText: latestResult.studentRawFeedback });
-            await updateDoc(doc(db, "results", latestResult.id), { studentFeedbackSummary: summary });
-            latestResult.studentFeedbackSummary = summary;
-            toast({ title: "요약 완료", description: "학생 피드백 요약이 완료되었습니다." });
-          } catch(e) {
-            console.error("Error summarizing on the fly:", e);
-            latestResult.studentFeedbackSummary = "AI 요약 중 오류가 발생했습니다.";
-          }
+        if (fetchedResults.length > 0) {
+            const latestResult = fetchedResults[fetchedResults.length - 1];
+            if (latestResult.studentRawFeedback && !latestResult.studentFeedbackSummary) {
+              try {
+                toast({ title: "학생 피드백 요약 중...", description: "AI가 학생의 피드백을 요약하고 있습니다." });
+                const { summary } = await summarizeStudentFeedback({ feedbackText: latestResult.studentRawFeedback });
+                await updateDoc(doc(db, "results", latestResult.id), { studentFeedbackSummary: summary });
+                latestResult.studentFeedbackSummary = summary;
+                toast({ title: "요약 완료", description: "학생 피드백 요약이 완료되었습니다." });
+              } catch(e) {
+                console.error("Error summarizing on the fly:", e);
+                latestResult.studentFeedbackSummary = "AI 요약 중 오류가 발생했습니다.";
+              }
+            }
         }
         
         setResults(fetchedResults);
