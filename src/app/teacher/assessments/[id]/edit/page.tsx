@@ -25,7 +25,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { scenarios, type TeacherAssessment, femaleVoices, maleVoices, allVoices, evaluationModels, voiceDescriptions, type AiVoice } from "@/lib/types";
 import { useAuth, mockStudents } from "@/context/auth-context";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 export default function EditAssessmentPage() {
@@ -191,6 +191,9 @@ export default function EditAssessmentPage() {
             delete (updateData as any).aiVoice;
             delete (updateData as any).scenario;
         }
+
+        // Ensure createdAt is not overwritten
+        delete (updateData as any).createdAt;
 
 
         await updateDoc(docRef, updateData as any);

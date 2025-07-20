@@ -152,13 +152,11 @@ export default function NewAssessmentPage() {
             docData.endDate = values.endDate.toISOString();
         }
 
-        // Remove voice and scenario if it's not a dialogue
         if (values.assessmentType === 'monologue') {
             delete (docData as any).aiVoice;
             delete (docData as any).scenario;
         }
 
-        // Remove undefined fields before sending to Firestore
         Object.keys(docData).forEach(key => docData[key as keyof typeof docData] === undefined && delete docData[key as keyof typeof docData]);
 
         await addDoc(collection(db, "assessments"), docData);
