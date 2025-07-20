@@ -37,13 +37,16 @@ export function GrowthView({ results, assessment, defaultTab }: GrowthViewProps)
     const [growthFeedback, setGrowthFeedback] = useState<GenerateGrowthFeedbackOutput | null>(null);
     const [isLoadingFeedback, setIsLoadingFeedback] = useState(true);
 
-    const chartData = results.map((r, i) => ({
+    // Sort results by creation time in ascending order (oldest first)
+    const sortedResults = results.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+
+    const chartData = sortedResults.map((r, i) => ({
         name: `${i + 1}차`,
         contentScore: r.contentScore ?? 0,
         pronunciationScore: r.pronunciationScore ?? 0,
     }));
 
-    const isRubricUsed = results.some(r => !!r.rubricScores);
+    const isRubricUsed = sortedResults.some(r => !!r.rubricScores);
     const isDialogue = assessment.assessmentType === 'dialogue';
     
     const rubricSubjects = isDialogue 
@@ -52,7 +55,7 @@ export function GrowthView({ results, assessment, defaultTab }: GrowthViewProps)
 
     const radarChartData = rubricSubjects.map(subject => {
         const entry: { [key: string]: string | number } = { subject };
-        results.forEach((r, i) => {
+        sortedResults.forEach((r, i) => {
             const key = `attempt${i + 1}`;
             if (r.rubricScores) {
                 switch(subject) {
@@ -70,22 +73,22 @@ export function GrowthView({ results, assessment, defaultTab }: GrowthViewProps)
     });
 
     useEffect(() => {
-        if (results.length > 1) {
+        if (sortedResults.length > 1) {
             const fetchGrowthFeedback = async () => {
                 setIsLoadingFeedback(true);
                 try {
-                    const previousAttempt = results[results.length - 2];
-                    const latestAttempt = results[results.length - 1];
+                    const previousAttempt = sortedResults[sortedResults.length - 2];
+                    const latestAttempt = sortedResults[sortedResults.length - 1];
                     const feedback = await generateGrowthFeedback({
                         previousAttempt: {
-                            attemptNumber: results.length - 1,
+                            attemptNumber: sortedResults.length - 1,
                             contentScore: previousAttempt.contentScore ?? 0,
                             pronunciationScore: previousAttempt.pronunciationScore ?? 0,
                             transcript: previousAttempt.studentTranscript ?? "",
                             aiFeedback: previousAttempt.aiFeedback ?? "",
                         },
                         latestAttempt: {
-                            attemptNumber: results.length,
+                            attemptNumber: sortedResults.length,
                             contentScore: latestAttempt.contentScore ?? 0,
                             pronunciationScore: latestAttempt.pronunciationScore ?? 0,
                             transcript: latestAttempt.studentTranscript ?? "",
@@ -105,7 +108,7 @@ export function GrowthView({ results, assessment, defaultTab }: GrowthViewProps)
         } else {
             setIsLoadingFeedback(false);
         }
-    }, [results, assessment.title]);
+    }, [sortedResults, assessment.title]);
     
     const retryLink = assessment.assessmentType === 'dialogue'
         ? `/student/assessment/free-talk?id=${assessment.id}`
@@ -119,10 +122,10 @@ export function GrowthView({ results, assessment, defaultTab }: GrowthViewProps)
     };
 
     return (
-        <Tabs defaultValue={defaultTab || `attempt-${results.length}`} className="w-full">
+        <Tabs defaultValue={defaultTab || `attempt-${sortedResults.length}`} className="w-full">
             <TabsList className="flex flex-wrap h-auto">
                 <TabsTrigger value="overview">종합 분석</TabsTrigger>
-                {results.map((result, index) => (
+                {sortedResults.map((result, index) => (
                     <TabsTrigger key={result.id} value={`attempt-${index + 1}`}>{index + 1}차 시도</TabsTrigger>
                 ))}
             </TabsList>
@@ -161,7 +164,7 @@ export function GrowthView({ results, assessment, defaultTab }: GrowthViewProps)
                                     <PolarRadiusAxis angle={30} domain={[0, 5]} tickCount={6} />
                                     <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}/>
                                     <Legend />
-                                    {results.map((r, i) => (
+                                    {sortedResults.map((r, i) => (
                                        <Radar 
                                          key={i} 
                                          name={`${i+1}차 시도`} 
@@ -176,7 +179,7 @@ export function GrowthView({ results, assessment, defaultTab }: GrowthViewProps)
                         </CardContent>
                     </Card>
                 )}
-                {results.length > 1 && (
+                {sortedResults.length > 1 && (
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2"><Sparkles />AI 성장 피드백</CardTitle>
@@ -212,9 +215,9 @@ export function GrowthView({ results, assessment, defaultTab }: GrowthViewProps)
                   </Card>
             </TabsContent>
 
-            {results.map((result, index) => (
+            {sortedResults.map((result, index) => (
                 <TabsContent key={result.id} value={`attempt-${index + 1}`}>
-                    {renderFeedbackComponent(result, index === results.length - 1)}
+                    {renderFeedbackComponent(result, index === sortedResults.length - 1)}
                 </TabsContent>
             ))}
         </Tabs>
