@@ -14,12 +14,8 @@ import { useAuth } from "@/context/auth-context";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, collection, query, where, getDocs, updateDoc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
-import { NanumGothicFont } from '@/lib/fonts/noto-sans-kr-for-jspdf';
-
-
-// This is the new, teacher-specific view. It does not reuse student components.
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 export default function TeacherStudentResultView() {
   const params = useParams();
@@ -29,7 +25,6 @@ export default function TeacherStudentResultView() {
   const [assessment, setAssessment] = useState<TeacherAssessment | null>(null);
   const [studentResult, setStudentResult] = useState<StudentResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isDownloading, setIsDownloading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
 
@@ -40,7 +35,6 @@ export default function TeacherStudentResultView() {
     if (!user || !studentId || !assessmentId) return;
     setIsLoading(true);
     try {
-        // Fetch all results for this student and assessment to get the latest one
         const resultsQuery = query(
             collection(db, "results"),
             where("assessmentId", "==", assessmentId),
@@ -55,7 +49,7 @@ export default function TeacherStudentResultView() {
 
         const allResults = resultsSnap.docs
             .map(doc => ({ id: doc.id, ...doc.data() } as StudentResult))
-            .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)); // Newest first
+            .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)); 
 
         const latestResult = allResults[0];
         setStudentResult(latestResult);
@@ -80,7 +74,7 @@ export default function TeacherStudentResultView() {
     } finally {
         setIsLoading(false);
     }
-  }, [studentId, assessmentId, user, toast, router]);
+  }, [studentId, assessmentId, user, toast, router, notFound]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -90,84 +84,18 @@ export default function TeacherStudentResultView() {
     }
     fetchResultData();
   }, [user, authLoading, router, fetchResultData]);
-
-  const handleDownloadReport = async () => {
-    if (!studentResult || !assessment) return;
-    setIsDownloading(true);
-    toast({ title: "리포트 생성 중...", description: "PDF 파일을 준비하고 있습니다." });
-
-    try {
-        const docPDF = new jsPDF();
-        
-        docPDF.addFileToVFS("NanumGothic.ttf", NanumGothicFont);
-        docPDF.addFont("NanumGothic.ttf", "NanumGothic", "normal");
-        docPDF.setFont("NanumGothic");
-
-        const margin = 15;
-        docPDF.setFontSize(22);
-        docPDF.text('학생 리포트', margin, 20);
-        docPDF.setFontSize(12);
-        docPDF.setTextColor(100);
-        docPDF.text(`${studentResult.name} 학생 - ${assessment.title}`, margin, 30);
-
-        const isDialogue = assessment.assessmentType === 'dialogue';
-        autoTable(docPDF, {
-            startY: 40,
-            head: [['항목', '세부 내용']],
-            body: [
-                ['학생 이름', studentResult.name],
-                ['평가명', assessment.title],
-                ['유형', isDialogue ? 'AI와 대화하기' : '혼자 말하기'],
-                ['제출일', studentResult.date],
-                ['내용 점수', `${studentResult.contentScore ?? 0}%`],
-                ['발음 점수', `${studentResult.pronunciationScore ?? 0}%`],
-            ],
-            theme: 'grid',
-            styles: { font: "NanumGothic", fontSize: 10 },
-            headStyles: { fontStyle: 'bold', fillColor: [41, 128, 185], textColor: 255 },
-        });
-
-        let finalY = (docPDF as any).lastAutoTable.finalY || 100;
-        const addSection = (title: string, content: string | undefined, startY: number): number => {
-            if (!content) return startY;
-            docPDF.setFontSize(14);
-            docPDF.setTextColor(0);
-            docPDF.text(title, margin, startY);
-            docPDF.setFontSize(10);
-            docPDF.setTextColor(100);
-            const splitContent = docPDF.splitTextToSize(content, 180);
-            docPDF.text(splitContent, margin, startY + 8);
-            return startY + docPDF.getTextDimensions(splitContent).h + 15;
-        };
-
-        let currentY = finalY + 10;
-        currentY = addSection('AI 피드백 (학생용)', studentResult.aiFeedback, currentY);
-        currentY = addSection('발음 분석', studentResult.pronunciationFeedback, currentY);
-        currentY = addSection(isDialogue ? '전체 대화 기록' : '답변 내용', studentResult.studentTranscript, currentY);
-        currentY = addSection('교과과정 비고 (개별)', studentResult.curricularRemarks, currentY);
-        currentY = addSection('교과과정 비고 (종합)', studentResult.growthCurricularRemarks, currentY);
-        currentY = addSection('선생님을 위한 조언 (종합)', studentResult.growthTeacherGuidance, currentY);
-        addSection('학생 피드백 요약', studentResult.studentFeedbackSummary, currentY);
-        
-        docPDF.save(`report_${studentResult.studentId}_${assessmentId}.pdf`);
-        toast({ title: "성공", description: "리포트 다운로드가 시작되었습니다." });
-    } catch (error) {
-        console.error("PDF 생성 오류:", error);
-        toast({ title: "오류", description: "PDF 리포트 생성에 실패했습니다.", variant: "destructive" });
-    } finally {
-        setIsDownloading(false);
-    }
-  };
   
   const handleSaveCurricularRemarks = async () => {
     if (!studentResult) return;
     setIsSaving(true);
     try {
         const resultRef = doc(db, "results", studentResult.id);
+        const remarksToSave = studentResult.growthCurricularRemarks || studentResult.curricularRemarks;
         await updateDoc(resultRef, {
-            curricularRemarks: studentResult.curricularRemarks,
-            growthCurricularRemarks: studentResult.growthCurricularRemarks
+            curricularRemarks: remarksToSave,
+            growthCurricularRemarks: remarksToSave,
         });
+        setStudentResult(prev => prev ? ({ ...prev, curricularRemarks: remarksToSave, growthCurricularRemarks: remarksToSave }) : null);
         toast({ title: "저장 완료", description: "교과과정 비고가 저장되었습니다." });
     } catch (error) {
         console.error("비고 저장 오류:", error);
@@ -212,10 +140,6 @@ export default function TeacherStudentResultView() {
               <CardTitle className="text-2xl">{studentResult.name} 학생 결과</CardTitle>
               <CardDescription>평가: <span className="font-semibold">{assessment.title}</span></CardDescription>
             </div>
-            <Button variant="outline" onClick={handleDownloadReport} disabled={isDownloading}>
-                {isDownloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                {isDownloading ? "생성 중..." : "리포트 다운로드"}
-            </Button>
           </CardHeader>
        </Card>
 
@@ -243,7 +167,7 @@ export default function TeacherStudentResultView() {
               <CardContent>
                 <Textarea 
                   value={finalRemarks} 
-                  onChange={(e) => setStudentResult({...studentResult, growthCurricularRemarks: e.target.value, curricularRemarks: e.target.value })}
+                  onChange={(e) => setStudentResult({...studentResult, curricularRemarks: e.target.value, growthCurricularRemarks: e.target.value })}
                   className="h-48 bg-background font-mono text-sm whitespace-pre-wrap" />
                 <Button className="w-full mt-4" onClick={handleSaveCurricularRemarks} disabled={isSaving}>
                   {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Paperclip className="mr-2 h-4 w-4" />}
@@ -269,7 +193,11 @@ export default function TeacherStudentResultView() {
                           <Progress value={studentResult.pronunciationScore} className="h-2" />
                       </div>
                   </div>
-                  <div className="text-sm text-muted-foreground p-4 bg-muted/50 rounded-lg whitespace-pre-wrap max-h-48 overflow-auto">{studentResult.aiFeedback || "AI 피드백이 없습니다."}</div>
+                   <div className="text-sm text-muted-foreground p-4 bg-muted/50 rounded-lg whitespace-pre-wrap max-h-48 overflow-auto markdown-content">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                            {studentResult.aiFeedback || "AI 피드백이 없습니다."}
+                        </ReactMarkdown>
+                    </div>
               </CardContent>
             </Card>
             <Card>
