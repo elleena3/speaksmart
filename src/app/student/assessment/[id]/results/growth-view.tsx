@@ -141,7 +141,7 @@ export function GrowthView({ results, assessment, defaultTab }: GrowthViewProps)
                          setGrowthFeedback({ 
                             growthFeedback: "성장 피드백을 생성하는 중 오류가 발생했습니다.",
                             teacherGuidance: "교사 조언을 생성하는 중 오류가 발생했습니다.",
-                            curricularRemarks: "교과과정 비고를 생성하는 중 오류가 발생했습니다."
+                            curricularRemarks: "생활기록부 교과 특기 사항을 생성하는 중 오류가 발생했습니다."
                          });
                     } finally {
                         setIsLoadingFeedback(false);
