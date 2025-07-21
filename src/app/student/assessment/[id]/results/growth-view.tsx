@@ -7,7 +7,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
 import { FeedbackView } from "./feedback-view";
-import { FreeTalkFeedbackView } from "../../free-talk/results/free-talk-feedback-view";
 import { generateGrowthFeedback, type GenerateGrowthFeedbackOutput } from "@/ai/flows/generate-growth-feedback-flow";
 import { Loader2, Sparkles, TrendingUp, DraftingCompass } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -42,8 +41,8 @@ export function GrowthView({ results, assessment, defaultTab }: GrowthViewProps)
     const [isLoadingFeedback, setIsLoadingFeedback] = useState(true);
     const { toast } = useToast();
 
-    // Sort results by creation time in ascending order (oldest first)
-    const sortedResults = results.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+    // The parent component already sorts the results.
+    const sortedResults = results;
 
     const chartData = sortedResults.map((r, i) => ({
         name: `${i + 1}차`,
@@ -52,9 +51,8 @@ export function GrowthView({ results, assessment, defaultTab }: GrowthViewProps)
     }));
 
     const isRubricUsed = sortedResults.some(r => !!r.rubricScores);
-    const isDialogue = assessment.assessmentType === 'dialogue';
     
-    const rubricSubjects = isDialogue 
+    const rubricSubjects = assessment.assessmentType === 'dialogue'
         ? ['유창성', '발음', '문법', '어휘', '상호작용']
         : ['유창성', '발음', '문법', '어휘'];
 
@@ -136,13 +134,6 @@ export function GrowthView({ results, assessment, defaultTab }: GrowthViewProps)
     const retryLink = assessment.assessmentType === 'dialogue'
         ? `/student/assessment/free-talk?id=${assessment.id}`
         : `/student/assessment/${assessment.id}`;
-
-    const renderFeedbackComponent = (result: StudentResult, isLatest: boolean) => {
-        if (assessment.assessmentType === 'dialogue') {
-            return <FreeTalkFeedbackView result={result} assessment={assessment} isLatestAttempt={isLatest} />;
-        }
-        return <FeedbackView result={result} assessment={assessment} isLatestAttempt={isLatest} />;
-    };
 
     return (
         <Tabs defaultValue={defaultTab || `attempt-${sortedResults.length}`} className="w-full">
@@ -240,7 +231,7 @@ export function GrowthView({ results, assessment, defaultTab }: GrowthViewProps)
 
             {sortedResults.map((result, index) => (
                 <TabsContent key={result.id} value={`attempt-${index + 1}`}>
-                    {renderFeedbackComponent(result, index === sortedResults.length - 1)}
+                    <FeedbackView result={result} assessment={assessment} isLatestAttempt={index === sortedResults.length - 1} />
                 </TabsContent>
             ))}
         </Tabs>

@@ -11,13 +11,12 @@ import { useAuth } from "@/context/auth-context";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, collection, getDocs, where, query, orderBy } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
-import { FreeTalkFeedbackView } from "@/app/student/assessment/free-talk/results/free-talk-feedback-view";
-import { FeedbackView } from "@/app/student/assessment/[id]/results/feedback-view";
 import { GrowthView as StudentGrowthView } from "@/app/student/assessment/[id]/results/growth-view";
 import { GrowthView as FreeTalkGrowthView } from "@/app/student/assessment/free-talk/results/growth-view";
+import { FeedbackView } from "@/app/student/assessment/[id]/results/feedback-view";
+import { FreeTalkFeedbackView } from "@/app/student/assessment/free-talk/results/free-talk-feedback-view";
 
-
-export default function StudentResultPage() {
+export default function StudentResultPageForTeacher() {
   const params = useParams();
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
@@ -50,11 +49,12 @@ export default function StudentResultPage() {
             where("assessmentId", "==", assessmentId),
             where("studentId", "==", studentId),
             where("status", "==", "채점 완료"),
-            orderBy("createdAt", "asc")
         );
         const querySnapshot = await getDocs(q);
         
-        const fetchedResults = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as StudentResult));
+        const fetchedResults = querySnapshot.docs
+          .map(doc => ({ id: doc.id, ...doc.data() } as StudentResult))
+          .sort((a,b) => (a.createdAt || 0) - (b.createdAt || 0)); // oldest first
 
         if (fetchedResults.length === 0) {
              toast({ title: "결과 없음", description: "해당 학생의 평가 결과가 없습니다.", variant: "destructive" });
@@ -65,18 +65,7 @@ export default function StudentResultPage() {
 
     } catch (error: any) {
         console.error("Error fetching result data:", error);
-        // Check if it's a missing index error
-        if (error.code === 'failed-precondition') {
-            toast({ 
-                title: "색인 필요", 
-                description: "데이터 조회를 위한 Firestore 색인이 필요합니다. 콘솔에서 생성해주세요.",
-                variant: "destructive",
-                duration: 10000,
-            });
-        } else {
-            toast({ title: "오류", description: "결과를 불러오는 중 오류가 발생했습니다.", variant: "destructive" });
-        }
-        // notFound();
+        toast({ title: "오류", description: "결과를 불러오는 중 오류가 발생했습니다.", variant: "destructive" });
     } finally {
         setIsLoading(false);
     }
@@ -117,6 +106,7 @@ export default function StudentResultPage() {
   const studentInfo = results[0];
 
   const renderContent = () => {
+    // When there are multiple results, show the growth view
     if (results.length > 1) {
         if (assessment.assessmentType === 'dialogue') {
             return <FreeTalkGrowthView results={results} assessment={assessment} />;
@@ -124,11 +114,12 @@ export default function StudentResultPage() {
         return <StudentGrowthView results={results} assessment={assessment} />;
     }
     
+    // For a single result, show the standard feedback view
+    const singleResult = results[0];
     if (assessment.assessmentType === 'dialogue') {
-        return <FreeTalkFeedbackView result={results[0]} assessment={assessment} isLatestAttempt={true} />;
+        return <FreeTalkFeedbackView result={singleResult} assessment={assessment} isLatestAttempt={true} />;
     }
-
-    return <FeedbackView result={results[0]} assessment={assessment} isLatestAttempt={true} />;
+    return <FeedbackView result={singleResult} assessment={assessment} isLatestAttempt={true} />;
   }
 
   return (
