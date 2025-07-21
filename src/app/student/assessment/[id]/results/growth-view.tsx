@@ -1,7 +1,7 @@
 
 "use client"
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { type StudentResult, type TeacherAssessment, type ResultSummary } from "@/lib/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -44,38 +44,61 @@ export function GrowthView({ results, assessment, defaultTab }: GrowthViewProps)
     const sortedResults = results;
     const latestResult = sortedResults[sortedResults.length - 1];
 
-    const chartData = latestResult.historicalScores 
-        ? latestResult.historicalScores.map(hs => ({
-            name: `${hs.attempt}차`,
-            contentScore: hs.contentScore,
-            pronunciationScore: hs.pronunciationScore,
-          }))
-        : [];
+    const chartData = useMemo(() => {
+        // 1. Try to use the cached historicalScores first.
+        if (latestResult.historicalScores && latestResult.historicalScores.length > 0) {
+            return latestResult.historicalScores.map(hs => ({
+                name: `${hs.attempt}차`,
+                contentScore: hs.contentScore,
+                pronunciationScore: hs.pronunciationScore,
+            }));
+        }
+        // 2. Fallback: If no cache, generate from all results.
+        return sortedResults.map((r, i) => ({
+            name: `${i + 1}차`,
+            contentScore: r.contentScore ?? 0,
+            pronunciationScore: r.pronunciationScore ?? 0,
+        }));
+    }, [latestResult.historicalScores, sortedResults]);
 
-    const isRubricUsed = latestResult.historicalScores?.some(r => !!r.rubricScores);
+    const isRubricUsed = useMemo(() => {
+        if (latestResult.historicalScores && latestResult.historicalScores.length > 0) {
+            return latestResult.historicalScores.some(r => !!r.rubricScores);
+        }
+        return sortedResults.some(r => !!r.rubricScores);
+    }, [latestResult.historicalScores, sortedResults]);
     
     const rubricSubjects = assessment.assessmentType === 'dialogue'
         ? ['유창성', '발음', '문법', '어휘', '상호작용']
         : ['유창성', '발음', '문법', '어휘'];
 
-    const radarChartData = rubricSubjects.map(subject => {
-        const entry: { [key: string]: string | number } = { subject };
-        latestResult.historicalScores?.forEach((hs, i) => {
-            const key = `attempt${i + 1}`;
-            if (hs.rubricScores) {
-                switch(subject) {
-                    case '유창성': entry[key] = hs.rubricScores.fluency; break;
-                    case '발음': entry[key] = hs.rubricScores.pronunciation; break;
-                    case '문법': entry[key] = hs.rubricScores.grammar; break;
-                    case '어휘': entry[key] = hs.rubricScores.vocabulary; break;
-                    case '상호작용': entry[key] = hs.rubricScores.interaction || 0; break;
+    const radarChartData = useMemo(() => {
+        const data = rubricSubjects.map(subject => {
+            const entry: { [key: string]: string | number } = { subject };
+            const source = latestResult.historicalScores && latestResult.historicalScores.length > 0
+                ? latestResult.historicalScores
+                : sortedResults.map((r, i) => ({ ...r, attempt: i + 1 }));
+
+            source.forEach((hs, i) => {
+                const attemptData = 'historicalScores' in hs ? hs : { rubricScores: hs.rubricScores, attempt: i + 1 };
+                const key = `attempt${attemptData.attempt}`;
+                if (attemptData.rubricScores) {
+                    switch(subject) {
+                        case '유창성': entry[key] = attemptData.rubricScores.fluency; break;
+                        case '발음': entry[key] = attemptData.rubricScores.pronunciation; break;
+                        case '문법': entry[key] = attemptData.rubricScores.grammar; break;
+                        case '어휘': entry[key] = attemptData.rubricScores.vocabulary; break;
+                        case '상호작용': entry[key] = attemptData.rubricScores.interaction || 0; break;
+                    }
+                } else {
+                     entry[key] = 0;
                 }
-            } else {
-                 entry[key] = 0;
-            }
+            });
+            return entry;
         });
-        return entry;
-    });
+        return data;
+    }, [latestResult.historicalScores, sortedResults, rubricSubjects]);
+
 
     useEffect(() => {
         if (sortedResults.length > 1) {
@@ -178,7 +201,7 @@ export function GrowthView({ results, assessment, defaultTab }: GrowthViewProps)
                                     <PolarRadiusAxis angle={30} domain={[0, 5]} tickCount={6} />
                                     <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}/>
                                     <Legend />
-                                    {latestResult.historicalScores?.map((r, i) => (
+                                    {chartData.map((_r, i) => (
                                        <Radar 
                                          key={i} 
                                          name={`${i+1}차 시도`} 
