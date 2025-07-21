@@ -1,13 +1,13 @@
 
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useRouter, notFound } from "next/navigation";
-import { type TeacherAssessment, type StudentResult } from "@/lib/types";
+import { type TeacherAssessment, type StudentResult, type ResultSummary } from "@/lib/types";
 import { useAuth, mockStudents } from "@/context/auth-context";
-import { Loader2 } from "lucide-react";
+import { Loader2, ArrowRight, User, BookOpen, Sparkles, TrendingUp, DraftingCompass } from "lucide-react";
 import { db } from "@/lib/firebase";
-import { doc, getDoc, collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
 import { useToast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,6 +16,9 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
+import { generateGrowthFeedback, type GenerateGrowthFeedbackOutput } from "@/ai/flows/generate-growth-feedback-flow";
+
 
 function AttemptDetailView({ result, assessment, attemptNumber }: { result: StudentResult, assessment: TeacherAssessment, attemptNumber: number }) {
   const {
@@ -26,8 +29,32 @@ function AttemptDetailView({ result, assessment, attemptNumber }: { result: Stud
     contentScore,
     studentRawFeedback,
     teacherGuidance,
-    curricularRemarks
+    curricularRemarks,
+    rubricScores,
   } = result;
+  
+  const isRubricUsed = !!rubricScores;
+  const rubricSubjects = assessment.assessmentType === 'dialogue'
+    ? ['유창성', '발음', '문법', '어휘', '상호작용']
+    : ['유창성', '발음', '문법', '어휘'];
+
+  const radarChartData = isRubricUsed ? rubricSubjects.map(subject => {
+      const entry: { [key: string]: string | number } = { subject };
+      const key = `attempt`;
+      if (rubricScores) {
+          switch(subject) {
+              case '유창성': entry[key] = rubricScores.fluency; break;
+              case '발음': entry[key] = rubricScores.pronunciation; break;
+              case '문법': entry[key] = rubricScores.grammar; break;
+              case '어휘': entry[key] = rubricScores.vocabulary; break;
+              case '상호작용': entry[key] = rubricScores.interaction || 0; break;
+          }
+      } else {
+           entry[key] = 0;
+      }
+      return entry;
+  }) : [];
+
 
   return (
     <div className="space-y-6">
@@ -72,6 +99,25 @@ function AttemptDetailView({ result, assessment, attemptNumber }: { result: Stud
           )}
         </CardContent>
       </Card>
+      
+        {isRubricUsed && (
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2"><DraftingCompass />루브릭 영역별 분석</CardTitle>
+                    <CardDescription>루브릭 항목별 점수입니다. (5점 만점)</CardDescription>
+                </CardHeader>
+                <CardContent className="h-80">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarChartData}>
+                            <PolarGrid />
+                            <PolarAngleAxis dataKey="subject" />
+                            <PolarRadiusAxis angle={30} domain={[0, 5]} tickCount={6} />
+                            <Radar name="점수" dataKey="attempt" stroke="hsl(var(--chart-1))" fill="hsl(var(--chart-1))" fillOpacity={0.4} />
+                        </RadarChart>
+                    </ResponsiveContainer>
+                </CardContent>
+            </Card>
+        )}
       
       <div className="grid md:grid-cols-2 gap-6">
           <Card>
@@ -120,6 +166,197 @@ function AttemptDetailView({ result, assessment, attemptNumber }: { result: Stud
   )
 }
 
+const chartConfig = {
+    contentScore: {
+      label: "내용 점수",
+      color: "hsl(var(--chart-1))",
+    },
+    pronunciationScore: {
+      label: "발음 점수",
+      color: "hsl(var(--chart-2))",
+    },
+};
+
+
+function TeacherGrowthView({ results, assessment }: { results: StudentResult[], assessment: TeacherAssessment }) {
+    const [growthFeedback, setGrowthFeedback] = useState<GenerateGrowthFeedbackOutput | null>(null);
+    const [isLoadingFeedback, setIsLoadingFeedback] = useState(true);
+    const { toast } = useToast();
+    
+    const latestResult = results[results.length - 1];
+
+    const chartData = useMemo(() => {
+        if (latestResult.historicalScores && latestResult.historicalScores.length > 0) {
+            return latestResult.historicalScores.map(hs => ({ name: `${hs.attempt}차`, contentScore: hs.contentScore, pronunciationScore: hs.pronunciationScore }));
+        }
+        return results.map((r, i) => ({ name: `${i + 1}차`, contentScore: r.contentScore ?? 0, pronunciationScore: r.pronunciationScore ?? 0, }));
+    }, [latestResult.historicalScores, results]);
+
+    const isRubricUsed = useMemo(() => {
+        return results.some(r => !!r.rubricScores);
+    }, [results]);
+
+    const rubricSubjects = useMemo(() => assessment.assessmentType === 'dialogue'
+        ? ['유창성', '발음', '문법', '어휘', '상호작용']
+        : ['유창성', '발음', '문법', '어휘'], [assessment.assessmentType]);
+
+    const radarChartData = useMemo(() => {
+        const data = rubricSubjects.map(subject => {
+            const entry: { [key: string]: string | number } = { subject };
+            const source = latestResult.historicalScores && latestResult.historicalScores.length > 0
+                ? latestResult.historicalScores
+                : results.map((r, i) => ({ ...r, attempt: i + 1 }));
+
+            source.forEach((hs, i) => {
+                const attemptData = 'historicalScores' in hs ? hs : { rubricScores: hs.rubricScores, attempt: i + 1 };
+                const key = `attempt${attemptData.attempt}`;
+                if (attemptData.rubricScores) {
+                    switch(subject) {
+                        case '유창성': entry[key] = attemptData.rubricScores.fluency; break;
+                        case '발음': entry[key] = attemptData.rubricScores.pronunciation; break;
+                        case '문법': entry[key] = attemptData.rubricScores.grammar; break;
+                        case '어휘': entry[key] = attemptData.rubricScores.vocabulary; break;
+                        case '상호작용': entry[key] = attemptData.rubricScores.interaction || 0; break;
+                    }
+                } else {
+                     entry[key] = 0;
+                }
+            });
+            return entry;
+        });
+        return data;
+    }, [latestResult.historicalScores, results, rubricSubjects]);
+
+     useEffect(() => {
+        if (results.length > 1) {
+            if (latestResult.growthFeedback && latestResult.growthFeedbackForAttempts === results.length) {
+                setGrowthFeedback({
+                    growthFeedback: latestResult.growthFeedback,
+                    teacherGuidance: latestResult.growthTeacherGuidance || "",
+                    curricularRemarks: latestResult.growthCurricularRemarks || ""
+                });
+                setIsLoadingFeedback(false);
+            } else {
+                const fetchGrowthFeedback = async () => {
+                    setIsLoadingFeedback(true);
+                    try {
+                        const attempts: ResultSummary[] = results.map((r, index) => ({
+                          attemptNumber: index + 1,
+                          contentScore: r.contentScore ?? 0,
+                          pronunciationScore: r.pronunciationScore ?? 0,
+                          transcript: r.studentTranscript ?? "",
+                          aiFeedback: r.aiFeedback ?? "",
+                        }));
+
+                        const feedback = await generateGrowthFeedback({ attempts: attempts, assessmentTitle: assessment.title, });
+                        setGrowthFeedback(feedback);
+                        
+                        const resultRef = doc(db, "results", latestResult.id);
+                        await updateDoc(resultRef, {
+                            growthFeedback: feedback.growthFeedback,
+                            growthTeacherGuidance: feedback.teacherGuidance,
+                            growthCurricularRemarks: feedback.curricularRemarks,
+                            growthFeedbackForAttempts: results.length
+                        });
+                        toast({ title: "AI 종합 분석 완료", description: "학생의 성장 과정에 대한 종합 분석이 완료되었습니다."});
+
+                    } catch (error) {
+                        console.error("Error generating growth feedback:", error);
+                        setGrowthFeedback({ 
+                            growthFeedback: "성장 피드백 생성 중 오류 발생",
+                            teacherGuidance: "교사 조언 생성 중 오류 발생",
+                            curricularRemarks: "교과과정 비고 생성 중 오류 발생"
+                         });
+                    } finally {
+                        setIsLoadingFeedback(false);
+                    }
+                };
+                fetchGrowthFeedback();
+            }
+        } else {
+            setIsLoadingFeedback(false);
+        }
+    }, [results, assessment.title, toast, latestResult]);
+
+    return (
+        <div className="space-y-6">
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2"><TrendingUp />성장 곡선</CardTitle>
+                    <CardDescription>평가 시도별 점수 변화입니다.</CardDescription>
+                </CardHeader>
+                <CardContent className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={chartData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="name" />
+                            <YAxis domain={[0, 100]} />
+                            <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}/>
+                            <Legend />
+                            <Line type="monotone" dataKey="contentScore" name="내용 점수" stroke={chartConfig.contentScore.color} activeDot={{ r: 8 }} />
+                            <Line type="monotone" dataKey="pronunciationScore" name="발음 점수" stroke={chartConfig.pronunciationScore.color} />
+                        </LineChart>
+                    </ResponsiveContainer>
+                </CardContent>
+            </Card>
+            {isRubricUsed && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2"><DraftingCompass />루브릭 영역별 성장 분석</CardTitle>
+                        <CardDescription>시도별 루브릭 항목 점수 변화를 비교합니다. (5점 만점)</CardDescription>
+                    </CardHeader>
+                    <CardContent className="h-80">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarChartData}>
+                                <PolarGrid />
+                                <PolarAngleAxis dataKey="subject" />
+                                <PolarRadiusAxis angle={30} domain={[0, 5]} tickCount={6} />
+                                <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}/>
+                                <Legend />
+                                {chartData.map((_r, i) => (
+                                   <Radar key={i} name={`${i+1}차 시도`} dataKey={`attempt${i+1}`} stroke={`hsl(var(--chart-${(i % 5) + 1}))`} fill={`hsl(var(--chart-${(i % 5) + 1}))`} fillOpacity={0.4} />
+                                ))}
+                            </RadarChart>
+                        </ResponsiveContainer>
+                    </CardContent>
+                </Card>
+            )}
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2"><Sparkles />AI 종합 성장 피드백</CardTitle>
+                    <CardDescription>모든 시도를 종합하여 AI가 분석한 학생의 성장 과정입니다.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    {isLoadingFeedback ? (
+                        <div className="flex items-center justify-center p-8"><Loader2 className="h-8 w-8 animate-spin" /></div>
+                    ) : (
+                        <div className="grid md:grid-cols-2 gap-6">
+                            <Card>
+                                <CardHeader><CardTitle>AI 생성 교과과정 비고</CardTitle></CardHeader>
+                                <CardContent className="p-4 bg-muted/50 rounded-lg whitespace-pre-wrap font-body text-sm leading-relaxed min-h-[150px]">
+                                    {growthFeedback?.curricularRemarks}
+                                </CardContent>
+                            </Card>
+                             <Card>
+                                <CardHeader><CardTitle>교사용 AI 조언</CardTitle></CardHeader>
+                                <CardContent className="p-4 bg-muted/50 rounded-lg whitespace-pre-wrap font-body text-sm leading-relaxed min-h-[150px]">
+                                    {growthFeedback?.teacherGuidance}
+                                </CardContent>
+                            </Card>
+                            <Card className="md:col-span-2">
+                                <CardHeader><CardTitle>학생에게 제공된 AI 종합 피드백</CardTitle></CardHeader>
+                                <CardContent className="p-4 bg-muted/50 rounded-lg font-body text-base leading-relaxed markdown-content">
+                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{growthFeedback?.growthFeedback || ""}</ReactMarkdown>
+                                </CardContent>
+                            </Card>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+        </div>
+    );
+}
+
 
 export default function TeacherStudentResultView() {
   const params = useParams();
@@ -160,31 +397,24 @@ export default function TeacherStudentResultView() {
         return;
       }
       
-      // Firestore Indexing 문제를 피하기 위해 쿼리를 단순화합니다.
       const resultsQuery = query(
         collection(db, "results"),
         where("assessmentId", "==", assessmentId),
-        where("studentId", "==", studentId)
+        where("studentId", "==", studentId),
+        where("status", "==", "채점 완료")
       );
       const resultsSnap = await getDocs(resultsQuery);
 
       if (resultsSnap.empty) {
-        toast({ title: "결과 없음", description: "해당 학생의 평가 결과가 없습니다.", variant: "destructive" });
+        toast({ title: "결과 없음", description: "해당 학생의 완료된 평가 결과가 없습니다.", variant: "destructive" });
         router.push(`/teacher/assessment/${assessmentId}`);
         return;
       }
       
       const studentResults = resultsSnap.docs
         .map(doc => ({ id: doc.id, ...doc.data() } as StudentResult))
-        .filter(res => res.status === '채점 완료') // 클라이언트 측에서 필터링
-        .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)); // 클라이언트 측에서 정렬
+        .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)); // oldest first
       
-      if(studentResults.length === 0) {
-        toast({ title: "결과 없음", description: "해당 학생의 완료된 평가 결과가 없습니다.", variant: "destructive" });
-        router.push(`/teacher/assessment/${assessmentId}`);
-        return;
-      }
-
       setResults(studentResults);
 
     } catch (error) {
@@ -194,7 +424,7 @@ export default function TeacherStudentResultView() {
     } finally {
       setIsLoading(false);
     }
-  }, [studentId, assessmentId, user, toast, router, notFound]);
+  }, [studentId, assessmentId, user, toast, router]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -213,6 +443,8 @@ export default function TeacherStudentResultView() {
       </div>
     );
   }
+  
+  const hasMultipleAttempts = results.length > 1;
 
   return (
     <div className="space-y-6">
@@ -224,17 +456,25 @@ export default function TeacherStudentResultView() {
              </Avatar>
              <div>
                  <CardTitle className="text-2xl">{student.displayName}</CardTitle>
-                 <CardDescription>'{assessment.title}' 평가 결과</CardDescription>
+                 <CardDescription>'{assessment.title}' 평가 결과 ({results.length}회 응시)</CardDescription>
              </div>
           </CardHeader>
        </Card>
 
-       <Tabs defaultValue={`attempt-${results.length}`} className="w-full">
+       <Tabs defaultValue={hasMultipleAttempts ? "overview" : "attempt-1"} className="w-full">
          <TabsList>
+           {hasMultipleAttempts && <TabsTrigger value="overview">종합 분석</TabsTrigger>}
            {results.map((result, index) => (
              <TabsTrigger key={result.id} value={`attempt-${index + 1}`}>{index + 1}차 시도</TabsTrigger>
            ))}
          </TabsList>
+         
+         {hasMultipleAttempts && (
+            <TabsContent value="overview" className="mt-4">
+                <TeacherGrowthView results={results} assessment={assessment} />
+            </TabsContent>
+         )}
+
          {results.map((result, index) => (
            <TabsContent key={result.id} value={`attempt-${index + 1}`} className="mt-4">
              <AttemptDetailView result={result} assessment={assessment} attemptNumber={index + 1}/>
