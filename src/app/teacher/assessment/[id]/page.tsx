@@ -9,14 +9,16 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
-import { Loader2, User, ArrowRight, CheckCircle, XCircle, RefreshCcw } from "lucide-react"
+import { Loader2, User, ArrowRight, CheckCircle, XCircle, RefreshCcw, Trash2 } from "lucide-react"
 import { type TeacherAssessment, type StudentResult } from "@/lib/types";
 import { useAuth, mockStudents } from "@/context/auth-context";
 import { useToast } from "@/hooks/use-toast";
-import { collection, query, where, getDocs, doc, getDoc, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, deleteDoc } from 'firebase/firestore';
 import { db } from "@/lib/firebase";
 import { format } from "date-fns";
 import { retryAnalysis } from "@/ai/flows/retry-analysis-flow";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+
 
 type EnrichedStudent = {
     uid: string;
@@ -132,6 +134,17 @@ export default function AssessmentSubmissionsPage() {
     }
   }
 
+  const handleDeleteResult = async (resultId: string) => {
+      try {
+        await deleteDoc(doc(db, "results", resultId));
+        toast({ title: "삭제 완료", description: "오류 기록이 삭제되었습니다. 학생은 다시 응시할 수 있습니다." });
+        fetchSubmissions(); // Refresh the list
+      } catch (error) {
+         console.error("Error deleting result:", error);
+         toast({ title: "삭제 실패", description: "기록을 삭제하는 중 오류가 발생했습니다.", variant: "destructive" });
+      }
+  }
+
 
   if (isLoading || authLoading) {
     return (
@@ -204,6 +217,27 @@ export default function AssessmentSubmissionsPage() {
                                    {isRetrying ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <RefreshCcw className="mr-2 h-4 w-4" />}
                                    분석 재시도
                                 </Button>
+                           )}
+                           {result?.status === "오류" && !result.studentRecordingUrl && (
+                                <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                        <Button variant="destructive" size="sm">
+                                            <Trash2 className="mr-2 h-4 w-4"/> 삭제
+                                        </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                            <AlertDialogTitle>오류 기록을 삭제하시겠습니까?</AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                                녹음 파일이 존재하지 않아 재평가가 불가능합니다. 이 오류 기록을 삭제하면 학생이 다시 평가에 응시할 수 있습니다.
+                                            </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                            <AlertDialogCancel>취소</AlertDialogCancel>
+                                            <AlertDialogAction onClick={() => handleDeleteResult(result.id)} className="bg-destructive hover:bg-destructive/90">삭제</AlertDialogAction>
+                                        </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                </AlertDialog>
                            )}
                         </TableCell>
                       </TableRow>

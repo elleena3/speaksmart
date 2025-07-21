@@ -75,8 +75,8 @@ export const CombinedAnalysisOutputSchema = z.object({
 
 // Schemas for the MONOLOGUE analysis flow
 export const GenerateMonologueAnalysisInputSchema = z.object({
-  studentRecordingUrl: z.string().describe(
-    "A direct download URL to the student's voice recording."
+  studentRecordingDataUri: z.string().describe(
+    "The student's voice recording as a data URI."
   ),
   activityPrompt: z.string().describe('The prompt or instructions for the speaking activity.'),
   expectedFormat: z.string().describe('The expected format or key points of the response for grading.'),
@@ -84,6 +84,8 @@ export const GenerateMonologueAnalysisInputSchema = z.object({
   assessmentTitle: z.string().describe('The title of the assessment.'),
   evaluationModel: z.enum(evaluationModels).optional(),
   useRubric: z.boolean().optional().describe('Whether to use the standardized rubric for evaluation.'),
+  resultId: z.string().describe('The Firestore document ID for the result to update progress.'),
+  teacherUid: z.string().describe("The UID of the teacher who created the assessment."),
 });
 export type GenerateMonologueAnalysisInput = z.infer<typeof GenerateMonologueAnalysisInputSchema>;
 
