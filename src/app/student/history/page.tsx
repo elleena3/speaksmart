@@ -137,14 +137,22 @@ export default function HistoryPage() {
   const getResultLink = (result: EnrichedResult, isLatest: boolean, totalAttempts: number) => {
     const attemptNumber = isLatest ? totalAttempts : groupedAssessments.find(g => g.assessmentId === result.assessmentId)?.previousAttempts.findIndex(p => p.id === result.id)! + 1;
     
-    const baseLink = result.assessmentType === 'dialogue'
-      ? `/student/assessment/free-talk/results?id=${result.assessmentId}`
-      : `/student/assessment/${result.assessmentId}/results`;
+    let baseLink = '';
+    let params = new URLSearchParams();
+
+    if (result.assessmentType === 'dialogue') {
+      baseLink = `/student/assessment/free-talk/results`;
+      params.append('id', result.assessmentId);
+    } else {
+      baseLink = `/student/assessment/${result.assessmentId}/results`;
+    }
 
     if (totalAttempts > 1) {
-        return `${baseLink}&attempt=${attemptNumber}`;
+      params.append('attempt', attemptNumber.toString());
     }
-    return baseLink;
+
+    const queryString = params.toString();
+    return queryString ? `${baseLink}?${queryString}` : baseLink;
   }
 
   return (
