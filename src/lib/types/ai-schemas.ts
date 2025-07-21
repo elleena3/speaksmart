@@ -53,7 +53,7 @@ export const ContentAnalysisOutputSchema = z.object({
     aiFeedback: z.string().describe('The generated feedback for the student in Korean.'),
     teacherGuidance: z.string().describe('Actionable guidance for the teacher based on the performance in Korean.'),
     contentScore: z.number().int().min(0).max(100).describe('A score from 0-100 for the performance content.'),
-    curricularRemarks: z.string().describe('A draft of curricular remarks suitable for a student record, in formal Korean.'),
+    curricularRemarks: z.string().describe('A draft of school record remarks, in formal Korean.'),
 });
 
 export const PronunciationAnalysisOutputSchema = z.object({
@@ -126,7 +126,7 @@ export type GenerateGrowthFeedbackInput = z.infer<typeof GenerateGrowthFeedbackI
 export const GenerateGrowthFeedbackOutputSchema = z.object({
     growthFeedback: z.string().describe("A comprehensive Markdown-formatted analysis of the student's growth."),
     teacherGuidance: z.string().describe("Actionable advice for the teacher based on the student's entire journey."),
-    curricularRemarks: z.string().describe("A comprehensive curricular remark based on the student's entire journey."),
+    curricularRemarks: z.string().describe("A comprehensive school record remark based on the student's entire journey."),
 });
 export type GenerateGrowthFeedbackOutput = z.infer<typeof GenerateGrowthFeedbackOutputSchema>;
 

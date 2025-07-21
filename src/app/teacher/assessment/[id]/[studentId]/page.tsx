@@ -130,7 +130,7 @@ function AttemptDetailView({ result, assessment, attemptNumber }: { result: Stud
           </Card>
            <Card>
             <CardHeader>
-                <CardTitle>AI 생성 교과과정 비고</CardTitle>
+                <CardTitle>생활기록부 교과 특기 사항</CardTitle>
             </CardHeader>
             <CardContent className="p-4 bg-muted/50 rounded-lg whitespace-pre-wrap font-body text-sm leading-relaxed min-h-[150px]">
                 {curricularRemarks}
@@ -255,7 +255,7 @@ function TeacherGrowthView({ results, assessment }: { results: StudentResult[], 
                         await updateDoc(resultRef, {
                             growthFeedback: feedback.growthFeedback,
                             growthTeacherGuidance: feedback.teacherGuidance,
-                            growthCurricularRemarks: feedback.curricularRemarks,
+                            curricularRemarks: feedback.curricularRemarks,
                             growthFeedbackForAttempts: results.length
                         });
                         toast({ title: "AI 종합 분석 완료", description: "학생의 성장 과정에 대한 종합 분석이 완료되었습니다."});
@@ -265,7 +265,7 @@ function TeacherGrowthView({ results, assessment }: { results: StudentResult[], 
                         setGrowthFeedback({ 
                             growthFeedback: "성장 피드백 생성 중 오류 발생",
                             teacherGuidance: "교사 조언 생성 중 오류 발생",
-                            curricularRemarks: "교과과정 비고 생성 중 오류 발생"
+                            curricularRemarks: "생활기록부 교과 특기 사항 생성 중 오류 발생"
                          });
                     } finally {
                         setIsLoadingFeedback(false);
@@ -332,7 +332,7 @@ function TeacherGrowthView({ results, assessment }: { results: StudentResult[], 
                     ) : (
                         <div className="grid md:grid-cols-2 gap-6">
                             <Card>
-                                <CardHeader><CardTitle>AI 생성 교과과정 비고</CardTitle></CardHeader>
+                                <CardHeader><CardTitle>생활기록부 교과 특기 사항</CardTitle></CardHeader>
                                 <CardContent className="p-4 bg-muted/50 rounded-lg whitespace-pre-wrap font-body text-sm leading-relaxed min-h-[150px]">
                                     {growthFeedback?.curricularRemarks}
                                 </CardContent>

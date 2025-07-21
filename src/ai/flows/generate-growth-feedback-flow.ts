@@ -53,7 +53,7 @@ Please perform the following steps based on ALL attempts provided:
     -   **Tone:** Professional and advisory.
     -   **Content:** Summarize the student's overall progress across all attempts. Pinpoint the most significant areas of improvement and persistent weaknesses. Suggest specific, targeted activities or teaching strategies for the teacher to help this student continue to grow (e.g., "이 학생은 어휘력은 꾸준히 향상되고 있으나, 복잡한 문장에서의 시제 일치 실수가 반복됩니다. 다음 수업에서 과거완료 시제를 활용한 짧은 문장 만들기 활동을 지도하면 도움이 될 것입니다.").
 
-3.  **Generate Curricular Remarks ('curricularRemarks'):**
+3.  **Generate '생활기록부 교과 특기 사항' ('curricularRemarks'):**
     -   **Format:** Formal Korean prose, with sentences ending in '~함' or '~임'.
     -   **Tone:** Official and descriptive, suitable for a school record.
     -   **Content:** Write a comprehensive remark that reflects the student's entire journey on this assessment. Start by mentioning their persistent effort over multiple attempts. Describe the initial state and how it evolved, using specific examples from early and late attempts. Conclude by summarizing their current demonstrated ability and attitude (e.g., "총 3회에 걸쳐 '취미 소개하기' 말하기 평가에 도전하며 영어 실력 향상에 대한 강한 의지를 보여줌. 초기 시도에서는 단답형 문장 위주였으나, 마지막 시도에서는 접속사를 활용하여 더 길고 논리적인 문장을 구사하는 등 눈에 띄는 성장을 이룸. 특히...").
