@@ -14,6 +14,10 @@ import { useAuth } from "@/context/auth-context";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, collection, query, where, getDocs, updateDoc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { NanumGothicFont } from '@/lib/fonts/noto-sans-kr-for-jspdf';
+
 
 // This is the new, teacher-specific view. It does not reuse student components.
 
@@ -76,7 +80,7 @@ export default function TeacherStudentResultView() {
     } finally {
         setIsLoading(false);
     }
-  }, [studentId, assessmentId, user, toast, router, notFound]);
+  }, [studentId, assessmentId, user, toast, router]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -93,10 +97,6 @@ export default function TeacherStudentResultView() {
     toast({ title: "리포트 생성 중...", description: "PDF 파일을 준비하고 있습니다." });
 
     try {
-        const { default: jsPDF } = await import('jspdf');
-        const { default: autoTable } = await import('jspdf-autotable');
-        const { NanumGothicFont } = await import('@/lib/fonts/noto-sans-kr-for-jspdf');
-        
         const docPDF = new jsPDF();
         
         docPDF.addFileToVFS("NanumGothic.ttf", NanumGothicFont);
@@ -198,7 +198,7 @@ export default function TeacherStudentResultView() {
 
   const isDialogue = assessment.assessmentType === 'dialogue';
   const hasFeedback = studentResult.studentFeedbackSummary && studentResult.studentFeedbackSummary !== "학생이 평가에 대해 남긴 피드백이 없습니다.";
-  const finalRemarks = studentResult.growthCurricularRemarks || studentResult.curricularRemarks;
+  const finalRemarks = studentResult.growthCurricularRemarks || studentResult.curricularRemarks || "";
 
   return (
     <div className="space-y-6">
