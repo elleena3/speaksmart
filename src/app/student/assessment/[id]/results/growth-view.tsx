@@ -131,7 +131,7 @@ export function GrowthView({ results, assessment, defaultTab }: GrowthViewProps)
                         await updateDoc(resultRef, {
                             growthFeedback: feedback.growthFeedback,
                             growthTeacherGuidance: feedback.teacherGuidance,
-                            growthCurricularRemarks: feedback.curricularRemarks,
+                            curricularRemarks: feedback.curricularRemarks,
                             growthFeedbackForAttempts: sortedResults.length
                         });
                         toast({ title: "AI 종합 분석 완료", description: "학생의 성장 과정에 대한 종합 분석이 완료되었습니다."});
@@ -168,25 +168,27 @@ export function GrowthView({ results, assessment, defaultTab }: GrowthViewProps)
             </TabsList>
 
             <TabsContent value="overview" className="mt-4 space-y-6">
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><TrendingUp />성장 곡선</CardTitle>
-                        <CardDescription>평가 시도별 점수 변화입니다.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="h-64">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={chartData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="name" />
-                                <YAxis domain={[0, 100]} />
-                                <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}/>
-                                <Legend />
-                                <Line type="monotone" dataKey="contentScore" name="내용 점수" stroke={chartConfig.contentScore.color} activeDot={{ r: 8 }} />
-                                <Line type="monotone" dataKey="pronunciationScore" name="발음 점수" stroke={chartConfig.pronunciationScore.color} />
-                            </LineChart>
-                        </ResponsiveContainer>
-                    </CardContent>
-                </Card>
+                {!isRubricUsed && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2"><TrendingUp />성장 곡선</CardTitle>
+                            <CardDescription>평가 시도별 점수 변화입니다.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="h-64">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <LineChart data={chartData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis dataKey="name" />
+                                    <YAxis domain={[0, 100]} />
+                                    <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}/>
+                                    <Legend />
+                                    <Line type="monotone" dataKey="contentScore" name="내용 점수" stroke={chartConfig.contentScore.color} activeDot={{ r: 8 }} />
+                                    <Line type="monotone" dataKey="pronunciationScore" name="발음 점수" stroke={chartConfig.pronunciationScore.color} />
+                                </LineChart>
+                            </ResponsiveContainer>
+                        </CardContent>
+                    </Card>
+                )}
                 {isRubricUsed && (
                     <Card>
                         <CardHeader>

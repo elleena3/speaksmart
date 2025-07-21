@@ -72,32 +72,34 @@ function AttemptDetailView({ result, assessment, attemptNumber }: { result: Stud
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>AI 성능 분석</CardTitle>
-          <CardDescription>AI가 분석한 내용 및 발음 점수입니다.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {contentScore !== undefined && (
-            <div className="w-full">
-              <div className="flex justify-between mb-1">
-                <span className="text-base font-medium text-primary">내용 점수</span>
-                <span className="text-sm font-medium text-primary">{contentScore}%</span>
-              </div>
-              <Progress value={contentScore} className="h-2" />
-            </div>
-          )}
-          {pronunciationScore !== undefined && (
-            <div className="w-full">
-              <div className="flex justify-between mb-1">
-                <span className="text-base font-medium text-primary">발음 점수</span>
-                <span className="text-sm font-medium text-primary">{pronunciationScore}%</span>
-              </div>
-              <Progress value={pronunciationScore} className="h-2" />
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {!isRubricUsed && (
+          <Card>
+            <CardHeader>
+              <CardTitle>AI 성능 분석</CardTitle>
+              <CardDescription>AI가 분석한 내용 및 발음 점수입니다.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {contentScore !== undefined && (
+                <div className="w-full">
+                  <div className="flex justify-between mb-1">
+                    <span className="text-base font-medium text-primary">내용 점수</span>
+                    <span className="text-sm font-medium text-primary">{contentScore}%</span>
+                  </div>
+                  <Progress value={contentScore} className="h-2" />
+                </div>
+              )}
+              {pronunciationScore !== undefined && (
+                <div className="w-full">
+                  <div className="flex justify-between mb-1">
+                    <span className="text-base font-medium text-primary">발음 점수</span>
+                    <span className="text-sm font-medium text-primary">{pronunciationScore}%</span>
+                  </div>
+                  <Progress value={pronunciationScore} className="h-2" />
+                </div>
+              )}
+            </CardContent>
+          </Card>
+      )}
       
         {isRubricUsed && (
             <Card>
@@ -294,25 +296,27 @@ function TeacherGrowthView({ results, assessment }: { results: StudentResult[], 
 
     return (
         <div className="space-y-6">
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2"><TrendingUp />성장 곡선</CardTitle>
-                    <CardDescription>평가 시도별 점수 변화입니다.</CardDescription>
-                </CardHeader>
-                <CardContent className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={chartData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="name" />
-                            <YAxis domain={[0, 100]} />
-                            <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}/>
-                            <Legend />
-                            <Line type="monotone" dataKey="contentScore" name="내용 점수" stroke={chartConfig.contentScore.color} activeDot={{ r: 8 }} />
-                            <Line type="monotone" dataKey="pronunciationScore" name="발음 점수" stroke={chartConfig.pronunciationScore.color} />
-                        </LineChart>
-                    </ResponsiveContainer>
-                </CardContent>
-            </Card>
+            {!isRubricUsed && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2"><TrendingUp />성장 곡선</CardTitle>
+                        <CardDescription>평가 시도별 점수 변화입니다.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="h-64">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={chartData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="name" />
+                                <YAxis domain={[0, 100]} />
+                                <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}/>
+                                <Legend />
+                                <Line type="monotone" dataKey="contentScore" name="내용 점수" stroke={chartConfig.contentScore.color} activeDot={{ r: 8 }} />
+                                <Line type="monotone" dataKey="pronunciationScore" name="발음 점수" stroke={chartConfig.pronunciationScore.color} />
+                            </LineChart>
+                        </ResponsiveContainer>
+                    </CardContent>
+                </Card>
+            )}
             {isRubricUsed && (
                 <Card>
                     <CardHeader>
@@ -451,6 +455,21 @@ export default function TeacherStudentResultView() {
   
   const completedResults = results.filter(r => r.status === "채점 완료");
   const hasMultipleAttempts = completedResults.length > 1;
+
+  if (completedResults.length === 0) {
+      return (
+        <Card>
+            <CardHeader>
+                <CardTitle>{student.displayName} 학생의 결과</CardTitle>
+                <CardDescription>'{assessment.title}'</CardDescription>
+            </CardHeader>
+            <CardContent className="text-center py-12">
+                <p className="text-muted-foreground">이 학생의 완료된 평가 결과가 없습니다.</p>
+                <p className="text-sm text-muted-foreground">오류가 있거나 채점 중인 결과는 있을 수 있습니다.</p>
+            </CardContent>
+        </Card>
+      )
+  }
 
   return (
     <div className="space-y-6">
