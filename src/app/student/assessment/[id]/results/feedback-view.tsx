@@ -129,43 +129,45 @@ export function FeedbackView({ result, assessment, isLatestAttempt }: FeedbackVi
             </CardContent>
         </Card>
         
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <Target className="w-8 h-8 text-primary shrink-0" />
-              <div>
-                <CardTitle className="text-2xl">상세 분석</CardTitle>
-                <CardDescription>AI가 분석한 내용/발음 정확도와 피드백입니다.</CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-              {contentScore !== undefined && (
-                  <div className="w-full">
-                      <div className="flex justify-between mb-1">
-                        <span className="text-base font-medium text-primary">내용 점수</span>
-                        <span className="text-sm font-medium text-primary">{contentScore}%</span>
-                    </div>
-                    <Progress value={contentScore} className="h-2" />
+        {!isRubricUsed && (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <Target className="w-8 h-8 text-primary shrink-0" />
+                  <div>
+                    <CardTitle className="text-2xl">상세 분석</CardTitle>
+                    <CardDescription>AI가 분석한 내용/발음 정확도와 피드백입니다.</CardDescription>
                   </div>
-              )}
-              {pronunciationScore !== undefined && (
-                  <div className="w-full">
-                      <div className="flex justify-between mb-1">
-                        <span className="text-base font-medium text-primary">발음 점수</span>
-                        <span className="text-sm font-medium text-primary">{pronunciationScore}%</span>
-                    </div>
-                    <Progress value={pronunciationScore} className="h-2" />
-                  </div>
-              )}
-              {pronunciationFeedback && (
-                  <div className="p-4 bg-muted/50 rounded-lg whitespace-pre-wrap font-body text-base leading-relaxed">
-                    <h4 className="font-semibold mb-2">발음 피드백</h4>
-                    {pronunciationFeedback}
-                  </div>
-              )}
-          </CardContent>
-        </Card>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                  {contentScore !== undefined && (
+                      <div className="w-full">
+                          <div className="flex justify-between mb-1">
+                            <span className="text-base font-medium text-primary">내용 점수</span>
+                            <span className="text-sm font-medium text-primary">{contentScore}%</span>
+                        </div>
+                        <Progress value={contentScore} className="h-2" />
+                      </div>
+                  )}
+                  {pronunciationScore !== undefined && (
+                      <div className="w-full">
+                          <div className="flex justify-between mb-1">
+                            <span className="text-base font-medium text-primary">발음 점수</span>
+                            <span className="text-sm font-medium text-primary">{pronunciationScore}%</span>
+                        </div>
+                        <Progress value={pronunciationScore} className="h-2" />
+                      </div>
+                  )}
+                  {pronunciationFeedback && (
+                      <div className="p-4 bg-muted/50 rounded-lg whitespace-pre-wrap font-body text-base leading-relaxed">
+                        <h4 className="font-semibold mb-2">발음 피드백</h4>
+                        {pronunciationFeedback}
+                      </div>
+                  )}
+              </CardContent>
+            </Card>
+        )}
 
         {isRubricUsed && (
             <Card>
