@@ -20,14 +20,13 @@ import { cn } from "@/lib/utils"
 type CombinedAssessment = TeacherAssessment & {
     resultStatus?: '채점 완료' | '채점 중' | '오류' | null;
     resultId?: string;
-    resultCreatedAt?: number;
     completedAttemptsCount: number;
 };
 
 function AssessmentCard({ assessment, t }: { assessment: CombinedAssessment, t: any }) {
-  const isCompleted = assessment.resultStatus === '채점 완료';
-  const isGrading = assessment.resultStatus === '채점 중';
-  const hasError = assessment.resultStatus === '오류';
+  const isCompleted = assessment.completedAttemptsCount > 0;
+  const isGrading = !isCompleted && assessment.resultStatus === '채점 중';
+  const hasError = !isCompleted && assessment.resultStatus === '오류';
   const hasMultipleAttempts = assessment.completedAttemptsCount > 1;
 
   const getStatusText = () => {
@@ -54,7 +53,7 @@ function AssessmentCard({ assessment, t }: { assessment: CombinedAssessment, t: 
   }
   
   const getButtonText = () => {
-      if (hasError) return "결과 보기";
+      if (hasError) return "다시 시도";
       if (isGrading) return "채점 현황 보기";
       if (isCompleted) {
           return hasMultipleAttempts ? "종합 결과 보기" : t.studentDashboard.viewResults;
@@ -67,8 +66,9 @@ function AssessmentCard({ assessment, t }: { assessment: CombinedAssessment, t: 
       ? `/student/assessment/free-talk/results?id=${assessment.id}`
       : `/student/assessment/${assessment.id}/results`;
       
-    if (isCompleted || isGrading || hasError) return resultsPath;
+    if (isCompleted) return resultsPath;
     
+    // For grading, error, or to-do, link to start page
     if (assessment.assessmentType === 'dialogue') {
       return `/student/assessment/free-talk?id=${assessment.id}`;
     }
@@ -143,7 +143,6 @@ export default function StudentDashboard() {
                 ...assessment,
                 resultStatus: latestResult ? latestResult.status : null,
                 resultId: latestResult ? latestResult.id : undefined,
-                resultCreatedAt: latestResult ? latestResult.createdAt : undefined,
                 completedAttemptsCount: completedAttemptsCount,
             };
         });
@@ -159,8 +158,8 @@ export default function StudentDashboard() {
         });
 
         filteredAssessments.sort((a, b) => {
-            const aIsCompleted = a.resultStatus === '채점 완료';
-            const bIsCompleted = b.resultStatus === '채점 완료';
+            const aIsCompleted = a.completedAttemptsCount > 0;
+            const bIsCompleted = b.completedAttemptsCount > 0;
 
             if (aIsCompleted !== bIsCompleted) {
                 return aIsCompleted ? 1 : -1;
@@ -175,7 +174,9 @@ export default function StudentDashboard() {
                 }
                 return (b.createdAt || 0) - (a.createdAt || 0);
             } else { 
-                return (b.resultCreatedAt || 0) - (a.resultCreatedAt || 0);
+                 const latestResultA = resultsByAssessment.get(a.id)?.find(r => r.status === '채점 완료');
+                 const latestResultB = resultsByAssessment.get(b.id)?.find(r => r.status === '채점 완료');
+                return (latestResultB?.createdAt || 0) - (latestResultA?.createdAt || 0);
             }
         });
         
