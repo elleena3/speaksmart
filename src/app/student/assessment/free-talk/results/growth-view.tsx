@@ -15,6 +15,9 @@ import Link from "next/link";
 import { Repeat } from "lucide-react";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from "remark-gfm";
+import { doc, updateDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { useToast } from "@/hooks/use-toast";
 
 type GrowthViewProps = {
     results: StudentResult[];
@@ -36,14 +39,17 @@ const chartConfig = {
 export function GrowthView({ results, assessment, defaultTab }: GrowthViewProps) {
     const [growthFeedback, setGrowthFeedback] = useState<GenerateGrowthFeedbackOutput | null>(null);
     const [isLoadingFeedback, setIsLoadingFeedback] = useState(true);
+    const { toast } = useToast();
 
-    const chartData = results.map((r, i) => ({
+    const sortedResults = results.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+
+    const chartData = sortedResults.map((r, i) => ({
         name: `${i + 1}차`,
         contentScore: r.contentScore ?? 0,
         pronunciationScore: r.pronunciationScore ?? 0,
     }));
 
-    const isRubricUsed = results.some(r => !!r.rubricScores);
+    const isRubricUsed = sortedResults.some(r => !!r.rubricScores);
     const isDialogue = assessment.assessmentType === 'dialogue';
     
     const rubricSubjects = isDialogue 
@@ -52,7 +58,7 @@ export function GrowthView({ results, assessment, defaultTab }: GrowthViewProps)
 
     const radarChartData = rubricSubjects.map(subject => {
         const entry: { [key: string]: string | number } = { subject };
-        results.forEach((r, i) => {
+        sortedResults.forEach((r, i) => {
             const key = `attempt${i + 1}`;
             if (r.rubricScores) {
                 switch(subject) {
@@ -70,39 +76,63 @@ export function GrowthView({ results, assessment, defaultTab }: GrowthViewProps)
     });
 
     useEffect(() => {
-        if (results.length > 1) {
-            const fetchGrowthFeedback = async () => {
-                setIsLoadingFeedback(true);
-                try {
-                    const attempts: ResultSummary[] = results.map((r, index) => ({
-                      attemptNumber: index + 1,
-                      contentScore: r.contentScore ?? 0,
-                      pronunciationScore: r.pronunciationScore ?? 0,
-                      transcript: r.studentTranscript ?? "",
-                      aiFeedback: r.aiFeedback ?? "",
-                    }));
+        if (sortedResults.length > 1) {
+            const latestResult = sortedResults[sortedResults.length - 1];
 
-                    const feedback = await generateGrowthFeedback({
-                        attempts: attempts,
-                        assessmentTitle: assessment.title,
-                    });
-                    setGrowthFeedback(feedback);
-                } catch (error) {
-                    console.error("Error generating growth feedback:", error);
-                     setGrowthFeedback({ 
-                        growthFeedback: "성장 피드백을 생성하는 중 오류가 발생했습니다.",
-                        teacherGuidance: "교사 조언을 생성하는 중 오류가 발생했습니다.",
-                        curricularRemarks: "교과과정 비고를 생성하는 중 오류가 발생했습니다."
-                     });
-                } finally {
-                    setIsLoadingFeedback(false);
-                }
-            };
-            fetchGrowthFeedback();
+            // Check if cached feedback exists and is for the current number of attempts
+            if (latestResult.growthFeedback && latestResult.growthFeedbackForAttempts === sortedResults.length) {
+                setGrowthFeedback({
+                    growthFeedback: latestResult.growthFeedback,
+                    teacherGuidance: latestResult.growthTeacherGuidance || "",
+                    curricularRemarks: latestResult.growthCurricularRemarks || ""
+                });
+                setIsLoadingFeedback(false);
+            } else {
+                // Fetch new feedback
+                const fetchGrowthFeedback = async () => {
+                    setIsLoadingFeedback(true);
+                    try {
+                        const attempts: ResultSummary[] = sortedResults.map((r, index) => ({
+                          attemptNumber: index + 1,
+                          contentScore: r.contentScore ?? 0,
+                          pronunciationScore: r.pronunciationScore ?? 0,
+                          transcript: r.studentTranscript ?? "",
+                          aiFeedback: r.aiFeedback ?? "",
+                        }));
+
+                        const feedback = await generateGrowthFeedback({
+                            attempts: attempts,
+                            assessmentTitle: assessment.title,
+                        });
+                        setGrowthFeedback(feedback);
+                        
+                        // Cache the new feedback on the latest result document
+                        const resultRef = doc(db, "results", latestResult.id);
+                        await updateDoc(resultRef, {
+                            growthFeedback: feedback.growthFeedback,
+                            growthTeacherGuidance: feedback.teacherGuidance,
+                            growthCurricularRemarks: feedback.curricularRemarks,
+                            growthFeedbackForAttempts: sortedResults.length
+                        });
+                        toast({ title: "AI 종합 분석 완료", description: "학생의 성장 과정에 대한 종합 분석이 완료되었습니다."});
+
+                    } catch (error) {
+                        console.error("Error generating growth feedback:", error);
+                         setGrowthFeedback({ 
+                            growthFeedback: "성장 피드백을 생성하는 중 오류가 발생했습니다.",
+                            teacherGuidance: "교사 조언을 생성하는 중 오류가 발생했습니다.",
+                            curricularRemarks: "교과과정 비고를 생성하는 중 오류가 발생했습니다."
+                         });
+                    } finally {
+                        setIsLoadingFeedback(false);
+                    }
+                };
+                fetchGrowthFeedback();
+            }
         } else {
             setIsLoadingFeedback(false);
         }
-    }, [results, assessment.title]);
+    }, [sortedResults, assessment.title, toast]);
     
     const retryLink = assessment.assessmentType === 'dialogue'
         ? `/student/assessment/free-talk?id=${assessment.id}`
@@ -116,10 +146,10 @@ export function GrowthView({ results, assessment, defaultTab }: GrowthViewProps)
     };
 
     return (
-        <Tabs defaultValue={defaultTab || `attempt-${results.length}`} className="w-full">
+        <Tabs defaultValue={defaultTab || `attempt-${sortedResults.length}`} className="w-full">
             <TabsList className="flex flex-wrap h-auto">
                 <TabsTrigger value="overview">종합 분석</TabsTrigger>
-                {results.map((result, index) => (
+                {sortedResults.map((result, index) => (
                     <TabsTrigger key={result.id} value={`attempt-${index + 1}`}>{index + 1}차 시도</TabsTrigger>
                 ))}
             </TabsList>
@@ -158,7 +188,7 @@ export function GrowthView({ results, assessment, defaultTab }: GrowthViewProps)
                                     <PolarRadiusAxis angle={30} domain={[0, 5]} tickCount={6} />
                                     <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}/>
                                     <Legend />
-                                    {results.map((r, i) => (
+                                    {sortedResults.map((r, i) => (
                                        <Radar 
                                          key={i} 
                                          name={`${i+1}차 시도`} 
@@ -173,7 +203,7 @@ export function GrowthView({ results, assessment, defaultTab }: GrowthViewProps)
                         </CardContent>
                     </Card>
                 )}
-                {results.length > 1 && (
+                {sortedResults.length > 1 && (
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2"><Sparkles />AI 종합 성장 피드백</CardTitle>
@@ -209,9 +239,9 @@ export function GrowthView({ results, assessment, defaultTab }: GrowthViewProps)
                   </Card>
             </TabsContent>
 
-            {results.map((result, index) => (
+            {sortedResults.map((result, index) => (
                 <TabsContent key={result.id} value={`attempt-${index + 1}`}>
-                    {renderFeedbackComponent(result, index === results.length - 1)}
+                    {renderFeedbackComponent(result, index === sortedResults.length - 1)}
                 </TabsContent>
             ))}
         </Tabs>

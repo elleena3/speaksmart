@@ -128,7 +128,8 @@ export default function StudentResultPage() {
 
         let finalY = (docPDF as any).lastAutoTable.finalY || 100;
 
-        const addSection = (title: string, content: string, startY: number): number => {
+        const addSection = (title: string, content: string | undefined, startY: number): number => {
+            if (!content) return startY;
             if (startY > 260) { 
                 docPDF.addPage();
                 startY = 20;
@@ -155,10 +156,11 @@ export default function StudentResultPage() {
 
         let currentY = finalY + 10;
         currentY = addSection('AI 피드백 (학생용)', studentResult.aiFeedback, currentY);
-        currentY = addSection('발음 분석', studentResult.pronunciationFeedback || 'N/A', currentY);
-        currentY = addSection(isDialogue ? '전체 대화 기록' : '답변 내용', studentResult.studentTranscript || '기록 없음', currentY);
-        currentY = addSection('교과과정 비고 초안', studentResult.curricularRemarks, currentY);
-        currentY = addSection('선생님을 위한 조언', studentResult.teacherGuidance, currentY);
+        currentY = addSection('발음 분석', studentResult.pronunciationFeedback, currentY);
+        currentY = addSection(isDialogue ? '전체 대화 기록' : '답변 내용', studentResult.studentTranscript, currentY);
+        currentY = addSection('종합 성장 피드백', studentResult.growthFeedback, currentY);
+        currentY = addSection('교과과정 비고 (종합)', studentResult.growthCurricularRemarks, currentY);
+        currentY = addSection('선생님을 위한 조언 (종합)', studentResult.growthTeacherGuidance, currentY);
         addSection('학생 피드백 요약', studentResult.studentFeedbackSummary, currentY);
         
         const safeFileName = `report_${studentResult.studentId}_${assessmentId}.pdf`;
@@ -179,7 +181,7 @@ export default function StudentResultPage() {
     try {
         const resultRef = doc(db, "results", studentResult.id);
         await updateDoc(resultRef, {
-            curricularRemarks: studentResult.curricularRemarks
+            growthCurricularRemarks: studentResult.growthCurricularRemarks
         });
         toast({
             title: "저장 완료",
@@ -275,8 +277,8 @@ export default function StudentResultPage() {
               </CardHeader>
               <CardContent>
                 <Textarea 
-                  value={studentResult.curricularRemarks} 
-                  onChange={(e) => setStudentResult({...studentResult, curricularRemarks: e.target.value})}
+                  value={studentResult.growthCurricularRemarks || ""} 
+                  onChange={(e) => setStudentResult({...studentResult, growthCurricularRemarks: e.target.value})}
                   className="h-48 bg-background font-mono text-sm whitespace-pre-wrap" />
                 <Button className="w-full mt-4" onClick={handleSaveCurricularRemarks} disabled={isSaving}>
                   {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Paperclip className="mr-2 h-4 w-4" />}
@@ -325,7 +327,7 @@ export default function StudentResultPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-sm text-muted-foreground p-4 bg-muted/50 rounded-lg whitespace-pre-wrap">
-                    {studentResult.teacherGuidance}
+                    {studentResult.growthTeacherGuidance}
                   </div>
                 </CardContent>
               </Card>

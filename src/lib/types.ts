@@ -112,7 +112,8 @@ export type StudentResult = {
   status: ResultStatus;
   date: string;
   aiFeedback: string;
-  curricularRemarks: string;
+  // This is being replaced by the growth fields below
+  // curricularRemarks: string;
   studentFeedbackSummary: string;
   studentRawFeedback?: string; // 원본 피드백 저장
   teacherGuidance: string;
@@ -124,4 +125,9 @@ export type StudentResult = {
   createdAt: number;
   contentScore: number;
   rubricScores?: RubricScores;
+  // New fields for cached growth feedback
+  growthFeedback?: string;
+  growthTeacherGuidance?: string;
+  growthCurricularRemarks?: string;
+  growthFeedbackForAttempts?: number;
 }
