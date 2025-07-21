@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { PlusCircle, MoreHorizontal, Copy, Users, Loader2, Trash2 } from 'lucide-react';
 import Link from 'next/link';
-import { type TeacherAssessment, type StudentResult } from "@/lib/types";
+import { type TeacherAssessment } from "@/lib/types";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -35,31 +35,18 @@ export default function AssessmentsPage() {
     setIsLoading(true);
     try {
         const assessmentsQuery = query(collection(db, "assessments"), where("uid", "==", user.uid));
+        const querySnapshot = await getDocs(assessmentsQuery);
         
-        // Optimization: Fetch all results for the teacher in one go.
-        const allResultsQuery = query(collection(db, 'results'), where('teacherUid', '==', user.uid));
-        
-        const [assessmentsSnapshot, allResultsSnapshot] = await Promise.all([
-            getDocs(assessmentsQuery),
-            getDocs(allResultsQuery)
-        ]);
-
-        // Process all results into a map for efficient lookup.
-        const submissionCounts = new Map<string, Set<string>>();
-        allResultsSnapshot.forEach(resultDoc => {
-            const result = resultDoc.data() as StudentResult;
-            if (!submissionCounts.has(result.assessmentId)) {
-                submissionCounts.set(result.assessmentId, new Set());
-            }
-            submissionCounts.get(result.assessmentId)!.add(result.studentId);
-        });
-        
-        const assessmentsData = assessmentsSnapshot.docs.map(doc => {
-            const assessmentData = { id: doc.id, ...doc.data() } as TeacherAssessment;
-            // Get submission count from the map instead of a new query.
-            assessmentData.submissionCount = submissionCounts.get(assessmentData.id)?.size || 0;
-            return assessmentData;
-        });
+        const assessmentsData = await Promise.all(querySnapshot.docs.map(async (doc) => {
+            const assessment = { id: doc.id, ...doc.data() } as TeacherAssessment;
+            
+            const resultsQuery = query(collection(db, 'results'), where('assessmentId', '==', assessment.id));
+            const resultsSnapshot = await getDocs(resultsQuery);
+            const uniqueStudentIds = new Set(resultsSnapshot.docs.map(d => d.data().studentId));
+            
+            assessment.submissionCount = uniqueStudentIds.size;
+            return assessment;
+        }));
 
         assessmentsData.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
         setAssessments(assessmentsData);
