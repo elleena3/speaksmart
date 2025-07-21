@@ -68,7 +68,7 @@ export default function TeacherStudentResultView() {
     } finally {
         setIsLoading(false);
     }
-  }, [studentId, assessmentId, user, toast, router]);
+  }, [studentId, assessmentId, user, toast, router, notFound]);
 
   useEffect(() => {
     if (authLoading) return;
