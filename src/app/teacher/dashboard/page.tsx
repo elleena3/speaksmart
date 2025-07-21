@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { ArrowRight, Users, Loader2 } from "lucide-react"
 import Link from "next/link"
-import { type TeacherAssessment } from "@/lib/types"
+import { type TeacherAssessment, type StudentResult } from "@/lib/types"
 import { OverviewChart } from "./overview-chart"
 import { useLanguage } from "@/context/language-context"
 import { useAuth, mockStudents } from '@/context/auth-context';
@@ -30,32 +30,37 @@ export default function TeacherDashboard() {
     try {
         const assessmentsQuery = query(
             collection(db, "assessments"), 
-            where("uid", "==", user.uid)
+            where("uid", "==", user.uid),
+            orderBy("createdAt", "desc"),
+            limit(5)
         );
-        
-        const assessmentsSnapshot = await getDocs(assessmentsQuery);
-        
-        let assessmentsData: TeacherAssessment[] = [];
-        for (const doc of assessmentsSnapshot.docs) {
-            const assessmentData = { id: doc.id, ...doc.data() } as TeacherAssessment;
-            
-            // For each assessment, get its results to calculate submissionCount
-            const resultsQuery = query(
-                collection(db, "results"),
-                where("assessmentId", "==", assessmentData.id)
-            );
-            const resultsSnapshot = await getDocs(resultsQuery);
-            const uniqueStudentIds = new Set(resultsSnapshot.docs.map(rDoc => rDoc.data().studentId));
-            
-            assessmentData.submissionCount = uniqueStudentIds.size;
-            assessmentsData.push(assessmentData);
-        }
-        
-        // Sort client-side to handle missing createdAt fields safely
-        assessmentsData.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 
-        // Limit to the 5 most recent assessments after sorting
-        setAssessments(assessmentsData.slice(0, 5));
+        // Optimization: Fetch all results for the teacher in one go.
+        const allResultsQuery = query(collection(db, 'results'), where('teacherUid', '==', user.uid));
+        
+        const [assessmentsSnapshot, allResultsSnapshot] = await Promise.all([
+            getDocs(assessmentsQuery),
+            getDocs(allResultsQuery)
+        ]);
+        
+        // Process all results into a map for efficient lookup.
+        const submissionCounts = new Map<string, Set<string>>();
+        allResultsSnapshot.forEach(resultDoc => {
+            const result = resultDoc.data() as StudentResult;
+            if (!submissionCounts.has(result.assessmentId)) {
+                submissionCounts.set(result.assessmentId, new Set());
+            }
+            submissionCounts.get(result.assessmentId)!.add(result.studentId);
+        });
+
+        const assessmentsData = assessmentsSnapshot.docs.map(doc => {
+            const assessmentData = { id: doc.id, ...doc.data() } as TeacherAssessment;
+            // Get submission count from the map instead of a new query.
+            assessmentData.submissionCount = submissionCounts.get(assessmentData.id)?.size || 0;
+            return assessmentData;
+        });
+        
+        setAssessments(assessmentsData);
 
     } catch (error) {
         console.error("Error fetching assessments:", error);
