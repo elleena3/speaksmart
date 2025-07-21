@@ -32,7 +32,7 @@ Here are all the attempts from the student, in chronological order:
 -   Content Score: {{this.contentScore}}/100
 -   Pronunciation Score: {{this.pronunciationScore}}/100
 -   Transcript: "{{this.transcript}}"
--   AI Feedback Given: "{{this.aiFeedback}}}"
+-   AI Feedback Given: "{{this.aiFeedback}}"
 ---
 {{/each}}
 
@@ -76,3 +76,4 @@ const generateGrowthFeedbackFlow = ai.defineFlow(
     return output;
   }
 );
+
