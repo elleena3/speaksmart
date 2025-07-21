@@ -7,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { Loader2, Paperclip, Download, User, Activity, BookText, FileText, Target, Mic } from "lucide-react"
+import { Loader2, Paperclip, User, Activity, BookText, FileText, Target } from "lucide-react"
 import { type TeacherAssessment, type StudentResult } from "@/lib/types";
 import { Progress } from "@/components/ui/progress";
 import { useAuth } from "@/context/auth-context";
@@ -74,7 +74,7 @@ export default function TeacherStudentResultView() {
     } finally {
         setIsLoading(false);
     }
-  }, [studentId, assessmentId, user, toast, router, notFound]);
+  }, [studentId, assessmentId, user, toast, router]);
 
   useEffect(() => {
     if (authLoading) return;
