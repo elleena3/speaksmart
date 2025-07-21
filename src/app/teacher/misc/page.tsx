@@ -243,7 +243,7 @@ function AudioProcessor({
 
       mediaRecorderRef.current.onstop = () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
-        setFile(audioBlob); // Set the recorded blob as the file to be analyzed
+        setFile(audioBlob as File); // Set the recorded blob as the file to be analyzed
         stream.getTracks().forEach(track => track.stop());
       };
 
@@ -278,7 +278,7 @@ function AudioProcessor({
                 </Button>
             )}
         </div>
-        {file && <p className="text-sm text-muted-foreground">{t.teacherMisc.audioProcessor.selectedFileText.replace('{fileName}', file.name.startsWith('blob:') ? `${t.teacherMisc.audioProcessor.recordedAudio} (${(file.size/1024).toFixed(1)} KB)` : file.name)}</p>}
+        {file && <p className="text-sm text-muted-foreground">{t.teacherMisc.audioProcessor.selectedFileText.replace('{fileName}', (file.name || `${t.teacherMisc.audioProcessor.recordedAudio} (${(file.size/1024).toFixed(1)} KB)`))}</p>}
       </div>
       <Button onClick={handleAnalyzeClick} disabled={isProcessing || !file} className="w-full">
         {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <AnalyzeIcon className="mr-2 h-4 w-4" />}
