@@ -74,7 +74,7 @@ export default function TeacherStudentResultView() {
     } finally {
         setIsLoading(false);
     }
-  }, [studentId, assessmentId, user, toast, router]);
+  }, [studentId, assessmentId, user, toast, router, notFound]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -167,7 +167,7 @@ export default function TeacherStudentResultView() {
               <CardContent>
                 <Textarea 
                   value={finalRemarks} 
-                  onChange={(e) => setStudentResult({...studentResult, curricularRemarks: e.target.value, growthCurricularRemarks: e.target.value })}
+                  onChange={(e) => setStudentResult(prev => prev ? ({ ...prev, curricularRemarks: e.target.value, growthCurricularRemarks: e.target.value }) : null)}
                   className="h-48 bg-background font-mono text-sm whitespace-pre-wrap" />
                 <Button className="w-full mt-4" onClick={handleSaveCurricularRemarks} disabled={isSaving}>
                   {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Paperclip className="mr-2 h-4 w-4" />}
