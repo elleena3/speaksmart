@@ -12,6 +12,7 @@ import { Progress } from '@/components/ui/progress';
 import { analyzePresentationVideo, type AnalyzePresentationVideoOutput } from '@/ai/flows/analyze-presentation-video-flow';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { Label } from '@/components/ui/label';
 
 type AnalysisState = 'idle' | 'analyzing' | 'analyzed' | 'error';
 
@@ -225,4 +226,3 @@ export function PresentationAnalyzerTool() {
         </div>
     );
 }
-
