@@ -3,13 +3,13 @@
 
 import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useState, useRef } from "react";
-import { type StudentResult, type TeacherAssessment } from "@/lib/types";
+import { type StudentResult, type TeacherAssessment, type HistoricalScore } from "@/lib/types";
 import { useAuth } from "@/context/auth-context";
 import { Loader2, AlertTriangle, CheckCircle2, UploadCloud, AudioLines, FileScan, Sparkles } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { db } from "@/lib/firebase";
-import { collection, query, where, onSnapshot, doc, updateDoc, getDocs, addDoc } from "firebase/firestore";
+import { collection, query, where, onSnapshot, doc, updateDoc, getDocs, addDoc, orderBy } from "firebase/firestore";
 import { generateMonologueAnalysisFlow } from "@/ai/flows/generate-monologue-analysis-flow";
 
 const SESSION_STORAGE_KEY = 'monologueSessionData';
@@ -114,46 +114,87 @@ export default function ProcessingPage() {
         console.log("[Processing Page] Starting analysis process.");
 
         const { assessmentDetails, studentRecordingDataUri } = sessionData;
+        let newResultDocRef: any = null;
         
         try {
-            const resultDocRef = await addDoc(collection(db, "results"), {
+            // Firestore에 결과 문서 사전 생성
+            newResultDocRef = await addDoc(collection(db, "results"), {
                 studentId: user.uid,
                 assessmentId: assessmentDetails.id,
                 assessmentTitle: assessmentDetails.title,
-                teacherUid: assessmentDetails.uid, // <-- Ensure teacherUid is set initially
+                teacherUid: assessmentDetails.uid,
                 name: user.displayName || "Student",
                 avatarUrl: user.photoURL || '',
                 createdAt: Date.now(),
                 date: new Date().toISOString(),
                 status: "분석 중: upload",
             });
-            resultIdRef.current = resultDocRef.id;
-            console.log(`[Processing Page] Created preliminary result document: ${resultDocRef.id}`);
+            resultIdRef.current = newResultDocRef.id;
+            console.log(`[Processing Page] Created preliminary result document: ${newResultDocRef.id}`);
 
-            // Set up snapshot listener for this specific document
-            unsubscribeRef.current = onSnapshot(resultDocRef, (doc) => {
+            // 상태 변경 감지 리스너 설정
+            unsubscribeRef.current = onSnapshot(newResultDocRef, (doc) => {
                 const resultData = doc.data() as StudentResult;
                 if (!resultData) return;
 
                 console.log(`[Processing Page Snapshot] Detected status change: ${resultData.status}`);
                 if (resultData.status === '채점 완료') {
-                    setStatus("completed");
-                    const attempt = (sessionStorage.getItem('attemptCount') || '1')
-                    router.push(`/student/assessment/${id}/results?attempt=${attempt}`);
+                    // 분석 완료 후 추가 작업 수행
+                    (async () => {
+                        try {
+                            const resultsQuery = query(
+                                collection(db, "results"),
+                                where("assessmentId", "==", assessmentDetails.id),
+                                where("studentId", "==", user.uid),
+                                where("status", "==", "채점 완료"),
+                                orderBy("createdAt", "asc")
+                            );
+                            const querySnapshot = await getDocs(resultsQuery);
+
+                            const allAttempts = querySnapshot.docs.map(doc => doc.data() as StudentResult);
+                            
+                            // Historical Scores 캐싱
+                            const historicalScores: HistoricalScore[] = allAttempts.map((attempt, index) => ({
+                                attempt: index + 1,
+                                contentScore: attempt.contentScore,
+                                pronunciationScore: attempt.pronunciationScore || 0,
+                                rubricScores: attempt.rubricScores
+                            }));
+
+                            await updateDoc(doc.ref, { historicalScores });
+
+                            // 전체 평가의 평균 점수 및 제출 횟수 업데이트
+                            const assessmentRef = doc(db, "assessments", assessmentDetails.id);
+                            const scores = allAttempts.map(d => d.contentScore || 0);
+                            const newSubmissionCount = new Set(allAttempts.map(r => r.studentId)).size;
+                            const newAverage = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
+                            
+                            await updateDoc(assessmentRef, {
+                                submissionCount: newSubmissionCount,
+                                averageScore: newAverage
+                            });
+                             console.log(`[Processing Page] Updated assessment stats for ${assessmentDetails.id}.`);
+                        } catch(e) {
+                            console.error("Error updating stats after completion:", e);
+                        } finally {
+                             setStatus("completed");
+                             const attempt = (sessionStorage.getItem('attemptCount') || '1')
+                             router.push(`/student/assessment/${id}/results?attempt=${attempt}`);
+                        }
+                    })();
                 } else if (resultData.status === '오류') {
                     setStatus('error');
                     setErrorInfo({ message: resultData.aiFeedback || '알 수 없는 오류가 발생했습니다.' });
                 } else if (resultData.status.startsWith('분석 중')) {
                      const stepKey = resultData.status.split(':')[1]?.trim() as AnalysisStep;
-                     console.log(`[Processing Page Snapshot] Current step: ${stepKey}`);
                      setAnalysisStep(stepKey || 'upload');
                      setStatus('analyzing');
                 }
             });
 
-            // Call the main analysis flow, passing teacherUid explicitly
+            // 주 분석 흐름 호출
             await generateMonologueAnalysisFlow({
-                resultId: resultDocRef.id,
+                resultId: newResultDocRef.id,
                 studentRecordingDataUri: studentRecordingDataUri,
                 activityPrompt: assessmentDetails.prompt,
                 expectedFormat: assessmentDetails.expectedFormat || "",
@@ -165,23 +206,7 @@ export default function ProcessingPage() {
             });
 
             console.log("[Processing Page] AI flow completed successfully.");
-            
-            // Update the overall assessment stats
-            const assessmentRef = doc(db, "assessments", assessmentDetails.id);
-            const resultsCollection = collection(db, "results");
-            const q = query(resultsCollection, where("assessmentId", "==", assessmentDetails.id), where("status", "==", "채점 완료"));
 
-            const querySnapshot = await getDocs(q);
-            const scores = querySnapshot.docs.map(d => (d.data() as StudentResult).contentScore || 0);
-            const newSubmissionCount = querySnapshot.docs.length;
-            const newAverage = newSubmissionCount > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / newSubmissionCount) : 0;
-            sessionStorage.setItem('attemptCount', newSubmissionCount.toString());
-            
-            await updateDoc(assessmentRef, {
-                submissionCount: newSubmissionCount,
-                averageScore: newAverage
-            });
-            console.log(`[Processing Page] Updated assessment stats for ${assessmentDetails.id}.`);
         } catch (e: any) {
             console.error("[Processing Page] Error during analysis flow:", e);
             let errorMessage = "AI 분석 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
@@ -205,7 +230,6 @@ export default function ProcessingPage() {
         } finally {
             sessionStorage.removeItem(SESSION_STORAGE_KEY);
             isProcessing.current = false;
-            console.log("[Processing Page] Analysis process finished.");
         }
     };
 

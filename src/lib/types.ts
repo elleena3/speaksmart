@@ -102,6 +102,13 @@ export type RubricScores = {
     interaction?: number; // Optional for monologue
 };
 
+export type HistoricalScore = {
+    attempt: number;
+    contentScore: number;
+    pronunciationScore: number;
+    rubricScores?: RubricScores;
+};
+
 export type StudentResult = {
   id: string; // Firestore document ID
   studentId: string; // Student's UID
@@ -112,15 +119,12 @@ export type StudentResult = {
   status: ResultStatus;
   date: string;
   aiFeedback: string;
-  // This is being replaced by the growth fields below
-  // curricularRemarks: string;
   studentFeedbackSummary: string;
   studentRawFeedback?: string; // 원본 피드백 저장
   teacherGuidance: string;
   studentTranscript?: string;
   studentRecordingUrl?: string; // Changed from DataUri to URL
   pronunciationScore?: number;
-  pronunciationFeedback?: string;
   teacherUid: string; // To query results by teacher
   createdAt: number;
   contentScore: number;
@@ -130,4 +134,6 @@ export type StudentResult = {
   growthTeacherGuidance?: string;
   growthCurricularRemarks?: string;
   growthFeedbackForAttempts?: number;
+  // New field for cached chart data
+  historicalScores?: HistoricalScore[];
 }

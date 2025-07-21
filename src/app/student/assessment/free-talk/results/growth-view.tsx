@@ -41,14 +41,17 @@ export function GrowthView({ results, assessment, defaultTab }: GrowthViewProps)
     const { toast } = useToast();
 
     const sortedResults = results;
+    const latestResult = sortedResults[sortedResults.length - 1];
 
-    const chartData = sortedResults.map((r, i) => ({
-        name: `${i + 1}차`,
-        contentScore: r.contentScore ?? 0,
-        pronunciationScore: r.pronunciationScore ?? 0,
-    }));
+    const chartData = latestResult.historicalScores 
+        ? latestResult.historicalScores.map(hs => ({
+            name: `${hs.attempt}차`,
+            contentScore: hs.contentScore,
+            pronunciationScore: hs.pronunciationScore,
+          }))
+        : [];
 
-    const isRubricUsed = sortedResults.some(r => !!r.rubricScores);
+    const isRubricUsed = latestResult.historicalScores?.some(r => !!r.rubricScores);
     
     const rubricSubjects = assessment.assessmentType === 'dialogue'
         ? ['유창성', '발음', '문법', '어휘', '상호작용']
@@ -56,15 +59,15 @@ export function GrowthView({ results, assessment, defaultTab }: GrowthViewProps)
 
     const radarChartData = rubricSubjects.map(subject => {
         const entry: { [key: string]: string | number } = { subject };
-        sortedResults.forEach((r, i) => {
+        latestResult.historicalScores?.forEach((hs, i) => {
             const key = `attempt${i + 1}`;
-            if (r.rubricScores) {
+            if (hs.rubricScores) {
                 switch(subject) {
-                    case '유창성': entry[key] = r.rubricScores.fluency; break;
-                    case '발음': entry[key] = r.rubricScores.pronunciation; break;
-                    case '문법': entry[key] = r.rubricScores.grammar; break;
-                    case '어휘': entry[key] = r.rubricScores.vocabulary; break;
-                    case '상호작용': entry[key] = r.rubricScores.interaction || 0; break;
+                    case '유창성': entry[key] = hs.rubricScores.fluency; break;
+                    case '발음': entry[key] = hs.rubricScores.pronunciation; break;
+                    case '문법': entry[key] = hs.rubricScores.grammar; break;
+                    case '어휘': entry[key] = hs.rubricScores.vocabulary; break;
+                    case '상호작용': entry[key] = hs.rubricScores.interaction || 0; break;
                 }
             } else {
                  entry[key] = 0;
@@ -75,8 +78,6 @@ export function GrowthView({ results, assessment, defaultTab }: GrowthViewProps)
 
     useEffect(() => {
         if (sortedResults.length > 1) {
-            const latestResult = sortedResults[sortedResults.length - 1];
-
             if (latestResult.growthFeedback && latestResult.growthFeedbackForAttempts === sortedResults.length) {
                 setGrowthFeedback({
                     growthFeedback: latestResult.growthFeedback,
@@ -127,7 +128,7 @@ export function GrowthView({ results, assessment, defaultTab }: GrowthViewProps)
         } else {
             setIsLoadingFeedback(false);
         }
-    }, [sortedResults, assessment.title, toast]);
+    }, [sortedResults, assessment.title, toast, latestResult]);
     
     const retryLink = assessment.assessmentType === 'dialogue'
         ? `/student/assessment/free-talk?id=${assessment.id}`
@@ -176,7 +177,7 @@ export function GrowthView({ results, assessment, defaultTab }: GrowthViewProps)
                                     <PolarRadiusAxis angle={30} domain={[0, 5]} tickCount={6} />
                                     <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}/>
                                     <Legend />
-                                    {sortedResults.map((r, i) => (
+                                    {latestResult.historicalScores?.map((r, i) => (
                                        <Radar 
                                          key={i} 
                                          name={`${i+1}차 시도`} 

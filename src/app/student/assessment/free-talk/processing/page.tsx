@@ -3,13 +3,13 @@
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState, useRef } from "react";
-import { type StudentResult, type TeacherAssessment, type ConversationTurn } from "@/lib/types";
+import { type StudentResult, type TeacherAssessment, type ConversationTurn, type HistoricalScore } from "@/lib/types";
 import { useAuth } from "@/context/auth-context";
-import { Loader2, AlertTriangle, CheckCircle2, UploadCloud, AudioLines, FileScan, Sparkles } from "lucide-react";
+import { Loader2, AlertTriangle, CheckCircle2, UploadCloud, FileScan, Sparkles } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { db, storage } from "@/lib/firebase";
-import { collection, query, where, onSnapshot, doc, updateDoc, getDocs, addDoc } from "firebase/firestore";
+import { collection, query, where, onSnapshot, doc, updateDoc, getDocs, addDoc, orderBy } from "firebase/firestore";
 import { generateDialogueAnalysis } from "@/ai/flows/generate-dialogue-analysis-flow";
 import { ref, uploadString, getDownloadURL } from "firebase/storage";
 
@@ -116,46 +116,86 @@ export default function DialogueProcessingPage() {
         const { assessment, studentRecordingDataUri, conversationHistory } = sessionData;
         
         try {
-            const resultDocRef = await addDoc(collection(db, "results"), {
+            const newResultDocRef = await addDoc(collection(db, "results"), {
                 studentId: user.uid,
                 assessmentId: assessment.id,
                 assessmentTitle: assessment.title,
-                teacherUid: assessment.uid, // <-- Ensure teacherUid is set initially
+                teacherUid: assessment.uid,
                 name: user.displayName || "Student",
                 avatarUrl: user.photoURL || '',
                 createdAt: Date.now(),
                 date: new Date().toISOString(),
                 status: "분석 중: upload",
             });
-            resultIdRef.current = resultDocRef.id;
-            console.log(`[Dialogue Processing] Created preliminary result document: ${resultDocRef.id}`);
+            resultIdRef.current = newResultDocRef.id;
+            console.log(`[Dialogue Processing] Created preliminary result document: ${newResultDocRef.id}`);
 
             // Set up snapshot listener for this specific document
-            unsubscribeRef.current = onSnapshot(resultDocRef, (doc) => {
+            unsubscribeRef.current = onSnapshot(newResultDocRef, (doc) => {
                 const resultData = doc.data() as StudentResult;
                 if (!resultData) return;
 
                 console.log(`[Dialogue Processing Snapshot] Detected status change: ${resultData.status}`);
                 if (resultData.status === '채점 완료') {
-                    setStatus("completed");
-                    const attempt = (sessionStorage.getItem('attemptCount') || '1')
-                    router.push(`/student/assessment/free-talk/results?id=${assessmentId}&attempt=${attempt}`);
+                     // 분석 완료 후 추가 작업 수행
+                    (async () => {
+                        try {
+                            const resultsQuery = query(
+                                collection(db, "results"),
+                                where("assessmentId", "==", assessment.id),
+                                where("studentId", "==", user.uid),
+                                where("status", "==", "채점 완료"),
+                                orderBy("createdAt", "asc")
+                            );
+                            const querySnapshot = await getDocs(resultsQuery);
+
+                            const allAttempts = querySnapshot.docs.map(doc => doc.data() as StudentResult);
+                            
+                            // Historical Scores 캐싱
+                            const historicalScores: HistoricalScore[] = allAttempts.map((attempt, index) => ({
+                                attempt: index + 1,
+                                contentScore: attempt.contentScore,
+                                pronunciationScore: attempt.pronunciationScore || 0,
+                                rubricScores: attempt.rubricScores
+                            }));
+
+                            await updateDoc(doc.ref, { historicalScores });
+
+                            // 전체 평가의 평균 점수 및 제출 횟수 업데이트
+                            const assessmentRef = doc(db, "assessments", assessment.id);
+                            const scores = allAttempts.map(d => d.contentScore || 0);
+                            const newSubmissionCount = new Set(allAttempts.map(r => r.studentId)).size;
+                            const newAverage = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
+                            
+                            await updateDoc(assessmentRef, {
+                                submissionCount: newSubmissionCount,
+                                averageScore: newAverage
+                            });
+                             console.log(`[Dialogue Processing] Updated assessment stats for ${assessment.id}.`);
+                        } catch(e) {
+                            console.error("Error updating stats after completion:", e);
+                        } finally {
+                             setStatus("completed");
+                             const attempt = (sessionStorage.getItem('attemptCount') || '1')
+                             router.push(`/student/assessment/free-talk/results?id=${assessmentId}&attempt=${attempt}`);
+                        }
+                    })();
+
                 } else if (resultData.status === '오류') {
                     setStatus('error');
                     setErrorInfo({ message: resultData.aiFeedback || '알 수 없는 오류가 발생했습니다.' });
                 } else if (resultData.status.startsWith('분석 중')) {
                      const stepKey = resultData.status.split(':')[1]?.trim() as AnalysisStep;
-                     console.log(`[Dialogue Processing Snapshot] Current step: ${stepKey}`);
                      setAnalysisStep(stepKey || 'upload');
                      setStatus('analyzing');
                 }
             });
 
             // Upload recording
-            const storageRef = ref(storage, `recordings/${user.uid}_dialogue_${resultDocRef.id}.webm`);
+            const storageRef = ref(storage, `recordings/${user.uid}_dialogue_${newResultDocRef.id}.webm`);
             const uploadSnapshot = await uploadString(storageRef, studentRecordingDataUri, 'data_url');
             const downloadURL = await getDownloadURL(uploadSnapshot.ref);
-            await updateDoc(resultDocRef, { studentRecordingUrl: downloadURL });
+            await updateDoc(newResultDocRef, { studentRecordingUrl: downloadURL });
             console.log(`[Dialogue Processing] Audio uploaded to ${downloadURL}`);
 
             // Prepare transcripts
@@ -169,7 +209,7 @@ export default function DialogueProcessingPage() {
             
             // Call the main analysis flow, passing teacherUid explicitly
             await generateDialogueAnalysis({
-                resultId: resultDocRef.id,
+                resultId: newResultDocRef.id,
                 teacherUid: assessment.uid,
                 studentRecordingUrl: downloadURL,
                 studentTranscript: studentOnlyTranscript,
@@ -184,22 +224,6 @@ export default function DialogueProcessingPage() {
 
             console.log("[Dialogue Processing] AI flow invocation completed.");
             
-            // Update the overall assessment stats
-            const assessmentRef = doc(db, "assessments", assessment.id);
-            const resultsCollection = collection(db, "results");
-            const q = query(resultsCollection, where("assessmentId", "==", assessment.id), where("status", "==", "채점 완료"));
-
-            const querySnapshot = await getDocs(q);
-            const scores = querySnapshot.docs.map(d => (d.data() as StudentResult).contentScore || 0);
-            const newSubmissionCount = querySnapshot.docs.length;
-            const newAverage = newSubmissionCount > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / newSubmissionCount) : 0;
-            sessionStorage.setItem('attemptCount', newSubmissionCount.toString());
-            
-            await updateDoc(assessmentRef, {
-                submissionCount: newSubmissionCount,
-                averageScore: newAverage
-            });
-            console.log(`[Dialogue Processing] Updated assessment stats for ${assessment.id}.`);
         } catch (e: any) {
             console.error("[Dialogue Processing] Error during analysis:", e);
             let errorMessage = "AI 분석 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
@@ -223,7 +247,6 @@ export default function DialogueProcessingPage() {
         } finally {
             sessionStorage.removeItem(SESSION_STORAGE_KEY);
             isProcessing.current = false;
-            console.log("[Dialogue Processing] Analysis process finished.");
         }
     };
 
