@@ -18,7 +18,7 @@ const FeedbackSchema = z.object({
     feedback: z.string().describe("Specific, constructive feedback for this category in Korean, including examples from the presentation."),
 });
 
-export const AnalyzePresentationVideoInputSchema = z.object({
+const AnalyzePresentationVideoInputSchema = z.object({
   videoDataUri: z.string().describe(
     "A video file of the student's presentation, as a data URI."
   ),
@@ -31,7 +31,7 @@ export const AnalyzePresentationVideoInputSchema = z.object({
 });
 export type AnalyzePresentationVideoInput = z.infer<typeof AnalyzePresentationVideoInputSchema>;
 
-export const AnalyzePresentationVideoOutputSchema = z.object({
+const AnalyzePresentationVideoOutputSchema = z.object({
   overallScore: z.number().int().min(0).max(100).describe("The final, weighted overall score for the presentation."),
   content: FeedbackSchema.describe("Evaluation of the presentation's content."),
   languageCompetence: FeedbackSchema.describe("Evaluation of the student's language competence."),
