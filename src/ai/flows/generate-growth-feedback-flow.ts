@@ -40,13 +40,13 @@ Here are all the attempts from the student, in chronological order:
 Please perform the following steps based on ALL attempts provided:
 
 1.  **Generate Student Growth Feedback ('growthFeedback'):**
-    -   **Format:** Markdown.
+    -   **Format:** Markdown with clear headings and bullet points for readability.
     -   **Tone:** Encouraging and insightful.
     -   **Content:**
         -   **Opening:** Start with a brief, encouraging sentence acknowledging their effort to try again.
-        -   **Section: "✨ 나아진 점" (Improvements):** Analyze the differences between all attempts. Identify upward trends in scores. Compare the transcripts to find specific improvements in vocabulary, sentence structure, fluency, or confidence. Use bullet points and provide concrete examples (e.g., "- 1차 시도에서는 'very good'만 사용했지만, 마지막 시도에서는 'fantastic', 'wonderful' 등 더 다양한 표현을 사용한 점이 돋보여요.").
-        -   **Section: "🚀 더 발전할 부분" (Areas for Further Improvement):** Analyze the latest attempt and any recurring issues across all attempts. Provide clear, actionable advice. Use bullet points (e.g., "- **(문법)** 여전히 'l'과 'r' 발음을 조금 더 구분해서 연습하면 훨씬 자연스럽게 들릴 거예요.").
-        -   **Section: "💡 총평 및 격려" (Overall Comment & Encouragement):** End with a positive, motivational summary message about their entire journey.
+        -   **Heading: "### ✨ 나아진 점" (Improvements):** Analyze the differences between all attempts. Identify upward trends in scores. Compare the transcripts to find specific improvements in vocabulary, sentence structure, fluency, or confidence. Use bullet points and provide concrete examples (e.g., "- **(문법)** 1차 시도에서는 'very good'만 사용했지만, 마지막 시도에서는 'fantastic', 'wonderful' 등 더 다양한 표현을 사용한 점이 돋보여요.").
+        -   **Heading: "### 🚀 더 발전할 부분" (Areas for Further Improvement):** Analyze the latest attempt and any recurring issues across all attempts. Provide clear, actionable advice. Use bullet points (e.g., "- **(발음)** 여전히 'l'과 'r' 발음을 조금 더 구분해서 연습하면 훨씬 자연스럽게 들릴 거예요.").
+        -   **Heading: "### 💡 총평 및 격려" (Overall Comment & Encouragement):** End with a positive, motivational summary message about their entire journey.
 
 2.  **Generate Teacher Guidance ('teacherGuidance'):**
     -   **Format:** Plain text.
