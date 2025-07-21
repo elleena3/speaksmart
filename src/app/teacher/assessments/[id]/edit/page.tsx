@@ -53,7 +53,7 @@ export default function EditAssessmentPage() {
     scenario: z.enum(scenarios).optional(),
     recordingTimeLimit: z.coerce.number().int().min(0).optional(),
     aiVoice: z.enum(allVoices).optional().default('algenib'),
-    evaluationModel: z.enum(evaluationModels).optional().default('gemini-2.5-flash-lite-preview-06-17'),
+    evaluationModel: z.enum(evaluationModels).optional().default('gemini-2.5-flash'),
     useRubric: z.boolean().default(false),
   }).superRefine((data, ctx) => {
     const isFreeTalk = data.assessmentType === 'dialogue' && data.scenario === 'free-talk';
@@ -96,7 +96,7 @@ export default function EditAssessmentPage() {
       scenario: "free-talk",
       recordingTimeLimit: 0,
       aiVoice: 'algenib',
-      evaluationModel: 'gemini-2.5-flash-lite-preview-06-17',
+      evaluationModel: 'gemini-2.5-flash',
       useRubric: false,
     },
   });
@@ -121,7 +121,7 @@ export default function EditAssessmentPage() {
               endDate: data.endDate ? new Date(data.endDate) : undefined,
               targetType: Array.isArray(data.targetStudentIds) ? 'specific' : 'all',
               aiVoice: data.aiVoice || 'algenib',
-              evaluationModel: data.evaluationModel || 'gemini-2.5-flash-lite-preview-06-17',
+              evaluationModel: data.evaluationModel || 'gemini-2.5-flash',
               useRubric: data.useRubric || false,
             });
         } else {
