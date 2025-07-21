@@ -9,7 +9,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import { FeedbackView } from "../../[id]/results/feedback-view";
 import { FreeTalkFeedbackView } from "./free-talk-feedback-view";
 import { generateGrowthFeedback, type GenerateGrowthFeedbackOutput } from "@/ai/flows/generate-growth-feedback-flow";
-import { Loader2, Sparkles, TrendingUp, DraftingCompass, BookText, Activity } from "lucide-react";
+import { Loader2, Sparkles, TrendingUp, DraftingCompass } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { Repeat } from "lucide-react";
@@ -194,32 +194,6 @@ export function GrowthView({ results, assessment, defaultTab }: GrowthViewProps)
                         </CardContent>
                     </Card>
                 )}
-                 {results.length > 1 && growthFeedback && !isLoadingFeedback && (
-                    <>
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2"><BookText />교사를 위한 종합 조언</CardTitle>
-                                <CardDescription>학생의 전체 성장 과정을 바탕으로 한 AI의 지도 조언입니다.</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="p-4 bg-muted/50 rounded-lg whitespace-pre-wrap font-body text-sm leading-relaxed">
-                                    {growthFeedback.teacherGuidance}
-                                </div>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2"><Activity />교과 과정 비고 (종합)</CardTitle>
-                                <CardDescription>학생의 성장 과정을 종합하여 생성된 생활기록부 비고 초안입니다.</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="p-4 bg-muted/50 rounded-lg whitespace-pre-wrap font-body text-sm leading-relaxed">
-                                    {growthFeedback.curricularRemarks}
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </>
-                 )}
                  <Card>
                     <CardHeader>
                       <CardTitle>다시 해보기</CardTitle>

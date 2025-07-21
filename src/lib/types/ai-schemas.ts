@@ -118,14 +118,15 @@ export const ResultSummarySchema = z.object({
 });
 
 export const GenerateGrowthFeedbackInputSchema = z.object({
-    previousAttempt: ResultSummarySchema.describe("The student's previous attempt."),
-    latestAttempt: ResultSummarySchema.describe("The student's most recent attempt."),
+    attempts: z.array(ResultSummarySchema).describe("An array of all the student's attempts, from oldest to newest."),
     assessmentTitle: z.string(),
 });
 export type GenerateGrowthFeedbackInput = z.infer<typeof GenerateGrowthFeedbackInputSchema>;
 
 export const GenerateGrowthFeedbackOutputSchema = z.object({
     growthFeedback: z.string().describe("A comprehensive Markdown-formatted analysis of the student's growth."),
+    teacherGuidance: z.string().describe("Actionable advice for the teacher based on the student's entire journey."),
+    curricularRemarks: z.string().describe("A comprehensive curricular remark based on the student's entire journey."),
 });
 export type GenerateGrowthFeedbackOutput = z.infer<typeof GenerateGrowthFeedbackOutputSchema>;
 
