@@ -310,7 +310,7 @@ const generateDialogueAnalysisFlow = ai.defineFlow(
         const rubricText = rubricResult.text;
 
         const parseScore = (text: string, category: string): number => {
-            const regex = new RegExp(`[\\s\\S]*?${category}[\\s\\S]*?점수:[^\\d]*(\\d)`);
+            const regex = new RegExp(`${category}[\\s\\S]*?점수:[^\\d]*(\\d)`);
             const match = text.match(regex);
             return match ? parseInt(match[1], 10) : 0;
         };
