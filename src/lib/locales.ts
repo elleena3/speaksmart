@@ -268,6 +268,11 @@ export const translations = {
           description: "학생의 자필 영어 사진을 업로드하여 AI에게 글씨체 교정 피드백을 받아보세요.",
           note: "참고: 이미지 위에 직접 피드백을 오버레이하는 더 정밀한 기능은 Google Cloud Vision API를 통해 구현할 수 있습니다."
       },
+      presentationAnalyzerTool: {
+        title: "영어 발표 동영상 분석 도구",
+        description: "학생의 발표 동영상(MP4, WebM)과 발표 자료(PDF, PPTX)를 업로드하여 종합적인 피드백을 받아보세요.",
+        note: "참고: 동영상 길이가 길거나 파일 크기가 클 경우 분석에 몇 분 이상 소요될 수 있습니다."
+      },
       audioProcessor: {
         label: "오디오 파일 선택 또는 녹음",
         recordButton: "녹음",
@@ -558,6 +563,11 @@ export const translations = {
           title: "AI Handwriting Analyzer",
           description: "Upload a photo of a student's English handwriting to receive AI feedback for improving their penmanship.",
           note: "Note: A more precise feature to overlay feedback directly on the image can be implemented using the Google Cloud Vision API."
+      },
+      presentationAnalyzerTool: {
+        title: "English Presentation Video Analyzer",
+        description: "Upload a student's presentation video (MP4, WebM) and presentation materials (PDF, PPTX) to get comprehensive feedback.",
+        note: "Note: Analysis may take several minutes for longer videos or larger files."
       },
       audioProcessor: {
         label: "Select audio file or record",

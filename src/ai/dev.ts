@@ -33,4 +33,7 @@ import '@/ai/flows/generate-growth-feedback-flow';
 
 // New flow for retrying analysis
 import '@/ai/flows/retry-analysis-flow';
+
+// New flow for presentation analysis
+import '@/ai/flows/analyze-presentation-video-flow';
     
