@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
@@ -39,7 +40,7 @@ function AttemptDetailView({ result, assessment, attemptNumber }: { result: Stud
 
   const radarChartData = isRubricUsed ? rubricSubjects.map(subject => {
       const entry: { [key: string]: string | number } = { subject };
-      const key = `attempt`;
+      const key = `score`;
       if (rubricScores) {
           switch(subject) {
               case '유창성': entry[key] = rubricScores.fluency; break;
@@ -113,7 +114,7 @@ function AttemptDetailView({ result, assessment, attemptNumber }: { result: Stud
                             <PolarGrid />
                             <PolarAngleAxis dataKey="subject" />
                             <PolarRadiusAxis angle={30} domain={[0, 5]} tickCount={6} />
-                            <Radar name="점수" dataKey="attempt" stroke="hsl(var(--chart-1))" fill="hsl(var(--chart-1))" fillOpacity={0.4} />
+                            <Radar name="점수" dataKey="score" stroke="hsl(var(--chart-1))" fill="hsl(var(--chart-1))" fillOpacity={0.4} />
                         </RadarChart>
                     </ResponsiveContainer>
                 </CardContent>
@@ -433,7 +434,7 @@ export default function TeacherStudentResultView() {
     } finally {
       setIsLoading(false);
     }
-  }, [studentId, assessmentId, user, toast, router, notFound]);
+  }, [studentId, assessmentId, user, toast, router]);
 
   useEffect(() => {
     if (authLoading) return;

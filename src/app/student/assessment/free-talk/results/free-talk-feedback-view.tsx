@@ -53,7 +53,7 @@ export function FreeTalkFeedbackView({ result, assessment, isLatestAttempt }: Fe
 
   const radarChartData = isRubricUsed ? rubricSubjects.map(subject => {
       const entry: { [key: string]: string | number } = { subject };
-      const key = `attempt1`;
+      const key = `score`;
       if (rubricScores) {
           switch(subject) {
               case '유창성': entry[key] = rubricScores.fluency; break;
@@ -210,7 +210,7 @@ export function FreeTalkFeedbackView({ result, assessment, isLatestAttempt }: Fe
                             <PolarRadiusAxis angle={30} domain={[0, 5]} tickCount={6} />
                             <Radar 
                               name="이번 시도"
-                              dataKey="attempt1" 
+                              dataKey="score" 
                               stroke="hsl(var(--chart-1))" 
                               fill="hsl(var(--chart-1))" 
                               fillOpacity={0.4} 
