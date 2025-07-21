@@ -52,8 +52,6 @@ export const RubricScoresSchema = z.object({
 export const ContentAnalysisOutputSchema = z.object({
     aiFeedback: z.string().describe('The generated feedback for the student in Korean.'),
     teacherGuidance: z.string().describe('Actionable guidance for the teacher based on the performance in Korean.'),
-    // This is now part of the growth feedback flow
-    // curricularRemarks: z.string().describe('A draft of curricular remarks suitable for the student’s academic record in Korean.'),
     contentScore: z.number().int().min(0).max(100).describe('A score from 0-100 for the performance content.'),
 });
 
@@ -67,7 +65,6 @@ export const CombinedAnalysisOutputSchema = z.object({
     contentScore: z.number(),
     aiFeedback: z.string(),
     teacherGuidance: z.string(),
-    // curricularRemarks: z.string(),
     pronunciationScore: z.number(),
     pronunciationFeedback: z.string(),
     rubricScores: RubricScoresSchema.optional(),
@@ -131,6 +128,14 @@ export const GenerateGrowthFeedbackOutputSchema = z.object({
 });
 export type GenerateGrowthFeedbackOutput = z.infer<typeof GenerateGrowthFeedbackOutputSchema>;
 
+
+// ##############################################################
+// ##                SCHEMA FOR RETRYING FLOW                  ##
+// ##############################################################
+export const RetryAnalysisInputSchema = z.object({
+  resultId: z.string().describe('The Firestore document ID of the result to retry.'),
+});
+export type RetryAnalysisInput = z.infer<typeof RetryAnalysisInputSchema>;
 
 
 // ##############################################################

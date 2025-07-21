@@ -14,13 +14,7 @@ import { generateMonologueAnalysisFlow } from './generate-monologue-analysis-flo
 import { generateDialogueAnalysis } from './generate-dialogue-analysis-flow';
 import { type TeacherAssessment, type StudentResult } from '@/lib/types';
 import { ref, getBytes } from "firebase/storage";
-
-
-export const RetryAnalysisInputSchema = z.object({
-  resultId: z.string().describe('The Firestore document ID of the result to retry.'),
-});
-export type RetryAnalysisInput = z.infer<typeof RetryAnalysisInputSchema>;
-
+import { RetryAnalysisInputSchema, type RetryAnalysisInput } from '@/lib/types/ai-schemas';
 
 export async function retryAnalysis(input: RetryAnalysisInput): Promise<{ success: boolean; message: string }> {
   return retryAnalysisFlow(input);
