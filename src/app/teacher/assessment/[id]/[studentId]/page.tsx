@@ -7,7 +7,7 @@ import { type TeacherAssessment, type StudentResult, type ResultSummary } from "
 import { useAuth, mockStudents } from "@/context/auth-context";
 import { Loader2, User, Sparkles, TrendingUp, DraftingCompass } from "lucide-react";
 import { db } from "@/lib/firebase";
-import { doc, getDoc, collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, updateDoc, orderBy } from 'firebase/firestore';
 import { useToast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -407,19 +407,18 @@ export default function TeacherStudentResultView() {
         collection(db, "results"),
         where("assessmentId", "==", assessmentId),
         where("studentId", "==", studentId),
-        where("status", "==", "채점 완료")
+        orderBy("createdAt", "asc") // Get all results, oldest first
       );
       const resultsSnap = await getDocs(resultsQuery);
 
       if (resultsSnap.empty) {
-        toast({ title: "결과 없음", description: "해당 학생의 완료된 평가 결과가 없습니다.", variant: "destructive" });
+        toast({ title: "결과 없음", description: "해당 학생의 평가 결과가 없습니다.", variant: "destructive" });
         router.push(`/teacher/assessment/${assessmentId}`);
         return;
       }
       
       const studentResults = resultsSnap.docs
-        .map(doc => ({ id: doc.id, ...doc.data() } as StudentResult))
-        .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)); // oldest first
+        .map(doc => ({ id: doc.id, ...doc.data() } as StudentResult));
       
       setResults(studentResults);
 
@@ -430,7 +429,7 @@ export default function TeacherStudentResultView() {
     } finally {
       setIsLoading(false);
     }
-  }, [studentId, assessmentId, user, toast, router]);
+  }, [studentId, assessmentId, user, toast, router, notFound]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -450,7 +449,8 @@ export default function TeacherStudentResultView() {
     );
   }
   
-  const hasMultipleAttempts = results.length > 1;
+  const completedResults = results.filter(r => r.status === "채점 완료");
+  const hasMultipleAttempts = completedResults.length > 1;
 
   return (
     <div className="space-y-6">
@@ -462,26 +462,26 @@ export default function TeacherStudentResultView() {
              </Avatar>
              <div>
                  <CardTitle className="text-2xl">{student.displayName}</CardTitle>
-                 <CardDescription>'{assessment.title}' 평가 결과 ({results.length}회 응시)</CardDescription>
+                 <CardDescription>'{assessment.title}' 평가 결과 ({completedResults.length}회 응시)</CardDescription>
              </div>
           </CardHeader>
        </Card>
 
-       <Tabs defaultValue={hasMultipleAttempts ? "overview" : "attempt-1"} className="w-full">
+       <Tabs defaultValue={hasMultipleAttempts ? "overview" : `attempt-${completedResults.length}`} className="w-full">
          <TabsList>
            {hasMultipleAttempts && <TabsTrigger value="overview">종합 분석</TabsTrigger>}
-           {results.map((result, index) => (
+           {completedResults.map((result, index) => (
              <TabsTrigger key={result.id} value={`attempt-${index + 1}`}>{index + 1}차 시도</TabsTrigger>
            ))}
          </TabsList>
          
          {hasMultipleAttempts && (
             <TabsContent value="overview" className="mt-4">
-                <TeacherGrowthView results={results} assessment={assessment} />
+                <TeacherGrowthView results={completedResults} assessment={assessment} />
             </TabsContent>
          )}
 
-         {results.map((result, index) => (
+         {completedResults.map((result, index) => (
            <TabsContent key={result.id} value={`attempt-${index + 1}`} className="mt-4">
              <AttemptDetailView result={result} assessment={assessment} attemptNumber={index + 1}/>
            </TabsContent>
