@@ -92,10 +92,10 @@ const createPrompt = (modelName: z.infer<typeof evaluationModels[number]>) => ({
     - Student's Spoken Response (Transcript): {{{studentTranscript}}}
     
     Based on all the information provided, perform the following tasks:
-    1.  **Generate Feedback for the Student:** Write encouraging and constructive feedback focusing on what they did well and what they can improve regarding fluency, grammar, and vocabulary in relation to the prompt. Include specific examples from their transcript. Suggest alternative English vocabulary or sentence structures.
-    2.  **Generate Guidance for the Teacher:** Provide actionable advice for the classroom teacher on how to help this student. Suggest specific English teaching activities or focus areas.
-    3.  **Draft '생활기록부 교과 특기 사항':** Write official school record remarks in a formal, descriptive tone with sentences ending in '~함' or '~임'. The remarks must be based on the student's performance in this specific task, summarizing their performance and linking it to English competencies. Follow a 3-part structure: ① General participation, ② Specific examples from their speech, ③ Collaboration/other character traits.
-    4.  **Assign a Content Score:** Give a score from 0 to 100 for the *content* of the response based on how well it aligns with the prompt and criteria.
+    1.  **Generate Feedback for the Student ('aiFeedback'):** Write encouraging and constructive feedback in Markdown format. Use headings (e.g., "### 👍 잘했어요 (What you did well)") and bullet points. Focus on fluency, grammar, and vocabulary in relation to the prompt. Include specific examples from their transcript and suggest alternative English vocabulary or sentence structures.
+    2.  **Generate Guidance for the Teacher ('teacherGuidance'):** Provide actionable advice for the classroom teacher on how to help this student. Suggest specific English teaching activities or focus areas.
+    3.  **Draft '생활기록부 교과 특기 사항' ('curricularRemarks'):** Write official school record remarks in a formal, descriptive tone with sentences ending in '~함' or '~임'. The remarks must be based on the student's performance in this specific task, summarizing their performance and linking it to English competencies. Follow a 3-part structure: ① General participation, ② Specific examples from their speech, ③ Collaboration/other character traits.
+    4.  **Assign a Content Score ('contentScore'):** Give a score from 0 to 100 for the *content* of the response based on how well it aligns with the prompt and criteria.
     `,
     }),
     pronunciation: ai.definePrompt({
