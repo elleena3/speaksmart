@@ -122,12 +122,14 @@ export type StudentResult = {
   studentFeedbackSummary: string;
   studentRawFeedback?: string; // 원본 피드백 저장
   teacherGuidance: string;
+  pronunciationFeedback: string;
   studentTranscript?: string;
   studentRecordingUrl?: string; // Changed from DataUri to URL
   pronunciationScore?: number;
   teacherUid: string; // To query results by teacher
   createdAt: number;
   contentScore: number;
+  curricularRemarks: string;
   rubricScores?: RubricScores;
   // New fields for cached growth feedback
   growthFeedback?: string;
