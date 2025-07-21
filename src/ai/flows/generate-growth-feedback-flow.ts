@@ -4,38 +4,16 @@
  * @fileOverview A flow to generate comparative feedback on a student's growth between two assessment attempts.
  *
  * - generateGrowthFeedback - A function that compares two attempts and provides feedback.
- * - GenerateGrowthFeedbackInput - The input type for the function.
- * - GenerateGrowthFeedbackOutput - The return type for the function.
  */
 
 import { ai } from '@/ai/genkit';
 import { googleAI } from '@genkit-ai/googleai';
 import { z } from 'zod';
-
-export const ResultSummarySchema = z.object({
-    attemptNumber: z.number().int(),
-    contentScore: z.number().int(),
-    pronunciationScore: z.number().int(),
-    transcript: z.string(),
-    aiFeedback: z.string(),
-});
-
-export const GenerateGrowthFeedbackInputSchema = z.object({
-    previousAttempt: ResultSummarySchema.describe("The student's previous attempt."),
-    latestAttempt: ResultSummarySchema.describe("The student's most recent attempt."),
-    assessmentTitle: z.string(),
-});
-export type GenerateGrowthFeedbackInput = z.infer<typeof GenerateGrowthFeedbackInputSchema>;
-
-export const GenerateGrowthFeedbackOutputSchema = z.object({
-    growthFeedback: z.string().describe("A comprehensive Markdown-formatted analysis of the student's growth."),
-});
-export type GenerateGrowthFeedbackOutput = z.infer<typeof GenerateGrowthFeedbackOutputSchema>;
-
+import { GenerateGrowthFeedbackInputSchema, GenerateGrowthFeedbackOutputSchema, type GenerateGrowthFeedbackInput, type GenerateGrowthFeedbackOutput } from '@/lib/types/ai-schemas';
 
 export async function generateGrowthFeedback(
-  input: z.infer<typeof GenerateGrowthFeedbackInputSchema>
-): Promise<z.infer<typeof GenerateGrowthFeedbackOutputSchema>> {
+  input: GenerateGrowthFeedbackInput
+): Promise<GenerateGrowthFeedbackOutput> {
   return generateGrowthFeedbackFlow(input);
 }
 
