@@ -303,25 +303,22 @@ export const generateMonologueAnalysisFlow = ai.defineFlow(
 
       if ('text' in analysisResult) { // This means it's a rubric result
           const rubricText = analysisResult.text;
-          const fluencyMatch = rubricText.match(/🗣️ 유창성 \(Fluency\)\s*-\s*📈 점수:\s*(\d)/);
-          const pronunciationMatch = rubricText.match(/🎤 발음 및 억양 \(Pronunciation & Intonation\)\s*-\s*📈 점수:\s*(\d)/);
-          const grammarMatch = rubricText.match(/✍️ 문법 \(Grammar\)\s*-\s*📈 점수:\s*(\d)/);
-          const vocabularyMatch = rubricText.match(/📚 어휘 \(Vocabulary\)\s*-\s*📈 점수:\s*(\d)/);
-
-          const fluencyScoreRaw = fluencyMatch ? parseInt(fluencyMatch[1], 10) : 0;
-          const pronunciationScoreRaw = pronunciationMatch ? parseInt(pronunciationMatch[1], 10) : 0;
-          const grammarScoreRaw = grammarMatch ? parseInt(grammarMatch[1], 10) : 0;
-          const vocabularyScoreRaw = vocabularyMatch ? parseInt(vocabularyMatch[1], 10) : 0;
           
+          const parseScore = (text: string, category: string): number => {
+            const regex = new RegExp(`[\\s\\S]*?${category}[\\s\\S]*?점수:[^\\d]*(\\d)`);
+            const match = text.match(regex);
+            return match ? parseInt(match[1], 10) : 0;
+          };
+
           const rubricScores: RubricScores = {
-            fluency: fluencyScoreRaw,
-            pronunciation: pronunciationScoreRaw,
-            grammar: grammarScoreRaw,
-            vocabulary: vocabularyScoreRaw,
+            fluency: parseScore(rubricText, '유창성'),
+            pronunciation: parseScore(rubricText, '발음 및 억양'),
+            grammar: parseScore(rubricText, '문법'),
+            vocabulary: parseScore(rubricText, '어휘'),
           };
           
-          const contentScore = Math.round(((fluencyScoreRaw + grammarScoreRaw + vocabularyScoreRaw) / 3) * 20);
-          const pronunciationScore = pronunciationScoreRaw * 20;
+          const contentScore = Math.round(((rubricScores.fluency + rubricScores.grammar + rubricScores.vocabulary) / 3) * 20);
+          const pronunciationScore = rubricScores.pronunciation * 20;
 
           finalResult = {
               studentTranscript,
@@ -329,7 +326,7 @@ export const generateMonologueAnalysisFlow = ai.defineFlow(
               pronunciationScore: pronunciationScore,
               aiFeedback: rubricText,
               teacherGuidance: "루브릭 기반 평가를 사용했습니다. 학생의 강점과 약점을 항목별로 확인하고, 개선점에 제시된 활동을 지도해주세요.",
-              curricularRemarks: `'${input.assessmentTitle}' 평가에서 루브릭 기반으로 유창성(${fluencyScoreRaw}점), 문법(${grammarScoreRaw}점), 어휘(${vocabularyScoreRaw}점) 영역에서 종합 ${contentScore}점, 발음 영역에서 ${pronunciationScore}점을 받는 등 준수한 성취를 보임.`,
+              curricularRemarks: `'${input.assessmentTitle}' 평가에서 루브릭 기반으로 유창성(${rubricScores.fluency}점), 문법(${rubricScores.grammar}점), 어휘(${rubricScores.vocabulary}점) 영역에서 종합 ${contentScore}점, 발음 영역에서 ${pronunciationScore}점을 받는 등 준수한 성취를 보임.`,
               pronunciationFeedback: `루브릭 기반 발음 점수는 ${pronunciationScore}점입니다. 상세 내용은 종합 분석 리포트를 참고하세요.`,
               rubricScores,
           };
