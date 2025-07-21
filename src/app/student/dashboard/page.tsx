@@ -25,37 +25,51 @@ type CombinedAssessment = TeacherAssessment & {
 
 function AssessmentCard({ assessment, t }: { assessment: CombinedAssessment, t: any }) {
   const isCompleted = assessment.completedAttemptsCount > 0;
-  const isGrading = !isCompleted && assessment.resultStatus === '채점 중';
-  const hasError = !isCompleted && assessment.resultStatus === '오류';
   const hasMultipleAttempts = assessment.completedAttemptsCount > 1;
 
-  const getStatusText = () => {
-    if (hasError) return "오류 발생";
-    if (isGrading) return "채점 중...";
-    if (isCompleted) return t.studentDashboard.status.graded;
-    return t.studentDashboard.status.todo;
-  }
+  // Determine the display status based on completed attempts first
+  let displayStatus: '채점 완료' | '채점 중' | '오류' | '할 일';
+  let displayBadgeVariant: "default" | "secondary" | "destructive" | "outline";
   
-  const getBadgeVariant = () => {
-    if (hasError) return "destructive";
-    if (isGrading) return "secondary";
-    if (isCompleted) return "default";
-    return "outline";
+  if (isCompleted) {
+    displayStatus = "채점 완료";
+    displayBadgeVariant = "default";
+  } else {
+    // If not completed, show the status of the latest attempt (which could be '채점 중' or '오류')
+    switch(assessment.resultStatus) {
+      case '채점 중':
+      case '분석 중':
+      case '분석 중: upload':
+      case '분석 중: transcribe':
+      case '분석 중: analyze':
+      case '분석 중: report':
+        displayStatus = '채점 중';
+        displayBadgeVariant = "secondary";
+        break;
+      case '오류':
+        displayStatus = '오류';
+        displayBadgeVariant = "destructive";
+        break;
+      default:
+        displayStatus = '할 일';
+        displayBadgeVariant = "outline";
+    }
   }
 
+
   const getIcon = () => {
-    if (hasError) return <AlertCircle className="h-5 w-5" />;
-    if (isGrading) return <Loader2 className="h-5 w-5 animate-spin" />;
-    if (isCompleted) {
+    if (displayStatus === "오류") return <AlertCircle className="h-5 w-5" />;
+    if (displayStatus === "채점 중") return <Loader2 className="h-5 w-5 animate-spin" />;
+    if (displayStatus === "채점 완료") {
         return hasMultipleAttempts ? <TrendingUp className="h-5 w-5"/> : <CheckCircle2 className="h-5 w-5" />;
     }
     return assessment.assessmentType === 'dialogue' ? <MessageCircle className="h-5 w-5" /> : <Mic className="h-5 w-5" />;
   }
   
   const getButtonText = () => {
-      if (hasError) return "다시 시도";
-      if (isGrading) return "채점 현황 보기";
-      if (isCompleted) {
+      if (displayStatus === "오류") return "다시 시도";
+      if (displayStatus === "채점 중") return "채점 현황 보기"; // This would link to the processing page if we had one
+      if (displayStatus === "채점 완료") {
           return hasMultipleAttempts ? "종합 결과 보기" : t.studentDashboard.viewResults;
       }
       return t.studentDashboard.startAssessment;
@@ -66,7 +80,7 @@ function AssessmentCard({ assessment, t }: { assessment: CombinedAssessment, t: 
       ? `/student/assessment/free-talk/results?id=${assessment.id}`
       : `/student/assessment/${assessment.id}/results`;
       
-    if (isCompleted) return resultsPath;
+    if (displayStatus === '채점 완료') return resultsPath;
     
     // For grading, error, or to-do, link to start page
     if (assessment.assessmentType === 'dialogue') {
@@ -84,8 +98,8 @@ function AssessmentCard({ assessment, t }: { assessment: CombinedAssessment, t: 
       <CardHeader>
         <div className="flex justify-between items-start">
           <CardTitle className="text-xl break-keep">{assessment.title}</CardTitle>
-          <Badge variant={getBadgeVariant()} className="whitespace-nowrap">
-            {getStatusText()}
+          <Badge variant={displayBadgeVariant} className="whitespace-nowrap">
+            {displayStatus}
           </Badge>
         </div>
         <CardDescription>{assessment.topic}</CardDescription>
@@ -134,6 +148,7 @@ export default function StudentDashboard() {
             const assessment = { id: doc.id, ...doc.data() } as TeacherAssessment;
             const studentResults = resultsByAssessment.get(assessment.id) || [];
             
+            // Sort by time to find the latest one
             studentResults.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
             const latestResult = studentResults[0];
 
@@ -162,22 +177,14 @@ export default function StudentDashboard() {
             const bIsCompleted = b.completedAttemptsCount > 0;
 
             if (aIsCompleted !== bIsCompleted) {
-                return aIsCompleted ? 1 : -1;
+                return aIsCompleted ? 1 : -1; // Incomplete tasks first
             }
 
-            if (!aIsCompleted) { 
-                const aEndDate = a.endDate ? new Date(a.endDate).getTime() : Infinity;
-                const bEndDate = b.endDate ? new Date(b.endDate).getTime() : Infinity;
+            // Both have same completion status (either both completed or both not)
+            const aLatestTimestamp = resultsByAssessment.get(a.id)?.[0]?.createdAt || a.createdAt || 0;
+            const bLatestTimestamp = resultsByAssessment.get(b.id)?.[0]?.createdAt || b.createdAt || 0;
 
-                if (aEndDate !== bEndDate) {
-                    return aEndDate - bEndDate;
-                }
-                return (b.createdAt || 0) - (a.createdAt || 0);
-            } else { 
-                 const latestResultA = resultsByAssessment.get(a.id)?.find(r => r.status === '채점 완료');
-                 const latestResultB = resultsByAssessment.get(b.id)?.find(r => r.status === '채점 완료');
-                return (latestResultB?.createdAt || 0) - (latestResultA?.createdAt || 0);
-            }
+            return bLatestTimestamp - aLatestTimestamp; // Most recent activity first
         });
         
         setAssessments(filteredAssessments);

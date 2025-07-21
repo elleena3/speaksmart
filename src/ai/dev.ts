@@ -30,4 +30,7 @@ import '@/ai/flows/analyze-handwriting-flow';
 
 // New flow for growth analysis
 import '@/ai/flows/generate-growth-feedback-flow';
+
+// New flow for retrying analysis
+import '@/ai/flows/retry-analysis-flow';
     

@@ -9,13 +9,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
-import { Loader2, User, ArrowRight, CheckCircle, XCircle } from "lucide-react"
+import { Loader2, User, ArrowRight, CheckCircle, XCircle, RefreshCcw } from "lucide-react"
 import { type TeacherAssessment, type StudentResult } from "@/lib/types";
 import { useAuth, mockStudents } from "@/context/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import { collection, query, where, getDocs, doc, getDoc, orderBy } from 'firebase/firestore';
 import { db } from "@/lib/firebase";
 import { format } from "date-fns";
+import { retryAnalysis } from "@/ai/flows/retry-analysis-flow";
 
 type EnrichedStudent = {
     uid: string;
@@ -33,6 +34,7 @@ export default function AssessmentSubmissionsPage() {
   const [completedStudents, setCompletedStudents] = useState<EnrichedStudent[]>([]);
   const [pendingStudents, setPendingStudents] = useState<EnrichedStudent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [retryingIds, setRetryingIds] = useState<string[]>([]);
   const { toast } = useToast();
 
   const assessmentId = Array.isArray(params.id) ? params.id[0] : params.id;
@@ -110,6 +112,27 @@ export default function AssessmentSubmissionsPage() {
     }
   }, [user, authLoading, router, fetchSubmissions]);
 
+  const handleRetry = async (resultId: string) => {
+    setRetryingIds(prev => [...prev, resultId]);
+    toast({ title: "분석 재시도", description: "AI 분석을 다시 요청하고 있습니다..."});
+    try {
+        const response = await retryAnalysis({ resultId });
+        if (response.success) {
+            toast({ title: "성공", description: "분석 재시도를 시작했습니다. 잠시 후 결과가 업데이트됩니다." });
+            // Optionally, you can implement a poller or rely on a snapshot listener to update the UI
+            setTimeout(fetchSubmissions, 5000); // Refresh after 5s
+        } else {
+            throw new Error(response.message);
+        }
+    } catch(error) {
+         console.error("Error retrying analysis:", error);
+         toast({ title: "재시도 실패", description: (error as Error).message, variant: "destructive" });
+    } finally {
+        setRetryingIds(prev => prev.filter(id => id !== resultId));
+    }
+  }
+
+
   if (isLoading || authLoading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -133,7 +156,7 @@ export default function AssessmentSubmissionsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><CheckCircle className="text-green-500" /> 완료한 학생 ({completedStudents.length})</CardTitle>
+          <CardTitle className="flex items-center gap-2"><CheckCircle className="text-green-500" /> 제출한 학생 ({completedStudents.length})</CardTitle>
         </CardHeader>
         <CardContent>
           {completedStudents.length > 0 ? (
@@ -148,33 +171,44 @@ export default function AssessmentSubmissionsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {completedStudents.map(({result, ...student}) => (
-                  <TableRow key={student.uid}>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <Avatar className="h-9 w-9">
-                          <AvatarImage src={student.photoURL} alt={student.displayName} data-ai-hint="person portrait" />
-                          <AvatarFallback>{student.displayName.charAt(0)}</AvatarFallback>
-                        </Avatar>
-                        <span className="font-medium">{student.displayName}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={result?.status === "채점 완료" ? "default" : result?.status === "오류" ? "destructive" : "secondary"}>
-                        {result?.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{result?.contentScore ? `${result.contentScore}%` : "N/A"}</TableCell>
-                    <TableCell>{result?.createdAt ? format(new Date(result.createdAt), 'yyyy-MM-dd') : 'N/A'}</TableCell>
-                    <TableCell className="text-right">
-                       {result && <Link href={`/teacher/assessment/${assessmentId}/${student.uid}`}>
-                         <Button variant="outline" size="sm">
-                           결과 보기 <ArrowRight className="ml-2 h-4 w-4" />
-                         </Button>
-                      </Link>}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {completedStudents.map(({result, ...student}) => {
+                    const isRetrying = result ? retryingIds.includes(result.id) : false;
+                    return (
+                        <TableRow key={student.uid}>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <Avatar className="h-9 w-9">
+                              <AvatarImage src={student.photoURL} alt={student.displayName} data-ai-hint="person portrait" />
+                              <AvatarFallback>{student.displayName.charAt(0)}</AvatarFallback>
+                            </Avatar>
+                            <span className="font-medium">{student.displayName}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={result?.status === "채점 완료" ? "default" : result?.status === "오류" ? "destructive" : "secondary"}>
+                            {result?.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{result?.contentScore ? `${result.contentScore}%` : "N/A"}</TableCell>
+                        <TableCell>{result?.createdAt ? format(new Date(result.createdAt), 'yyyy-MM-dd') : 'N/A'}</TableCell>
+                        <TableCell className="text-right">
+                           {result?.status === "채점 완료" && (
+                               <Link href={`/teacher/assessment/${assessmentId}/${student.uid}`}>
+                                <Button variant="outline" size="sm">
+                                   결과 보기 <ArrowRight className="ml-2 h-4 w-4" />
+                                </Button>
+                              </Link>
+                           )}
+                           {result?.status === "오류" && result.studentRecordingUrl && (
+                                <Button variant="outline" size="sm" onClick={() => handleRetry(result!.id)} disabled={isRetrying}>
+                                   {isRetrying ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <RefreshCcw className="mr-2 h-4 w-4" />}
+                                   분석 재시도
+                                </Button>
+                           )}
+                        </TableCell>
+                      </TableRow>
+                    )
+                })}
               </TableBody>
             </Table>
           ) : (

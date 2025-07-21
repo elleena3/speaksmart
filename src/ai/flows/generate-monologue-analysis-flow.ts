@@ -16,7 +16,7 @@ import {
   PronunciationAnalysisOutputSchema,
   CombinedAnalysisOutputSchema,
 } from '@/lib/types/ai-schemas';
-import { evaluationModels, type RubricScores } from '@/lib/types';
+import { evaluationModels, type RubricScores, type StudentResult } from '@/lib/types';
 import { ref, uploadString, getDownloadURL } from "firebase/storage";
 import { db, storage } from "@/lib/firebase";
 import { doc, updateDoc } from 'firebase/firestore';
@@ -236,6 +236,7 @@ export const generateMonologueAnalysisFlow = ai.defineFlow(
     const model = input.evaluationModel || 'gemini-2.5-flash';
     const prompts = createPrompt(model);
     const resultDocRef = doc(db, "results", input.resultId);
+    let downloadURL = ""; // To store the URL for retry purposes
 
     try {
       // Step 1: Upload File to Storage first (can happen in parallel with first AI call)
@@ -258,7 +259,7 @@ export const generateMonologueAnalysisFlow = ai.defineFlow(
       
       // Wait for the upload to finish and get the URL
       const uploadSnapshot = await uploadTask;
-      const downloadURL = await getDownloadURL(uploadSnapshot.ref);
+      downloadURL = await getDownloadURL(uploadSnapshot.ref);
       console.log("[Flow] Audio uploaded, URL:", downloadURL);
 
       // Step 3: Content & Pronunciation Analysis (in parallel)
@@ -359,7 +360,8 @@ export const generateMonologueAnalysisFlow = ai.defineFlow(
        console.error("[Flow] An error occurred in generateMonologueAnalysisFlow", e);
        await updateDoc(resultDocRef, { 
           status: '오류', 
-          aiFeedback: (e as Error).message || "알 수 없는 오류가 발생했습니다."
+          aiFeedback: (e as Error).message || "알 수 없는 오류가 발생했습니다.",
+          studentRecordingUrl: downloadURL || "" // Save URL even on failure if available
        });
        // Re-throw the error to be caught by the client-side caller if needed
        throw e;

@@ -65,6 +65,8 @@ export async function generateDialogueAnalysis(
           ...analysisResult,
           status: "채점 완료",
           teacherUid: input.teacherUid,
+          // Ensure the URL is persisted upon success as well
+          studentRecordingUrl: input.studentRecordingUrl,
       };
       
       await updateDoc(resultDocRef, finalResultData);
@@ -72,9 +74,11 @@ export async function generateDialogueAnalysis(
 
   } catch (e: any) {
       console.error(`[Dialogue Flow] An error occurred during dialogue analysis for ${input.resultId}:`, e);
+      // On error, still try to save the recording URL for retry purposes.
       await updateDoc(resultDocRef, {
           status: "오류",
-          aiFeedback: (e as Error).message || "알 수 없는 오류가 발생했습니다."
+          aiFeedback: (e as Error).message || "알 수 없는 오류가 발생했습니다.",
+          studentRecordingUrl: input.studentRecordingUrl, // Save URL even on failure
       });
       // Re-throw to let the caller know something went wrong.
       throw e;
