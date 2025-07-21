@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2, FileText, Target, Mic, Bot, BookOpen, Sparkles, ScanText, KeyRound, AlertTriangle, MessageCircle, MicVocal, Video } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { transcribeFile, type TranscriptionResult } from "@/ai/flows/transcribe-file";
 import { analyzePronunciation, type PronunciationAnalysisResult } from "@/ai/flows/analyze-pronunciation";
@@ -383,3 +384,5 @@ function PronunciationAnalyzerTool() {
     </AudioProcessor>
   );
 }
+
+    
