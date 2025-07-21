@@ -7,7 +7,7 @@ import { type TeacherAssessment, type StudentResult, type ResultSummary } from "
 import { useAuth, mockStudents } from "@/context/auth-context";
 import { Loader2, User, Sparkles, TrendingUp, DraftingCompass } from "lucide-react";
 import { db } from "@/lib/firebase";
-import { doc, getDoc, collection, query, where, getDocs, updateDoc, orderBy } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
 import { useToast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -284,7 +284,7 @@ function TeacherGrowthView({ results, assessment }: { results: StudentResult[], 
           {isLoadingFeedback ? (
             <div className="flex items-center gap-2 text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin"/> 생성 중...</div>
           ) : content ? (
-            content
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
           ) : (
              <div className="text-muted-foreground">오류가 발생했거나 생성된 내용이 없습니다.</div>
           )}
@@ -406,8 +406,7 @@ export default function TeacherStudentResultView() {
       const resultsQuery = query(
         collection(db, "results"),
         where("assessmentId", "==", assessmentId),
-        where("studentId", "==", studentId),
-        orderBy("createdAt", "asc") // Get all results, oldest first
+        where("studentId", "==", studentId)
       );
       const resultsSnap = await getDocs(resultsQuery);
 
@@ -418,7 +417,8 @@ export default function TeacherStudentResultView() {
       }
       
       const studentResults = resultsSnap.docs
-        .map(doc => ({ id: doc.id, ...doc.data() } as StudentResult));
+        .map(doc => ({ id: doc.id, ...doc.data() } as StudentResult))
+        .sort((a,b) => (a.createdAt || 0) - (b.createdAt || 0)); // Sort client-side
       
       setResults(studentResults);
 
