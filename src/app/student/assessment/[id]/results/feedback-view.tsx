@@ -46,19 +46,16 @@ export function FeedbackView({ result, assessment, isLatestAttempt }: FeedbackVi
   const rubricSubjects = ['유창성', '발음', '문법', '어휘'];
 
   const radarChartData = isRubricUsed ? rubricSubjects.map(subject => {
-      const entry: { [key: string]: string | number } = { subject };
-      const key = `score`;
+      let score = 0;
       if (rubricScores) {
           switch(subject) {
-              case '유창성': entry[key] = rubricScores.fluency; break;
-              case '발음': entry[key] = rubricScores.pronunciation; break;
-              case '문법': entry[key] = rubricScores.grammar; break;
-              case '어휘': entry[key] = rubricScores.vocabulary; break;
+              case '유창성': score = rubricScores.fluency; break;
+              case '발음': score = rubricScores.pronunciation; break;
+              case '문법': score = rubricScores.grammar; break;
+              case '어휘': score = rubricScores.vocabulary; break;
           }
-      } else {
-           entry[key] = 0;
       }
-      return entry;
+      return { subject, score };
   }) : [];
 
 
