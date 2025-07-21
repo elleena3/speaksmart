@@ -277,6 +277,21 @@ function TeacherGrowthView({ results, assessment }: { results: StudentResult[], 
         }
     }, [results, assessment.title, toast, latestResult]);
 
+    const RemarksCard = ({ title, content }: { title: string, content?: string }) => (
+      <Card>
+        <CardHeader><CardTitle>{title}</CardTitle></CardHeader>
+        <CardContent className="p-4 bg-muted/50 rounded-lg whitespace-pre-wrap font-body text-sm leading-relaxed min-h-[150px]">
+          {isLoadingFeedback ? (
+            <div className="flex items-center gap-2 text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin"/> 생성 중...</div>
+          ) : content ? (
+            content
+          ) : (
+             <div className="text-muted-foreground">오류가 발생했거나 생성된 내용이 없습니다.</div>
+          )}
+        </CardContent>
+      </Card>
+    );
+
     return (
         <div className="space-y-6">
             <Card>
@@ -326,30 +341,22 @@ function TeacherGrowthView({ results, assessment }: { results: StudentResult[], 
                     <CardDescription>모든 시도를 종합하여 AI가 분석한 학생의 성장 과정입니다.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    {isLoadingFeedback ? (
-                        <div className="flex items-center justify-center p-8"><Loader2 className="h-8 w-8 animate-spin" /></div>
-                    ) : (
-                        <div className="grid md:grid-cols-2 gap-6">
-                            <Card>
-                                <CardHeader><CardTitle>생활기록부 교과 특기 사항</CardTitle></CardHeader>
-                                <CardContent className="p-4 bg-muted/50 rounded-lg whitespace-pre-wrap font-body text-sm leading-relaxed min-h-[150px]">
-                                    {growthFeedback?.curricularRemarks}
-                                </CardContent>
-                            </Card>
-                             <Card>
-                                <CardHeader><CardTitle>교사용 AI 조언</CardTitle></CardHeader>
-                                <CardContent className="p-4 bg-muted/50 rounded-lg whitespace-pre-wrap font-body text-sm leading-relaxed min-h-[150px]">
-                                    {growthFeedback?.teacherGuidance}
-                                </CardContent>
-                            </Card>
-                            <Card className="md:col-span-2">
-                                <CardHeader><CardTitle>학생에게 제공된 AI 종합 피드백</CardTitle></CardHeader>
-                                <CardContent className="p-4 bg-muted/50 rounded-lg font-body text-base leading-relaxed markdown-content">
-                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{growthFeedback?.growthFeedback || ""}</ReactMarkdown>
-                                </CardContent>
-                            </Card>
-                        </div>
-                    )}
+                    <div className="grid md:grid-cols-2 gap-6">
+                        <RemarksCard title="생활기록부 교과 특기 사항" content={growthFeedback?.curricularRemarks} />
+                        <RemarksCard title="교사용 AI 조언" content={growthFeedback?.teacherGuidance} />
+                        <Card className="md:col-span-2">
+                            <CardHeader><CardTitle>학생에게 제공된 AI 종합 피드백</CardTitle></CardHeader>
+                            <CardContent className="p-4 bg-muted/50 rounded-lg font-body text-base leading-relaxed markdown-content">
+                               {isLoadingFeedback ? (
+                                    <div className="flex items-center gap-2 text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin"/> 생성 중...</div>
+                                ) : growthFeedback?.growthFeedback ? (
+                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{growthFeedback.growthFeedback}</ReactMarkdown>
+                                ) : (
+                                    <div className="text-muted-foreground">오류가 발생했거나 생성된 내용이 없습니다.</div>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </div>
                 </CardContent>
             </Card>
         </div>
