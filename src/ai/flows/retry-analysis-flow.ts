@@ -9,10 +9,11 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { db, storage } from '@/lib/firebase';
 import { generateMonologueAnalysisFlow } from './generate-monologue-analysis-flow';
 import { generateDialogueAnalysis } from './generate-dialogue-analysis-flow';
 import { type TeacherAssessment, type StudentResult } from '@/lib/types';
+import { ref, getBytes } from "firebase/storage";
 
 
 export const RetryAnalysisInputSchema = z.object({
@@ -64,7 +65,7 @@ const retryAnalysisFlow = ai.defineFlow(
         // Determine which analysis flow to call based on assessment type
         if (assessmentData.assessmentType === 'dialogue') {
             // Dialogue flow is more complex and expects a full input object.
-            // Note: The full conversation transcript is not saved on error.
+            // Note: The full conversation transcript might not be saved on initial error.
             // We will have to pass what we have. This is a limitation.
             const studentTranscript = resultData.studentTranscript || "";
             const fullTranscript = studentTranscript ? `학생: ${studentTranscript}` : "대화 기록을 복구할 수 없습니다.";
@@ -83,17 +84,28 @@ const retryAnalysisFlow = ai.defineFlow(
                 useRubric: assessmentData.useRubric || false,
              });
 
-        } else {
-            // Monologue flow can be called directly with the necessary info.
-            // Note: Monologue flow takes a data URI, but we have a URL.
-            // The flow needs to be able to handle both or we need to fetch the data.
-            // For now, we assume the monologue flow was designed to handle a URL.
-            // Let's call the *exported* function, not the flow itself.
-            // This is incorrect. The monologue flow takes a dataURI.
-            // This will fail. We need to refactor the monologue flow.
-            // For now, let's just log an error for monologue.
-            // TODO: Refactor monologue flow to accept a URL or fetch the data.
-             throw new Error('Monologue retry is not yet implemented due to data format mismatch.');
+        } else { // Handle Monologue
+            // 1. Download the file from the URL
+            const storageRef = ref(storage, resultData.studentRecordingUrl);
+            const audioBytes = await getBytes(storageRef);
+            const audioBuffer = Buffer.from(audioBytes);
+
+            // 2. Convert to Data URI
+            const mimeType = 'audio/webm;codecs=opus'; // Assuming webm format
+            const studentRecordingDataUri = `data:${mimeType};base64,${audioBuffer.toString('base64')}`;
+
+            // 3. Call the monologue flow with the correct data format
+            await generateMonologueAnalysisFlow({
+                resultId: resultId,
+                studentRecordingDataUri: studentRecordingDataUri,
+                activityPrompt: assessmentData.prompt,
+                expectedFormat: assessmentData.expectedFormat || "",
+                studentName: resultData.name,
+                assessmentTitle: assessmentData.title,
+                evaluationModel: assessmentData.evaluationModel,
+                useRubric: assessmentData.useRubric || false,
+                teacherUid: resultData.teacherUid,
+            });
         }
 
         console.log(`[Retry Flow] Successfully re-triggered analysis for ${resultId}`);
