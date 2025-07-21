@@ -22,6 +22,15 @@ import { evaluationModels, type RubricScores, type StudentResult } from '@/lib/t
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
+// This parsing logic is now centralized here.
+const parseScore = (text: string, category: string): number => {
+    // A more flexible regex that doesn't rely on emojis or exact spacing
+    const regex = new RegExp(`${category}[\\s\\S]*?점수[^\\d]*(\\d)`);
+    const match = text.match(regex);
+    return match ? parseInt(match[1], 10) : 0;
+};
+
+
 // Helper function for retrying API calls on overload
 async function withRetry<T>(fn: () => Promise<T>, retries = 2, delay = 1500): Promise<T> {
   let lastError: any;
@@ -54,7 +63,7 @@ export async function generateDialogueAnalysis(
 
   try {
       console.log(`[Dialogue Flow] Starting analysis for result ID: ${input.resultId}`);
-      await updateDoc(resultDocRef, { status: "분석 중: analyze" });
+      await updateDoc(resultDocRef, { status: "분석 중: analyze", assessmentType: "dialogue" });
       
       const analysisResult = await generateDialogueAnalysisFlow(input);
 
@@ -67,6 +76,7 @@ export async function generateDialogueAnalysis(
           teacherUid: input.teacherUid,
           // Ensure the URL is persisted upon success as well
           studentRecordingUrl: input.studentRecordingUrl,
+          assessmentType: "dialogue",
       };
       
       await updateDoc(resultDocRef, finalResultData);
@@ -79,6 +89,7 @@ export async function generateDialogueAnalysis(
           status: "오류",
           aiFeedback: (e as Error).message || "알 수 없는 오류가 발생했습니다.",
           studentRecordingUrl: input.studentRecordingUrl, // Save URL even on failure
+          assessmentType: "dialogue",
       });
       // Re-throw to let the caller know something went wrong.
       throw e;
@@ -308,12 +319,6 @@ const generateDialogueAnalysisFlow = ai.defineFlow(
     if (input.useRubric) {
         const rubricResult = await withRetry(() => prompts.rubric({ fullConversationTranscript: input.fullConversationTranscript }));
         const rubricText = rubricResult.text;
-
-        const parseScore = (text: string, category: string): number => {
-            const regex = new RegExp(`${category}[\\s\\S]*?점수:[^\\d]*(\\d)`);
-            const match = text.match(regex);
-            return match ? parseInt(match[1], 10) : 0;
-        };
         
         const rubricScores: RubricScores = {
             fluency: parseScore(rubricText, '유창성'),

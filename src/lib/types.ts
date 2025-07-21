@@ -1,4 +1,5 @@
 
+
 import { type ConversationTurn, type ResultSummarySchema } from "@/lib/types/ai-schemas";
 import { z } from 'zod';
 
@@ -29,7 +30,7 @@ export const voiceDescriptions: Record<AiVoice, string> = {
     zubenelgenubi: "밝고 긍정적인 톤 (남성)",
 };
 
-export const evaluationModels = ["gemini-2.5-flash-lite-preview-06-17", "gemini-2.5-flash", "gemini-2.0-flash"] as const;
+export const evaluationModels = ["gemini-2.5-flash", "gemini-2.5-flash-lite-preview-06-17", "gemini-2.0-flash"] as const;
 export type EvaluationModel = (typeof evaluationModels)[number];
 
 
@@ -114,6 +115,7 @@ export type StudentResult = {
   studentId: string; // Student's UID
   assessmentId: string;
   assessmentTitle: string; 
+  assessmentType?: 'monologue' | 'dialogue'; // Keep track of type for reprocessing
   name: string; // Student's display name
   avatarUrl: string;
   status: ResultStatus;

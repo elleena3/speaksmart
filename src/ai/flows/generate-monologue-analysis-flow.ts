@@ -39,6 +39,14 @@ const MonologueProcessingInputSchema = z.object({
 });
 type MonologueProcessingInput = z.infer<typeof MonologueProcessingInputSchema>;
 
+// This parsing logic is now centralized here.
+const parseScore = (text: string, category: string): number => {
+    // A more flexible regex that doesn't rely on emojis or exact spacing
+    const regex = new RegExp(`${category}[\\s\\S]*?점수[^\\d]*(\\d)`);
+    const match = text.match(regex);
+    return match ? parseInt(match[1], 10) : 0;
+};
+
 
 // Helper function for retrying API calls on overload
 async function withRetry<T>(fn: () => Promise<T>, retries = 2, delay = 1500): Promise<T> {
@@ -241,7 +249,7 @@ export const generateMonologueAnalysisFlow = ai.defineFlow(
 
     try {
       // Step 1: Upload File to Storage first (can happen in parallel with first AI call)
-      await updateDoc(resultDocRef, { status: "분석 중: upload" });
+      await updateDoc(resultDocRef, { status: "분석 중: upload", assessmentType: "monologue" });
       console.log("[Flow] Step 1: Uploading audio file to Storage.");
       const studentUid = input.studentName; 
       const uploadPath = `recordings/${studentUid}_${input.assessmentTitle}_${Date.now()}.webm`;
@@ -304,12 +312,6 @@ export const generateMonologueAnalysisFlow = ai.defineFlow(
       if ('text' in analysisResult) { // This means it's a rubric result
           const rubricText = analysisResult.text;
           
-          const parseScore = (text: string, category: string): number => {
-            const regex = new RegExp(`${category}[\\s\\S]*?점수:[^\\d]*(\\d)`);
-            const match = text.match(regex);
-            return match ? parseInt(match[1], 10) : 0;
-          };
-
           const rubricScores: RubricScores = {
             fluency: parseScore(rubricText, '유창성'),
             pronunciation: parseScore(rubricText, '발음 및 억양'),
@@ -351,6 +353,7 @@ export const generateMonologueAnalysisFlow = ai.defineFlow(
           studentRecordingUrl: downloadURL,
           status: "채점 완료",
           teacherUid: input.teacherUid,
+          assessmentType: "monologue",
       });
 
       console.log(`[Flow] Final result document ${input.resultId} updated. Status: '채점 완료'`);

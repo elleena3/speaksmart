@@ -4,11 +4,11 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useRouter, notFound } from "next/navigation";
-import { type TeacherAssessment, type StudentResult, type ResultSummary } from "@/lib/types";
+import { type TeacherAssessment, type StudentResult, type ResultSummary, type RubricScores } from "@/lib/types";
 import { useAuth, mockStudents } from "@/context/auth-context";
-import { Loader2, User, Sparkles, TrendingUp, DraftingCompass } from "lucide-react";
+import { Loader2, User, Sparkles, TrendingUp, DraftingCompass, AlertCircle, RefreshCcwDot } from "lucide-react";
 import { db } from "@/lib/firebase";
-import { doc, getDoc, collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, updateDoc, onSnapshot } from 'firebase/firestore';
 import { useToast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,9 +18,11 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
 import { generateGrowthFeedback, type GenerateGrowthFeedbackOutput } from "@/ai/flows/generate-growth-feedback-flow";
+import { Button } from "@/components/ui/button";
+import { recalculateScores } from "@/ai/flows/recalculate-scores-flow";
 
 
-function AttemptDetailView({ result, assessment, attemptNumber }: { result: StudentResult, assessment: TeacherAssessment, attemptNumber: number }) {
+function AttemptDetailView({ result, assessment, attemptNumber, onRecalculate }: { result: StudentResult, assessment: TeacherAssessment, attemptNumber: number, onRecalculate: (resultId: string) => Promise<void> }) {
   const {
     aiFeedback,
     studentTranscript,
@@ -32,6 +34,8 @@ function AttemptDetailView({ result, assessment, attemptNumber }: { result: Stud
     curricularRemarks,
     rubricScores,
   } = result;
+  
+  const [isRecalculating, setIsRecalculating] = useState(false);
   
   const isRubricUsed = !!rubricScores;
   const rubricSubjects = assessment.assessmentType === 'dialogue'
@@ -52,6 +56,13 @@ function AttemptDetailView({ result, assessment, attemptNumber }: { result: Stud
       return { subject, score };
   }) : [];
 
+  const hasZeroScores = isRubricUsed && Object.values(rubricScores).some(score => score === 0);
+
+  const handleRecalculate = async () => {
+      setIsRecalculating(true);
+      await onRecalculate(result.id);
+      setIsRecalculating(false);
+  }
 
   return (
     <div className="space-y-6">
@@ -102,8 +113,24 @@ function AttemptDetailView({ result, assessment, attemptNumber }: { result: Stud
         {isRubricUsed && (
             <Card>
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2"><DraftingCompass />루브릭 영역별 분석</CardTitle>
-                    <CardDescription>루브릭 항목별 점수입니다. (5점 만점)</CardDescription>
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <CardTitle className="flex items-center gap-2"><DraftingCompass />루브릭 영역별 분석</CardTitle>
+                            <CardDescription>루브릭 항목별 점수입니다. (5점 만점)</CardDescription>
+                        </div>
+                        {hasZeroScores && (
+                             <Button onClick={handleRecalculate} disabled={isRecalculating} variant="outline" size="sm">
+                                {isRecalculating ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <RefreshCcwDot className="mr-2 h-4 w-4"/>}
+                                {isRecalculating ? "계산 중..." : "점수 재계산"}
+                            </Button>
+                        )}
+                    </div>
+                     {hasZeroScores && (
+                        <div className="p-3 bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-md flex items-center gap-2 text-sm mt-2">
+                            <AlertCircle className="h-4 w-4"/>
+                            <span>점수 추출에 실패한 항목이 있습니다. '점수 재계산'을 시도해주세요.</span>
+                        </div>
+                    )}
                 </CardHeader>
                 <CardContent className="h-80">
                     <ResponsiveContainer width="100%" height="100%">
@@ -380,67 +407,89 @@ export default function TeacherStudentResultView() {
   const assessmentId = Array.isArray(params.id) ? params.id[0] : params.id;
   const studentId = Array.isArray(params.studentId) ? params.studentId[0] : params.studentId;
 
-  const fetchResultData = useCallback(async () => {
-    if (!user || !studentId || !assessmentId) return;
-    setIsLoading(true);
-
+  const handleRecalculateScores = useCallback(async (resultId: string) => {
+    toast({ title: "점수 재계산 중...", description: "AI 피드백에서 점수를 다시 추출하고 있습니다." });
     try {
-      const assessmentRef = doc(db, "assessments", assessmentId);
-      const assessmentSnap = await getDoc(assessmentRef);
-      
-      if (!assessmentSnap.exists() || assessmentSnap.data().uid !== user.uid) {
-        toast({ title: "오류", description: "평가를 찾을 수 없거나 접근 권한이 없습니다.", variant: "destructive" });
-        notFound();
-        return;
-      }
-      const assessmentData = { id: assessmentSnap.id, ...assessmentSnap.data() } as TeacherAssessment;
-      setAssessment(assessmentData);
-
-      const foundStudent = mockStudents.find(s => s.uid === studentId);
-      if (foundStudent) {
-        setStudent(foundStudent);
-      } else {
-        toast({ title: "오류", description: "학생 정보를 찾을 수 없습니다.", variant: "destructive" });
-        notFound();
-        return;
-      }
-      
-      const resultsQuery = query(
-        collection(db, "results"),
-        where("assessmentId", "==", assessmentId),
-        where("studentId", "==", studentId)
-      );
-      const resultsSnap = await getDocs(resultsQuery);
-
-      if (resultsSnap.empty) {
-        toast({ title: "결과 없음", description: "해당 학생의 평가 결과가 없습니다.", variant: "destructive" });
-        router.push(`/teacher/assessment/${assessmentId}`);
-        return;
-      }
-      
-      const studentResults = resultsSnap.docs
-        .map(doc => ({ id: doc.id, ...doc.data() } as StudentResult))
-        .sort((a,b) => (a.createdAt || 0) - (b.createdAt || 0)); // Sort client-side
-      
-      setResults(studentResults);
-
+        const response = await recalculateScores({ resultId });
+        if (response.success) {
+            toast({ title: "재계산 완료", description: "점수가 성공적으로 업데이트되었습니다." });
+            // The onSnapshot listener will automatically update the UI.
+        } else {
+            throw new Error(response.message || "재계산에 실패했습니다.");
+        }
     } catch (error) {
-      console.error("Error fetching result data:", error);
-      toast({ title: "오류", description: "결과를 불러오는 중 오류가 발생했습니다.", variant: "destructive" });
-      notFound();
-    } finally {
-      setIsLoading(false);
+        console.error("Error recalculating scores:", error);
+        toast({ title: "재계산 오류", description: (error as Error).message, variant: "destructive" });
     }
-  }, [studentId, assessmentId, user, toast, router]);
+  }, [toast]);
+
 
   useEffect(() => {
-    if (authLoading) return;
-    if (!user) {
-      router.push('/');
-      return;
-    }
-    fetchResultData();
-  }, [user, authLoading, router, fetchResultData]);
+    if (authLoading || !user || !studentId || !assessmentId) return;
+    
+    setIsLoading(true);
+
+    const fetchInitialData = async () => {
+        try {
+            const assessmentRef = doc(db, "assessments", assessmentId);
+            const assessmentSnap = await getDoc(assessmentRef);
+          
+            if (!assessmentSnap.exists() || assessmentSnap.data().uid !== user.uid) {
+                toast({ title: "오류", description: "평가를 찾을 수 없거나 접근 권한이 없습니다.", variant: "destructive" });
+                notFound();
+                return false;
+            }
+            setAssessment({ id: assessmentSnap.id, ...assessmentSnap.data() } as TeacherAssessment);
+    
+            const foundStudent = mockStudents.find(s => s.uid === studentId);
+            if (foundStudent) {
+                setStudent(foundStudent);
+            } else {
+                toast({ title: "오류", description: "학생 정보를 찾을 수 없습니다.", variant: "destructive" });
+                notFound();
+                return false;
+            }
+            return true;
+
+        } catch (error) {
+             console.error("Error fetching initial data:", error);
+             toast({ title: "오류", description: "데이터를 불러오는 중 오류가 발생했습니다.", variant: "destructive" });
+             notFound();
+             return false;
+        }
+    };
+
+    fetchInitialData().then(success => {
+        if(success) {
+            const resultsQuery = query(
+                collection(db, "results"),
+                where("assessmentId", "==", assessmentId),
+                where("studentId", "==", studentId)
+            );
+            
+            const unsubscribe = onSnapshot(resultsQuery, (querySnapshot) => {
+                if (querySnapshot.empty && !isLoading) {
+                     toast({ title: "결과 없음", description: "해당 학생의 평가 결과가 없습니다.", variant: "destructive" });
+                     router.push(`/teacher/assessment/${assessmentId}`);
+                     return;
+                }
+                const studentResults = querySnapshot.docs
+                    .map(doc => ({ id: doc.id, ...doc.data() } as StudentResult))
+                    .sort((a,b) => (a.createdAt || 0) - (b.createdAt || 0)); // Sort client-side
+      
+                setResults(studentResults);
+                setIsLoading(false);
+            }, (error) => {
+                 console.error("Error with snapshot listener:", error);
+                 toast({ title: "실시간 업데이트 오류", description: "결과를 실시간으로 업데이트하는 데 실패했습니다.", variant: "destructive" });
+                 setIsLoading(false);
+            });
+
+            return () => unsubscribe(); // Cleanup listener on unmount
+        }
+    });
+
+  }, [studentId, assessmentId, user, toast, router, authLoading, isLoading]);
   
 
   if (isLoading || authLoading || !assessment || !student) {
@@ -500,7 +549,7 @@ export default function TeacherStudentResultView() {
 
          {completedResults.map((result, index) => (
            <TabsContent key={result.id} value={`attempt-${index + 1}`} className="mt-4">
-             <AttemptDetailView result={result} assessment={assessment} attemptNumber={index + 1}/>
+             <AttemptDetailView result={result} assessment={assessment} attemptNumber={index + 1} onRecalculate={handleRecalculateScores} />
            </TabsContent>
          ))}
        </Tabs>
