@@ -18,7 +18,7 @@ import { useLanguage } from '@/context/language-context';
 import { useAuth, mockStudents } from '@/context/auth-context';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, doc, deleteDoc, addDoc, writeBatch } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, deleteDoc, addDoc, writeBatch, orderBy } from 'firebase/firestore';
 
 export default function AssessmentsPage() {
   const { user, loading: authLoading } = useAuth();
@@ -34,23 +34,32 @@ export default function AssessmentsPage() {
     if (!user) return;
     setIsLoading(true);
     try {
-        const assessmentsQuery = query(collection(db, "assessments"), where("uid", "==", user.uid));
-        const querySnapshot = await getDocs(assessmentsQuery);
+        const assessmentsQuery = query(collection(db, "assessments"), where("uid", "==", user.uid), orderBy("createdAt", "desc"));
         
-        const assessmentsData = await Promise.all(querySnapshot.docs.map(async (doc) => {
-            const assessment = { id: doc.id, ...doc.data() } as TeacherAssessment;
-            
-            const resultsQuery = query(collection(db, 'results'), where('assessmentId', '==', assessment.id));
-            const resultsSnapshot = await getDocs(resultsQuery);
-            const uniqueStudentIds = new Set(resultsSnapshot.docs.map(d => d.data().studentId));
-            
-            assessment.submissionCount = uniqueStudentIds.size;
-            return assessment;
-        }));
+        const allResultsQuery = query(collection(db, 'results'), where('teacherUid', '==', user.uid));
 
-        assessmentsData.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+        const [assessmentsSnapshot, allResultsSnapshot] = await Promise.all([
+            getDocs(assessmentsQuery),
+            getDocs(allResultsQuery)
+        ]);
+
+        const submissionCounts = new Map<string, Set<string>>();
+        allResultsSnapshot.forEach(resultDoc => {
+            const result = resultDoc.data();
+            if (!submissionCounts.has(result.assessmentId)) {
+                submissionCounts.set(result.assessmentId, new Set());
+            }
+            submissionCounts.get(result.assessmentId)!.add(result.studentId);
+        });
+
+        const assessmentsData = assessmentsSnapshot.docs.map((doc) => {
+            const assessment = { id: doc.id, ...doc.data() } as TeacherAssessment;
+            assessment.submissionCount = submissionCounts.get(assessment.id)?.size || 0;
+            return assessment;
+        });
+
         setAssessments(assessmentsData);
-        setSelectedRowIds([]); // Reset selection after fetching
+        setSelectedRowIds([]);
     } catch (error) {
         console.error("Error fetching assessments: ", error);
         toast({ title: "오류", description: "평가 목록을 불러오는 데 실패했습니다.", variant: "destructive" });
