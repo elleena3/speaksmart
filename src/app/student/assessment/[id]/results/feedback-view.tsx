@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
-import { Send, ThumbsUp, ThumbsDown, MessageSquareQuote, Loader2, FileText, Target, Repeat, DraftingCompass } from "lucide-react"
+import { Send, ThumbsUp, ThumbsDown, MessageSquareQuote, Loader2, FileText, Target, Repeat, DraftingCompass, RefreshCcw } from "lucide-react"
 import { type StudentResult, type TeacherAssessment } from "@/lib/types"
 import { Progress } from "@/components/ui/progress"
 import { db } from "@/lib/firebase"
@@ -15,6 +15,7 @@ import { doc, updateDoc } from "firebase/firestore"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Legend } from "recharts"
+import { recalculateScores } from "@/ai/flows/recalculate-scores-flow"
 
 
 type FeedbackViewProps = {
@@ -28,6 +29,7 @@ export function FeedbackView({ result, assessment, isLatestAttempt }: FeedbackVi
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [satisfaction, setSatisfaction] = useState<"good" | "bad" | null>(null);
   const [localResult, setLocalResult] = useState(result);
+  const [isRecalculating, setIsRecalculating] = useState(false);
   const { toast } = useToast()
 
   const {
@@ -36,7 +38,6 @@ export function FeedbackView({ result, assessment, isLatestAttempt }: FeedbackVi
     studentTranscript,
     studentRecordingUrl,
     pronunciationScore,
-    pronunciationFeedback,
     contentScore,
     studentRawFeedback,
     rubricScores
@@ -58,6 +59,51 @@ export function FeedbackView({ result, assessment, isLatestAttempt }: FeedbackVi
       return { subject, score };
   }) : [];
 
+
+  const handleRecalculate = async () => {
+    setIsRecalculating(true);
+    toast({
+      title: '점수 재계산 중...',
+      description: 'AI가 평가를 다시 분석하고 있습니다. 잠시만 기다려주세요.',
+    });
+    try {
+      const newScores = await recalculateScores({
+        studentTranscript: localResult.studentTranscript || "",
+        assessmentType: 'monologue',
+        evaluationModel: assessment.evaluationModel,
+        assessmentTitle: assessment.title,
+      });
+
+      const updatedResult: Partial<StudentResult> = {
+        aiFeedback: newScores.aiFeedback,
+        rubricScores: newScores.rubricScores,
+        contentScore: newScores.contentScore,
+        pronunciationScore: newScores.pronunciationScore,
+        teacherGuidance: newScores.teacherGuidance,
+        curricularRemarks: newScores.curricularRemarks,
+      };
+
+      const resultRef = doc(db, "results", resultId);
+      await updateDoc(resultRef, updatedResult);
+      
+      setLocalResult(prev => ({...prev, ...updatedResult}));
+
+      toast({
+        title: '재계산 완료!',
+        description: '루브릭 점수와 피드백이 업데이트되었습니다.',
+      });
+
+    } catch (e: any) {
+      console.error("Failed to recalculate scores:", e);
+      toast({
+        title: '재계산 실패',
+        description: '점수를 다시 계산하는 중 오류가 발생했습니다.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsRecalculating(false);
+    }
+  }
 
   const handleSubmitFeedback = async () => {
     if (!teacherFeedback.trim()) {
@@ -169,8 +215,16 @@ export function FeedbackView({ result, assessment, isLatestAttempt }: FeedbackVi
         {isRubricUsed && (
             <Card>
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2"><DraftingCompass />루브릭 영역별 분석</CardTitle>
-                    <CardDescription>루브릭 항목별 점수입니다. (5점 만점)</CardDescription>
+                    <div className="flex justify-between items-center">
+                        <div>
+                            <CardTitle className="flex items-center gap-2"><DraftingCompass />루브릭 영역별 분석</CardTitle>
+                            <CardDescription>루브릭 항목별 점수입니다. (5점 만점)</CardDescription>
+                        </div>
+                        <Button variant="outline" size="sm" onClick={handleRecalculate} disabled={isRecalculating}>
+                            {isRecalculating ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <RefreshCcw className="mr-2 h-4 w-4"/>}
+                            점수 다시 계산
+                        </Button>
+                    </div>
                 </CardHeader>
                 <CardContent className="h-80">
                     <ResponsiveContainer width="100%" height="100%">

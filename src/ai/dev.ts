@@ -36,4 +36,7 @@ import '@/ai/flows/retry-analysis-flow';
 
 // New flow for presentation analysis
 import '@/ai/flows/analyze-presentation-video-flow';
+
+// New flow for recalculating rubric scores
+import '@/ai/flows/recalculate-scores-flow';
     
