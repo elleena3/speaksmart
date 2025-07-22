@@ -28,14 +28,11 @@ export default function TeacherDashboard() {
     setIsLoading(true);
 
     try {
+        // 1. Firestore 쿼리를 단순화하여 색인 오류를 방지합니다. 필터링만 수행합니다.
         const assessmentsQuery = query(
             collection(db, "assessments"), 
-            where("uid", "==", "teacher-mock-uid"),
-            orderBy("createdAt", "desc"),
-            limit(5)
+            where("uid", "==", "teacher-mock-uid")
         );
-
-        // Optimization: Fetch all results for the teacher in one go.
         const allResultsQuery = query(collection(db, 'results'), where('teacherUid', '==', 'teacher-mock-uid'));
         
         const [assessmentsSnapshot, allResultsSnapshot] = await Promise.all([
@@ -43,7 +40,6 @@ export default function TeacherDashboard() {
             getDocs(allResultsQuery)
         ]);
         
-        // Process all results into a map for efficient lookup.
         const submissionCounts = new Map<string, Set<string>>();
         allResultsSnapshot.forEach(resultDoc => {
             const result = resultDoc.data() as StudentResult;
@@ -55,12 +51,15 @@ export default function TeacherDashboard() {
 
         const assessmentsData = assessmentsSnapshot.docs.map(doc => {
             const assessmentData = { id: doc.id, ...doc.data() } as TeacherAssessment;
-            // Get submission count from the map instead of a new query.
             assessmentData.submissionCount = submissionCounts.get(assessmentData.id)?.size || 0;
             return assessmentData;
         });
+
+        // 2. 데이터를 가져온 후, 클라이언트 측에서 정렬하고 상위 5개만 선택합니다.
+        assessmentsData.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+        const recentAssessments = assessmentsData.slice(0, 5);
         
-        setAssessments(assessmentsData);
+        setAssessments(recentAssessments);
 
     } catch (error) {
         console.error("Error fetching assessments:", error);
