@@ -222,7 +222,7 @@ const createPrompt = (modelName: z.infer<typeof evaluationModels[number]>) => ({
 ### 🗣️ 유창성 (Fluency) - 📈 점수: [점수]/5점
 | 👍 잘한 점 (Strengths) | 💡 개선점 (Areas for Improvement) |
 | :--- | :--- |
-| [유창성 측면에서 잘한 점을 구체적인 예시를 들어 칭찬해 주세요. 목록 형식(-)으로 작성하세요.] | [유창성을 저해하는 요소(예: 잦은 멈춤, 필러 사용)를 지적하고, 개선을 위한 실질적인 조언 1~2가지를 목록 형식(-)으로 제안해 주세요.] |
+| [유창성 측면에서 잘한 점을 구체적인 예시를 들어 목록 형식(-)으로 칭찬해 주세요.] | [유창성을 저해하는 요소(예: 잦은 멈춤, 필러 사용)를 지적하고, 개선을 위한 실질적인 조언 1~2가지를 목록 형식(-)으로 제안해 주세요.] |
 
 ### 🎤 발음 및 억양 (Pronunciation & Intonation) - 📈 점수: [점수]/5점
 | 👍 잘한 점 (Strengths) | 💡 개선점 (Areas for Improvement) |
