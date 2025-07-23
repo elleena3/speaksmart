@@ -95,7 +95,7 @@ const rubricPrompt = ai.definePrompt({
 
 [평가 항목: 문법 (Grammar)]
 5점 (최상): 복잡한 문장 구조를 포함하여 다양한 문법을 거의 실수 없이 사용함.
-4점 (상): 일상적인 문법 구조를 대부분 정확하게 사용함.
+4점 (상): 일상적인 문장 구조를 대부분 정확하게 사용함.
 3점 (중): 기본적인 문장 구조는 사용하나, 반복적인 실수가 나타남.
 2점 (하): 기본적인 문장 구성에도 오류가 많음.
 1점 (최하): 문장을 거의 구성하지 못함.
@@ -150,8 +150,13 @@ const rubricPrompt = ai.definePrompt({
 ### 🤝 내용 이해 및 상호작용 (Comprehension & Interaction) - 📈 점수: [점수]/5점
 | 👍 잘한 점 (Strengths) | 💡 개선점 (Areas for Improvement) |
 | :--- | :--- |
-| {{#if (eq assessmentType "dialogue")}}[AI의 질문을 잘 이해하고 적절하게 답변한 부분을 목록 형식(-)으로 칭찬해 주세요.]{{else}}- 혼자 말하기 과제에서는 평가하지 않는 항목입니다.{{/if}} | {{#if (eq assessmentType "dialogue")}}[상호작용에서 아쉬웠던 점이나 개선할 점을 목록 형식(-)으로 지적해 주세요.]{{else}}- 혼자 말하기 과제에서는 평가하지 않는 항목입니다.{{/if}} |
+| {{#if assessmentType}}{{#if (isDialogue assessmentType)}}[AI의 질문을 잘 이해하고 적절하게 답변한 부분을 목록 형식(-)으로 칭찬해 주세요.]{{else}}- 혼자 말하기 과제에서는 평가하지 않는 항목입니다.{{/if}}{{/if}} | {{#if assessmentType}}{{#if (isDialogue assessmentType)}}[상호작용에서 아쉬웠던 점이나 개선할 점을 목록 형식(-)으로 지적해 주세요.]{{else}}- 혼자 말하기 과제에서는 평가하지 않는 항목입니다.{{/if}}{{/if}} |
 `,
+    config: {
+        helpers: {
+            isDialogue: (assessmentType: string) => assessmentType === 'dialogue',
+        },
+    }
 });
 
 const recalculateScoresFlow = ai.defineFlow(
@@ -197,3 +202,6 @@ const recalculateScoresFlow = ai.defineFlow(
     };
   }
 );
+
+
+    
