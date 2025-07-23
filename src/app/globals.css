@@ -95,9 +95,34 @@ body {
   .markdown-content blockquote { @apply border-l-4 border-muted-foreground/50 pl-4 italic text-muted-foreground my-4; }
   .markdown-content code { @apply bg-muted text-muted-foreground rounded-sm px-1 py-0.5 font-mono text-sm; }
   .markdown-content pre { @apply bg-muted p-4 rounded-md overflow-x-auto; }
-  .markdown-content table { @apply w-full my-4 border-collapse border border-border; }
-  .markdown-content th, .markdown-content td { @apply border border-border px-4 py-2 text-left; }
-  .markdown-content th { @apply font-semibold bg-muted; }
+  .markdown-content table { 
+    @apply w-full my-4 border-collapse border border-border; 
+    
+    /* Custom styles for two-column feedback table */
+    @apply md:grid md:grid-cols-2 md:gap-px md:border-none;
+  }
+  .markdown-content th { 
+    @apply font-semibold bg-muted;
+  }
+  .markdown-content th, .markdown-content td { 
+    @apply border border-border px-4 py-2 text-left;
+    @apply md:border-none md:p-0;
+  }
+  .markdown-content table thead, .markdown-content table tbody tr {
+    @apply md:contents;
+  }
+  .markdown-content table th, .markdown-content table td {
+     @apply md:p-4 md:border md:border-border;
+  }
+  .markdown-content table th {
+     @apply md:rounded-t-lg md:border-b-0;
+  }
+  .markdown-content table tr:last-child td:first-child {
+      @apply md:rounded-bl-lg;
+  }
+  .markdown-content table tr:last-child td:last-child {
+      @apply md:rounded-br-lg;
+  }
   .markdown-content strong { @apply font-bold; }
 }
 
