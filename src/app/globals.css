@@ -115,7 +115,7 @@ body {
 
   .markdown-content h3 + table thead,
   .markdown-content h3 + p + table thead {
-      @apply md:hidden; /* Hide table header on desktop for this specific table */
+      @apply hidden;
   }
 
   .markdown-content h3 + table tbody,
@@ -130,7 +130,7 @@ body {
 
   .markdown-content h3 + table td,
   .markdown-content h3 + p + table td {
-      @apply border rounded-lg p-4;
+      @apply border rounded-lg p-4 bg-background;
   }
 }
 
@@ -142,3 +142,5 @@ body {
     font-family: var(--font-pt-sans), sans-serif;
   }
 }
+
+    

@@ -183,7 +183,7 @@ const createPrompt = (modelName: z.infer<typeof evaluationModels[number]>) => ({
 4점 (상): 대부분의 발음이 정확하여 쉽게 이해할 수 있음.
 3점 (중): 일부 단어의 발음이 부정확하여 가끔 재확인이 필요함.
 2점 (하): 부정확한 발음이 많아 이해하기 위해 노력이 필요함.
-1_점 (최하): 발음을 거의 이해할 수 없음.
+1점 (최하): 발음을 거의 이해할 수 없음.
 
 [평가 항목: 문법 (Grammar)]
 5점 (최상): 복잡한 문장 구조를 포함하여 다양한 문법을 거의 실수 없이 사용함.
@@ -344,3 +344,5 @@ const generateDialogueAnalysisFlow = ai.defineFlow(
     };
   }
 );
+
+    
