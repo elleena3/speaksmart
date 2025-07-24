@@ -319,7 +319,7 @@ export function GrowthView({ results: initialResults, assessment, defaultTab }: 
             </TabsContent>
 
             {sortedResults.map((result, index) => (
-                <TabsContent key={result.id} value={`attempt-${index + 1}`}>
+                <TabsContent key={result.id} value={`attempt-${index + 1}`} className="mt-4">
                     <FeedbackView result={result} assessment={assessment} isLatestAttempt={index === sortedResults.length - 1} />
                 </TabsContent>
             ))}
