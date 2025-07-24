@@ -88,11 +88,11 @@
           "order": "ASCENDING"
         },
         {
-          "fieldPath": "studentId",
+          "fieldPath": "status",
           "order": "ASCENDING"
         },
         {
-          "fieldPath": "status",
+          "fieldPath": "studentId",
           "order": "ASCENDING"
         },
         {
@@ -128,3 +128,4 @@
   ],
   "fieldOverrides": []
 }
+
