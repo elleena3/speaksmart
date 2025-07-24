@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, MoreHorizontal, Copy, Users, Loader2, Trash2 } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Copy, Users, Loader2, Trash2, DraftingCompass } from 'lucide-react';
 import Link from 'next/link';
 import { type TeacherAssessment } from "@/lib/types";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -323,9 +323,17 @@ export default function AssessmentsPage() {
                         />
                       </TableCell>
                       <TableCell className="font-medium">
-                        <Link href={`/teacher/assessment/${assessment.id}`} className="hover:underline text-primary">
-                          {`${assessment.title}`}
-                        </Link>
+                        <div className="flex items-center gap-2">
+                           <Link href={`/teacher/assessment/${assessment.id}`} className="hover:underline text-primary">
+                             {`${assessment.title}`}
+                           </Link>
+                           {assessment.useRubric && (
+                             <Badge variant="destructive" className="flex items-center gap-1">
+                               <DraftingCompass className="h-3 w-3" />
+                               루브릭 평가
+                             </Badge>
+                           )}
+                        </div>
                         <p className="text-sm text-muted-foreground">{assessment.topic} ({getTargetAudienceText(assessment.targetStudentIds)})</p>
                       </TableCell>
                       <TableCell className="text-center">

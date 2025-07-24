@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { ArrowRight, Users, Loader2 } from "lucide-react"
+import { ArrowRight, Users, Loader2, DraftingCompass } from "lucide-react"
 import Link from "next/link"
 import { type TeacherAssessment, type StudentResult } from "@/lib/types"
 import { OverviewChart } from "./overview-chart"
@@ -152,9 +152,17 @@ export default function TeacherDashboard() {
               {assessments.length > 0 ? assessments.map((assessment) => (
                 <TableRow key={assessment.id}>
                   <TableCell className="font-medium">
-                    <Link href={`/teacher/assessment/${assessment.id}`} className="hover:underline text-primary">
-                      {`${assessment.title} (${getTargetAudienceText(assessment.targetStudentIds)})`}
-                    </Link>
+                    <div className="flex items-center gap-2">
+                        <Link href={`/teacher/assessment/${assessment.id}`} className="hover:underline text-primary">
+                          {`${assessment.title} (${getTargetAudienceText(assessment.targetStudentIds)})`}
+                        </Link>
+                         {assessment.useRubric && (
+                           <Badge variant="destructive" className="flex items-center gap-1">
+                             <DraftingCompass className="h-3 w-3" />
+                             루브릭 평가
+                           </Badge>
+                         )}
+                    </div>
                      <p className="text-sm text-muted-foreground">{assessment.topic}</p>
                   </TableCell>
                   <TableCell className="text-center">
