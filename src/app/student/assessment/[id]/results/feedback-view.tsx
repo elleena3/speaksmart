@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
-import { Send, ThumbsUp, ThumbsDown, MessageSquareQuote, Loader2, FileText, Target, Repeat, DraftingCompass, RefreshCcw } from "lucide-react"
+import { Send, ThumbsUp, ThumbsDown, MessageSquareQuote, Loader2, FileText, Target, Repeat, DraftingCompass } from "lucide-react"
 import { type StudentResult, type TeacherAssessment, type RubricScores } from "@/lib/types"
 import { Progress } from "@/components/ui/progress"
 import { db } from "@/lib/firebase"
@@ -15,12 +15,6 @@ import { doc, updateDoc } from "firebase/firestore"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Legend } from "recharts"
-
-const parseScoreFromFeedback = (text: string, category: string): number => {
-    const regex = new RegExp(`${category}[\\s\\S]*?점수[^\\d]*(\\d)`);
-    const match = text.match(regex);
-    return match ? parseInt(match[1], 10) : 0;
-};
 
 type FeedbackViewProps = {
   result: StudentResult
@@ -33,7 +27,6 @@ export function FeedbackView({ result, assessment, isLatestAttempt }: FeedbackVi
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [satisfaction, setSatisfaction] = useState<"good" | "bad" | null>(null);
   const [localResult, setLocalResult] = useState(result);
-  const [isRecalculating, setIsRecalculating] = useState(false);
   const { toast } = useToast()
 
   const {
@@ -63,53 +56,6 @@ export function FeedbackView({ result, assessment, isLatestAttempt }: FeedbackVi
       return { subject, score };
   }) : [];
 
-
-  const handleRecalculate = async () => {
-    setIsRecalculating(true);
-    toast({
-      title: '피드백에서 점수 다시 읽는 중...',
-      description: 'AI 종합 피드백 텍스트에서 점수를 추출하여 차트를 업데이트합니다.',
-    });
-    try {
-        const feedbackText = localResult.aiFeedback || "";
-        const newRubricScores: RubricScores = {
-            fluency: parseScoreFromFeedback(feedbackText, '유창성'),
-            pronunciation: parseScoreFromFeedback(feedbackText, '발음 및 억양'),
-            grammar: parseScoreFromFeedback(feedbackText, '문법'),
-            vocabulary: parseScoreFromFeedback(feedbackText, '어휘'),
-            interaction: 1, // Monologue doesn't have interaction
-        };
-      
-      const newContentScore = Math.round(((newRubricScores.fluency + newRubricScores.grammar + newRubricScores.vocabulary) / 3) * 20);
-      const newPronunciationScore = newRubricScores.pronunciation * 20;
-
-      const updatedResult: Partial<StudentResult> = {
-        rubricScores: newRubricScores,
-        contentScore: newContentScore,
-        pronunciationScore: newPronunciationScore,
-      };
-
-      const resultRef = doc(db, "results", resultId);
-      await updateDoc(resultRef, updatedResult);
-      
-      setLocalResult(prev => ({...prev, ...updatedResult}));
-
-      toast({
-        title: '차트 업데이트 완료!',
-        description: '피드백에서 추출한 점수로 차트를 새로고침했습니다.',
-      });
-
-    } catch (e: any) {
-      console.error("Failed to re-parse scores:", e);
-      toast({
-        title: '업데이트 실패',
-        description: '점수를 다시 읽어오는 중 오류가 발생했습니다.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsRecalculating(false);
-    }
-  }
 
   const handleSubmitFeedback = async () => {
     if (!teacherFeedback.trim()) {
@@ -208,12 +154,6 @@ export function FeedbackView({ result, assessment, isLatestAttempt }: FeedbackVi
                         <Progress value={pronunciationScore} className="h-2" />
                       </div>
                   )}
-                  {pronunciationFeedback && (
-                      <div className="p-4 bg-muted/50 rounded-lg whitespace-pre-wrap font-body text-base leading-relaxed">
-                        <h4 className="font-semibold mb-2">발음 피드백</h4>
-                        {pronunciationFeedback}
-                      </div>
-                  )}
               </CardContent>
             </Card>
         )}
@@ -226,10 +166,6 @@ export function FeedbackView({ result, assessment, isLatestAttempt }: FeedbackVi
                             <CardTitle className="flex items-center gap-2"><DraftingCompass />루브릭 영역별 분석</CardTitle>
                             <CardDescription>루브릭 항목별 점수입니다. (5점 만점)</CardDescription>
                         </div>
-                        <Button variant="outline" size="sm" onClick={handleRecalculate} disabled={isRecalculating}>
-                            {isRecalculating ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <RefreshCcw className="mr-2 h-4 w-4"/>}
-                            피드백에서 점수 다시 읽기
-                        </Button>
                     </div>
                 </CardHeader>
                 <CardContent className="h-80">
