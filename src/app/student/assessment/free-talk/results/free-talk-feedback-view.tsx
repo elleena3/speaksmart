@@ -8,15 +8,19 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
 import { Send, ThumbsUp, ThumbsDown, MessageSquareQuote, Loader2, FileText, Target, Repeat, Bot, User, DraftingCompass, RefreshCcw } from "lucide-react"
-import { type StudentResult, type TeacherAssessment } from "@/lib/types"
+import { type StudentResult, type TeacherAssessment, type RubricScores } from "@/lib/types"
 import { Progress } from "@/components/ui/progress"
 import { db } from "@/lib/firebase"
 import { doc, updateDoc } from "firebase/firestore"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Legend } from "recharts"
-import { recalculateScores } from "@/ai/flows/recalculate-scores-flow"
 
+const parseScoreFromFeedback = (text: string, category: string): number => {
+    const regex = new RegExp(`${category}[\\s\\S]*?점수[^\\d]*(\\d)`);
+    const match = text.match(regex);
+    return match ? parseInt(match[1], 10) : 0;
+};
 
 type FeedbackViewProps = {
   result: StudentResult
@@ -70,24 +74,26 @@ export function FreeTalkFeedbackView({ result, assessment, isLatestAttempt }: Fe
   const handleRecalculate = async () => {
     setIsRecalculating(true);
     toast({
-      title: '점수 재계산 중...',
-      description: 'AI가 평가를 다시 분석하고 있습니다. 잠시만 기다려주세요.',
+      title: '피드백에서 점수 다시 읽는 중...',
+      description: 'AI 종합 피드백 텍스트에서 점수를 추출하여 차트를 업데이트합니다.',
     });
     try {
-      const newScores = await recalculateScores({
-        studentTranscript: localResult.studentTranscript || "",
-        assessmentType: 'dialogue',
-        evaluationModel: assessment.evaluationModel,
-        assessmentTitle: assessment.title,
-      });
-
+      const feedbackText = localResult.aiFeedback || "";
+      const newRubricScores: RubricScores = {
+        fluency: parseScoreFromFeedback(feedbackText, '유창성'),
+        pronunciation: parseScoreFromFeedback(feedbackText, '발음 및 억양'),
+        grammar: parseScoreFromFeedback(feedbackText, '문법'),
+        vocabulary: parseScoreFromFeedback(feedbackText, '어휘'),
+        interaction: parseScoreFromFeedback(feedbackText, '내용 이해 및 상호작용'),
+      };
+      
+      const newContentScore = Math.round(((newRubricScores.fluency + newRubricScores.grammar + newRubricScores.vocabulary + (newRubricScores.interaction || 0)) / 4) * 20);
+      const newPronunciationScore = newRubricScores.pronunciation * 20;
+      
       const updatedResult: Partial<StudentResult> = {
-        aiFeedback: newScores.aiFeedback,
-        rubricScores: newScores.rubricScores,
-        contentScore: newScores.contentScore,
-        pronunciationScore: newScores.pronunciationScore,
-        teacherGuidance: newScores.teacherGuidance,
-        curricularRemarks: newScores.curricularRemarks,
+        rubricScores: newRubricScores,
+        contentScore: newContentScore,
+        pronunciationScore: newPronunciationScore,
       };
 
       const resultRef = doc(db, "results", resultId);
@@ -96,15 +102,15 @@ export function FreeTalkFeedbackView({ result, assessment, isLatestAttempt }: Fe
       setLocalResult(prev => ({...prev, ...updatedResult}));
 
       toast({
-        title: '재계산 완료!',
-        description: '루브릭 점수와 피드백이 업데이트되었습니다.',
+        title: '차트 업데이트 완료!',
+        description: '피드백에서 추출한 점수로 차트를 새로고침했습니다.',
       });
 
     } catch (e: any) {
-      console.error("Failed to recalculate scores:", e);
+      console.error("Failed to re-parse scores:", e);
       toast({
-        title: '재계산 실패',
-        description: '점수를 다시 계산하는 중 오류가 발생했습니다.',
+        title: '업데이트 실패',
+        description: '점수를 다시 읽어오는 중 오류가 발생했습니다.',
         variant: 'destructive',
       });
     } finally {
@@ -249,7 +255,7 @@ export function FreeTalkFeedbackView({ result, assessment, isLatestAttempt }: Fe
                         </div>
                          <Button variant="outline" size="sm" onClick={handleRecalculate} disabled={isRecalculating}>
                             {isRecalculating ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <RefreshCcw className="mr-2 h-4 w-4"/>}
-                            점수 다시 계산
+                            피드백에서 점수 다시 읽기
                         </Button>
                     </div>
                 </CardHeader>
