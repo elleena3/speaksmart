@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
-import { Send, ThumbsUp, ThumbsDown, MessageSquareQuote, Loader2, FileText, Target, Repeat, DraftingCompass } from "lucide-react"
+import { Send, ThumbsUp, ThumbsDown, MessageSquareQuote, Loader2, FileText, Target, Repeat, DraftingCompass, RefreshCcw } from "lucide-react"
 import { type StudentResult, type TeacherAssessment, type RubricScores } from "@/lib/types"
 import { Progress } from "@/components/ui/progress"
 import { db } from "@/lib/firebase"
@@ -15,6 +15,7 @@ import { doc, updateDoc } from "firebase/firestore"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Legend } from "recharts"
+import { regenerateHtmlFeedback } from "@/ai/flows/regenerate-html-feedback-flow"
 
 type FeedbackViewProps = {
   result: StudentResult
@@ -22,11 +23,34 @@ type FeedbackViewProps = {
   isLatestAttempt: boolean
 }
 
+const parseScoresFromFeedback = (text: string, isDialogue: boolean): { rubricScores: RubricScores, contentScore: number, pronunciationScore: number } => {
+    const parseScore = (category: string): number => {
+        const regex = new RegExp(`${category}[\\s\\S]*?점수[^\\d]*(\\d)`);
+        const match = text.match(regex);
+        return match ? parseInt(match[1], 10) : 0;
+    };
+    
+    const rubricScores: RubricScores = {
+        fluency: parseScore('유창성'),
+        pronunciation: parseScore('발음 및 억양'),
+        grammar: parseScore('문법'),
+        vocabulary: parseScore('어휘'),
+        interaction: isDialogue ? parseScore('내용 이해 및 상호작용') : 1,
+    };
+  
+    const contentScore = Math.round(((rubricScores.fluency + rubricScores.grammar + rubricScores.vocabulary + (rubricScores.interaction || 0)) / (isDialogue ? 4 : 3)) * 20);
+    const pronunciationScore = rubricScores.pronunciation * 20;
+
+    return { rubricScores, contentScore, pronunciationScore };
+};
+
+
 export function FeedbackView({ result, assessment, isLatestAttempt }: FeedbackViewProps) {
   const [teacherFeedback, setTeacherFeedback] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [satisfaction, setSatisfaction] = useState<"good" | "bad" | null>(null);
   const [localResult, setLocalResult] = useState(result);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const { toast } = useToast()
 
   const {
@@ -41,6 +65,7 @@ export function FeedbackView({ result, assessment, isLatestAttempt }: FeedbackVi
   } = localResult;
   
   const isRubricUsed = !!rubricScores;
+  const isHtmlFeedback = aiFeedback?.trim().startsWith('<!DOCTYPE html>');
   const rubricSubjects = ['유창성', '발음', '문법', '어휘'];
 
   const radarChartData = isRubricUsed ? rubricSubjects.map(subject => {
@@ -92,6 +117,41 @@ export function FeedbackView({ result, assessment, isLatestAttempt }: FeedbackVi
       setIsSubmitting(false);
     }
   }
+
+  const handleRefreshFeedback = async () => {
+      if (!studentTranscript) {
+          toast({ title: '오류', description: '학생 답변 텍스트가 없어 피드백을 새로고침할 수 없습니다.', variant: 'destructive' });
+          return;
+      }
+      setIsRefreshing(true);
+      toast({ title: '피드백 새로고침 중...', description: 'AI가 새로운 HTML 형식으로 피드백을 생성하고 있습니다.' });
+      try {
+          const { htmlFeedback } = await regenerateHtmlFeedback({
+              transcript: studentTranscript,
+              assessmentType: assessment.assessmentType,
+          });
+
+          const { rubricScores, contentScore, pronunciationScore } = parseScoresFromFeedback(htmlFeedback, assessment.assessmentType === 'dialogue');
+          
+          const updatedData: Partial<StudentResult> = {
+              aiFeedback: htmlFeedback,
+              rubricScores,
+              contentScore,
+              pronunciationScore,
+          };
+
+          const resultRef = doc(db, "results", resultId);
+          await updateDoc(resultRef, updatedData);
+          setLocalResult(prev => ({ ...prev, ...updatedData }));
+
+          toast({ title: '새로고침 완료', description: '피드백이 새로운 형식으로 업데이트되었습니다.' });
+      } catch (e) {
+          console.error("Error refreshing feedback:", e);
+          toast({ title: '오류', description: '피드백을 새로고침하는 중 오류가 발생했습니다.', variant: 'destructive' });
+      } finally {
+          setIsRefreshing(false);
+      }
+  };
 
   const retryLink = assessment.assessmentType === 'dialogue'
     ? `/student/assessment/free-talk?id=${assessment.id}`
@@ -190,20 +250,30 @@ export function FeedbackView({ result, assessment, isLatestAttempt }: FeedbackVi
 
         <Card>
             <CardHeader>
-              <div className="flex items-center gap-3">
-                <MessageSquareQuote className="w-8 h-8 text-primary shrink-0" />
-                <div>
-                  <CardTitle className="text-2xl">AI 종합 피드백</CardTitle>
-                  <CardDescription>AI가 생성한 성과 분석입니다.</CardDescription>
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <MessageSquareQuote className="w-8 h-8 text-primary shrink-0" />
+                  <div>
+                    <CardTitle className="text-2xl">AI 종합 피드백</CardTitle>
+                    <CardDescription>AI가 생성한 성과 분석입니다.</CardDescription>
+                  </div>
                 </div>
+                <Button variant="outline" size="sm" onClick={handleRefreshFeedback} disabled={isRefreshing}>
+                  {isRefreshing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <RefreshCcw className="mr-2 h-4 w-4"/>}
+                  피드백 새로고침
+                </Button>
               </div>
             </CardHeader>
             <CardContent>
-              <div className="p-4 bg-muted/50 rounded-lg font-body text-base leading-relaxed markdown-content">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                      {aiFeedback}
-                  </ReactMarkdown>
-              </div>
+               {isHtmlFeedback ? (
+                  <iframe srcDoc={aiFeedback} className="w-full h-[600px] border-0 rounded-md bg-muted/50"/>
+               ) : (
+                  <div className="p-4 bg-muted/50 rounded-lg font-body text-base leading-relaxed markdown-content">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {aiFeedback}
+                      </ReactMarkdown>
+                  </div>
+               )}
             </CardContent>
             <CardFooter className="flex-col items-start gap-4">
                 <p className="text-sm font-medium">이 피드백이 도움이 되었나요?</p>

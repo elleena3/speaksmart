@@ -37,4 +37,7 @@ import '@/ai/flows/retry-analysis-flow';
 // New flow for presentation analysis
 import '@/ai/flows/analyze-presentation-video-flow';
 
+// New flow for re-generating HTML feedback
+import '@/ai/flows/regenerate-html-feedback-flow';
+
     
