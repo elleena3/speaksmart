@@ -34,6 +34,7 @@ function AttemptDetailView({ result, assessment, attemptNumber }: { result: Stud
   } = result;
 
   const isRubricUsed = !!rubricScores;
+  const isHtmlFeedback = aiFeedback?.trim().startsWith('<!DOCTYPE html>');
   const rubricSubjects = assessment.assessmentType === 'dialogue'
     ? ['유창성', '발음', '문법', '어휘', '상호작용']
     : ['유창성', '발음', '문법', '어휘'];
@@ -143,11 +144,15 @@ function AttemptDetailView({ result, assessment, attemptNumber }: { result: Stud
           <CardTitle>학생에게 제공된 AI 종합 피드백</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="p-4 bg-muted/50 rounded-lg font-body text-base leading-relaxed markdown-content">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {aiFeedback}
-            </ReactMarkdown>
-          </div>
+          {isHtmlFeedback ? (
+            <iframe srcDoc={aiFeedback} className="w-full h-[600px] border-0 rounded-md bg-background" title="AI Feedback Report"/>
+          ) : (
+            <div className="p-4 bg-muted/50 rounded-lg font-body text-base leading-relaxed markdown-content">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {aiFeedback}
+              </ReactMarkdown>
+            </div>
+          )}
         </CardContent>
       </Card>
 
