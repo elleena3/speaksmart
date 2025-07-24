@@ -134,11 +134,9 @@ const regenerateHtmlFeedbackFlow = ai.defineFlow(
   },
   async (input) => {
     const { output } = await htmlGenerationPrompt(input, {
-        config: {
-            helpers: {
-                eq: (a: string, b: string) => a === b,
-            },
-        }
+        helpers: {
+            eq: (a: string, b: string) => a === b,
+        },
     });
     if (!output?.html) {
       throw new Error("The AI model did not return valid HTML feedback.");
