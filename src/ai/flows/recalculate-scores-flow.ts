@@ -48,6 +48,7 @@ export async function recalculateScores(input: RecalculateScoresInput): Promise<
 
 // Helper to parse scores from the rubric's text output.
 const parseScore = (text: string, category: string): number => {
+    // A more flexible regex that doesn't rely on emojis or exact spacing
     const regex = new RegExp(`${category}[\\s\\S]*?점수[^\\d]*(\\d)`);
     const match = text.match(regex);
     return match ? parseInt(match[1], 10) : 0;
@@ -79,6 +80,8 @@ const rubricPrompt = ai.definePrompt({
 {{{studentTranscript}}}
 
 ### 평가 기준 루브릭 (Evaluation Rubric)
+아래의 평가 기준을 반드시 준수하여 각 항목을 평가하시오. 각 항목은 고유한 평가 기준을 가지며, 점수별 설명에 따라 정확하게 평가해야 합니다.
+
 [평가 항목: 유창성 (Fluency)]
 5점 (최상): 원어민과 가까운 속도와 리듬으로 매우 자연스럽게 말함.
 4점 (상): 큰 막힘 없이 안정적인 속도로 말함.
@@ -152,11 +155,6 @@ const rubricPrompt = ai.definePrompt({
 | :--- | :--- |
 | {{#if (isDialogue assessmentType)}}[AI의 질문을 잘 이해하고 적절하게 답변한 부분을 목록 형식(-)으로 칭찬해 주세요.]{{else}}- 혼자 말하기 과제에서는 평가하지 않는 항목입니다.{{/if}} | {{#if (isDialogue assessmentType)}}[상호작용에서 아쉬웠던 점이나 개선할 점을 목록 형식(-)으로 지적해 주세요.]{{else}}- 혼자 말하기 과제에서는 평가하지 않는 항목입니다.{{/if}} |
 `,
-    config: {
-        helpers: {
-            isDialogue: (assessmentType: string) => assessmentType === 'dialogue',
-        },
-    }
 });
 
 const recalculateScoresFlow = ai.defineFlow(
@@ -167,7 +165,14 @@ const recalculateScoresFlow = ai.defineFlow(
   },
   async (input) => {
     const model = input.evaluationModel || 'gemini-2.5-flash';
-    const llmResponse = await rubricPrompt(input, {model: googleAI.model(model)});
+    const llmResponse = await rubricPrompt(input, {
+        model: googleAI.model(model),
+        config: {
+            helpers: {
+                isDialogue: (assessmentType: string) => assessmentType === 'dialogue',
+            },
+        }
+    });
     const rubricText = llmResponse.text;
     
     const rubricScores: RubricScores = {
