@@ -38,14 +38,14 @@ type AppLayoutProps = {
 export function AppLayout({ children, navItems, titleKey }: AppLayoutProps) {
   const pathname = usePathname()
   const router = useRouter()
-  const { user } = useAuth()
+  const { user, logout } = useAuth()
   const { t } = useLanguage()
   const { toast } = useToast()
 
   const handleLogout = async () => {
-    // Since login is disabled, this just navigates to the home page.
+    await logout();
     router.push('/');
-    toast({ title: "홈으로 이동", description: "시작 페이지로 돌아갑니다." });
+    toast({ title: "로그아웃", description: "성공적으로 로그아웃되었습니다." });
   }
 
   return (

@@ -33,6 +33,19 @@ export const voiceDescriptions: Record<AiVoice, string> = {
 export const evaluationModels = ["gemini-2.5-flash", "gemini-2.5-flash-lite-preview-06-17", "gemini-2.0-flash"] as const;
 export type EvaluationModel = (typeof evaluationModels)[number];
 
+// New UserData type for Firestore
+export type UserData = {
+    uid: string;
+    email: string;
+    displayName: string;
+    photoURL: string;
+    role: 'student' | 'teacher';
+    grade?: string;
+    class?: string;
+    number?: string;
+    createdAt: number;
+};
+
 
 export type Assessment = {
   id: string;

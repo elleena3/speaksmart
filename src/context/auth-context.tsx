@@ -1,16 +1,17 @@
 
+
 // src/context/auth-context.tsx
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo } from 'react';
-import { getAuth, onAuthStateChanged, type User } from 'firebase/auth';
-import { app } from '@/lib/firebase'; // Ensure app is initialized
+import { getAuth, onAuthStateChanged, signOut, type User } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
+import { app, db } from '@/lib/firebase';
 import { Loader2 } from 'lucide-react';
+import { type UserData } from '@/lib/types';
 
-// Get the Auth instance
 const auth = getAuth(app);
 
-// 로컬 테스트용 목업(가짜) 사용자 객체입니다.
 const mockTeacher: User = {
     uid: 'teacher-mock-uid',
     displayName: '김선생',
@@ -117,38 +118,58 @@ const mockStudent3: User = {
     toJSON: () => ({}),
 };
 
-// Export mock students for use in other components like the assessment form
 export const mockStudents = [mockStudent1, mockStudent2, mockStudent3];
 
 
 interface AuthContextType {
   user: User | null;
+  userData: UserData | null;
   loading: boolean;
   loginAs: (role: 'teacher' | 'student1' | 'student2' | 'student3') => void;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // This listener will be used if real Firebase Auth is implemented
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      // For now, we ignore the real auth state and rely on mock login
-      // setUser(user); 
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        setUser(user);
+        // Fetch user data from Firestore
+        const userDocRef = doc(db, 'users', user.uid);
+        const userDoc = await getDoc(userDocRef);
+        if (userDoc.exists()) {
+          setUserData(userDoc.data() as UserData);
+        }
+      } else {
+        setUser(null);
+        setUserData(null);
+      }
       setLoading(false);
     });
 
-    // Clean up subscription on unmount
     return () => unsubscribe();
   }, []);
+
+  const logout = async () => {
+    setLoading(true);
+    await signOut(auth);
+    setUser(null);
+    setUserData(null);
+    setLoading(false);
+  };
 
 
   const value = useMemo(() => ({
     user,
+    userData,
     loading,
+    logout,
     loginAs: (role: 'teacher' | 'student1' | 'student2' | 'student3') => {
         setLoading(true);
         if (role === 'teacher') {
@@ -160,21 +181,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } else if (role === 'student3') {
             setUser(mockStudent3);
         }
+        setUserData(null); // Mock users don't have firestore data
         setLoading(false);
     }
-  }), [user, loading]);
-
-  if (loading) {
-     return (
-      <div className="flex h-screen w-screen items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    );
-  }
+  }), [user, userData, loading]);
 
   return (
     <AuthContext.Provider value={value}>
-      {children}
+      {loading ? (
+        <div className="flex h-screen w-screen items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+      ) : children}
     </AuthContext.Provider>
   );
 };

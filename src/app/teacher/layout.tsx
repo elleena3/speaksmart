@@ -1,7 +1,7 @@
 
 import type { Metadata } from 'next';
 import { AppLayout } from '@/components/app-layout';
-import { LayoutDashboard, BookOpenCheck, Settings, FlaskConical } from 'lucide-react';
+import { LayoutDashboard, BookOpenCheck, Users, Settings, FlaskConical } from 'lucide-react';
 
 export const metadata: Metadata = {
   title: '교사 대시보드 | SpeakSmart 평가도구',
@@ -11,6 +11,7 @@ export const metadata: Metadata = {
 const navItems = [
   { href: '/teacher/dashboard', labelKey: 'dashboard' as const, icon: <LayoutDashboard /> },
   { href: '/teacher/assessments', labelKey: 'assessments' as const, icon: <BookOpenCheck /> },
+  { href: '/teacher/students', labelKey: 'students' as const, icon: <Users /> },
   { href: '/teacher/settings', labelKey: 'settings' as const, icon: <Settings /> },
   { href: '/teacher/misc', labelKey: 'misc' as const, icon: <FlaskConical /> },
 ];

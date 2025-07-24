@@ -1,21 +1,32 @@
 
+
 export const translations = {
   ko: {
     language: {
         title: "언어"
     },
     mainPage: {
-        accessTitle: "접근 확인",
-        accessDescription: "이 페이지는 현재 테스트 중입니다. 사용하고 싶다면 비밀번호를 입력해주세요.",
-        passwordPlaceholder: "비밀번호",
-        confirmButton: "확인",
-        incorrectPasswordError: "비밀번호가 올바르지 않습니다."
+        accessTitle: "SpeakSmart 평가도구",
+        accessDescription: "AI 기반 영어 말하기 평가 플랫폼에 오신 것을 환영합니다.",
+        loginButton: "로그인",
+        signupButton: "학생 회원가입",
+        mockLoginTitle: "빠른 테스트 (목업 계정)",
+        studentLoginTitle: "학생으로 시작하기",
+        studentLoginDescription: "목업 학생 계정을 선택하여 시작하세요.",
+        student1Login: "학생 1",
+        student2Login: "학생 2",
+        student3Login: "학생 3",
+        teacherLoginTitle: "교사로 시작하기",
+        teacherLoginDescription: "교사 대시보드 및 평가 관리 도구에 접근합니다.",
+        teacherLoginButton: "교사로 시작하기",
+        footer: `© ${new Date().getFullYear()} SpeakSmart 평가도구. 요망진 AI 모든 권리 보유.`
     },
     nav: {
       dashboard: "대시보드",
       myResults: "내 결과",
       profile: "프로필",
       assessments: "평가 관리",
+      students: "학생 관리",
       settings: "설정",
       misc: "기타",
       logout: "로그아웃",
@@ -118,8 +129,8 @@ export const translations = {
         description: "평가가 성공적으로 삭제되었습니다."
       },
       copyToast: {
-          title: "평가 복사됨",
-          description: "'{title}' 평가의 복사본이 생성되었습니다.",
+        title: "평가 복사됨",
+        description: "'{title}' 평가의 복사본이 생성되었습니다.",
       },
       noAssessments: {
           title: "아직 생성된 평가가 없습니다.",
@@ -301,17 +312,27 @@ export const translations = {
         title: "Language"
     },
     mainPage: {
-        accessTitle: "Access Confirmation",
-        accessDescription: "This page is currently under testing. Please enter the password to proceed.",
-        passwordPlaceholder: "Password",
-        confirmButton: "Confirm",
-        incorrectPasswordError: "Incorrect password."
+        accessTitle: "SpeakSmart Assessment Tool",
+        accessDescription: "Welcome to the AI-Powered English Speaking Assessment Platform.",
+        loginButton: "Login",
+        signupButton: "Student Sign Up",
+        mockLoginTitle: "Quick Test (Mock Accounts)",
+        studentLoginTitle: "Start as a Student",
+        studentLoginDescription: "Select a mock student account to begin.",
+        student1Login: "Student 1",
+        student2Login: "Student 2",
+        student3Login: "Student 3",
+        teacherLoginTitle: "Start as a Teacher",
+        teacherLoginDescription: "Access the teacher dashboard and assessment management tools.",
+        teacherLoginButton: "Start as a Teacher",
+        footer: `© ${new Date().getFullYear()} SpeakSmart Assessment Tool. Yomangjin AI All rights reserved.`
     },
     nav: {
       dashboard: "Dashboard",
       myResults: "My Results",
       profile: "Profile",
       assessments: "Assessments",
+      students: "Students",
       settings: "Settings",
       misc: "Misc",
       logout: "Logout",
