@@ -22,11 +22,12 @@ import { useLanguage } from "@/context/language-context";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { scenarios, type TeacherAssessment, femaleVoices, maleVoices, allVoices, evaluationModels, voiceDescriptions, type AiVoice } from "@/lib/types";
 import { useAuth, mockStudents } from "@/context/auth-context";
-import { addDoc, collection } from "firebase/firestore";
+import { addDoc, collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 export default function NewAssessmentPage() {
   const router = useRouter();
@@ -35,6 +36,8 @@ export default function NewAssessmentPage() {
   const { t, language } = useLanguage();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [voicePopoverOpen, setVoicePopoverOpen] = useState(false);
+  const [isDuplicateTitle, setIsDuplicateTitle] = useState(false);
+  const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
   
   const formSchema = useMemo(() => z.object({
     title: z.string().optional(),
@@ -113,12 +116,8 @@ export default function NewAssessmentPage() {
     form.trigger();
   }, [language, form]);
 
-  async function onSubmit(values: z.infer<typeof formSchema>) {
-    if (!user) {
-        toast({ title: "인증 오류", description: "로그인이 필요합니다.", variant: "destructive" });
-        return;
-    }
-
+  const proceedToSubmit = async (values: z.infer<typeof formSchema>) => {
+    if (!user) return;
     setIsSubmitting(true);
     
     try {
@@ -173,6 +172,32 @@ export default function NewAssessmentPage() {
         toast({ title: "생성 오류", description: "평가를 생성하는 중 문제가 발생했습니다.", variant: "destructive" });
     } finally {
         setIsSubmitting(false);
+        setShowDuplicateWarning(false);
+    }
+  }
+
+
+  async function onSubmit(values: z.infer<typeof formSchema>) {
+    if (!user) {
+        toast({ title: "인증 오류", description: "로그인이 필요합니다.", variant: "destructive" });
+        return;
+    }
+    
+    const titleToCheck = values.title || (isFreeTalkDialogue ? t.teacherAssessmentForm.scenarios.freeTalk : "");
+    if (!titleToCheck) {
+        proceedToSubmit(values);
+        return;
+    }
+    
+    const assessmentsQuery = query(collection(db, "assessments"), where("uid", "==", user.uid), where("title", "==", titleToCheck));
+    const querySnapshot = await getDocs(assessmentsQuery);
+
+    if (!querySnapshot.empty) {
+        setIsDuplicateTitle(true);
+        setShowDuplicateWarning(true);
+    } else {
+        setIsDuplicateTitle(false);
+        proceedToSubmit(values);
     }
   }
 
@@ -290,6 +315,7 @@ export default function NewAssessmentPage() {
                                 {femaleVoices.map((voice) => (
                                     <Button
                                         key={voice}
+                                        type="button"
                                         variant="ghost"
                                         className="w-full justify-start text-left h-auto"
                                         onClick={() => {
@@ -313,6 +339,7 @@ export default function NewAssessmentPage() {
                                 {maleVoices.map((voice) => (
                                     <Button
                                         key={voice}
+                                        type="button"
                                         variant="ghost"
                                         className="w-full justify-start text-left h-auto"
                                         onClick={() => {
@@ -664,6 +691,23 @@ export default function NewAssessmentPage() {
             </div>
             
             <div className="flex justify-end gap-2">
+                <AlertDialog open={showDuplicateWarning} onOpenChange={setShowDuplicateWarning}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                        <AlertDialogTitle>중복된 평가 제목</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            이미 같은 이름의 평가가 존재합니다. 그래도 계속해서 생성하시겠습니까?
+                        </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                        <AlertDialogCancel>취소</AlertDialogCancel>
+                        <AlertDialogAction onClick={form.handleSubmit(proceedToSubmit)}>
+                            계속
+                        </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+
                <Button type="button" variant="outline" onClick={() => router.back()}>{t.teacherAssessmentForm.cancelButton}</Button>
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

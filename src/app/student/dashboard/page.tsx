@@ -1,4 +1,5 @@
 
+
 "use client"
 
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -6,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import Link from "next/link"
 import { type TeacherAssessment, type StudentResult } from "@/lib/types"
-import { CheckCircle2, MessageCircle, Mic, Loader2, AlertCircle, TrendingUp } from "lucide-react"
+import { CheckCircle2, MessageCircle, Mic, Loader2, AlertCircle, TrendingUp, DraftingCompass } from "lucide-react"
 import { useLanguage } from "@/context/language-context"
 import { useAuth } from "@/context/auth-context"
 import { useToast } from "@/hooks/use-toast"
@@ -97,12 +98,22 @@ function AssessmentCard({ assessment, t }: { assessment: CombinedAssessment, t: 
       )}>
       <CardHeader>
         <div className="flex justify-between items-start">
-          <CardTitle className="text-xl break-keep">{assessment.title}</CardTitle>
-          <Badge variant={displayBadgeVariant} className="whitespace-nowrap">
-            {displayStatus}
-          </Badge>
+            <div className="flex-grow">
+                <CardTitle className="text-xl break-keep mb-1">{assessment.title}</CardTitle>
+                <div className="flex items-center gap-2">
+                    {assessment.useRubric && (
+                      <Badge variant="destructive" className="flex items-center gap-1">
+                        <DraftingCompass className="h-3 w-3" />
+                        루브릭 평가
+                      </Badge>
+                    )}
+                </div>
+            </div>
+            <Badge variant={displayBadgeVariant} className="whitespace-nowrap ml-2">
+                {displayStatus}
+            </Badge>
         </div>
-        <CardDescription>{assessment.topic}</CardDescription>
+        <CardDescription className="pt-2">{assessment.topic}</CardDescription>
       </CardHeader>
       <CardContent className="flex-grow" />
       <CardFooter>

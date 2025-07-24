@@ -82,7 +82,7 @@ export default function AssessmentsPage() {
   }, [user, authLoading, router, fetchAssessments]);
 
 
-  const handleCopy = async (assessmentId: string) => {
+  const performCopy = async (assessmentId: string) => {
     const assessmentToCopy = assessments.find(a => a.id === assessmentId);
     if (!assessmentToCopy) return;
 
@@ -91,8 +91,8 @@ export default function AssessmentsPage() {
       
       await addDoc(collection(db, "assessments"), {
         ...copyData,
-        title: `${copyData.title}`,
-        topic: `${copyData.topic} (복사본)`,
+        // The title is now copied exactly as it is.
+        title: `${copyData.title}`, 
         createdAt: Date.now(),
         dateCreated: new Date().toISOString().split('T')[0],
         submissionCount: 0,
@@ -108,7 +108,18 @@ export default function AssessmentsPage() {
       console.error("Error copying assessment:", error);
       toast({ title: "복사 실패", description: "평가를 복사하는 중 오류가 발생했습니다.", variant: "destructive"});
     }
-  }
+  };
+
+  const handleCopy = (assessmentId: string) => {
+    const assessmentToCopy = assessments.find(a => a.id === assessmentId);
+    if (!assessmentToCopy) return;
+
+    const isTitleDuplicate = assessments.some(a => a.title === assessmentToCopy.title && a.id !== assessmentId);
+    
+    // Always trigger the confirmation dialog for copying
+    document.getElementById(`copy-dialog-trigger-${assessmentId}`)?.click();
+  };
+
 
   const deleteAssessmentAndResults = async (assessmentIds: string[]) => {
     const batch = writeBatch(db);
@@ -337,46 +348,72 @@ export default function AssessmentsPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-center">
-                        <AlertDialog>
-                         <DropdownMenu>
-                           <DropdownMenuTrigger asChild>
-                             <Button variant="ghost" className="h-8 w-8 p-0">
-                               <span className="sr-only">{t.teacherAssessments.menuOpen}</span>
-                               <MoreHorizontal className="h-4 w-4" />
-                             </Button>
-                           </DropdownMenuTrigger>
-                           <DropdownMenuContent align="end">
-                             <DropdownMenuItem asChild>
-                               <Link href={`/teacher/assessment/${assessment.id}`}>{t.teacherAssessments.menuViewResults}</Link>
-                             </DropdownMenuItem>
-                              <DropdownMenuItem asChild>
-                                <Link href={`/teacher/assessments/${assessment.id}/edit`}>{t.teacherAssessments.menuEdit}</Link>
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleCopy(assessment.id)}>
-                               <Copy className="mr-2 h-4 w-4" />
-                               {t.teacherAssessments.menuCopy}
-                             </DropdownMenuItem>
-                             <DropdownMenuSeparator />
-                              <AlertDialogTrigger asChild>
-                               <DropdownMenuItem className="text-destructive focus:bg-destructive/10 focus:text-destructive" onSelect={(e) => e.preventDefault()}>
-                                   {t.teacherAssessments.menuDelete}
-                               </DropdownMenuItem>
-                             </AlertDialogTrigger>
-                           </DropdownMenuContent>
-                         </DropdownMenu>
-                         <AlertDialogContent>
-                             <AlertDialogHeader>
-                                 <AlertDialogTitle>{t.teacherAssessments.deleteDialogTitle}</AlertDialogTitle>
-                                 <AlertDialogDescription>
-                                     {t.teacherAssessments.deleteDialogDescription}
-                                 </AlertDialogDescription>
-                             </AlertDialogHeader>
-                             <AlertDialogFooter>
-                                 <AlertDialogCancel>{t.teacherAssessments.deleteDialogCancel}</AlertDialogCancel>
-                                 <AlertDialogAction onClick={() => handleDelete(assessment.id)} className="bg-destructive hover:bg-destructive/90">{t.teacherAssessments.deleteDialogConfirm}</AlertDialogAction>
-                             </AlertDialogFooter>
-                         </AlertDialogContent>
-                       </AlertDialog>
+                         <AlertDialog>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" className="h-8 w-8 p-0">
+                                  <span className="sr-only">{t.teacherAssessments.menuOpen}</span>
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem asChild>
+                                  <Link href={`/teacher/assessment/${assessment.id}`}>{t.teacherAssessments.menuViewResults}</Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem asChild>
+                                  <Link href={`/teacher/assessments/${assessment.id}/edit`}>{t.teacherAssessments.menuEdit}</Link>
+                                </DropdownMenuItem>
+                                
+                                <AlertDialogTrigger asChild>
+                                  <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                                    <Copy className="mr-2 h-4 w-4" />
+                                    {t.teacherAssessments.menuCopy}
+                                  </DropdownMenuItem>
+                                </AlertDialogTrigger>
+                                
+                                <DropdownMenuSeparator />
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <DropdownMenuItem className="text-destructive focus:bg-destructive/10 focus:text-destructive" onSelect={(e) => e.preventDefault()}>
+                                      {t.teacherAssessments.menuDelete}
+                                    </DropdownMenuItem>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>{t.teacherAssessments.deleteDialogTitle}</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        {t.teacherAssessments.deleteDialogDescription}
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>{t.teacherAssessments.deleteDialogCancel}</AlertDialogCancel>
+                                      <AlertDialogAction onClick={() => handleDelete(assessment.id)} className="bg-destructive hover:bg-destructive/90">{t.teacherAssessments.deleteDialogConfirm}</AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+
+                            {/* This Dialog is specifically for the copy action */}
+                            <AlertDialogContent>
+                                <AlertDialogHeader>
+                                    <AlertDialogTitle>평가를 복사하시겠습니까?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                        '{assessment.title}' 평가의 모든 설정을 그대로 복사하여 새 평가를 만듭니다.
+                                        {assessments.some(a => a.title === assessment.title) && (
+                                            <span className="mt-2 block font-semibold text-orange-600">
+                                                경고: 같은 이름의 평가가 이미 존재합니다. 그래도 복사하시겠습니까?
+                                            </span>
+                                        )}
+                                    </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel>취소</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => performCopy(assessment.id)}>복사</AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
                       </TableCell>
                     </TableRow>
                   ))}
