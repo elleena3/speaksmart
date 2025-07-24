@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
-import { Send, ThumbsUp, ThumbsDown, MessageSquareQuote, Loader2, FileText, Target, Repeat, Bot, User, DraftingCompass, RefreshCcw } from "lucide-react"
+import { Send, ThumbsUp, ThumbsDown, MessageSquareQuote, Loader2, FileText, Target, Repeat, Bot, User, DraftingCompass } from "lucide-react"
 import { type StudentResult, type TeacherAssessment, type RubricScores } from "@/lib/types"
 import { Progress } from "@/components/ui/progress"
 import { db } from "@/lib/firebase"
@@ -230,7 +230,7 @@ export function FreeTalkFeedbackView({ result, assessment, isLatestAttempt }: Fe
             </CardHeader>
             <CardContent>
               {isHtmlFeedback ? (
-                  <iframe srcDoc={aiFeedback} className="w-full h-[600px] border-0 rounded-md bg-muted/50"/>
+                  <iframe srcDoc={aiFeedback} className="w-full h-[600px] border-0 rounded-md bg-background" title="AI Feedback Report"/>
                ) : (
                   <div className="p-4 bg-muted/50 rounded-lg font-body text-base leading-relaxed markdown-content">
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>
