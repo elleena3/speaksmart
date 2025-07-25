@@ -56,14 +56,18 @@ export default function HistoryPage() {
     }
 
     try {
+        // 1. Fetch all results for the student, ordered by date.
         const resultsQuery = query(
             collection(db, "results"),
             where("studentId", "==", user.uid),
-            where("status", "==", "채점 완료"),
             orderBy("createdAt", "desc")
         );
         const resultsSnapshot = await getDocs(resultsQuery);
-        const studentResults = resultsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as StudentResult));
+        
+        // 2. Filter for "채점 완료" status on the client-side.
+        const studentResults = resultsSnapshot.docs
+            .map(doc => ({ id: doc.id, ...doc.data() } as StudentResult))
+            .filter(result => result.status === "채점 완료");
 
         const resultsByAssessmentId: { [key: string]: StudentResult[] } = {};
         for (const result of studentResults) {
@@ -88,6 +92,7 @@ export default function HistoryPage() {
         
         const grouped: GroupedResult[] = Object.entries(resultsByAssessmentId).map(([assessmentId, attempts]) => {
             const assessmentDetails = assessmentsMap.get(assessmentId);
+            // Since we already sorted by date descending, the first one is the latest.
             const latestAttempt = attempts[0]; 
             const previousAttempts = attempts.slice(1);
             
@@ -96,6 +101,7 @@ export default function HistoryPage() {
                 assessmentTitle: assessmentDetails?.title || latestAttempt.assessmentTitle || "제목 없음",
                 assessmentType: assessmentDetails?.assessmentType || 'monologue',
                 latestAttempt: latestAttempt,
+                // Reverse previous attempts to show them in chronological order (1st, 2nd...)
                 previousAttempts: previousAttempts.reverse(),
                 totalAttempts: attempts.length,
             };
@@ -107,7 +113,7 @@ export default function HistoryPage() {
         console.error("Error fetching history: ", error);
         toast({
             title: "기록 조회 오류",
-            description: "평가 기록을 불러오는 중 오류가 발생했습니다. 필요한 데이터베이스 색인이 설정되지 않았을 수 있습니다.",
+            description: "평가 기록을 불러오는 중 오류가 발생했습니다.",
             variant: "destructive",
         });
     } finally {
