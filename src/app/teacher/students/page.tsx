@@ -6,7 +6,7 @@ import { collection, getDocs, query, where, doc, updateDoc, deleteDoc, writeBatc
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/context/auth-context';
 import { type UserData } from '@/lib/types';
-import { Loader2, ChevronsUpDown, Check, Edit, Mail, KeyRound, Search, Trash2 } from 'lucide-react';
+import { Loader2, ChevronsUpDown, Check, Edit, KeyRound, Search, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -21,6 +21,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
 const editFormSchema = z.object({
   grade: z.string().min(1, '학년을 입력해주세요.'),
@@ -171,60 +172,86 @@ function StudentManagementPage() {
               />
             </div>
           </div>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>이름</TableHead>
-                <TableHead className="text-center">학년</TableHead>
-                <TableHead className="text-center">반</TableHead>
-                <TableHead className="text-center">번호</TableHead>
-                <TableHead>이메일</TableHead>
-                <TableHead className="text-right">작업</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredStudents.map(student => (
-                <TableRow key={student.uid}>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-9 w-9">
-                        <AvatarImage src={student.photoURL} alt={student.displayName} />
-                        <AvatarFallback>{student.displayName.charAt(0)}</AvatarFallback>
-                      </Avatar>
-                      <span className="font-medium">{student.displayName}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-center">{student.grade || '-'}</TableCell>
-                  <TableCell className="text-center">{student.class || '-'}</TableCell>
-                  <TableCell className="text-center">{student.number || '-'}</TableCell>
-                  <TableCell className="text-muted-foreground">{student.email}</TableCell>
-                  <TableCell className="text-right space-x-2">
-                    <Button variant="outline" size="sm" onClick={() => handleEditStudent(student)}><Edit className="mr-2 h-4 w-4"/>정보 수정</Button>
-                    <Button variant="outline" size="sm" onClick={() => handlePasswordReset(student)}><KeyRound className="mr-2 h-4 w-4"/>비밀번호 초기화</Button>
-                    <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                            <Button variant="destructive" size="sm"><Trash2 className="mr-2 h-4 w-4"/>삭제</Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                            <AlertDialogHeader>
-                                <AlertDialogTitle>{student.displayName} 학생을 삭제하시겠습니까?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                    이 작업은 되돌릴 수 없습니다. 학생의 계정 정보와 함께 모든 평가 결과 기록이 영구적으로 삭제됩니다.
-                                </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                                <AlertDialogCancel>취소</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDeleteStudent(student)} className="bg-destructive hover:bg-destructive/90">
-                                    삭제
-                                </AlertDialogAction>
-                            </AlertDialogFooter>
-                        </AlertDialogContent>
-                    </AlertDialog>
-                  </TableCell>
+          <TooltipProvider>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>이름</TableHead>
+                  <TableHead className="text-center">학년</TableHead>
+                  <TableHead className="text-center">반</TableHead>
+                  <TableHead className="text-center">번호</TableHead>
+                  <TableHead>이메일</TableHead>
+                  <TableHead className="text-right">작업</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {filteredStudents.map(student => (
+                  <TableRow key={student.uid}>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-9 w-9">
+                          <AvatarImage src={student.photoURL} alt={student.displayName} />
+                          <AvatarFallback>{student.displayName.charAt(0)}</AvatarFallback>
+                        </Avatar>
+                        <span className="font-medium">{student.displayName}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-center">{student.grade || '-'}</TableCell>
+                    <TableCell className="text-center">{student.class || '-'}</TableCell>
+                    <TableCell className="text-center">{student.number || '-'}</TableCell>
+                    <TableCell className="text-muted-foreground">{student.email}</TableCell>
+                    <TableCell className="text-right space-x-2">
+                       <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" onClick={() => handleEditStudent(student)}>
+                                    <Edit className="h-4 w-4"/>
+                                    <span className="sr-only">정보 수정</span>
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>정보 수정</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" onClick={() => handlePasswordReset(student)}>
+                                    <KeyRound className="h-4 w-4"/>
+                                    <span className="sr-only">비밀번호 초기화</span>
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>비밀번호 초기화</TooltipContent>
+                        </Tooltip>
+                        <AlertDialog>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <AlertDialogTrigger asChild>
+                                        <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
+                                            <Trash2 className="h-4 w-4"/>
+                                            <span className="sr-only">삭제</span>
+                                        </Button>
+                                    </AlertDialogTrigger>
+                                </TooltipTrigger>
+                                <TooltipContent>삭제</TooltipContent>
+                            </Tooltip>
+                            <AlertDialogContent>
+                                <AlertDialogHeader>
+                                    <AlertDialogTitle>{student.displayName} 학생을 삭제하시겠습니까?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                        이 작업은 되돌릴 수 없습니다. 학생의 계정 정보와 함께 모든 평가 결과 기록이 영구적으로 삭제됩니다.
+                                    </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel>취소</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => handleDeleteStudent(student)} className="bg-destructive hover:bg-destructive/90">
+                                        삭제
+                                    </AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TooltipProvider>
           {filteredStudents.length === 0 && (
             <div className="text-center py-12 text-muted-foreground">
               해당 조건의 학생이 없습니다.
