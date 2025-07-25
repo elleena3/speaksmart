@@ -56,7 +56,6 @@ export default function HistoryPage() {
     }
 
     try {
-        // 1. Fetch all completed results for the current student, ordered by creation date.
         const resultsQuery = query(
             collection(db, "results"),
             where("studentId", "==", user.uid),
@@ -66,7 +65,6 @@ export default function HistoryPage() {
         const resultsSnapshot = await getDocs(resultsQuery);
         const studentResults = resultsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as StudentResult));
 
-        // 2. Group results by assessmentId client-side.
         const resultsByAssessmentId: { [key: string]: StudentResult[] } = {};
         for (const result of studentResults) {
             if (!resultsByAssessmentId[result.assessmentId]) {
@@ -75,11 +73,9 @@ export default function HistoryPage() {
             resultsByAssessmentId[result.assessmentId].push(result);
         }
 
-        // 3. Fetch assessment details only for the assessments the student has completed.
         const assessmentIds = Object.keys(resultsByAssessmentId);
         const assessmentsMap = new Map<string, TeacherAssessment>();
         if (assessmentIds.length > 0) {
-            // Firestore 'in' query can take up to 30 elements. Chunk if necessary for larger scales.
             const assessmentDocs = await Promise.all(
               assessmentIds.map(id => getDoc(doc(db, "assessments", id)))
             );
@@ -90,24 +86,21 @@ export default function HistoryPage() {
             });
         }
         
-        // 4. Create the final grouped data structure.
         const grouped: GroupedResult[] = Object.entries(resultsByAssessmentId).map(([assessmentId, attempts]) => {
             const assessmentDetails = assessmentsMap.get(assessmentId);
-            // Sort attempts within each group: latest is the first one due to the initial query order.
             const latestAttempt = attempts[0]; 
             const previousAttempts = attempts.slice(1);
             
             return {
                 assessmentId: latestAttempt.assessmentId,
-                assessmentTitle: assessmentDetails?.title || latestAttempt.assessmentTitle, // Use fresh title from assessment if available
+                assessmentTitle: assessmentDetails?.title || latestAttempt.assessmentTitle,
                 assessmentType: assessmentDetails?.assessmentType || 'monologue',
                 latestAttempt: latestAttempt,
-                previousAttempts: previousAttempts.reverse(), // Show oldest first in dropdown
+                previousAttempts: previousAttempts.reverse(),
                 totalAttempts: attempts.length,
             };
         }).filter(group => group.totalAttempts > 0);
         
-        // Sort the final groups by the latest attempt's date (already sorted by query)
         setGroupedAssessments(grouped);
 
     } catch (error) {
