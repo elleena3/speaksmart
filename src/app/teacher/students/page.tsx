@@ -7,7 +7,7 @@ import { getAuth, sendPasswordResetEmail } from 'firebase/auth';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/context/auth-context';
 import { type UserData } from '@/lib/types';
-import { Loader2, User, ChevronsUpDown, Check, Edit, Mail, KeyRound } from 'lucide-react';
+import { Loader2, User, ChevronsUpDown, Check, Edit, Mail, KeyRound, Search } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -35,6 +35,7 @@ function StudentManagementPage() {
   const [students, setStudents] = useState<UserData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<{ grade: string, class: string }>({ grade: 'all', class: 'all' });
+  const [searchTerm, setSearchTerm] = useState('');
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<UserData | null>(null);
   const { toast } = useToast();
@@ -73,9 +74,10 @@ function StudentManagementPage() {
     return students.filter(student => {
       const gradeMatch = filter.grade === 'all' || student.grade === filter.grade;
       const classMatch = filter.class === 'all' || student.class === filter.class;
-      return gradeMatch && classMatch;
+      const nameMatch = student.displayName.toLowerCase().includes(searchTerm.toLowerCase());
+      return gradeMatch && classMatch && nameMatch;
     });
-  }, [students, filter]);
+  }, [students, filter, searchTerm]);
 
   const uniqueGrades = useMemo(() => ['all', ...Array.from(new Set(students.map(s => s.grade || ''))).filter(g => g)], [students]);
   const uniqueClasses = useMemo(() => ['all', ...Array.from(new Set(students.map(s => s.class || ''))).filter(c => c)], [students]);
@@ -139,9 +141,18 @@ function StudentManagementPage() {
           <CardDescription>등록된 모든 학생 목록입니다. 정보를 수정하거나 비밀번호를 재설정할 수 있습니다.</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center gap-4 mb-4">
+          <div className="flex flex-wrap items-center gap-4 mb-4">
             <FilterCombobox label="학년" options={uniqueGrades} value={filter.grade} onSelect={(value) => setFilter({ ...filter, grade: value, class: 'all' })} />
             <FilterCombobox label="반" options={uniqueClasses} value={filter.class} onSelect={(value) => setFilter({ ...filter, class: value })} />
+            <div className="relative ml-auto">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="이름으로 검색..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 w-full max-w-sm"
+              />
+            </div>
           </div>
           <Table>
             <TableHeader>
