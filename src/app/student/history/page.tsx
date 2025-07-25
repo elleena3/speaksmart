@@ -56,7 +56,7 @@ export default function HistoryPage() {
     }
 
     try {
-        // 1. Fetch all results for the student, ordered by date.
+        // 1. Fetch all results for the student using a simple query
         const resultsQuery = query(
             collection(db, "results"),
             where("studentId", "==", user.uid)
