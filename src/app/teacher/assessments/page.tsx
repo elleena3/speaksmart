@@ -34,7 +34,11 @@ export default function AssessmentsPage() {
     if (!user) return;
     setIsLoading(true);
     try {
-        const assessmentsQuery = query(collection(db, "assessments"), where("uid", "==", user.uid));
+        const assessmentsQuery = query(
+            collection(db, "assessments"), 
+            where("uid", "==", user.uid),
+            orderBy("createdAt", "desc")
+        );
         
         const allResultsQuery = query(collection(db, 'results'), where('teacherUid', '==', user.uid));
 
@@ -57,9 +61,6 @@ export default function AssessmentsPage() {
             assessment.submissionCount = submissionCounts.get(assessment.id)?.size || 0;
             return assessment;
         });
-
-        // Sort assessments by createdAt in descending order (client-side)
-        assessmentsData.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 
         setAssessments(assessmentsData);
         setSelectedRowIds([]);

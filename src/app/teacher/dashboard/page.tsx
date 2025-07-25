@@ -28,10 +28,12 @@ export default function TeacherDashboard() {
     setIsLoading(true);
 
     try {
-        // 1. Firestore 쿼리를 수정하여 실제 사용자 uid를 사용합니다.
+        // Firestore 쿼리를 수정하여 uid와 createdAt을 함께 사용하도록 변경
         const assessmentsQuery = query(
             collection(db, "assessments"), 
-            where("uid", "==", user.uid)
+            where("uid", "==", user.uid),
+            orderBy("createdAt", "desc"),
+            limit(5)
         );
         const allResultsQuery = query(collection(db, 'results'), where('teacherUid', '==', user.uid));
         
@@ -54,12 +56,8 @@ export default function TeacherDashboard() {
             assessmentData.submissionCount = submissionCounts.get(assessmentData.id)?.size || 0;
             return assessmentData;
         });
-
-        // 2. 데이터를 가져온 후, 클라이언트 측에서 정렬하고 상위 5개만 선택합니다.
-        assessmentsData.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-        const recentAssessments = assessmentsData.slice(0, 5);
         
-        setAssessments(recentAssessments);
+        setAssessments(assessmentsData);
 
     } catch (error) {
         console.error("Error fetching assessments:", error);
