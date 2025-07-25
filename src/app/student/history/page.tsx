@@ -93,7 +93,7 @@ export default function HistoryPage() {
             
             return {
                 assessmentId: latestAttempt.assessmentId,
-                assessmentTitle: assessmentDetails?.title || latestAttempt.assessmentTitle,
+                assessmentTitle: assessmentDetails?.title || latestAttempt.assessmentTitle || "제목 없음",
                 assessmentType: assessmentDetails?.assessmentType || 'monologue',
                 latestAttempt: latestAttempt,
                 previousAttempts: previousAttempts.reverse(),
@@ -138,6 +138,7 @@ export default function HistoryPage() {
   }
   
   const getAssessmentTypeText = (assessmentType?: 'monologue' | 'dialogue') => {
+      if (!assessmentType) return 'N/A';
       if (assessmentType === 'dialogue') {
           return t.teacherAssessments.assessmentTypes.dialogue;
       }
@@ -200,7 +201,7 @@ export default function HistoryPage() {
                                             ) : (
                                                 <div className="w-8 h-8 p-0"/> 
                                             )}
-                                            <span className="font-semibold break-words">{group.assessmentTitle}</span>
+                                            <span className="font-semibold break-words">{group.assessmentTitle || '제목 없음'}</span>
                                             {group.totalAttempts > 1 && <Badge variant="outline" className="flex justify-center">총 {group.totalAttempts}회 응시</Badge>}
                                         </div>
                                     </TableCell>
