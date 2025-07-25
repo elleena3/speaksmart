@@ -10,7 +10,7 @@ import Link from 'next/link';
 import { type StudentResult, type TeacherAssessment } from "@/lib/types";
 import { useLanguage } from '@/context/language-context';
 import { useAuth } from '@/context/auth-context';
-import { Loader2, ChevronDown, TrendingUp } from 'lucide-react';
+import { Loader2, ChevronDown, TrendingUp, DraftingCompass } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -29,6 +29,7 @@ type GroupedResult = {
   latestAttempt: EnrichedResult;
   previousAttempts: EnrichedResult[];
   totalAttempts: number;
+  useRubric?: boolean;
 };
 
 
@@ -101,6 +102,7 @@ export default function HistoryPage() {
                 assessmentId: latestAttempt.assessmentId,
                 assessmentTitle: assessmentDetails?.title || latestAttempt.assessmentTitle || "제목 없음",
                 assessmentType: assessmentDetails?.assessmentType || 'monologue',
+                useRubric: assessmentDetails?.useRubric || false,
                 latestAttempt: { ...latestAttempt, assessmentType: assessmentDetails?.assessmentType },
                 // Reverse previous attempts to show them in chronological order (1st, 2nd...)
                 previousAttempts: previousAttempts.map(p => ({ ...p, assessmentType: assessmentDetails?.assessmentType })).reverse(),
@@ -212,6 +214,12 @@ export default function HistoryPage() {
                                                 <div className="w-8 h-8 p-0"/> 
                                             )}
                                             <span className="font-semibold break-words">{group.assessmentTitle || '제목 없음'}</span>
+                                            {group.useRubric && (
+                                                <Badge variant="destructive" className="flex items-center gap-1">
+                                                    <DraftingCompass className="h-3 w-3" />
+                                                    루브릭 평가
+                                                </Badge>
+                                            )}
                                             {group.totalAttempts > 1 && <Badge variant="outline" className="flex justify-center">총 {group.totalAttempts}회 응시</Badge>}
                                         </div>
                                     </TableCell>
