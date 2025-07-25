@@ -9,7 +9,7 @@ import { Loader2, AlertTriangle, CheckCircle2, UploadCloud, FileScan, Sparkles }
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { db, storage } from "@/lib/firebase";
-import { collection, query, where, onSnapshot, doc, updateDoc, getDocs, addDoc, orderBy } from "firebase/firestore";
+import { collection, query, where, onSnapshot, doc, updateDoc, getDocs, addDoc, orderBy, runTransaction } from "firebase/firestore";
 import { generateDialogueAnalysis } from "@/ai/flows/generate-dialogue-analysis-flow";
 import { ref, uploadString, getDownloadURL } from "firebase/storage";
 import { useToast } from '@/hooks/use-toast';
@@ -144,47 +144,41 @@ export default function DialogueProcessingPage() {
             console.log(`[Dialogue Processing] Created preliminary result document: ${newResultDocRef.id}`);
 
             // Set up snapshot listener for this specific document
-            unsubscribeRef.current = onSnapshot(newResultDocRef, (doc) => {
-                const resultData = doc.data() as StudentResult;
+            unsubscribeRef.current = onSnapshot(newResultDocRef, (docSnapshot) => {
+                const resultData = docSnapshot.data() as StudentResult;
                 if (!resultData) return;
 
                 console.log(`[Dialogue Processing Snapshot] Detected status change: ${resultData.status}`);
                 if (resultData.status === '채점 완료') {
-                     // 분석 완료 후 추가 작업 수행
+                    // 분석 완료 후 추가 작업 수행
                     (async () => {
                         try {
-                            const resultsQuery = query(
-                                collection(db, "results"),
-                                where("assessmentId", "==", assessment.id),
-                                where("studentId", "==", user.uid),
-                                where("status", "==", "채점 완료"),
-                                orderBy("createdAt", "asc")
-                            );
-                            const querySnapshot = await getDocs(resultsQuery);
-
-                            const allAttempts = querySnapshot.docs.map(doc => doc.data() as StudentResult);
-                            
-                            // Historical Scores 캐싱
-                            const historicalScores: HistoricalScore[] = allAttempts.map((attempt, index) => ({
-                                attempt: index + 1,
-                                contentScore: attempt.contentScore,
-                                pronunciationScore: attempt.pronunciationScore || 0,
-                                rubricScores: attempt.rubricScores
-                            }));
-
-                            await updateDoc(doc.ref, { historicalScores });
-
-                            // 전체 평가의 평균 점수 및 제출 횟수 업데이트
                             const assessmentRef = doc(db, "assessments", assessment.id);
-                            const scores = allAttempts.map(d => d.contentScore || 0);
-                            const newSubmissionCount = new Set(allAttempts.map(r => r.studentId)).size;
-                            const newAverage = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
-                            
-                            await updateDoc(assessmentRef, {
-                                submissionCount: newSubmissionCount,
-                                averageScore: newAverage
+                            await runTransaction(db, async (transaction) => {
+                                const assessmentDoc = await transaction.get(assessmentRef);
+                                if (!assessmentDoc.exists()) {
+                                    throw "Assessment document does not exist!";
+                                }
+
+                                const resultsQuery = query(
+                                    collection(db, "results"),
+                                    where("assessmentId", "==", assessment.id),
+                                    where("status", "==", "채점 완료")
+                                );
+                                const querySnapshot = await getDocs(resultsQuery);
+
+                                const allAttempts = querySnapshot.docs.map(doc => doc.data() as StudentResult);
+                                const scores = allAttempts.map(d => d.contentScore || 0);
+                                const studentIds = new Set(allAttempts.map(r => r.studentId));
+
+                                transaction.update(assessmentRef, {
+                                    submissionCount: studentIds.size,
+                                    averageScore: scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0,
+                                    [`submissions.${user.uid}`]: 'completed'
+                                });
+                                console.log(`[Dialogue Processing] Transactionally updated assessment stats for ${assessment.id}.`);
                             });
-                             console.log(`[Dialogue Processing] Updated assessment stats for ${assessment.id}.`);
+                             
                         } catch(e) {
                             console.error("Error updating stats after completion:", e);
                         } finally {

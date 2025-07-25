@@ -47,26 +47,10 @@ export default function AssessmentsPage() {
             orderBy("createdAt", "desc")
         );
         
-        const allResultsQuery = query(collection(db, 'results'), where('teacherUid', '==', user.uid));
-
-        const [assessmentsSnapshot, allResultsSnapshot] = await Promise.all([
-            getDocs(assessmentsQuery),
-            getDocs(allResultsQuery)
-        ]);
-
-        const submissionCounts = new Map<string, Set<string>>();
-        allResultsSnapshot.forEach(resultDoc => {
-            const result = resultDoc.data();
-            if (!submissionCounts.has(result.assessmentId)) {
-                submissionCounts.set(result.assessmentId, new Set());
-            }
-            submissionCounts.get(result.assessmentId)!.add(result.studentId);
-        });
-
+        const assessmentsSnapshot = await getDocs(assessmentsQuery);
+        
         const assessmentsData = assessmentsSnapshot.docs.map((doc) => {
-            const assessment = { id: doc.id, ...doc.data() } as TeacherAssessment;
-            assessment.submissionCount = submissionCounts.get(assessment.id)?.size || 0;
-            return assessment;
+            return { id: doc.id, ...doc.data() } as TeacherAssessment;
         });
 
         setAssessments(assessmentsData);
@@ -105,6 +89,7 @@ export default function AssessmentsPage() {
         dateCreated: new Date().toISOString().split('T')[0],
         submissionCount: 0,
         averageScore: 0,
+        submissions: {}, // Reset submissions
       });
 
       toast({
@@ -385,7 +370,7 @@ export default function AssessmentsPage() {
                                 </DropdownMenuItem>
                                 
                                 <AlertDialogTrigger asChild>
-                                  <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                                  <DropdownMenuItem onSelect={(e) => e.preventDefault()} id={`copy-dialog-trigger-${assessment.id}`}>
                                     <Copy className="mr-2 h-4 w-4" />
                                     {t.teacherAssessments.menuCopy}
                                   </DropdownMenuItem>

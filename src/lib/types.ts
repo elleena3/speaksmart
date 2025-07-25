@@ -90,6 +90,7 @@ export type TeacherAssessment = {
   useRubric?: boolean; // New field for rubric option
   // For Firestore timestamp
   createdAt: number;
+  submissions?: { [studentId: string]: 'completed' | 'in_progress' };
 };
 
 export type { ConversationTurn };
