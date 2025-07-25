@@ -13,13 +13,13 @@ import { useAuth } from "@/context/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
+import { collection, query, where, getDocs, orderBy, doc, getDoc, collectionGroup } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { cn } from "@/lib/utils"
 
 
 type CombinedAssessment = TeacherAssessment & {
-    resultStatus?: '채점 완료' | '채점 중' | '오류' | null;
+    resultStatus?: '채점 완료' | '채점 중' | '오류' | '분석 중' | '분석 중: upload' | '분석 중: transcribe' | '분석 중: analyze' | '분석 중: report' | null;
     resultId?: string;
     completedAttemptsCount: number;
 };
@@ -71,15 +71,17 @@ function AssessmentCard({ assessment, t }: { assessment: CombinedAssessment, t: 
       if (displayStatus === "오류") return "다시 시도";
       if (displayStatus === "채점 중") return "채점 현황 보기"; // This would link to the processing page if we had one
       if (displayStatus === "채점 완료") {
+          const attemptQuery = hasMultipleAttempts ? `&attempt=${assessment.completedAttemptsCount}` : '';
           return hasMultipleAttempts ? "종합 결과 보기" : t.studentDashboard.viewResults;
       }
       return t.studentDashboard.startAssessment;
   }
 
   const getLink = () => {
+    const attemptQuery = hasMultipleAttempts ? `?attempt=${assessment.completedAttemptsCount}` : '';
     const resultsPath = assessment.assessmentType === 'dialogue'
-      ? `/student/assessment/free-talk/results?id=${assessment.id}`
-      : `/student/assessment/${assessment.id}/results`;
+      ? `/student/assessment/free-talk/results?id=${assessment.id}${attemptQuery}`
+      : `/student/assessment/${assessment.id}/results${attemptQuery}`;
       
     if (displayStatus === '채점 완료') return resultsPath;
     
@@ -141,8 +143,8 @@ export default function StudentDashboard() {
     setIsLoading(true);
     try {
         const assessmentsQuery = query(collection(db, "assessments"), orderBy("createdAt", "desc"));
-        const resultsQuery = query(collection(db, "results"), where("studentId", "==", user.uid));
-        
+        const resultsQuery = query(collectionGroup(db, "results"), where("studentId", "==", user.uid));
+
         const [assessmentsSnapshot, resultsSnapshot] = await Promise.all([
             getDocs(assessmentsQuery),
             getDocs(resultsQuery),
@@ -159,7 +161,6 @@ export default function StudentDashboard() {
             const assessment = { id: doc.id, ...doc.data() } as TeacherAssessment;
             const studentResults = resultsByAssessment.get(assessment.id) || [];
             
-            // Sort by time to find the latest one
             studentResults.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
             const latestResult = studentResults[0];
 
@@ -186,16 +187,8 @@ export default function StudentDashboard() {
         filteredAssessments.sort((a, b) => {
             const aIsCompleted = a.completedAttemptsCount > 0;
             const bIsCompleted = b.completedAttemptsCount > 0;
-
-            if (aIsCompleted !== bIsCompleted) {
-                return aIsCompleted ? 1 : -1; // Incomplete tasks first
-            }
-
-            // Both have same completion status (either both completed or both not)
-            const aLatestTimestamp = resultsByAssessment.get(a.id)?.[0]?.createdAt || a.createdAt || 0;
-            const bLatestTimestamp = resultsByAssessment.get(b.id)?.[0]?.createdAt || b.createdAt || 0;
-
-            return bLatestTimestamp - aLatestTimestamp; // Most recent activity first
+            if (aIsCompleted !== bIsCompleted) return aIsCompleted ? 1 : -1;
+            return (b.createdAt || 0) - (a.createdAt || 0);
         });
         
         setAssessments(filteredAssessments);
@@ -210,6 +203,7 @@ export default function StudentDashboard() {
         setIsLoading(false);
     }
   }, [user, toast]);
+
 
   useEffect(() => {
     if (!authLoading) {

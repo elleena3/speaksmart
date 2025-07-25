@@ -30,11 +30,11 @@ export default function TeacherDashboard() {
     try {
         const assessmentsQuery = query(
             collection(db, "assessments"), 
-            where("uid", "==", user.uid),
+            where("uid", "==", 'teacher-mock-uid'),
             orderBy("createdAt", "desc"),
             limit(5)
         );
-        const allResultsQuery = query(collection(db, 'results'), where('teacherUid', '==', user.uid));
+        const allResultsQuery = query(collection(db, 'results'), where('teacherUid', '==', 'teacher-mock-uid'));
         
         const [assessmentsSnapshot, allResultsSnapshot] = await Promise.all([
             getDocs(assessmentsQuery),
