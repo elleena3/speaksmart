@@ -1,3 +1,4 @@
+
 // src/lib/firebase.ts
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
@@ -24,13 +25,6 @@ export const firebaseConfig = {
   appId: "1:1057027581793:web:723a95133e02835e076321",
   measurementId: "G-J6E3E2L17P"
 };
-
-// 모든 필수 환경 변수가 설정되었는지 확인합니다.
-if (!firebaseConfig.apiKey || firebaseConfig.apiKey === "YOUR_API_KEY") {
-  console.error(
-    "Firebase API 키가 설정되지 않았습니다. src/lib/firebase.ts 파일의 firebaseConfig 객체를 확인해주세요."
-  );
-}
 
 // Firebase 앱 초기화
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
