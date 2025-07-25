@@ -33,8 +33,6 @@ Here are all the attempts from the student, in chronological order:
 -   Pronunciation Score: {{this.pronunciationScore}}/100
 -   Transcript: "{{this.transcript}}"
 -   AI Feedback Given: "{{this.aiFeedback}}"
--   Teacher Guidance from this attempt: "{{this.teacherGuidance}}"
--   Curricular Remarks from this attempt: "{{this.curricularRemarks}}"
 ---
 {{/each}}
 
@@ -58,7 +56,7 @@ Please perform the following steps based on ALL attempts provided:
 3.  **Generate '생활기록부 교과 특기 사항' ('curricularRemarks'):**
     -   **Format:** Formal Korean prose, with sentences ending in '~함' or '~임'.
     -   **Tone:** Official and descriptive, suitable for a school record.
-    -   **Content:** Synthesize the 'Curricular Remarks from this attempt' from ALL attempts into a single, comprehensive narrative of about 700 Korean characters. The final remark should start by mentioning the student's persistent effort, describe the initial state and how it evolved with specific examples, and conclude by summarizing their current demonstrated ability and attitude. This should be a well-written, cohesive summary, not just a list of points.
+    -   **Content:** Synthesize the student's performance from ALL attempts into a single, comprehensive narrative of about 700 Korean characters. The final remark should start by mentioning the student's persistent effort, describe the initial state and how it evolved with specific examples, and conclude by summarizing their current demonstrated ability and attitude. This should be a well-written, cohesive summary, not just a list of points.
 
 The final output must be a single JSON object containing 'growthFeedback', 'teacherGuidance', and 'curricularRemarks'.
 `,
