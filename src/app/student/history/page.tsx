@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -12,7 +12,7 @@ import { useLanguage } from '@/context/language-context';
 import { useAuth } from '@/context/auth-context';
 import { Loader2, ChevronDown, TrendingUp } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -41,12 +41,9 @@ export default function HistoryPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [openStates, setOpenStates] = useState<Record<string, boolean>>({});
 
-  useEffect(() => {
-    if (authLoading) return;
-    if (!user) {
-      router.push('/');
-      return;
-    }
+  const fetchHistory = useCallback(async () => {
+    if (!user) return;
+    setIsLoading(true);
 
     if (!db) {
         toast({
@@ -58,72 +55,82 @@ export default function HistoryPage() {
         return;
     }
 
-    const fetchHistory = async () => {
-        setIsLoading(true);
-        try {
-            const assessmentsQuery = getDocs(collection(db, "assessments"));
-            
-            const resultsQuery = getDocs(query(
-                collection(db, "results"),
-                where("studentId", "==", user.uid),
-                where("status", "==", "채점 완료"),
-                orderBy("createdAt", "desc") // Sort on the server
-            ));
-            
-            const [assessmentsSnapshot, resultsSnapshot] = await Promise.all([assessmentsQuery, resultsQuery]);
-            
-            const assessmentsMap = new Map<string, TeacherAssessment>();
-            assessmentsSnapshot.forEach(doc => {
-                assessmentsMap.set(doc.id, { id: doc.id, ...doc.data() } as TeacherAssessment);
-            });
+    try {
+        // 1. Fetch all completed results for the current student, ordered by creation date.
+        const resultsQuery = query(
+            collection(db, "results"),
+            where("studentId", "==", user.uid),
+            where("status", "==", "채점 완료"),
+            orderBy("createdAt", "desc")
+        );
+        const resultsSnapshot = await getDocs(resultsQuery);
+        const studentResults = resultsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as StudentResult));
 
-            const allResults: EnrichedResult[] = [];
-            resultsSnapshot.forEach(doc => {
-                const result = { id: doc.id, ...doc.data() } as StudentResult;
-                const assessment = assessmentsMap.get(result.assessmentId);
-                if (assessment) {
-                    allResults.push({
-                        ...result,
-                        assessmentType: assessment.assessmentType || 'monologue',
-                    });
-                }
-            });
-
-            const resultsByAssessmentId: { [key: string]: EnrichedResult[] } = {};
-            allResults.forEach(result => {
-                if (!resultsByAssessmentId[result.assessmentId]) {
-                    resultsByAssessmentId[result.assessmentId] = [];
-                }
-                resultsByAssessmentId[result.assessmentId].push(result);
-            });
-
-            const grouped: GroupedResult[] = Object.values(resultsByAssessmentId).map(attempts => {
-                // Since they are already sorted by desc createdAt, the first one is the latest
-                const latestAttempt = attempts[0]; 
-                const previousAttempts = attempts.slice(1);
-                return {
-                    assessmentId: latestAttempt.assessmentId,
-                    assessmentTitle: latestAttempt.assessmentTitle,
-                    assessmentType: latestAttempt.assessmentType,
-                    latestAttempt: latestAttempt,
-                    previousAttempts: previousAttempts.reverse(), // Show oldest first in dropdown
-                    totalAttempts: attempts.length,
-                };
-            }).filter(group => group.totalAttempts > 0);
-            
-            // Sort the final groups by the latest attempt's date
-            grouped.sort((a,b) => (b.latestAttempt.createdAt || 0) - (a.latestAttempt.createdAt || 0));
-
-            setGroupedAssessments(grouped);
-        } catch (error) {
-            console.error("Error fetching history: ", error);
-        } finally {
-            setIsLoading(false);
+        // 2. Group results by assessmentId client-side.
+        const resultsByAssessmentId: { [key: string]: StudentResult[] } = {};
+        for (const result of studentResults) {
+            if (!resultsByAssessmentId[result.assessmentId]) {
+                resultsByAssessmentId[result.assessmentId] = [];
+            }
+            resultsByAssessmentId[result.assessmentId].push(result);
         }
-    };
 
+        // 3. Fetch assessment details only for the assessments the student has completed.
+        const assessmentIds = Object.keys(resultsByAssessmentId);
+        const assessmentsMap = new Map<string, TeacherAssessment>();
+        if (assessmentIds.length > 0) {
+            // Firestore 'in' query can take up to 30 elements. Chunk if necessary for larger scales.
+            const assessmentDocs = await Promise.all(
+              assessmentIds.map(id => getDoc(doc(db, "assessments", id)))
+            );
+            assessmentDocs.forEach(docSnap => {
+                if (docSnap.exists()) {
+                    assessmentsMap.set(docSnap.id, { id: docSnap.id, ...docSnap.data() } as TeacherAssessment);
+                }
+            });
+        }
+        
+        // 4. Create the final grouped data structure.
+        const grouped: GroupedResult[] = Object.entries(resultsByAssessmentId).map(([assessmentId, attempts]) => {
+            const assessmentDetails = assessmentsMap.get(assessmentId);
+            // Sort attempts within each group: latest is the first one due to the initial query order.
+            const latestAttempt = attempts[0]; 
+            const previousAttempts = attempts.slice(1);
+            
+            return {
+                assessmentId: latestAttempt.assessmentId,
+                assessmentTitle: assessmentDetails?.title || latestAttempt.assessmentTitle, // Use fresh title from assessment if available
+                assessmentType: assessmentDetails?.assessmentType || 'monologue',
+                latestAttempt: latestAttempt,
+                previousAttempts: previousAttempts.reverse(), // Show oldest first in dropdown
+                totalAttempts: attempts.length,
+            };
+        }).filter(group => group.totalAttempts > 0);
+        
+        // Sort the final groups by the latest attempt's date (already sorted by query)
+        setGroupedAssessments(grouped);
+
+    } catch (error) {
+        console.error("Error fetching history: ", error);
+        toast({
+            title: "기록 조회 오류",
+            description: "평가 기록을 불러오는 중 오류가 발생했습니다. 필요한 데이터베이스 색인이 설정되지 않았을 수 있습니다.",
+            variant: "destructive",
+        });
+    } finally {
+        setIsLoading(false);
+    }
+  }, [user, toast]);
+
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      router.push('/');
+      return;
+    }
     fetchHistory();
-  }, [user, authLoading, router, toast]);
+  }, [user, authLoading, router, fetchHistory]);
   
   const toggleGroup = (assessmentId: string) => {
     setOpenStates(prev => ({ ...prev, [assessmentId]: !prev[assessmentId] }));
