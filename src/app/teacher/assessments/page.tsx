@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { PlusCircle, MoreHorizontal, Copy, Users, Loader2, Trash2, DraftingCompass } from 'lucide-react';
 import Link from 'next/link';
-import { type TeacherAssessment } from "@/lib/types";
+import { type TeacherAssessment, type StudentResult } from "@/lib/types";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -46,11 +46,36 @@ export default function AssessmentsPage() {
             where("uid", "==", user.uid),
             orderBy("createdAt", "desc")
         );
+
+        // In a larger application, this would be inefficient.
+        // For this project's scale, fetching all results and processing client-side is acceptable.
+        const allResultsQuery = query(collection(db, 'results'), where('teacherUid', '==', user.uid));
         
-        const assessmentsSnapshot = await getDocs(assessmentsQuery);
+        const [assessmentsSnapshot, allResultsSnapshot] = await Promise.all([
+            getDocs(assessmentsQuery),
+            getDocs(allResultsQuery)
+        ]);
         
+        const resultsByAssessmentId = new Map<string, StudentResult[]>();
+        allResultsSnapshot.forEach(doc => {
+            const result = doc.data() as StudentResult;
+            const assessmentResults = resultsByAssessmentId.get(result.assessmentId) || [];
+            assessmentResults.push(result);
+            resultsByAssessmentId.set(result.assessmentId, assessmentResults);
+        });
+
         const assessmentsData = assessmentsSnapshot.docs.map((doc) => {
-            return { id: doc.id, ...doc.data() } as TeacherAssessment;
+            const assessmentData = { id: doc.id, ...doc.data() } as TeacherAssessment;
+            const relatedResults = resultsByAssessmentId.get(assessmentData.id) || [];
+            
+            const completedResults = relatedResults.filter(r => r.status === '채점 완료');
+            const uniqueSubmissions = new Set(completedResults.map(r => r.studentId));
+            const scores = completedResults.map(r => r.contentScore || 0);
+            
+            assessmentData.submissionCount = uniqueSubmissions.size;
+            assessmentData.averageScore = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
+            
+            return assessmentData;
         });
 
         setAssessments(assessmentsData);
