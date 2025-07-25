@@ -32,7 +32,7 @@ import { collection, query, where, getDocs } from "firebase/firestore";
 import { type UserData } from "@/lib/types";
 
 const formSchema = z.object({
-  email: z.string().email("올바른 이메일 형식이 아닙니다."),
+  name: z.string().min(1, "이름을 입력해주세요."),
   password: z.string().min(1, "비밀번호를 입력해주세요."),
 });
 
@@ -45,7 +45,7 @@ export default function LoginPage() {
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
         defaultValues: {
-            email: "",
+            name: "",
             password: "",
         },
     });
@@ -54,14 +54,14 @@ export default function LoginPage() {
         setIsLoading(true);
         try {
             const usersRef = collection(db, "users");
-            const q = query(usersRef, where("email", "==", values.email), where("password", "==", values.password));
+            const q = query(usersRef, where("displayName", "==", values.name), where("password", "==", values.password));
             
             const querySnapshot = await getDocs(q);
 
             if (querySnapshot.empty) {
                 toast({
                     title: "로그인 실패",
-                    description: "이메일 또는 비밀번호가 일치하지 않습니다.",
+                    description: "이름(아이디) 또는 비밀번호가 일치하지 않습니다.",
                     variant: "destructive",
                 });
                 setIsLoading(false);
@@ -113,12 +113,12 @@ export default function LoginPage() {
                         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                             <FormField
                                 control={form.control}
-                                name="email"
+                                name="name"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>이메일</FormLabel>
+                                        <FormLabel>이름 (아이디)</FormLabel>
                                         <FormControl>
-                                            <Input placeholder="user@example.com" {...field} />
+                                            <Input placeholder="홍길동" {...field} />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>

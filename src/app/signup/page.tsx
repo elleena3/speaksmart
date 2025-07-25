@@ -58,12 +58,27 @@ export default function SignupPage() {
     async function onSubmit(values: z.infer<typeof formSchema>) {
         setIsLoading(true);
         try {
-            // Check if email already exists
+            // Check for duplicate displayName or email
             const usersRef = collection(db, "users");
-            const q = query(usersRef, where("email", "==", values.email));
-            const querySnapshot = await getDocs(q);
+            const nameQuery = query(usersRef, where("displayName", "==", values.displayName));
+            const emailQuery = query(usersRef, where("email", "==", values.email));
+            
+            const [nameSnapshot, emailSnapshot] = await Promise.all([
+                getDocs(nameQuery),
+                getDocs(emailQuery)
+            ]);
 
-            if (!querySnapshot.empty) {
+            if (!nameSnapshot.empty) {
+                toast({
+                    title: "회원가입 오류",
+                    description: "이미 사용 중인 이름(아이디)입니다.",
+                    variant: "destructive",
+                });
+                setIsLoading(false);
+                return;
+            }
+
+            if (!emailSnapshot.empty) {
                 toast({
                     title: "회원가입 오류",
                     description: "이미 사용 중인 이메일입니다.",
@@ -165,7 +180,7 @@ export default function SignupPage() {
                                 name="displayName"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>이름</FormLabel>
+                                        <FormLabel>이름 (아이디)</FormLabel>
                                         <FormControl>
                                             <Input placeholder="홍길동" {...field} />
                                         </FormControl>
@@ -178,7 +193,7 @@ export default function SignupPage() {
                                 name="email"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>이메일 (아이디)</FormLabel>
+                                        <FormLabel>이메일 (비밀번호 초기화용)</FormLabel>
                                         <FormControl>
                                             <Input placeholder="student@example.com" {...field} />
                                         </FormControl>
