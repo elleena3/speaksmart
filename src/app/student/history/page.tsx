@@ -12,7 +12,7 @@ import { useLanguage } from '@/context/language-context';
 import { useAuth } from '@/context/auth-context';
 import { Loader2, ChevronDown, TrendingUp } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { collection, query, where, getDocs, doc, getDoc, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -59,8 +59,7 @@ export default function HistoryPage() {
         // 1. Fetch all results for the student, ordered by date.
         const resultsQuery = query(
             collection(db, "results"),
-            where("studentId", "==", user.uid),
-            orderBy("createdAt", "desc")
+            where("studentId", "==", user.uid)
         );
         const resultsSnapshot = await getDocs(resultsQuery);
         
@@ -92,7 +91,9 @@ export default function HistoryPage() {
         
         const grouped: GroupedResult[] = Object.entries(resultsByAssessmentId).map(([assessmentId, attempts]) => {
             const assessmentDetails = assessmentsMap.get(assessmentId);
-            // Since we already sorted by date descending, the first one is the latest.
+            // Sort attempts by date descending to find the latest one
+            attempts.sort((a,b) => (b.createdAt || 0) - (a.createdAt || 0));
+
             const latestAttempt = attempts[0]; 
             const previousAttempts = attempts.slice(1);
             
@@ -106,6 +107,9 @@ export default function HistoryPage() {
                 totalAttempts: attempts.length,
             };
         }).filter(group => group.totalAttempts > 0);
+
+        // Sort the final list of assessments by the latest attempt's creation date
+        grouped.sort((a,b) => (b.latestAttempt.createdAt || 0) - (a.latestAttempt.createdAt || 0));
         
         setGroupedAssessments(grouped);
 
