@@ -3,44 +3,44 @@
 @tailwind utilities;
 
 body {
-  font-family: 'PT Sans', 'sans-serif';
+  font-family: 'Noto_Sans_KR', 'sans-serif';
 }
 
 @layer base {
   :root {
-    --background: 220 13% 95.7%; /* #F2F4F7 (light gray) */
-    --foreground: 224 71.4% 4.1%;
+    --background: 30 33% 96.7%; /* saebyeol-beige */
+    --foreground: 240 4% 33%; /* basalt-gray */
     --card: 0 0% 100%;
-    --card-foreground: 224 71.4% 4.1%;
+    --card-foreground: 240 4% 33%;
     --popover: 0 0% 100%;
-    --popover-foreground: 224 71.4% 4.1%;
-    --primary: 196 76% 53%; /* #29ABE2 (vibrant blue) */
+    --popover-foreground: 240 4% 33%;
+    --primary: 212 73% 59%; /* jeju-sea */
     --primary-foreground: 0 0% 100%;
     --secondary: 220 14.3% 95.9%;
     --secondary-foreground: 222.2 47.4% 11.2%;
     --muted: 220 14.3% 95.9%;
-    --muted-foreground: 220 8.9% 46.1%;
-    --accent: 45 100% 50%; /* #FFD700 (yellow) */
+    --muted-foreground: 240 4% 45%;
+    --accent: 38 92% 56%; /* tangerine */
     --accent-foreground: 222.2 47.4% 11.2%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
     --border: 220 13% 91%;
     --input: 220 13% 91%;
-    --ring: 196 76% 53%;
-    --chart-1: 196 76% 53%;
-    --chart-2: 45 100% 50%;
-    --chart-3: 197 37% 24%;
+    --ring: 212 73% 59%;
+    --chart-1: 212 73% 59%;
+    --chart-2: 38 92% 56%;
+    --chart-3: 147 50% 36%; /* bijarim-green */
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
     --radius: 0.5rem;
     --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 196 76% 53%;
+    --sidebar-foreground: 240 4% 33%;
+    --sidebar-primary: 212 73% 59%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 14.3% 95.9%;
+    --sidebar-accent: 30 33% 96.7%;
     --sidebar-accent-foreground: 222.2 47.4% 11.2%;
     --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 196 76% 53%;
+    --sidebar-ring: 212 73% 59%;
   }
   .dark {
     --background: 224 71.4% 4.1%;
@@ -49,32 +49,32 @@ body {
     --card-foreground: 210 40% 98%;
     --popover: 224 71.4% 4.1%;
     --popover-foreground: 210 40% 98%;
-    --primary: 196 76% 53%;
+    --primary: 212 73% 59%;
     --primary-foreground: 0 0% 100%;
     --secondary: 222.2 47.4% 11.2%;
     --secondary-foreground: 210 40% 98%;
     --muted: 222.2 47.4% 11.2%;
     --muted-foreground: 215 20.2% 65.1%;
-    --accent: 45 100% 50%;
+    --accent: 38 92% 56%;
     --accent-foreground: 210 40% 98%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
     --border: 222.2 47.4% 11.2%;
     --input: 222.2 47.4% 11.2%;
-    --ring: 196 76% 53%;
-    --chart-1: 196 76% 53%;
-    --chart-2: 45 100% 50%;
-    --chart-3: 30 80% 55%;
+    --ring: 212 73% 59%;
+    --chart-1: 212 73% 59%;
+    --chart-2: 38 92% 56%;
+    --chart-3: 147 50% 36%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
     --sidebar-background: 224 71.4% 4.1%;
     --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 196 76% 53%;
+    --sidebar-primary: 212 73% 59%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 222.2 47.4% 11.2%;
     --sidebar-accent-foreground: 210 40% 98%;
     --sidebar-border: 222.2 47.4% 11.2%;
-    --sidebar-ring: 196 76% 53%;
+    --sidebar-ring: 212 73% 59%;
   }
 }
 
@@ -136,11 +136,9 @@ body {
 
 @layer utilities {
   .font-body {
-    font-family: var(--font-pt-sans), sans-serif;
+    font-family: var(--font-noto-sans-kr), sans-serif;
   }
   .font-headline {
-    font-family: var(--font-pt-sans), sans-serif;
+    font-family: var(--font-noto-sans-kr), sans-serif;
   }
 }
-
-    
