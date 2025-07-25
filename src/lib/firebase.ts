@@ -17,14 +17,21 @@ import { getStorage } from "firebase/storage";
 // 찾은 값들을 이 프로젝트의 루트에 있는 .env 파일에 복사하여 붙여넣으세요.
 // ====================================================================
 export const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "speaksmart-evaluator.firebaseapp.com",
-  projectId: "speaksmart-evaluator",
-  storageBucket: "speaksmart-evaluator.appspot.com",
-  messagingSenderId: "1057027581793",
-  appId: "1:1057027581793:web:723a95133e02835e076321",
-  measurementId: "G-J6E3E2L17P"
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
+
+// 모든 필수 환경 변수가 설정되었는지 확인합니다.
+if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
+  console.warn(
+    "Firebase 설정이 .env 파일에 올바르게 구성되지 않았습니다. NEXT_PUBLIC_FIREBASE_API_KEY, NEXT_PUBLIC_FIREBASE_PROJECT_ID 값을 확인해주세요."
+  );
+}
 
 // Firebase 앱 초기화
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
