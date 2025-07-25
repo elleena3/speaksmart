@@ -17,13 +17,13 @@ import { getStorage, type FirebaseStorage } from "firebase/storage";
 // 참고: 이 방식은 환경 변수(.env) 설정 문제를 해결하기 위한 가장 확실한 방법입니다.
 // ====================================================================
 export const firebaseConfig = {
-  apiKey: "YOUR_API_KEY", // 여기에 API 키를 입력하세요.
-  authDomain: "YOUR_AUTH_DOMAIN", // 여기에 인증 도메인을 입력하세요.
-  projectId: "YOUR_PROJECT_ID", // 여기에 프로젝트 ID를 입력하세요.
-  storageBucket: "YOUR_STORAGE_BUCKET", // 여기에 스토리지 버킷을 입력하세요.
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID", // 여기에 메시징 발신자 ID를 입력하세요.
-  appId: "YOUR_APP_ID", // 여기에 앱 ID를 입력하세요.
-  measurementId: "YOUR_MEASUREMENT_ID", // 여기에 측정 ID를 입력하세요 (선택 사항).
+  apiKey: "AIzaSyAieUKTGnuh0f9zWJYjgYM77j4mEshxWCg",
+  authDomain: "speaksmart-evaluator2.firebaseapp.com",
+  projectId: "speaksmart-evaluator2",
+  storageBucket: "speaksmart-evaluator2.firebasestorage.app",
+  messagingSenderId: "60227542963",
+  appId: "1:60227542963:web:f5d6c51046eb572a9c35c6",
+  measurementId: "G-M20FDF494Y",
 };
 
 let app: FirebaseApp;
