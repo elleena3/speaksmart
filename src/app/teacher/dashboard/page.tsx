@@ -28,12 +28,12 @@ export default function TeacherDashboard() {
     setIsLoading(true);
 
     try {
-        // 1. Firestore 쿼리를 단순화하여 색인 오류를 방지합니다. 필터링만 수행합니다.
+        // 1. Firestore 쿼리를 수정하여 실제 사용자 uid를 사용합니다.
         const assessmentsQuery = query(
             collection(db, "assessments"), 
-            where("uid", "==", "teacher-mock-uid")
+            where("uid", "==", user.uid)
         );
-        const allResultsQuery = query(collection(db, 'results'), where('teacherUid', '==', 'teacher-mock-uid'));
+        const allResultsQuery = query(collection(db, 'results'), where('teacherUid', '==', user.uid));
         
         const [assessmentsSnapshot, allResultsSnapshot] = await Promise.all([
             getDocs(assessmentsQuery),
