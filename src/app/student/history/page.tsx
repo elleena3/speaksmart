@@ -63,10 +63,10 @@ export default function HistoryPage() {
         );
         const resultsSnapshot = await getDocs(resultsQuery);
         
-        // 2. Filter for "채점 완료" status on the client-side.
+        // 2. Filter for "채점 완료" status and valid assessmentTitle on the client-side.
         const studentResults = resultsSnapshot.docs
             .map(doc => ({ id: doc.id, ...doc.data() } as StudentResult))
-            .filter(result => result.status === "채점 완료");
+            .filter(result => result.status === "채점 완료" && result.assessmentTitle);
 
         const resultsByAssessmentId: { [key: string]: StudentResult[] } = {};
         for (const result of studentResults) {
