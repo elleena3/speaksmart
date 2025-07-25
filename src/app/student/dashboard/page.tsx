@@ -71,7 +71,6 @@ function AssessmentCard({ assessment, t }: { assessment: CombinedAssessment, t: 
       if (displayStatus === "오류") return "다시 시도";
       if (displayStatus === "채점 중") return "채점 현황 보기"; // This would link to the processing page if we had one
       if (displayStatus === "채점 완료") {
-          const attemptQuery = hasMultipleAttempts ? `&attempt=${assessment.completedAttemptsCount}` : '';
           return hasMultipleAttempts ? "종합 결과 보기" : t.studentDashboard.viewResults;
       }
       return t.studentDashboard.startAssessment;
@@ -153,14 +152,32 @@ export default function StudentDashboard() {
     }
 
     try {
-        const assessmentsQuery = query(collection(db, "assessments"), orderBy("createdAt", "desc"));
-        const resultsQuery = query(collectionGroup(db, "results"), where("studentId", "==", user.uid));
+        const assessmentsRef = collection(db, "assessments");
 
-        const [assessmentsSnapshot, resultsSnapshot] = await Promise.all([
-            getDocs(assessmentsQuery),
-            getDocs(resultsQuery),
-        ]);
+        // 1. Fetch assessments assigned to the specific student OR to all students
+        const qAssigned = query(assessmentsRef, where("targetStudentIds", "array-contains", user.uid));
+        const qAll = query(assessmentsRef, where("targetStudentIds", "==", "all"));
         
+        const [assignedSnapshot, allSnapshot] = await Promise.all([getDocs(qAssigned), getDocs(qAll)]);
+        
+        const allAssignedAssessments: TeacherAssessment[] = [];
+        const assessmentIds = new Set<string>();
+
+        const processSnapshot = (snapshot: typeof assignedSnapshot) => {
+            snapshot.forEach(doc => {
+                if (!assessmentIds.has(doc.id)) {
+                    assessmentIds.add(doc.id);
+                    allAssignedAssessments.push({ id: doc.id, ...doc.data() } as TeacherAssessment);
+                }
+            });
+        };
+        processSnapshot(assignedSnapshot);
+        processSnapshot(allSnapshot);
+
+        // 2. Fetch all results for this student to determine their status for each assessment
+        const resultsQuery = query(collection(db, "results"), where("studentId", "==", user.uid));
+        const resultsSnapshot = await getDocs(resultsQuery);
+
         const resultsByAssessment = new Map<string, StudentResult[]>();
         resultsSnapshot.forEach(doc => {
             const result = { id: doc.id, ...doc.data() } as StudentResult;
@@ -168,41 +185,30 @@ export default function StudentDashboard() {
             resultsByAssessment.set(result.assessmentId, [...existing, result]);
         });
         
-        const allAssessments = assessmentsSnapshot.docs.map(doc => {
-            const assessment = { id: doc.id, ...doc.data() } as TeacherAssessment;
+        // 3. Combine assessment data with student's result status
+        const combinedAssessments = allAssignedAssessments.map(assessment => {
             const studentResults = resultsByAssessment.get(assessment.id) || [];
-            
-            studentResults.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+            studentResults.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)); // newest first
             const latestResult = studentResults[0];
-
             const completedAttemptsCount = studentResults.filter(r => r.status === '채점 완료').length;
 
             return {
                 ...assessment,
                 resultStatus: latestResult ? latestResult.status : null,
                 resultId: latestResult ? latestResult.id : undefined,
-                completedAttemptsCount: completedAttemptsCount,
+                completedAttemptsCount,
             };
         });
 
-        const filteredAssessments = allAssessments.filter(assessment => {
-            if (!assessment.targetStudentIds || assessment.targetStudentIds === 'all') {
-                return true;
-            }
-            if (Array.isArray(assessment.targetStudentIds) && assessment.targetStudentIds.includes(user.uid)) {
-                return true;
-            }
-            return false;
-        });
-
-        filteredAssessments.sort((a, b) => {
+        // 4. Sort the final list: to-do first, then completed, then by creation date
+        combinedAssessments.sort((a, b) => {
             const aIsCompleted = a.completedAttemptsCount > 0;
             const bIsCompleted = b.completedAttemptsCount > 0;
             if (aIsCompleted !== bIsCompleted) return aIsCompleted ? 1 : -1;
-            return (b.createdAt || 0) - (a.createdAt || 0);
+            return (b.createdAt || 0) - (a.createdAt || 0); // newest first
         });
         
-        setAssessments(filteredAssessments);
+        setAssessments(combinedAssessments);
     } catch (error) {
         console.error("Error fetching assessments:", error);
         toast({
