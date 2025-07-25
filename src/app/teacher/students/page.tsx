@@ -200,6 +200,7 @@ function StudentManagementPage() {
                   <TableCell className="text-muted-foreground">{student.email}</TableCell>
                   <TableCell className="text-right space-x-2">
                     <Button variant="outline" size="sm" onClick={() => handleEditStudent(student)}><Edit className="mr-2 h-4 w-4"/>정보 수정</Button>
+                    <Button variant="outline" size="sm" onClick={() => handlePasswordReset(student)}><KeyRound className="mr-2 h-4 w-4"/>비밀번호 초기화</Button>
                     <AlertDialog>
                         <AlertDialogTrigger asChild>
                             <Button variant="destructive" size="sm"><Trash2 className="mr-2 h-4 w-4"/>삭제</Button>
