@@ -3,13 +3,13 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { LanguageProvider } from '@/context/language-context';
 import { AuthProvider } from '@/context/auth-context';
-import { PT_Sans } from 'next/font/google';
+import { Noto_Sans_KR } from 'next/font/google';
 
-const ptSans = PT_Sans({
+const noto_sans_kr = Noto_Sans_KR({
   subsets: ['latin'],
   weight: ['400', '700'],
-  style: ['normal', 'italic'],
-  variable: '--font-pt-sans',
+  style: ['normal'],
+  variable: '--font-noto-sans-kr',
 });
 
 export const metadata: Metadata = {
@@ -24,7 +24,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko" suppressHydrationWarning>
-      <body className={`${ptSans.variable} font-body antialiased bg-background text-foreground`}>
+      <body className={`${noto_sans_kr.variable} font-body antialiased bg-saebyeol-beige text-basalt-gray`}>
         <AuthProvider>
           <LanguageProvider>
             {children}

@@ -10,11 +10,16 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        body: ['PT Sans', 'sans-serif'],
-        headline: ['PT Sans', 'sans-serif'],
+        body: ['var(--font-noto-sans-kr)', 'sans-serif'],
+        headline: ['var(--font-noto-sans-kr)', 'sans-serif'],
         code: ['monospace'],
       },
       colors: {
+        'jeju-sea': '#4A90E2',
+        'basalt-gray': '#555555',
+        'tangerine': '#F5A623',
+        'bijarim-green': '#2E8B57',
+        'saebyeol-beige': '#F8F5F2',
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
         card: {

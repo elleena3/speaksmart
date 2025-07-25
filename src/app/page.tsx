@@ -32,7 +32,8 @@ export default function Home() {
   
   const RoleButton = ({ role, children }: { role: string; children: React.ReactNode }) => (
     <Button
-      className="w-full"
+      className="w-full bg-white hover:bg-gray-100 text-basalt-gray border-gray-300"
+      variant="outline"
       size="lg"
       onClick={() => handleMockLogin(role)}
       disabled={!!loadingRole || loading}
@@ -45,11 +46,11 @@ export default function Home() {
 
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-background p-4 md:p-8 relative space-y-8">
+    <main className="flex min-h-screen flex-col items-center justify-center bg-saebyeol-beige p-4 md:p-8 relative space-y-8">
       <div className="absolute top-4 right-4">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" className="bg-white/70">
               <Globe className="mr-2 h-4 w-4" />
               <span>{t.language.title}</span>
             </Button>
@@ -67,35 +68,35 @@ export default function Home() {
 
       <div className="text-center">
         <div className="flex justify-center items-center mb-4">
-          <Logo className="w-16 h-16 text-primary" />
-          <h1 className="text-5xl font-bold font-headline ml-4">{t.mainPage.accessTitle}</h1>
+          <Logo className="w-16 h-16 text-jeju-sea" />
+          <h1 className="text-5xl font-bold font-headline text-basalt-gray ml-4">{t.mainPage.accessTitle}</h1>
         </div>
-        <p className="text-xl text-muted-foreground">
+        <p className="text-xl text-gray-500">
           {t.mainPage.accessDescription}
         </p>
       </div>
       
       <div className="flex gap-4">
           <Link href="/login" passHref>
-             <Button size="lg"><LogIn className="mr-2"/>{t.mainPage.loginButton}</Button>
+             <Button size="lg" className="bg-jeju-sea hover:bg-jeju-sea/90"><LogIn className="mr-2"/>{t.mainPage.loginButton}</Button>
           </Link>
           <Link href="/signup" passHref>
-             <Button size="lg" variant="secondary">{t.mainPage.signupButton}</Button>
+             <Button size="lg" variant="secondary" className="bg-tangerine hover:bg-tangerine/90 text-white">{t.mainPage.signupButton}</Button>
           </Link>
       </div>
 
       <div className="w-full max-w-4xl space-y-4">
-        <h2 className="text-center font-semibold text-muted-foreground">{t.mainPage.mockLoginTitle}</h2>
+        <h2 className="text-center font-semibold text-gray-500">{t.mainPage.mockLoginTitle}</h2>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <Card>
+            <Card className="bg-white/70 backdrop-blur-sm shadow-lg hover:shadow-xl transition-shadow">
                 <CardHeader>
                     <div className="flex items-center gap-3">
-                        <div className="p-3 bg-primary/10 rounded-full">
-                            <Users className="h-6 w-6 text-primary" />
+                        <div className="p-3 bg-jeju-sea/10 rounded-full">
+                            <Users className="h-6 w-6 text-jeju-sea" />
                         </div>
                         <div>
-                            <CardTitle>{t.mainPage.studentLoginTitle}</CardTitle>
-                            <CardDescription>{t.mainPage.studentLoginDescription}</CardDescription>
+                            <CardTitle className="text-basalt-gray">{t.mainPage.studentLoginTitle}</CardTitle>
+                            <CardDescription className="text-gray-500">{t.mainPage.studentLoginDescription}</CardDescription>
                         </div>
                     </div>
                 </CardHeader>
@@ -106,15 +107,15 @@ export default function Home() {
                 </CardContent>
             </Card>
             
-            <Card>
+            <Card className="bg-white/70 backdrop-blur-sm shadow-lg hover:shadow-xl transition-shadow">
                 <CardHeader>
                      <div className="flex items-center gap-3">
-                        <div className="p-3 bg-primary/10 rounded-full">
-                            <School className="h-6 w-6 text-primary" />
+                        <div className="p-3 bg-jeju-sea/10 rounded-full">
+                            <School className="h-6 w-6 text-jeju-sea" />
                         </div>
                         <div>
-                            <CardTitle>{t.mainPage.teacherLoginTitle}</CardTitle>
-                            <CardDescription>{t.mainPage.teacherLoginDescription}</CardDescription>
+                            <CardTitle className="text-basalt-gray">{t.mainPage.teacherLoginTitle}</CardTitle>
+                            <CardDescription className="text-gray-500">{t.mainPage.teacherLoginDescription}</CardDescription>
                         </div>
                     </div>
                 </CardHeader>
@@ -125,7 +126,7 @@ export default function Home() {
         </div>
       </div>
       
-      <footer className="mt-8 text-center text-muted-foreground text-sm absolute bottom-8">
+      <footer className="mt-8 text-center text-gray-500 text-sm absolute bottom-8">
         <p>{t.mainPage.footer}</p>
       </footer>
     </main>

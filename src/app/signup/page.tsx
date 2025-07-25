@@ -106,14 +106,14 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-saebyeol-beige p-4">
+      <Card className="w-full max-w-md bg-white/80 backdrop-blur-sm shadow-xl hover:shadow-2xl transition-shadow duration-300">
         <CardHeader className="text-center">
            <Link href="/" className="flex justify-center items-center mb-4">
-                <Logo className="w-12 h-12 text-primary" />
+                <Logo className="w-12 h-12 text-jeju-sea" />
             </Link>
-          <CardTitle className="text-2xl">학생 회원가입</CardTitle>
-          <CardDescription>계정을 만들어 평가에 참여하세요.</CardDescription>
+          <CardTitle className="text-2xl text-basalt-gray">학생 회원가입</CardTitle>
+          <CardDescription className="text-gray-500">계정을 만들어 평가에 참여하세요.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -123,9 +123,9 @@ export default function SignupPage() {
                 name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>이름 (아이디로 사용)</FormLabel>
+                    <FormLabel className="text-basalt-gray">이름 (아이디로 사용)</FormLabel>
                     <FormControl>
-                      <Input placeholder="홍길동" {...field} />
+                      <Input className="bg-gray-50 border-gray-300" placeholder="홍길동" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -137,9 +137,9 @@ export default function SignupPage() {
                   name="grade"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>학년</FormLabel>
+                      <FormLabel className="text-basalt-gray">학년</FormLabel>
                       <FormControl>
-                        <Input placeholder="1" {...field} />
+                        <Input className="bg-gray-50 border-gray-300" placeholder="1" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -150,9 +150,9 @@ export default function SignupPage() {
                   name="class"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>반</FormLabel>
+                      <FormLabel className="text-basalt-gray">반</FormLabel>
                       <FormControl>
-                        <Input placeholder="3" {...field} />
+                        <Input className="bg-gray-50 border-gray-300" placeholder="3" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -163,9 +163,9 @@ export default function SignupPage() {
                   name="number"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>번호</FormLabel>
+                      <FormLabel className="text-basalt-gray">번호</FormLabel>
                       <FormControl>
-                        <Input placeholder="15" {...field} />
+                        <Input className="bg-gray-50 border-gray-300" placeholder="15" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -177,9 +177,9 @@ export default function SignupPage() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>이메일</FormLabel>
+                    <FormLabel className="text-basalt-gray">이메일</FormLabel>
                     <FormControl>
-                      <Input placeholder="email@example.com" {...field} />
+                      <Input className="bg-gray-50 border-gray-300" placeholder="email@example.com" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -190,23 +190,23 @@ export default function SignupPage() {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>비밀번호</FormLabel>
+                    <FormLabel className="text-basalt-gray">비밀번호</FormLabel>
                     <FormControl>
-                      <Input type="password" placeholder="6자 이상" {...field} />
+                      <Input className="bg-gray-50 border-gray-300" type="password" placeholder="6자 이상" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full" disabled={isLoading}>
+              <Button type="submit" className="w-full bg-jeju-sea hover:bg-jeju-sea/90" disabled={isLoading}>
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 회원가입
               </Button>
             </form>
           </Form>
-          <p className="mt-4 text-center text-sm text-muted-foreground">
+          <p className="mt-4 text-center text-sm text-gray-500">
             이미 계정이 있으신가요?{" "}
-            <Link href="/login" className="font-medium text-primary hover:underline">
+            <Link href="/login" className="font-medium text-tangerine hover:underline">
               로그인
             </Link>
           </p>
@@ -215,4 +215,3 @@ export default function SignupPage() {
     </div>
   );
 }
-

@@ -89,14 +89,14 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-saebyeol-beige p-4">
+      <Card className="w-full max-w-md bg-white/80 backdrop-blur-sm shadow-xl hover:shadow-2xl transition-shadow duration-300">
         <CardHeader className="text-center">
             <Link href="/" className="flex justify-center items-center mb-4">
-                <Logo className="w-12 h-12 text-primary" />
+                <Logo className="w-12 h-12 text-jeju-sea" />
             </Link>
-          <CardTitle className="text-2xl">로그인</CardTitle>
-          <CardDescription>SpeakSmart 평가도구에 오신 것을 환영합니다.</CardDescription>
+          <CardTitle className="text-2xl text-basalt-gray">로그인</CardTitle>
+          <CardDescription className="text-gray-500">SpeakSmart 평가도구에 오신 것을 환영합니다.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -106,9 +106,9 @@ export default function LoginPage() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>이메일</FormLabel>
+                    <FormLabel className="text-basalt-gray">이메일</FormLabel>
                     <FormControl>
-                      <Input placeholder="email@example.com" {...field} />
+                      <Input className="bg-gray-50 border-gray-300" placeholder="email@example.com" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -119,23 +119,23 @@ export default function LoginPage() {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>비밀번호</FormLabel>
+                    <FormLabel className="text-basalt-gray">비밀번호</FormLabel>
                     <FormControl>
-                      <Input type="password" placeholder="••••••••" {...field} />
+                      <Input className="bg-gray-50 border-gray-300" type="password" placeholder="••••••••" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full" disabled={isLoading}>
+              <Button type="submit" className="w-full bg-jeju-sea hover:bg-jeju-sea/90" disabled={isLoading}>
                 {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogIn className="mr-2 h-4 w-4"/>}
                 로그인
               </Button>
             </form>
           </Form>
-          <p className="mt-4 text-center text-sm text-muted-foreground">
+          <p className="mt-4 text-center text-sm text-gray-500">
             계정이 없으신가요?{" "}
-            <Link href="/signup" className="font-medium text-primary hover:underline">
+            <Link href="/signup" className="font-medium text-tangerine hover:underline">
               학생 회원가입
             </Link>
           </p>
