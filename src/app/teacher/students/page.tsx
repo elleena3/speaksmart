@@ -196,7 +196,7 @@ function StudentManagementPage() {
               </TableHeader>
               <TableBody>
                 {filteredStudents.map(student => (
-                  <TableRow key={student.uid}>
+                  <TableRow key={student.docId || student.uid}>
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <Avatar className="h-9 w-9">
