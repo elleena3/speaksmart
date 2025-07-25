@@ -4,7 +4,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Globe, Users, School, Loader2, KeyRound, AlertTriangle, LogIn } from "lucide-react";
+import { Globe, Users, School, Loader2 } from "lucide-react";
 import { Logo } from "@/components/icons";
 import { useLanguage } from "@/context/language-context";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -76,15 +76,6 @@ export default function Home() {
         </p>
       </div>
       
-      <div className="flex gap-4">
-          <Link href="/login" passHref>
-             <Button size="lg" className="bg-jeju-sea hover:bg-jeju-sea/90"><LogIn className="mr-2"/>{t.mainPage.loginButton}</Button>
-          </Link>
-          <Link href="/signup" passHref>
-             <Button size="lg" variant="secondary" className="bg-tangerine hover:bg-tangerine/90 text-white">{t.mainPage.signupButton}</Button>
-          </Link>
-      </div>
-
       <div className="w-full max-w-4xl space-y-4">
         <h2 className="text-center font-semibold text-gray-500">{t.mainPage.mockLoginTitle}</h2>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
