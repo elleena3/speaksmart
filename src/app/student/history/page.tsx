@@ -101,9 +101,9 @@ export default function HistoryPage() {
                 assessmentId: latestAttempt.assessmentId,
                 assessmentTitle: assessmentDetails?.title || latestAttempt.assessmentTitle || "제목 없음",
                 assessmentType: assessmentDetails?.assessmentType || 'monologue',
-                latestAttempt: latestAttempt,
+                latestAttempt: { ...latestAttempt, assessmentType: assessmentDetails?.assessmentType },
                 // Reverse previous attempts to show them in chronological order (1st, 2nd...)
-                previousAttempts: previousAttempts.reverse(),
+                previousAttempts: previousAttempts.map(p => ({ ...p, assessmentType: assessmentDetails?.assessmentType })).reverse(),
                 totalAttempts: attempts.length,
             };
         }).filter(group => group.totalAttempts > 0);
