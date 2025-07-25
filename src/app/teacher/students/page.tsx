@@ -2,11 +2,11 @@
 "use client";
 
 import React, { useEffect, useState, useMemo } from 'react';
-import { collection, getDocs, query, where, doc, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, query, where, doc, updateDoc, deleteDoc, writeBatch } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/context/auth-context';
 import { type UserData } from '@/lib/types';
-import { Loader2, ChevronsUpDown, Check, Edit, Mail, KeyRound, Search } from 'lucide-react';
+import { Loader2, ChevronsUpDown, Check, Edit, Mail, KeyRound, Search, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -91,6 +92,35 @@ function StudentManagementPage() {
     });
   };
 
+  const handleDeleteStudent = async (studentToDelete: UserData) => {
+    if (!studentToDelete.docId || !studentToDelete.uid) return;
+    
+    try {
+        const batch = writeBatch(db);
+
+        // 1. Delete the student's user document
+        const studentRef = doc(db, "users", studentToDelete.docId);
+        batch.delete(studentRef);
+
+        // 2. Find and delete all of the student's results
+        const resultsQuery = query(collection(db, "results"), where("studentId", "==", studentToDelete.uid));
+        const resultsSnapshot = await getDocs(resultsQuery);
+        resultsSnapshot.forEach((resultDoc) => {
+            batch.delete(resultDoc.ref);
+        });
+
+        // 3. Commit the batch
+        await batch.commit();
+
+        setStudents(prev => prev.filter(s => s.uid !== studentToDelete.uid));
+        toast({ title: "삭제 완료", description: `${studentToDelete.displayName} 학생의 정보와 모든 평가 기록이 삭제되었습니다.` });
+
+    } catch (error) {
+        console.error("Error deleting student:", error);
+        toast({ title: "오류", description: "학생 정보 삭제에 실패했습니다.", variant: "destructive" });
+    }
+  };
+
   const onEditSubmit = async (values: z.infer<typeof editFormSchema>) => {
     if (!selectedStudent || !selectedStudent.docId) return;
     
@@ -125,7 +155,7 @@ function StudentManagementPage() {
       <Card>
         <CardHeader>
           <CardTitle>학생 관리</CardTitle>
-          <CardDescription>등록된 모든 학생 목록입니다. 정보를 수정하거나 비밀번호를 재설정할 수 있습니다.</CardDescription>
+          <CardDescription>등록된 모든 학생 목록입니다. 정보를 수정하거나 계정을 삭제할 수 있습니다.</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap items-center gap-4 mb-4">
@@ -170,7 +200,25 @@ function StudentManagementPage() {
                   <TableCell className="text-muted-foreground">{student.email}</TableCell>
                   <TableCell className="text-right space-x-2">
                     <Button variant="outline" size="sm" onClick={() => handleEditStudent(student)}><Edit className="mr-2 h-4 w-4"/>정보 수정</Button>
-                    <Button variant="secondary" size="sm" onClick={() => handlePasswordReset(student)}><KeyRound className="mr-2 h-4 w-4"/>비번 초기화</Button>
+                    <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                            <Button variant="destructive" size="sm"><Trash2 className="mr-2 h-4 w-4"/>삭제</Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>{student.displayName} 학생을 삭제하시겠습니까?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    이 작업은 되돌릴 수 없습니다. 학생의 계정 정보와 함께 모든 평가 결과 기록이 영구적으로 삭제됩니다.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>취소</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleDeleteStudent(student)} className="bg-destructive hover:bg-destructive/90">
+                                    삭제
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
                   </TableCell>
                 </TableRow>
               ))}
