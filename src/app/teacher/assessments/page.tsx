@@ -33,29 +33,33 @@ export default function AssessmentsPage() {
   const fetchAssessments = useCallback(async () => {
     if (!user) return;
     setIsLoading(true);
-
-    if (!db) {
-        toast({ title: "오류", description: "Firebase가 설정되지 않아 평가를 불러올 수 없습니다.", variant: "destructive" });
-        setIsLoading(false);
-        return;
-    }
-
     try {
-        const assessmentsQuery = query(
-            collection(db, "assessments"), 
-            where("uid", "==", user.uid),
-            orderBy("createdAt", "desc")
-        );
+        const assessmentsQuery = query(collection(db, "assessments"), where("uid", "==", user.uid));
         
-        const assessmentsSnapshot = await getDocs(assessmentsQuery);
-        
-        const assessmentsData = assessmentsSnapshot.docs.map((doc) => {
-            const data = { id: doc.id, ...doc.data() } as TeacherAssessment;
-            // 통계 정보는 기본값으로 설정
-            data.submissionCount = 0;
-            data.averageScore = 0;
-            return data;
+        const allResultsQuery = query(collection(db, 'results'), where('teacherUid', '==', user.uid));
+
+        const [assessmentsSnapshot, allResultsSnapshot] = await Promise.all([
+            getDocs(assessmentsQuery),
+            getDocs(allResultsQuery)
+        ]);
+
+        const submissionCounts = new Map<string, Set<string>>();
+        allResultsSnapshot.forEach(resultDoc => {
+            const result = resultDoc.data();
+            if (!submissionCounts.has(result.assessmentId)) {
+                submissionCounts.set(result.assessmentId, new Set());
+            }
+            submissionCounts.get(result.assessmentId)!.add(result.studentId);
         });
+
+        const assessmentsData = assessmentsSnapshot.docs.map((doc) => {
+            const assessment = { id: doc.id, ...doc.data() } as TeacherAssessment;
+            assessment.submissionCount = submissionCounts.get(assessment.id)?.size || 0;
+            return assessment;
+        });
+
+        // Sort assessments by createdAt in descending order (client-side)
+        assessmentsData.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 
         setAssessments(assessmentsData);
         setSelectedRowIds([]);
@@ -80,19 +84,19 @@ export default function AssessmentsPage() {
 
   const performCopy = async (assessmentId: string) => {
     const assessmentToCopy = assessments.find(a => a.id === assessmentId);
-    if (!assessmentToCopy || !db) return;
+    if (!assessmentToCopy) return;
 
     try {
       const { id, ...copyData } = assessmentToCopy;
       
       await addDoc(collection(db, "assessments"), {
         ...copyData,
+        // The title is now copied exactly as it is.
         title: `${copyData.title}`, 
         createdAt: Date.now(),
         dateCreated: new Date().toISOString().split('T')[0],
         submissionCount: 0,
         averageScore: 0,
-        submissions: {},
       });
 
       toast({
@@ -106,25 +110,38 @@ export default function AssessmentsPage() {
     }
   };
 
+  const handleCopy = (assessmentId: string) => {
+    const assessmentToCopy = assessments.find(a => a.id === assessmentId);
+    if (!assessmentToCopy) return;
+
+    const isTitleDuplicate = assessments.some(a => a.title === assessmentToCopy.title && a.id !== assessmentId);
+    
+    // Always trigger the confirmation dialog for copying
+    document.getElementById(`copy-dialog-trigger-${assessmentId}`)?.click();
+  };
+
+
   const deleteAssessmentAndResults = async (assessmentIds: string[]) => {
-    if (!db) {
-      toast({ title: "삭제 실패", description: "Firebase DB가 설정되지 않았습니다.", variant: "destructive" });
-      return;
-    }
     const batch = writeBatch(db);
     const resultsCollection = collection(db, 'results');
 
+    // For each assessment, find and delete its results
     for (const id of assessmentIds) {
+        // Delete the assessment itself
         const assessmentRef = doc(db, "assessments", id);
         batch.delete(assessmentRef);
 
+        // Query for related results
         const resultsQuery = query(resultsCollection, where('assessmentId', '==', id));
         const resultsSnapshot = await getDocs(resultsQuery);
 
+        // Add each result to the batch delete
         resultsSnapshot.forEach(resultDoc => {
             batch.delete(resultDoc.ref);
         });
     }
+
+    // Commit the batch
     await batch.commit();
   }
 
@@ -184,20 +201,34 @@ export default function AssessmentsPage() {
   
   const getTargetAudienceText = (targetStudentIds?: string[] | 'all'): string => {
     if (!targetStudentIds || targetStudentIds === 'all') {
-      return `(${t.teacherAssessments.targetAudience.all})`;
+      return t.teacherAssessments.targetAudience.all;
     }
     if (Array.isArray(targetStudentIds)) {
       if (targetStudentIds.length === 1) {
         const student = mockStudents.find(s => s.uid === targetStudentIds[0]);
-        return student ? `(${student.displayName})` : `(${t.teacherAssessments.targetAudience.individual})`;
+        return student ? student.displayName || '개별' : '개별';
       }
       if (targetStudentIds.length > 1) {
-        return `(${t.teacherAssessments.targetAudience.group} ${targetStudentIds.length})`;
+        return `${t.teacherAssessments.targetAudience.group} (${targetStudentIds.length})`;
       }
     }
-    return `(${t.teacherAssessments.targetAudience.all})`;
+    return t.teacherAssessments.targetAudience.all; // Fallback
   };
   
+  const getCompletionFraction = (assessment: TeacherAssessment) => {
+    const submissionCount = assessment.submissionCount ?? 0;
+    const { targetStudentIds } = assessment;
+    let totalStudents = 0;
+
+    if (!targetStudentIds || targetStudentIds === 'all') {
+      totalStudents = mockStudents.length;
+    } else if (Array.isArray(targetStudentIds)) {
+      totalStudents = targetStudentIds.length;
+    }
+
+    return `${submissionCount} / ${totalStudents}`;
+  }
+
   const numSelected = selectedRowIds.length;
   const rowCount = assessments.length;
 
@@ -216,80 +247,84 @@ export default function AssessmentsPage() {
       </div>
       <Card>
         <CardContent className="p-0">
-          <div className="p-4 border-b">
-            {numSelected > 0 ? (
-              <div className="flex items-center gap-4">
-                <span className="text-sm font-medium">{numSelected}개 선택됨</span>
-                 <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                       <Button variant="destructive" size="sm" disabled={isDeleting}>
-                          {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
-                          선택 항목 삭제
-                       </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>정말로 삭제하시겠습니까?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          선택된 {numSelected}개의 평가를 영구적으로 삭제합니다. 이 작업은 되돌릴 수 없습니다.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>취소</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleBulkDelete} className="bg-destructive hover:bg-destructive/90">삭제</AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                </AlertDialog>
-              </div>
-            ) : (
-              <span className="text-sm text-muted-foreground">삭제할 평가를 선택하세요.</span>
-            )}
-          </div>
           {isLoading ? (
              <div className="flex justify-center items-center h-64">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
           ) : assessments.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-12 text-center px-4">
-                    <Checkbox
-                      checked={rowCount > 0 && numSelected === rowCount}
-                      onCheckedChange={(value) => {
-                        setSelectedRowIds(value ? assessments.map((a) => a.id) : []);
-                      }}
-                      aria-label="모두 선택"
-                    />
-                  </TableHead>
-                  <TableHead className="w-[40%]">{t.teacherAssessments.tableHeaderTitle}</TableHead>
-                  <TableHead className="text-center">{t.teacherAssessments.tableHeaderType}</TableHead>
-                  <TableHead className="text-center">{t.teacherAssessments.tableHeaderPeriod}</TableHead>
-                  <TableHead className="text-center">{t.teacherAssessments.tableHeaderCompleted}</TableHead>
-                  <TableHead className="text-center">{t.teacherAssessments.tableHeaderAvgScore}</TableHead>
-                  <TableHead className="text-center"><span className="sr-only">{t.teacherAssessments.tableHeaderActions}</span></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {assessments.map((assessment) => (
-                  <TableRow key={assessment.id} data-state={selectedRowIds.includes(assessment.id) && "selected"}>
-                    <TableCell className="text-center px-4">
-                       <Checkbox
-                        checked={selectedRowIds.includes(assessment.id)}
+            <div>
+              <div className="p-4 border-b flex items-center gap-4">
+                {numSelected > 0 ? (
+                  <>
+                    <span className="text-sm font-medium">{numSelected}개 선택됨</span>
+                     <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                           <Button variant="destructive" size="sm" disabled={isDeleting}>
+                              {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                              선택 항목 삭제
+                           </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>정말로 삭제하시겠습니까?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              선택된 {numSelected}개의 평가를 영구적으로 삭제합니다. 이 작업은 되돌릴 수 없습니다.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>취소</AlertDialogCancel>
+                            <AlertDialogAction onClick={handleBulkDelete} className="bg-destructive hover:bg-destructive/90">삭제</AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+                  </>
+                ) : (
+                  <span className="text-sm text-muted-foreground">삭제할 평가를 선택하세요.</span>
+                )}
+              </div>
+               <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead padding="checkbox" className="w-12 text-center">
+                      <Checkbox
+                        checked={rowCount > 0 && numSelected === rowCount}
                         onCheckedChange={(value) => {
-                          setSelectedRowIds(
-                            value
-                              ? [...selectedRowIds, assessment.id]
-                              : selectedRowIds.filter((id) => id !== assessment.id)
-                          );
+                          if (value) {
+                            setSelectedRowIds(assessments.map((a) => a.id));
+                          } else {
+                            setSelectedRowIds([]);
+                          }
                         }}
-                        aria-label={`${assessment.title} 선택`}
+                        aria-label="모두 선택"
                       />
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      <div className="flex flex-col">
-                         <div className="flex items-center gap-2">
-                           <Link href={`/teacher/assessment/${assessment.id}`} className="hover:underline text-primary font-semibold">
+                    </TableHead>
+                    <TableHead>{t.teacherAssessments.tableHeaderTitle}</TableHead>
+                    <TableHead className="text-center">{t.teacherAssessments.tableHeaderType}</TableHead>
+                    <TableHead className="text-center">{t.teacherAssessments.tableHeaderPeriod}</TableHead>
+                    <TableHead className="text-center">{t.teacherAssessments.tableHeaderCompleted}</TableHead>
+                    <TableHead className="text-center">{t.teacherAssessments.tableHeaderAvgScore}</TableHead>
+                    <TableHead className="text-center"><span className="sr-only">{t.teacherAssessments.tableHeaderActions}</span></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {assessments.map((assessment) => (
+                    <TableRow key={assessment.id} data-state={selectedRowIds.includes(assessment.id) && "selected"}>
+                      <TableCell padding="checkbox" className="text-center">
+                         <Checkbox
+                          checked={selectedRowIds.includes(assessment.id)}
+                          onCheckedChange={(value) => {
+                            if (value) {
+                              setSelectedRowIds([...selectedRowIds, assessment.id]);
+                            } else {
+                              setSelectedRowIds(selectedRowIds.filter((id) => id !== assessment.id));
+                            }
+                          }}
+                          aria-label={`${assessment.title} 선택`}
+                        />
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                           <Link href={`/teacher/assessment/${assessment.id}`} className="hover:underline text-primary">
                              {`${assessment.title}`}
                            </Link>
                            {assessment.useRubric && (
@@ -299,90 +334,100 @@ export default function AssessmentsPage() {
                              </Badge>
                            )}
                         </div>
-                        <span className="text-sm text-muted-foreground">
-                            {assessment.prompt} {getTargetAudienceText(assessment.targetStudentIds)}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-center">
-                       <Badge variant="outline">{getAssessmentTypeText(assessment)}</Badge>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground text-center">
-                       {formatDateRange(assessment.startDate, assessment.endDate)}
-                    </TableCell>
-                    <TableCell className="text-center">
-                       <div className="flex items-center justify-center gap-1.5">
-                         <Users className="h-4 w-4 text-muted-foreground" />
-                          <Badge variant="secondary" className="text-white">- / -</Badge>
-                       </div>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <Badge variant="outline" className="font-mono">
-                        {t.teacherAssessments.scoreNotApplicable}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-center">
-                       <AlertDialog>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" className="h-8 w-8 p-0">
-                                <span className="sr-only">{t.teacherAssessments.menuOpen}</span>
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem asChild>
-                                <Link href={`/teacher/assessment/${assessment.id}`}>{t.teacherAssessments.menuViewResults}</Link>
-                              </DropdownMenuItem>
-                              <DropdownMenuItem asChild>
-                                <Link href={`/teacher/assessments/${assessment.id}/edit`}>{t.teacherAssessments.menuEdit}</Link>
-                              </DropdownMenuItem>
-                              <AlertDialogTrigger asChild>
-                                <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                                  <Copy className="mr-2 h-4 w-4" />
-                                  {t.teacherAssessments.menuCopy}
+                        <p className="text-sm text-muted-foreground">{assessment.topic} ({getTargetAudienceText(assessment.targetStudentIds)})</p>
+                      </TableCell>
+                      <TableCell className="text-center">
+                         <Badge variant="outline">{getAssessmentTypeText(assessment)}</Badge>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground text-center">
+                         {formatDateRange(assessment.startDate, assessment.endDate)}
+                      </TableCell>
+                      <TableCell className="text-center">
+                         <div className="flex items-center justify-center gap-1.5">
+                           <Users className="h-4 w-4 text-muted-foreground" />
+                           <Badge variant={(assessment.submissionCount ?? 0) > 0 ? "default" : "secondary"}>
+                             {getCompletionFraction(assessment)}
+                           </Badge>
+                         </div>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Badge variant="outline" className="font-mono">
+                          {assessment.averageScore > 0 ? `${assessment.averageScore}%` : t.teacherAssessments.scoreNotApplicable}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-center">
+                         <AlertDialog>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" className="h-8 w-8 p-0">
+                                  <span className="sr-only">{t.teacherAssessments.menuOpen}</span>
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem asChild>
+                                  <Link href={`/teacher/assessment/${assessment.id}`}>{t.teacherAssessments.menuViewResults}</Link>
                                 </DropdownMenuItem>
-                              </AlertDialogTrigger>
-                              <DropdownMenuSeparator />
-                              <AlertDialog>
+                                <DropdownMenuItem asChild>
+                                  <Link href={`/teacher/assessments/${assessment.id}/edit`}>{t.teacherAssessments.menuEdit}</Link>
+                                </DropdownMenuItem>
+                                
                                 <AlertDialogTrigger asChild>
-                                  <DropdownMenuItem className="text-destructive focus:bg-destructive/10 focus:text-destructive" onSelect={(e) => e.preventDefault()}>
-                                    {t.teacherAssessments.menuDelete}
+                                  <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                                    <Copy className="mr-2 h-4 w-4" />
+                                    {t.teacherAssessments.menuCopy}
                                   </DropdownMenuItem>
                                 </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>{t.teacherAssessments.deleteDialogTitle}</AlertDialogTitle>
+                                
+                                <DropdownMenuSeparator />
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <DropdownMenuItem className="text-destructive focus:bg-destructive/10 focus:text-destructive" onSelect={(e) => e.preventDefault()}>
+                                      {t.teacherAssessments.menuDelete}
+                                    </DropdownMenuItem>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>{t.teacherAssessments.deleteDialogTitle}</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        {t.teacherAssessments.deleteDialogDescription}
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>{t.teacherAssessments.deleteDialogCancel}</AlertDialogCancel>
+                                      <AlertDialogAction onClick={() => handleDelete(assessment.id)} className="bg-destructive hover:bg-destructive/90">{t.teacherAssessments.deleteDialogConfirm}</AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+
+                            {/* This Dialog is specifically for the copy action */}
+                            <AlertDialogContent>
+                                <AlertDialogHeader>
+                                    <AlertDialogTitle>평가를 복사하시겠습니까?</AlertDialogTitle>
                                     <AlertDialogDescription>
-                                      {t.teacherAssessments.deleteDialogDescription}
+                                        '{assessment.title}' 평가의 모든 설정을 그대로 복사하여 새 평가를 만듭니다.
+                                        {assessments.some(a => a.title === assessment.title) && (
+                                            <span className="mt-2 block font-semibold text-orange-600">
+                                                경고: 같은 이름의 평가가 이미 존재합니다. 그래도 복사하시겠습니까?
+                                            </span>
+                                        )}
                                     </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>{t.teacherAssessments.deleteDialogCancel}</AlertDialogCancel>
-                                    <AlertDialogAction onClick={() => handleDelete(assessment.id)} className="bg-destructive hover:bg-destructive/90">{t.teacherAssessments.deleteDialogConfirm}</AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                          <AlertDialogContent>
-                              <AlertDialogHeader>
-                                  <AlertDialogTitle>평가를 복사하시겠습니까?</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                      '{assessment.title}' 평가의 모든 설정을 그대로 복사하여 새 평가를 만듭니다.
-                                  </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                  <AlertDialogCancel>취소</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => performCopy(assessment.id)}>복사</AlertDialogAction>
-                              </AlertDialogFooter>
-                          </AlertDialogContent>
-                      </AlertDialog>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel>취소</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => performCopy(assessment.id)}>복사</AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           ) : (
             <div className="text-center py-12 border-2 border-dashed rounded-lg m-4">
                 <h3 className="text-lg font-medium text-muted-foreground">{t.teacherAssessments.noAssessments.title}</h3>
