@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useEffect, useState, useCallback } from 'react';
@@ -8,21 +7,19 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { ArrowRight, Users, Loader2, DraftingCompass } from "lucide-react"
+import { ArrowRight, Users, Loader2 } from "lucide-react"
 import Link from "next/link"
-import { type TeacherAssessment, type StudentResult } from "@/lib/types"
+import { type TeacherAssessment } from "@/lib/types"
 import { OverviewChart } from "./overview-chart"
 import { useLanguage } from "@/context/language-context"
 import { useAuth, mockStudents } from '@/context/auth-context';
 import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { useToast } from '@/hooks/use-toast';
 
 export default function TeacherDashboard() {
   const { t } = useLanguage();
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
-  const { toast } = useToast();
   const [assessments, setAssessments] = useState<TeacherAssessment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -30,53 +27,49 @@ export default function TeacherDashboard() {
     if (!user) return;
     setIsLoading(true);
 
-    if (!db) {
-        toast({
-            title: "설정 오류",
-            description: "Firebase 데이터베이스가 설정되지 않았습니다. 대시보드를 표시할 수 없습니다.",
-            variant: "destructive",
-        });
-        setIsLoading(false);
-        return;
-    }
-
     try {
         const assessmentsQuery = query(
             collection(db, "assessments"), 
-            where("uid", "==", user.uid),
-            orderBy("createdAt", "desc"),
-            limit(5)
+            where("uid", "==", user.uid)
+            // Removed orderBy and limit to fetch all and sort client-side
         );
-        const allResultsQuery = query(collection(db, 'results'), where('teacherUid', '==', user.uid));
         
-        const [assessmentsSnapshot, allResultsSnapshot] = await Promise.all([
+        const resultsQuery = query(
+            collection(db, "results"),
+            where("teacherUid", "==", user.uid)
+        );
+
+        const [assessmentsSnapshot, resultsSnapshot] = await Promise.all([
             getDocs(assessmentsQuery),
-            getDocs(allResultsQuery)
+            getDocs(resultsQuery),
         ]);
         
-        const submissionCounts = new Map<string, Set<string>>();
-        allResultsSnapshot.forEach(resultDoc => {
-            const result = resultDoc.data() as StudentResult;
-            if (!submissionCounts.has(result.assessmentId)) {
-                submissionCounts.set(result.assessmentId, new Set());
-            }
-            submissionCounts.get(result.assessmentId)!.add(result.studentId);
-        });
-
         const assessmentsData = assessmentsSnapshot.docs.map(doc => {
             const assessmentData = { id: doc.id, ...doc.data() } as TeacherAssessment;
-            assessmentData.submissionCount = submissionCounts.get(assessmentData.id)?.size || 0;
+            
+            const relevantResults = resultsSnapshot.docs
+                .map(rDoc => rDoc.data())
+                .filter(r => r.assessmentId === assessmentData.id);
+
+            const uniqueStudentIds = new Set(relevantResults.map(r => r.studentId));
+            
+            assessmentData.submissionCount = uniqueStudentIds.size;
+            
             return assessmentData;
         });
         
-        setAssessments(assessmentsData);
+        // Sort client-side to handle missing createdAt fields
+        assessmentsData.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+        // Limit to the 5 most recent assessments after sorting
+        setAssessments(assessmentsData.slice(0, 5));
 
     } catch (error) {
         console.error("Error fetching assessments:", error);
     } finally {
         setIsLoading(false);
     }
-  }, [user, toast]);
+  }, [user]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -162,17 +155,9 @@ export default function TeacherDashboard() {
               {assessments.length > 0 ? assessments.map((assessment) => (
                 <TableRow key={assessment.id}>
                   <TableCell className="font-medium">
-                    <div className="flex items-center gap-2">
-                        <Link href={`/teacher/assessment/${assessment.id}`} className="hover:underline text-primary">
-                          {`${assessment.title} (${getTargetAudienceText(assessment.targetStudentIds)})`}
-                        </Link>
-                         {assessment.useRubric && (
-                           <Badge variant="destructive" className="flex items-center gap-1">
-                             <DraftingCompass className="h-3 w-3" />
-                             루브릭 평가
-                           </Badge>
-                         )}
-                    </div>
+                    <Link href={`/teacher/assessment/${assessment.id}`} className="hover:underline text-primary">
+                      {`${assessment.title} (${getTargetAudienceText(assessment.targetStudentIds)})`}
+                    </Link>
                      <p className="text-sm text-muted-foreground">{assessment.topic}</p>
                   </TableCell>
                   <TableCell className="text-center">
