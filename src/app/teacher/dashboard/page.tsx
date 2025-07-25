@@ -28,7 +28,6 @@ export default function TeacherDashboard() {
     setIsLoading(true);
 
     try {
-        // Firestore 쿼리를 수정하여 uid와 createdAt을 함께 사용하도록 변경
         const assessmentsQuery = query(
             collection(db, "assessments"), 
             where("uid", "==", user.uid),
