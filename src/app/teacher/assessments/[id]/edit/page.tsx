@@ -109,6 +109,13 @@ export default function EditAssessmentPage() {
 
   const fetchAssessment = useCallback(async () => {
     if (!user || !assessmentId) return;
+
+    if (!db) {
+      toast({ title: "오류", description: "Firebase가 설정되지 않아 평가를 불러올 수 없습니다.", variant: "destructive" });
+      setIsLoading(false);
+      return;
+    }
+    
     try {
         const docRef = doc(db, "assessments", assessmentId);
         const docSnap = await getDoc(docRef);
@@ -151,7 +158,7 @@ export default function EditAssessmentPage() {
   }, [language, form]);
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    if (!user || !assessmentId) return;
+    if (!user || !assessmentId || !db) return;
     setIsSubmitting(true);
     
     try {

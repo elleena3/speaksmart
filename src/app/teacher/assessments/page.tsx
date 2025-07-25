@@ -33,6 +33,13 @@ export default function AssessmentsPage() {
   const fetchAssessments = useCallback(async () => {
     if (!user) return;
     setIsLoading(true);
+
+    if (!db) {
+        toast({ title: "오류", description: "Firebase가 설정되지 않아 평가를 불러올 수 없습니다.", variant: "destructive" });
+        setIsLoading(false);
+        return;
+    }
+
     try {
         const assessmentsQuery = query(
             collection(db, "assessments"), 
@@ -85,7 +92,7 @@ export default function AssessmentsPage() {
 
   const performCopy = async (assessmentId: string) => {
     const assessmentToCopy = assessments.find(a => a.id === assessmentId);
-    if (!assessmentToCopy) return;
+    if (!assessmentToCopy || !db) return;
 
     try {
       const { id, ...copyData } = assessmentToCopy;
@@ -123,6 +130,10 @@ export default function AssessmentsPage() {
 
 
   const deleteAssessmentAndResults = async (assessmentIds: string[]) => {
+    if (!db) {
+      toast({ title: "삭제 실패", description: "Firebase DB가 설정되지 않았습니다.", variant: "destructive" });
+      return;
+    }
     const batch = writeBatch(db);
     const resultsCollection = collection(db, 'results');
 

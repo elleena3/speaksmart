@@ -12,6 +12,7 @@ import { db, storage } from "@/lib/firebase";
 import { collection, query, where, onSnapshot, doc, updateDoc, getDocs, addDoc, orderBy } from "firebase/firestore";
 import { generateDialogueAnalysis } from "@/ai/flows/generate-dialogue-analysis-flow";
 import { ref, uploadString, getDownloadURL } from "firebase/storage";
+import { useToast } from '@/hooks/use-toast';
 
 const SESSION_STORAGE_KEY = 'freeTalkSessionData';
 
@@ -78,6 +79,7 @@ export default function DialogueProcessingPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const assessmentId = searchParams.get('id');
+  const { toast } = useToast();
   
   const [analysisStep, setAnalysisStep] = useState<AnalysisStep | null>(null);
   const [status, setStatus] = useState<PageStatus>("loading");
@@ -89,6 +91,17 @@ export default function DialogueProcessingPage() {
 
   useEffect(() => {
     if (authLoading || !user || !assessmentId) return;
+
+    if (!db) {
+        toast({
+            title: "설정 오류",
+            description: "Firebase 데이터베이스가 설정되지 않았습니다. 분석을 진행할 수 없습니다.",
+            variant: "destructive",
+        });
+        setStatus("error");
+        setErrorInfo({ message: "Firebase DB not configured."})
+        return;
+    }
     
     const sessionDataRaw = sessionStorage.getItem(SESSION_STORAGE_KEY);
     if (!sessionDataRaw) {
@@ -257,7 +270,7 @@ export default function DialogueProcessingPage() {
             unsubscribeRef.current();
         }
     };
-  }, [assessmentId, user, authLoading, router]);
+  }, [assessmentId, user, authLoading, router, toast]);
 
   if (status === "loading" || authLoading) {
     return (

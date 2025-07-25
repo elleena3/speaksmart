@@ -10,12 +10,14 @@ import { useAuth } from "@/context/auth-context";
 import { Loader2 } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { collection, query, where, getDocs, doc, getDoc, orderBy } from "firebase/firestore";
+import { useToast } from '@/hooks/use-toast';
 
 export default function AssessmentResultsPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
+  const { toast } = useToast();
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
   
   const [results, setResults] = useState<StudentResult[]>([]);
@@ -24,6 +26,17 @@ export default function AssessmentResultsPage() {
   
   useEffect(() => {
     if (authLoading || !user || !id) return;
+    
+    if (!db) {
+        toast({
+            title: "설정 오류",
+            description: "Firebase 데이터베이스가 설정되지 않았습니다. 결과를 볼 수 없습니다.",
+            variant: "destructive",
+        });
+        setStatus("completed"); // To avoid infinite loading
+        setResults([]);
+        return;
+    }
     
     const fetchResults = async () => {
       try {
@@ -68,7 +81,7 @@ export default function AssessmentResultsPage() {
     
     fetchResults();
 
-  }, [id, user, authLoading, router]);
+  }, [id, user, authLoading, router, toast]);
   
   if (status === "loading" || authLoading) {
     return (

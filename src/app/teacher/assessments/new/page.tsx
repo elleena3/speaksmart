@@ -182,6 +182,11 @@ export default function NewAssessmentPage() {
         toast({ title: "인증 오류", description: "로그인이 필요합니다.", variant: "destructive" });
         return;
     }
+
+    if (!db) {
+      toast({ title: "DB 오류", description: "Firebase가 설정되지 않아 평가를 생성할 수 없습니다.", variant: "destructive" });
+      return;
+    }
     
     const titleToCheck = values.title || (isFreeTalkDialogue ? t.teacherAssessmentForm.scenarios.freeTalk : "");
     if (!titleToCheck) {

@@ -1,3 +1,4 @@
+
 // src/lib/firebase.ts
 import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
 import { getAuth, type Auth } from "firebase/auth";
@@ -25,17 +26,21 @@ export const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
-let app: FirebaseApp;
-let auth: Auth;
-let db: Firestore;
-let storage: FirebaseStorage;
+let app: FirebaseApp | undefined;
+let auth: Auth | undefined;
+let db: Firestore | undefined;
+let storage: FirebaseStorage | undefined;
 
 // 모든 필수 환경 변수가 설정되었는지 확인합니다.
 if (firebaseConfig.apiKey && firebaseConfig.projectId) {
-    app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-    auth = getAuth(app);
-    db = getFirestore(app);
-    storage = getStorage(app);
+    try {
+        app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+        auth = getAuth(app);
+        db = getFirestore(app);
+        storage = getStorage(app);
+    } catch (e) {
+        console.error("Firebase initialization error", e);
+    }
 } else {
   console.warn(
     "Firebase 설정이 .env 파일에 올바르게 구성되지 않았습니다. 실제 Firebase 연동 기능이 작동하지 않을 수 있습니다. .env.example을 참고하여 .env 파일을 설정해주세요."

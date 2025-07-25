@@ -44,6 +44,12 @@ export default function AssessmentSubmissionsPage() {
   const fetchSubmissions = useCallback(async () => {
     if (!user || !assessmentId) return;
     setIsLoading(true);
+    
+    if (!db) {
+        toast({ title: "오류", description: "Firebase가 설정되지 않았습니다.", variant: "destructive"});
+        setIsLoading(false);
+        return;
+    }
 
     try {
         const assessmentRef = doc(db, "assessments", assessmentId);

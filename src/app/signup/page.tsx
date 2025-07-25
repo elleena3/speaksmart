@@ -57,6 +57,16 @@ export default function SignupPage() {
 
     async function onSubmit(values: z.infer<typeof formSchema>) {
         setIsLoading(true);
+        if (!db) {
+            toast({
+                title: "설정 오류",
+                description: "Firebase 데이터베이스가 설정되지 않았습니다. 관리자에게 문의하세요.",
+                variant: "destructive",
+            });
+            setIsLoading(false);
+            return;
+        }
+
         try {
             // Check for duplicate displayName or email
             const usersRef = collection(db, "users");
@@ -97,7 +107,7 @@ export default function SignupPage() {
                 class: values.class,
                 number: values.number,
                 role: "student",
-                createdAt: new Date().toISOString(),
+                createdAt: Date.now(),
                 photoURL: `https://placehold.co/40x40.png?text=${values.displayName.charAt(0)}`,
             });
             

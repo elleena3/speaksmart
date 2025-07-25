@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useMemo } from 'react';
@@ -46,6 +47,15 @@ function StudentManagementPage() {
   useEffect(() => {
     if (authLoading) return;
     if (!user) return;
+    if (!db) {
+        toast({
+            title: "설정 오류",
+            description: "Firebase 데이터베이스가 설정되지 않았습니다. 학생 목록을 볼 수 없습니다.",
+            variant: "destructive",
+        });
+        setIsLoading(false);
+        return;
+    }
 
     const fetchStudents = async () => {
       setIsLoading(true);
@@ -57,7 +67,7 @@ function StudentManagementPage() {
       setIsLoading(false);
     };
     fetchStudents();
-  }, [user, authLoading]);
+  }, [user, authLoading, toast]);
 
   useEffect(() => {
     if (selectedStudent) {
@@ -94,7 +104,7 @@ function StudentManagementPage() {
   };
 
   const handleDeleteStudent = async (studentToDelete: UserData) => {
-    if (!studentToDelete.docId || !studentToDelete.uid) return;
+    if (!studentToDelete.docId || !studentToDelete.uid || !db) return;
     
     try {
         const batch = writeBatch(db);
@@ -123,7 +133,7 @@ function StudentManagementPage() {
   };
 
   const onEditSubmit = async (values: z.infer<typeof editFormSchema>) => {
-    if (!selectedStudent || !selectedStudent.docId) return;
+    if (!selectedStudent || !selectedStudent.docId || !db) return;
     
     try {
       const studentRef = doc(db, "users", selectedStudent.docId);

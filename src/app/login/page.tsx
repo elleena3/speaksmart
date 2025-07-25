@@ -52,6 +52,16 @@ export default function LoginPage() {
 
     async function onSubmit(values: z.infer<typeof formSchema>) {
         setIsLoading(true);
+        if (!db) {
+            toast({
+                title: "설정 오류",
+                description: "Firebase 데이터베이스가 설정되지 않았습니다. 관리자에게 문의하세요.",
+                variant: "destructive",
+            });
+            setIsLoading(false);
+            return;
+        }
+
         try {
             const usersRef = collection(db, "users");
             const q = query(usersRef, where("displayName", "==", values.name), where("password", "==", values.password));

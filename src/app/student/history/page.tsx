@@ -16,7 +16,7 @@ import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
-
+import { useToast } from '@/hooks/use-toast';
 
 type EnrichedResult = StudentResult & {
     assessmentType?: 'monologue' | 'dialogue';
@@ -36,6 +36,7 @@ export default function HistoryPage() {
   const { t } = useLanguage();
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
+  const { toast } = useToast();
   const [groupedAssessments, setGroupedAssessments] = useState<GroupedResult[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [openStates, setOpenStates] = useState<Record<string, boolean>>({});
@@ -45,6 +46,16 @@ export default function HistoryPage() {
     if (!user) {
       router.push('/');
       return;
+    }
+
+    if (!db) {
+        toast({
+            title: "설정 오류",
+            description: "Firebase 데이터베이스가 설정되지 않았습니다. 기록을 볼 수 없습니다.",
+            variant: "destructive",
+        });
+        setIsLoading(false);
+        return;
     }
 
     const fetchHistory = async () => {
@@ -113,7 +124,7 @@ export default function HistoryPage() {
     };
 
     fetchHistory();
-  }, [user, authLoading, router]);
+  }, [user, authLoading, router, toast]);
   
   const toggleGroup = (assessmentId: string) => {
     setOpenStates(prev => ({ ...prev, [assessmentId]: !prev[assessmentId] }));

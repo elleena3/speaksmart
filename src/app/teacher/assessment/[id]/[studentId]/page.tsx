@@ -389,6 +389,13 @@ export default function TeacherStudentResultView() {
   const fetchStudentResults = useCallback(async () => {
     if (!assessmentId || !studentId) return;
     setIsLoading(true);
+    
+    if (!db) {
+      toast({ title: "오류", description: "Firebase가 설정되지 않았습니다.", variant: "destructive" });
+      setIsLoading(false);
+      return;
+    }
+    
     try {
       const resultsQuery = query(
         collection(db, "results"),
@@ -417,6 +424,12 @@ export default function TeacherStudentResultView() {
 
   useEffect(() => {
     if (authLoading || !user) return;
+    
+    if (!db) {
+      toast({ title: "오류", description: "Firebase가 설정되지 않았습니다.", variant: "destructive" });
+      setIsLoading(false);
+      return;
+    }
     
     const fetchInitialData = async () => {
         setIsLoading(true);

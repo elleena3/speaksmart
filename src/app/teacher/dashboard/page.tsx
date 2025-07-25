@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useEffect, useState, useCallback } from 'react';
@@ -15,17 +16,29 @@ import { useLanguage } from "@/context/language-context"
 import { useAuth, mockStudents } from '@/context/auth-context';
 import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { useToast } from '@/hooks/use-toast';
 
 export default function TeacherDashboard() {
   const { t } = useLanguage();
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
+  const { toast } = useToast();
   const [assessments, setAssessments] = useState<TeacherAssessment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchAssessments = useCallback(async () => {
     if (!user) return;
     setIsLoading(true);
+
+    if (!db) {
+        toast({
+            title: "설정 오류",
+            description: "Firebase 데이터베이스가 설정되지 않았습니다. 대시보드를 표시할 수 없습니다.",
+            variant: "destructive",
+        });
+        setIsLoading(false);
+        return;
+    }
 
     try {
         const assessmentsQuery = query(
@@ -63,7 +76,7 @@ export default function TeacherDashboard() {
     } finally {
         setIsLoading(false);
     }
-  }, [user]);
+  }, [user, toast]);
 
   useEffect(() => {
     if (authLoading) return;

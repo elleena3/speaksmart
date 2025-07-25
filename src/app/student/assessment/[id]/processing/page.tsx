@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { db } from "@/lib/firebase";
 import { collection, query, where, onSnapshot, doc, updateDoc, getDocs, addDoc, orderBy } from "firebase/firestore";
 import { generateMonologueAnalysisFlow } from "@/ai/flows/generate-monologue-analysis-flow";
+import { useToast } from '@/hooks/use-toast';
 
 const SESSION_STORAGE_KEY = 'monologueSessionData';
 
@@ -77,6 +78,7 @@ export default function ProcessingPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const params = useParams();
+  const { toast } = useToast();
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
   
   const [analysisStep, setAnalysisStep] = useState<AnalysisStep | null>(null);
@@ -89,6 +91,17 @@ export default function ProcessingPage() {
 
   useEffect(() => {
     if (authLoading || !user || !id) return;
+
+    if (!db) {
+        toast({
+            title: "설정 오류",
+            description: "Firebase 데이터베이스가 설정되지 않았습니다. 분석을 진행할 수 없습니다.",
+            variant: "destructive",
+        });
+        setStatus("error");
+        setErrorInfo({ message: "Firebase DB not configured."})
+        return;
+    }
     
     const sessionDataRaw = sessionStorage.getItem(SESSION_STORAGE_KEY);
     if (!sessionDataRaw) {
@@ -240,7 +253,7 @@ export default function ProcessingPage() {
             unsubscribeRef.current();
         }
     };
-  }, [id, user, authLoading, router]);
+  }, [id, user, authLoading, router, toast]);
 
   if (status === "loading" || authLoading) {
     return (

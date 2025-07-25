@@ -26,6 +26,10 @@ export default function AssessmentPage() {
         router.push('/');
         return;
     }
+    if (!db) {
+        setIsLoading(false);
+        return;
+    }
     if (id) {
         const fetchAssessment = async () => {
             const docRef = doc(db, "assessments", id);
