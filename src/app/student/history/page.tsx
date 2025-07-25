@@ -56,17 +56,30 @@ export default function HistoryPage() {
     }
 
     try {
-        // 1. Fetch all results for the student using a simple query
-        const resultsQuery = query(
-            collection(db, "results"),
-            where("studentId", "==", user.uid)
-        );
-        const resultsSnapshot = await getDocs(resultsQuery);
+        // 1. Fetch student results and all assessments in parallel
+        const resultsQuery = query(collection(db, "results"), where("studentId", "==", user.uid));
+        const assessmentsQuery = query(collection(db, "assessments"));
+
+        const [resultsSnapshot, assessmentsSnapshot] = await Promise.all([
+            getDocs(resultsQuery),
+            getDocs(assessmentsQuery)
+        ]);
         
-        // 2. Filter for "채점 완료" status and valid assessmentTitle on the client-side.
+        // 2. Create a Set of valid assessment IDs for quick lookup
+        const validAssessmentIds = new Set<string>();
+        const assessmentsMap = new Map<string, TeacherAssessment>();
+        assessmentsSnapshot.forEach(doc => {
+            validAssessmentIds.add(doc.id);
+            assessmentsMap.set(doc.id, { id: doc.id, ...doc.data() } as TeacherAssessment);
+        });
+
+        // 3. Filter student results on the client-side
         const studentResults = resultsSnapshot.docs
             .map(doc => ({ id: doc.id, ...doc.data() } as StudentResult))
-            .filter(result => result.status === "채점 완료" && result.assessmentTitle);
+            .filter(result => 
+                result.status === "채점 완료" && // Must be completed
+                validAssessmentIds.has(result.assessmentId) // And must have a valid parent assessment
+            );
 
         const resultsByAssessmentId: { [key: string]: StudentResult[] } = {};
         for (const result of studentResults) {
@@ -74,19 +87,6 @@ export default function HistoryPage() {
                 resultsByAssessmentId[result.assessmentId] = [];
             }
             resultsByAssessmentId[result.assessmentId].push(result);
-        }
-
-        const assessmentIds = Object.keys(resultsByAssessmentId);
-        const assessmentsMap = new Map<string, TeacherAssessment>();
-        if (assessmentIds.length > 0) {
-            const assessmentDocs = await Promise.all(
-              assessmentIds.map(id => getDoc(doc(db, "assessments", id)))
-            );
-            assessmentDocs.forEach(docSnap => {
-                if (docSnap.exists()) {
-                    assessmentsMap.set(docSnap.id, { id: docSnap.id, ...docSnap.data() } as TeacherAssessment);
-                }
-            });
         }
         
         const grouped: GroupedResult[] = Object.entries(resultsByAssessmentId).map(([assessmentId, attempts]) => {
@@ -276,3 +276,5 @@ export default function HistoryPage() {
     </Card>
   );
 }
+
+    
