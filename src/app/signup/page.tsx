@@ -7,8 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { getAuth, createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
-import { doc, setDoc } from "firebase/firestore";
+import { collection, addDoc, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,8 +16,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 import { Logo } from "@/components/icons";
+import { v4 as uuidv4 } from 'uuid';
 
-const auth = getAuth();
 
 const formSchema = z.object({
   name: z.string().min(2, { message: "이름은 2자 이상이어야 합니다." }),
@@ -28,6 +27,13 @@ const formSchema = z.object({
   email: z.string().email({ message: "유효한 이메일 주소를 입력해주세요." }),
   password: z.string().min(6, { message: "비밀번호는 6자 이상이어야 합니다." }),
 });
+
+// A simple function to generate a unique ID, since we are not using Firebase Auth's UID
+function generateUniqueId() {
+    // This is a simple way, for a real app, a more robust method might be needed.
+    return uuidv4();
+}
+
 
 export default function SignupPage() {
   const router = useRouter();
@@ -49,28 +55,36 @@ export default function SignupPage() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
     try {
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        values.email,
-        values.password
-      );
-      const user = userCredential.user;
+      // Check if email already exists
+      const usersRef = collection(db, "users");
+      const q = query(usersRef, where("email", "==", values.email));
+      const querySnapshot = await getDocs(q);
 
-      await updateProfile(user, {
-        displayName: values.name,
-      });
-
-      await setDoc(doc(db, "users", user.uid), {
-        uid: user.uid,
+      if (!querySnapshot.empty) {
+        toast({
+          title: "회원가입 실패",
+          description: "이미 사용 중인 이메일입니다.",
+          variant: "destructive",
+        });
+        setIsLoading(false);
+        return;
+      }
+      
+      // If email doesn't exist, create new user document in Firestore
+      const newUser = {
+        uid: generateUniqueId(),
         displayName: values.name,
         email: values.email,
+        password: values.password, // Storing password in plaintext, as requested.
         photoURL: `https://placehold.co/40x40.png?text=${values.name.charAt(0)}`,
         role: "student",
         grade: values.grade,
         class: values.class,
         number: values.number,
         createdAt: Date.now(),
-      });
+      };
+
+      await addDoc(collection(db, "users"), newUser);
       
       toast({
         title: "회원가입 성공",
@@ -81,13 +95,9 @@ export default function SignupPage() {
 
     } catch (error: any) {
       console.error("Signup error:", error);
-      let errorMessage = "회원가입 중 오류가 발생했습니다.";
-      if (error.code === 'auth/email-already-in-use') {
-        errorMessage = "이미 사용 중인 이메일입니다.";
-      }
       toast({
         title: "회원가입 실패",
-        description: errorMessage,
+        description: "회원가입 중 오류가 발생했습니다.",
         variant: "destructive",
       });
     } finally {
@@ -205,3 +215,4 @@ export default function SignupPage() {
     </div>
   );
 }
+

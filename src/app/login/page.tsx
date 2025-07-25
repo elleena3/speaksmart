@@ -7,8 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,17 +16,18 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, LogIn } from "lucide-react";
 import { Logo } from "@/components/icons";
-
-const auth = getAuth();
+import { useAuth } from "@/context/auth-context";
+import { type UserData } from "@/lib/types";
 
 const formSchema = z.object({
   email: z.string().email({ message: "유효한 이메일 주소를 입력해주세요." }),
-  password: z.string().min(6, { message: "비밀번호는 6자 이상이어야 합니다." }),
+  password: z.string().min(1, { message: "비밀번호를 입력해주세요." }),
 });
 
 export default function LoginPage() {
   const router = useRouter();
   const { toast } = useToast();
+  const { manualLogin } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -41,38 +41,47 @@ export default function LoginPage() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
     try {
-      const userCredential = await signInWithEmailAndPassword(
-        auth,
-        values.email,
-        values.password
+      const usersRef = collection(db, "users");
+      const q = query(
+        usersRef,
+        where("email", "==", values.email),
+        where("password", "==", values.password)
       );
-      const user = userCredential.user;
+      
+      const querySnapshot = await getDocs(q);
 
-      // Firestore에서 사용자 역할 정보 가져오기
-      const userDocRef = doc(db, "users", user.uid);
-      const userDoc = await getDoc(userDocRef);
-
-      if (userDoc.exists()) {
-        const userData = userDoc.data();
-        if (userData.role === 'teacher') {
-          router.push("/teacher/dashboard");
-        } else {
-          router.push("/student/dashboard");
-        }
-      } else {
-        // Firestore에 사용자 문서가 없는 경우 (이론적으로는 발생하지 않음)
+      if (querySnapshot.empty) {
         toast({
-          title: "오류",
-          description: "사용자 정보를 찾을 수 없습니다.",
+          title: "로그인 실패",
+          description: "이메일 또는 비밀번호가 올바르지 않습니다.",
           variant: "destructive",
         });
         setIsLoading(false);
+        return;
       }
+      
+      const userDoc = querySnapshot.docs[0];
+      const userData = userDoc.data() as UserData;
+      
+      // Manually set user in context
+      manualLogin(userData);
+
+      toast({
+        title: "로그인 성공!",
+        description: `환영합니다, ${userData.displayName}님!`,
+      });
+
+      if (userData.role === 'teacher') {
+        router.push("/teacher/dashboard");
+      } else {
+        router.push("/student/dashboard");
+      }
+
     } catch (error: any) {
       console.error("Login error:", error);
       toast({
-        title: "로그인 실패",
-        description: "이메일 또는 비밀번호가 올바르지 않습니다.",
+        title: "오류",
+        description: "로그인 중 문제가 발생했습니다.",
         variant: "destructive",
       });
       setIsLoading(false);

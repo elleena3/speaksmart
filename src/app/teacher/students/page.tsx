@@ -3,11 +3,10 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import { collection, getDocs, query, where, doc, updateDoc } from 'firebase/firestore';
-import { getAuth, sendPasswordResetEmail } from 'firebase/auth';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/context/auth-context';
 import { type UserData } from '@/lib/types';
-import { Loader2, User, ChevronsUpDown, Check, Edit, Mail, KeyRound, Search } from 'lucide-react';
+import { Loader2, ChevronsUpDown, Check, Edit, Mail, KeyRound, Search } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -21,8 +20,6 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-
-const auth = getAuth();
 
 const editFormSchema = z.object({
   grade: z.string().min(1, '학년을 입력해주세요.'),
@@ -52,7 +49,7 @@ function StudentManagementPage() {
       setIsLoading(true);
       const q = query(collection(db, "users"), where("role", "==", "student"));
       const querySnapshot = await getDocs(q);
-      const studentList = querySnapshot.docs.map(doc => doc.data() as UserData);
+      const studentList = querySnapshot.docs.map(doc => ({ ...doc.data(), docId: doc.id }) as UserData & { docId: string });
       studentList.sort((a,b) => (a.displayName).localeCompare(b.displayName));
       setStudents(studentList);
       setIsLoading(false);
@@ -87,28 +84,18 @@ function StudentManagementPage() {
     setIsEditDialogOpen(true);
   };
   
-  const handlePasswordReset = async (email: string) => {
-    try {
-      await sendPasswordResetEmail(auth, email);
-      toast({
-        title: "비밀번호 재설정 이메일 발송",
-        description: `${email}으로 비밀번호를 재설정할 수 있는 링크를 보냈습니다.`,
-      });
-    } catch (error) {
-      console.error("Password reset error:", error);
-      toast({
-        title: "오류",
-        description: "비밀번호 재설정 이메일을 보내는 데 실패했습니다.",
-        variant: "destructive",
-      });
-    }
+  const handlePasswordReset = async (student: UserData) => {
+    toast({
+      title: "기능 안내",
+      description: `이 기능은 보통 이메일로 비밀번호 재설정 링크를 보내지만, 현재 시스템에서는 학생의 비밀번호를 직접 수정할 수 있도록 구현할 수 있습니다.`,
+    });
   };
 
   const onEditSubmit = async (values: z.infer<typeof editFormSchema>) => {
-    if (!selectedStudent) return;
+    if (!selectedStudent || !selectedStudent.docId) return;
     
     try {
-      const studentRef = doc(db, "users", selectedStudent.uid);
+      const studentRef = doc(db, "users", selectedStudent.docId);
       await updateDoc(studentRef, {
         grade: values.grade,
         class: values.class,
@@ -183,7 +170,7 @@ function StudentManagementPage() {
                   <TableCell className="text-muted-foreground">{student.email}</TableCell>
                   <TableCell className="text-right space-x-2">
                     <Button variant="outline" size="sm" onClick={() => handleEditStudent(student)}><Edit className="mr-2 h-4 w-4"/>정보 수정</Button>
-                    <Button variant="secondary" size="sm" onClick={() => handlePasswordReset(student.email)}><KeyRound className="mr-2 h-4 w-4"/>비번 초기화</Button>
+                    <Button variant="secondary" size="sm" onClick={() => handlePasswordReset(student)}><KeyRound className="mr-2 h-4 w-4"/>비번 초기화</Button>
                   </TableCell>
                 </TableRow>
               ))}

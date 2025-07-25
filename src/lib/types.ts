@@ -43,7 +43,9 @@ export type UserData = {
     grade?: string;
     class?: string;
     number?: string;
+    password?: string; // Storing password in plaintext for simplicity as requested.
     createdAt: number;
+    docId?: string; // Firestore document ID
 };
 
 
