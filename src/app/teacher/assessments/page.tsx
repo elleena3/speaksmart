@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { PlusCircle, MoreHorizontal, Copy, Users, Loader2, Trash2, DraftingCompass } from 'lucide-react';
 import Link from 'next/link';
-import { type TeacherAssessment, type StudentResult } from "@/lib/types";
+import { type TeacherAssessment } from "@/lib/types";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -46,34 +46,15 @@ export default function AssessmentsPage() {
             where("uid", "==", user.uid),
             orderBy("createdAt", "desc")
         );
-
-        const allResultsQuery = query(collection(db, 'results'), where('teacherUid', '==', user.uid));
         
-        const [assessmentsSnapshot, allResultsSnapshot] = await Promise.all([
-            getDocs(assessmentsQuery),
-            getDocs(allResultsQuery)
-        ]);
+        const assessmentsSnapshot = await getDocs(assessmentsQuery);
         
-        const resultsByAssessmentId = new Map<string, StudentResult[]>();
-        allResultsSnapshot.forEach(doc => {
-            const result = doc.data() as StudentResult;
-            const assessmentResults = resultsByAssessmentId.get(result.assessmentId) || [];
-            assessmentResults.push(result);
-            resultsByAssessmentId.set(result.assessmentId, assessmentResults);
-        });
-
         const assessmentsData = assessmentsSnapshot.docs.map((doc) => {
-            const assessmentData = { id: doc.id, ...doc.data() } as TeacherAssessment;
-            const relatedResults = resultsByAssessmentId.get(assessmentData.id) || [];
-            
-            const completedResults = relatedResults.filter(r => r.status === '채점 완료');
-            const uniqueSubmissions = new Set(completedResults.map(r => r.studentId));
-            const scores = completedResults.map(r => r.contentScore || 0);
-            
-            assessmentData.submissionCount = uniqueSubmissions.size;
-            assessmentData.averageScore = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
-            
-            return assessmentData;
+            const data = { id: doc.id, ...doc.data() } as TeacherAssessment;
+            // 통계 정보는 기본값으로 설정
+            data.submissionCount = 0;
+            data.averageScore = 0;
+            return data;
         });
 
         setAssessments(assessmentsData);
@@ -217,20 +198,6 @@ export default function AssessmentsPage() {
     return `(${t.teacherAssessments.targetAudience.all})`;
   };
   
-  const getCompletionFraction = (assessment: TeacherAssessment) => {
-    const submissionCount = assessment.submissionCount ?? 0;
-    const { targetStudentIds } = assessment;
-    let totalStudents = 0;
-
-    if (!targetStudentIds || targetStudentIds === 'all') {
-      totalStudents = mockStudents.length;
-    } else if (Array.isArray(targetStudentIds)) {
-      totalStudents = targetStudentIds.length;
-    }
-
-    return `${submissionCount} / ${totalStudents}`;
-  }
-
   const numSelected = selectedRowIds.length;
   const rowCount = assessments.length;
 
@@ -346,14 +313,12 @@ export default function AssessmentsPage() {
                     <TableCell className="text-center">
                        <div className="flex items-center justify-center gap-1.5">
                          <Users className="h-4 w-4 text-muted-foreground" />
-                         <Badge variant={(assessment.submissionCount ?? 0) > 0 ? "default" : "secondary"} className="text-white">
-                           {getCompletionFraction(assessment)}
-                         </Badge>
+                          <Badge variant="secondary" className="text-white">- / -</Badge>
                        </div>
                     </TableCell>
                     <TableCell className="text-center">
                       <Badge variant="outline" className="font-mono">
-                        {(assessment.averageScore ?? 0) > 0 ? `${assessment.averageScore}%` : t.teacherAssessments.scoreNotApplicable}
+                        {t.teacherAssessments.scoreNotApplicable}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-center">
