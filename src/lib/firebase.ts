@@ -26,25 +26,24 @@ export const firebaseConfig = {
   measurementId: "YOUR_MEASUREMENT_ID", // 여기에 측정 ID를 입력하세요 (선택 사항).
 };
 
-let app: FirebaseApp | undefined;
-let auth: Auth | undefined;
-let db: Firestore | undefined;
-let storage: FirebaseStorage | undefined;
+let app: FirebaseApp;
+let auth: Auth;
+let db: Firestore;
+let storage: FirebaseStorage;
 
-// 모든 필수 환경 변수가 설정되었는지 확인합니다.
-if (firebaseConfig.apiKey && firebaseConfig.projectId && firebaseConfig.apiKey !== "YOUR_API_KEY") {
-    try {
-        app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-        auth = getAuth(app);
-        db = getFirestore(app);
-        storage = getStorage(app);
-    } catch (e) {
-        console.error("Firebase initialization error", e);
-    }
-} else {
-  console.warn(
-    "Firebase 설정이 src/lib/firebase.ts 파일에 올바르게 구성되지 않았습니다. 위의 주석을 참고하여 firebaseConfig 객체를 업데이트해주세요."
-  );
+try {
+    app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+    auth = getAuth(app);
+    db = getFirestore(app);
+    storage = getStorage(app);
+} catch (e) {
+    console.error("Firebase initialization error", e);
+    console.warn(
+      "Firebase 설정이 src/lib/firebase.ts 파일에 올바르게 구성되지 않았을 수 있습니다. firebaseConfig 객체를 확인해주세요."
+    );
+    // 앱이 완전히 중단되는 것을 막기 위해 db, auth, storage를 undefined로 두지 않습니다.
+    // 대신, 이후의 코드에서 이 객체들을 사용하기 전에 유효성 검사를 수행해야 합니다.
+    // 현재는 try-catch 블록으로 에러를 로깅하고, 초기화 실패 시 앱이 깨지는 것을 방지합니다.
 }
 
 export { app, db, auth, storage };

@@ -36,9 +36,9 @@ export default function NewAssessmentPage() {
   const { t, language } = useLanguage();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [voicePopoverOpen, setVoicePopoverOpen] = useState(false);
-  const [isDuplicateTitle, setIsDuplicateTitle] = useState(false);
   const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
-  
+  const [formData, setFormData] = useState<z.infer<typeof formSchema> | null>(null);
+
   const formSchema = useMemo(() => z.object({
     title: z.string().optional(),
     topic: z.string().optional(),
@@ -190,19 +190,19 @@ export default function NewAssessmentPage() {
     
     const titleToCheck = values.title || (isFreeTalkDialogue ? t.teacherAssessmentForm.scenarios.freeTalk : "");
     if (!titleToCheck) {
-        proceedToSubmit(values);
+        form.handleSubmit(proceedToSubmit)(values);
         return;
     }
     
+    setFormData(values);
+
     const assessmentsQuery = query(collection(db, "assessments"), where("uid", "==", user.uid), where("title", "==", titleToCheck));
     const querySnapshot = await getDocs(assessmentsQuery);
 
     if (!querySnapshot.empty) {
-        setIsDuplicateTitle(true);
         setShowDuplicateWarning(true);
     } else {
-        setIsDuplicateTitle(false);
-        proceedToSubmit(values);
+        await proceedToSubmit(values);
     }
   }
 
@@ -706,7 +706,7 @@ export default function NewAssessmentPage() {
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                         <AlertDialogCancel>취소</AlertDialogCancel>
-                        <AlertDialogAction onClick={form.handleSubmit(proceedToSubmit)}>
+                        <AlertDialogAction onClick={() => { if(formData) proceedToSubmit(formData) }}>
                             계속
                         </AlertDialogAction>
                         </AlertDialogFooter>
