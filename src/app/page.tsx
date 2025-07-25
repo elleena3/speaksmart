@@ -1,5 +1,4 @@
 
-
 "use client"
 
 import { useState } from "react";
@@ -116,6 +115,21 @@ export default function Home() {
             </Card>
         </div>
       </div>
+
+       <div className="text-center text-sm text-basalt-gray">
+          <p>
+            이미 계정이 있으신가요?{' '}
+            <Link href="/login" className="font-semibold text-tangerine hover:underline">
+              로그인
+            </Link>
+          </p>
+          <p className="mt-1">
+            계정이 없으신가요?{' '}
+            <Link href="/signup" className="font-semibold text-tangerine hover:underline">
+              학생으로 회원가입
+            </Link>
+          </p>
+        </div>
       
       <footer className="mt-8 text-center text-gray-500 text-sm absolute bottom-8">
         <p>{t.mainPage.footer}</p>
