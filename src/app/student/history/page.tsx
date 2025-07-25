@@ -12,7 +12,7 @@ import { useLanguage } from '@/context/language-context';
 import { useAuth } from '@/context/auth-context';
 import { Loader2, ChevronDown, TrendingUp } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -66,7 +66,8 @@ export default function HistoryPage() {
             const resultsQuery = getDocs(query(
                 collection(db, "results"),
                 where("studentId", "==", user.uid),
-                where("status", "==", "채점 완료") // Only fetch completed results
+                where("status", "==", "채점 완료"),
+                orderBy("createdAt", "desc") // Sort on the server
             ));
             
             const [assessmentsSnapshot, resultsSnapshot] = await Promise.all([assessmentsQuery, resultsQuery]);
@@ -79,7 +80,6 @@ export default function HistoryPage() {
             const allResults: EnrichedResult[] = [];
             resultsSnapshot.forEach(doc => {
                 const result = { id: doc.id, ...doc.data() } as StudentResult;
-                // Check if the parent assessment still exists
                 const assessment = assessmentsMap.get(result.assessmentId);
                 if (assessment) {
                     allResults.push({
@@ -88,9 +88,6 @@ export default function HistoryPage() {
                     });
                 }
             });
-            
-            // Sort by creation date descending
-            allResults.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 
             const resultsByAssessmentId: { [key: string]: EnrichedResult[] } = {};
             allResults.forEach(result => {
@@ -101,7 +98,8 @@ export default function HistoryPage() {
             });
 
             const grouped: GroupedResult[] = Object.values(resultsByAssessmentId).map(attempts => {
-                const latestAttempt = attempts[0]; // The most recent one
+                // Since they are already sorted by desc createdAt, the first one is the latest
+                const latestAttempt = attempts[0]; 
                 const previousAttempts = attempts.slice(1);
                 return {
                     assessmentId: latestAttempt.assessmentId,
@@ -111,8 +109,9 @@ export default function HistoryPage() {
                     previousAttempts: previousAttempts.reverse(), // Show oldest first in dropdown
                     totalAttempts: attempts.length,
                 };
-            }).filter(group => group.totalAttempts > 0); // Ensure there's at least one completed attempt
+            }).filter(group => group.totalAttempts > 0);
             
+            // Sort the final groups by the latest attempt's date
             grouped.sort((a,b) => (b.latestAttempt.createdAt || 0) - (a.latestAttempt.createdAt || 0));
 
             setGroupedAssessments(grouped);
