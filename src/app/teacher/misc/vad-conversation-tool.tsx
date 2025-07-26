@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils"
 import { Label } from "@/components/ui/label"
 import { Slider } from "@/components/ui/slider"
 
-const SILENCE_DURATION_MS = 2000; // Reduced to 2 seconds for faster turn-taking
+const SILENCE_DURATION_MS = 2000; 
 
 type SessionState = "idle" | "initializing" | "speaking" | "listening" | "processing" | "ending";
 
@@ -22,7 +22,7 @@ export function VadConversationTool() {
   const [interimTranscript, setInterimTranscript] = useState<string>("");
   const [finalTranscript, setFinalTranscript] = useState<string>("");
   
-  const [silenceThreshold, setSilenceThreshold] = useState(0.03); // Default to a less sensitive value
+  const [silenceThreshold, setSilenceThreshold] = useState(0.03);
 
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -66,14 +66,17 @@ export function VadConversationTool() {
         startListening(); // Just listen again if nothing was said.
         return;
     }
+    
     setSessionState("processing");
+    // Add user's final transcript to conversation immediately
+    const userTurn: ConversationTurn = {role: 'user', text: transcript};
+    setConversation(prev => [...prev, userTurn]);
     setInterimTranscript("");
-    setConversation(prev => [...prev, {role: 'user', text: transcript}]);
     
     try {
         const { aiResponseText, aiResponseAudioDataUri } = await converseWithNativeTeacher({
             studentTranscript: transcript,
-            conversationHistory: conversation,
+            conversationHistory: [...conversation, userTurn], // Pass the updated conversation history
         });
 
         setConversation(prev => [...prev, {role: 'model', text: aiResponseText}]);
@@ -131,24 +134,24 @@ export function VadConversationTool() {
     };
     
     recognitionRef.current.onend = () => {
-        if(sessionState !== 'ending' && finalTranscript.trim()){
-            processFinalTranscript(finalTranscript);
+        const finalTranscriptToProcess = (finalTranscript + " " + interimTranscript).trim();
+        if(sessionState !== 'ending' && finalTranscriptToProcess){
+            processFinalTranscript(finalTranscriptToProcess);
         } else if (sessionState === 'listening') {
-             // If it ends without any final transcript and we are still in listening mode, just restart.
              if (recognitionRef.current) recognitionRef.current.start();
         }
     };
 
     recognitionRef.current.onerror = (event) => {
         console.error("SpeechRecognition error", event.error);
-        if (event.error !== 'no-speech') {
+        if (event.error !== 'no-speech' && event.error !== 'aborted') {
             toast({title: "음성 인식 오류", description: `오류가 발생했습니다: ${event.error}`, variant: "destructive"});
         }
     };
     
     recognitionRef.current.start();
 
-  }, [sessionState, toast, finalTranscript, processFinalTranscript]);
+  }, [sessionState, toast, finalTranscript, processFinalTranscript, interimTranscript]);
 
   const startConversation = async () => {
     setConversation([]);
