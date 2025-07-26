@@ -86,7 +86,7 @@ const promptExamples = [
   },
   {
     prompt: "산 정상에서 일출을 보고 있는 등산객의 뒷모습, 장엄한 풍경, 사실적인 사진 스타일",
-    image: "https://placehold.co/400x400.png",
+    image: "https://firebasestorage.googleapis.com/v0/b/speaksmart-evaluator2.firebasestorage.app/o/image%2FGemini_Generated_Image_96vqrp96v.png?alt=media&token=1e48e934-2bc5-4e29-b199-9f8e96b2c2eb",
     hint: "hiker sunrise mountain",
   },
 ];
@@ -990,10 +990,3 @@ export default function NewAssessmentPage() {
     </Card>
   );
 }
-
-
-
-
-
-
-
