@@ -9,19 +9,54 @@ import { Switch } from '@/components/ui/switch';
 import { useLanguage } from '@/context/language-context';
 import { useAuth } from '@/context/auth-context';
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { doc, updateDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 export default function SettingsPage() {
     const { t } = useLanguage();
-    const { user, loading } = useAuth();
+    const { user, loading, manualLogin } = useAuth();
     const router = useRouter();
+    const { toast } = useToast();
+
+    const [displayName, setDisplayName] = useState(user?.displayName || '');
+    const [isUpdating, setIsUpdating] = useState(false);
 
     useEffect(() => {
         if(!loading && !user) {
             router.push('/');
+        } else if (user) {
+            setDisplayName(user.displayName);
         }
     }, [user, loading, router]);
+
+    const handleUpdateProfile = async () => {
+        if (!user || !user.docId || !displayName.trim()) {
+            toast({ title: "오류", description: "사용자 정보가 올바르지 않거나 이름이 비어있습니다.", variant: "destructive" });
+            return;
+        }
+
+        setIsUpdating(true);
+        try {
+            const userRef = doc(db, "users", user.docId);
+            await updateDoc(userRef, {
+                displayName: displayName,
+            });
+
+            // Update the user state in the auth context
+            const updatedUser = { ...user, displayName: displayName };
+            manualLogin(updatedUser);
+
+            toast({ title: "성공", description: "프로필이 성공적으로 업데이트되었습니다." });
+        } catch (error) {
+            console.error("Error updating profile: ", error);
+            toast({ title: "오류", description: "프로필 업데이트 중 문제가 발생했습니다.", variant: "destructive" });
+        } finally {
+            setIsUpdating(false);
+        }
+    };
 
     if (loading || !user) {
         return (
@@ -44,13 +79,16 @@ export default function SettingsPage() {
             <CardContent className="space-y-4">
                 <div className="grid gap-2">
                     <Label htmlFor="name">{t.teacherSettings.account.nameLabel}</Label>
-                    <Input id="name" defaultValue={user.displayName || ''} />
+                    <Input id="name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
                 </div>
                 <div className="grid gap-2">
                     <Label htmlFor="email">{t.teacherSettings.account.emailLabel}</Label>
                     <Input id="email" type="email" defaultValue={user.email || ''} readOnly />
                 </div>
-                 <Button>{t.teacherSettings.account.updateButton}</Button>
+                 <Button onClick={handleUpdateProfile} disabled={isUpdating}>
+                    {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
+                    {t.teacherSettings.account.updateButton}
+                 </Button>
             </CardContent>
         </Card>
         <Card>
