@@ -16,12 +16,13 @@ import {
   SidebarFooter
 } from "@/components/ui/sidebar"
 import { Logo } from "@/components/icons"
-import { LogOut } from "lucide-react"
+import { LogOut, Bell } from "lucide-react"
 import { useLanguage } from "@/context/language-context"
 import { translations } from "@/lib/locales"
 import { useAuth } from "@/context/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import { Avatar, AvatarImage, AvatarFallback } from "./ui/avatar"
+import { Button } from "./ui/button"
 
 type NavItem = {
   href: string
@@ -93,12 +94,26 @@ export function AppLayout({ children, navItems, titleKey }: AppLayoutProps) {
       </Sidebar>
       <SidebarInset>
         <header className="flex items-center justify-between p-4 border-b bg-card md:bg-transparent">
-          <div className="md:hidden">
-             <SidebarTrigger />
+          <div className="flex items-center gap-4">
+            <div className="md:hidden">
+               <SidebarTrigger />
+            </div>
+            <h2 className="text-xl font-semibold font-headline">{t.titles[titleKey]}</h2>
           </div>
-          <h2 className="text-xl font-semibold font-headline ml-4 md:ml-0">{t.titles[titleKey]}</h2>
-          <div className="hidden md:block">
-            <SidebarTrigger />
+          <div className="flex items-center gap-2">
+            {user?.role === 'teacher' && (
+                <Button variant="ghost" size="icon" className="relative">
+                    <Bell className="h-5 w-5" />
+                    <span className="absolute top-1 right-1 flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                    </span>
+                    <span className="sr-only">알림 보기</span>
+                </Button>
+            )}
+            <div className="hidden md:block">
+              <SidebarTrigger />
+            </div>
           </div>
         </header>
         <main className="flex-1 p-4 md:p-6 lg:p-8 overflow-auto">
