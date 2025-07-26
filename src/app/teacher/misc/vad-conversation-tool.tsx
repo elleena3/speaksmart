@@ -12,23 +12,18 @@ import { cn } from "@/lib/utils"
 import { Label } from "@/components/ui/label"
 import { Slider } from "@/components/ui/slider"
 
-const mimeType = 'audio/webm;codecs=opus';
-const SILENCE_DURATION_MS = 6000; // 6 seconds of silence to trigger turn end
+const SILENCE_DURATION_MS = 2000; // Reduced to 2 seconds for faster turn-taking
 
 type SessionState = "idle" | "initializing" | "speaking" | "listening" | "processing" | "ending";
 
 export function VadConversationTool() {
   const [sessionState, setSessionState] = useState<SessionState>("idle");
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
-  const [interimTranscript, setInterimTranscript] = useState<string | null>(null);
-  const [silenceThreshold, setSilenceThreshold] = useState(0.03);
+  const [interimTranscript, setInterimTranscript] = useState<string>("");
+  const [finalTranscript, setFinalTranscript] = useState<string>("");
   
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const audioStreamRef = useRef<MediaStream | null>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
   const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
   const scrollAreaRef = useRef<HTMLDivElement | null>(null);
   
@@ -36,23 +31,13 @@ export function VadConversationTool() {
 
   const cleanup = useCallback(() => {
     if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
-    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-        audioContextRef.current.close().catch(console.error);
+    if (recognitionRef.current) {
+        recognitionRef.current.onresult = null;
+        recognitionRef.current.onend = null;
+        recognitionRef.current.onerror = null;
+        recognitionRef.current.stop();
+        recognitionRef.current = null;
     }
-    if (mediaRecorderRef.current) {
-        if(mediaRecorderRef.current.state === 'recording') mediaRecorderRef.current.stop();
-        mediaRecorderRef.current.ondataavailable = null;
-        mediaRecorderRef.current.onstop = null;
-        mediaRecorderRef.current.onerror = null;
-    }
-    if (audioStreamRef.current) {
-        audioStreamRef.current.getTracks().forEach(track => track.stop());
-    }
-    mediaRecorderRef.current = null;
-    audioContextRef.current = null;
-    analyserRef.current = null;
-    audioStreamRef.current = null;
-    audioChunksRef.current = [];
   }, []);
 
   useEffect(() => {
@@ -74,89 +59,103 @@ export function VadConversationTool() {
     }
   }, [conversation, interimTranscript]);
 
-  const startListening = useCallback(async () => {
+  const processFinalTranscript = useCallback(async (transcript: string) => {
+    if (sessionState === 'ending' || !transcript.trim()) {
+        startListening(); // Just listen again if nothing was said.
+        return;
+    }
+    setSessionState("processing");
+    setInterimTranscript("");
+    setConversation(prev => [...prev, {role: 'user', text: transcript}]);
+    
+    try {
+        const { aiResponseText, aiResponseAudioDataUri } = await converseWithNativeTeacher({
+            studentTranscript: transcript,
+            conversationHistory: conversation,
+        });
+
+        setConversation(prev => [...prev, {role: 'model', text: aiResponseText}]);
+        
+        if (audioPlayerRef.current) {
+            audioPlayerRef.current.src = aiResponseAudioDataUri;
+            audioPlayerRef.current.play();
+            setSessionState("speaking");
+        }
+    } catch (error) {
+        toast({ title: "AI 처리 오류", variant: "destructive" });
+        startListening(); // Go back to listening if AI fails
+    }
+  }, [conversation, sessionState, toast]);
+
+  const startListening = useCallback(() => {
     if (sessionState === 'ending') return;
     setSessionState("listening");
-    setInterimTranscript("듣고 있어요...");
+    setFinalTranscript("");
+    setInterimTranscript("");
 
-    try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        audioStreamRef.current = stream;
-
-        // Setup VAD
-        const context = new AudioContext();
-        audioContextRef.current = context;
-        const source = context.createMediaStreamSource(stream);
-        const analyser = context.createAnalyser();
-        analyser.fftSize = 2048;
-        source.connect(analyser);
-        analyserRef.current = analyser;
-
-        // Setup MediaRecorder
-        mediaRecorderRef.current = new MediaRecorder(stream, { mimeType });
-        audioChunksRef.current = [];
-        mediaRecorderRef.current.ondataavailable = (event) => {
-            if (event.data.size > 0) audioChunksRef.current.push(event.data);
-        };
-        mediaRecorderRef.current.onstop = () => {
-             if (audioChunksRef.current.length === 0) {
-                 console.warn("No audio recorded.");
-                 startListening(); // Just listen again if nothing was said.
-                 return;
-             }
-             const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
-             const reader = new FileReader();
-             reader.readAsDataURL(audioBlob);
-             reader.onloadend = async () => processAudio(reader.result as string);
-        };
-        
-        const checkForSilence = () => {
-            if (sessionState === 'ending' || !analyserRef.current) return;
-            
-            const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
-            analyserRef.current.getByteFrequencyData(dataArray);
-            
-            // A more robust way to check for speaking activity
-            const sum = dataArray.reduce((acc, val) => acc + val, 0);
-            const avg = sum / dataArray.length;
-            const isSpeaking = avg > (silenceThreshold * 10); // scale threshold for this calculation
-
-            if (isSpeaking) {
-                if (mediaRecorderRef.current?.state === 'inactive') {
-                    mediaRecorderRef.current.start();
-                }
-                if (silenceTimerRef.current) {
-                    clearTimeout(silenceTimerRef.current);
-                    silenceTimerRef.current = null;
-                }
-            } else { // Silence detected
-                if (mediaRecorderRef.current?.state === 'recording' && !silenceTimerRef.current) {
-                    silenceTimerRef.current = setTimeout(() => {
-                        if (mediaRecorderRef.current?.state === 'recording') {
-                            mediaRecorderRef.current.stop();
-                        }
-                    }, SILENCE_DURATION_MS);
-                }
-            }
-            requestAnimationFrame(checkForSilence);
-        };
-
-        requestAnimationFrame(checkForSilence);
-
-    } catch (err) {
-        console.error("Mic access error:", err);
-        toast({ title: "마이크 오류", description: "마이크 접근 권한을 허용해주세요.", variant: "destructive" });
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+        toast({ title: "브라우저 지원 안함", description: "실시간 음성 인식을 지원하지 않는 브라우저입니다.", variant: "destructive"});
         setSessionState("idle");
+        return;
     }
-  }, [sessionState, toast, silenceThreshold]);
+    
+    recognitionRef.current = new SpeechRecognition();
+    recognitionRef.current.continuous = true;
+    recognitionRef.current.interimResults = true;
+    recognitionRef.current.lang = 'en-US';
+
+    recognitionRef.current.onresult = (event) => {
+        let interim = '';
+        let final = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+            if (event.results[i].isFinal) {
+                final += event.results[i][0].transcript;
+            } else {
+                interim += event.results[i][0].transcript;
+            }
+        }
+        setInterimTranscript(interim);
+        if (final.trim()) {
+            setFinalTranscript(prev => prev + " " + final.trim());
+        }
+
+        if(silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+        silenceTimerRef.current = setTimeout(() => {
+             if (recognitionRef.current) {
+                recognitionRef.current.stop();
+             }
+        }, SILENCE_DURATION_MS);
+    };
+    
+    recognitionRef.current.onend = () => {
+        if(sessionState !== 'ending' && finalTranscript.trim()){
+            processFinalTranscript(finalTranscript);
+        } else if (sessionState === 'listening') {
+             // If it ends without any final transcript and we are still in listening mode, just restart.
+             if (recognitionRef.current) recognitionRef.current.start();
+        }
+    };
+
+    recognitionRef.current.onerror = (event) => {
+        console.error("SpeechRecognition error", event.error);
+        if (event.error !== 'no-speech') {
+            toast({title: "음성 인식 오류", description: `오류가 발생했습니다: ${event.error}`, variant: "destructive"});
+        }
+    };
+    
+    recognitionRef.current.start();
+
+  }, [sessionState, toast, finalTranscript, processFinalTranscript]);
 
   const startConversation = async () => {
     setConversation([]);
-    setInterimTranscript(null);
+    setInterimTranscript("");
+    setFinalTranscript("");
     setSessionState("initializing");
     try {
       const { aiResponseText, aiResponseAudioDataUri } = await converseWithNativeTeacher({
-        studentRecordingDataUri: null,
+        studentTranscript: null,
         conversationHistory: [],
       });
       setConversation([{ role: 'model', text: aiResponseText }]);
@@ -170,37 +169,13 @@ export function VadConversationTool() {
       setSessionState("idle");
     }
   };
-  
-  const processAudio = async (dataUri: string) => {
-    setSessionState("processing");
-    setInterimTranscript("처리 중...");
-    cleanup(); // Clean up mic/VAD resources while processing
-
-    try {
-        const { studentTranscript, aiResponseText, aiResponseAudioDataUri } = await converseWithNativeTeacher({
-            studentRecordingDataUri: dataUri,
-            conversationHistory: conversation,
-        });
-
-        setInterimTranscript(null);
-        setConversation(prev => [...prev, {role: 'user', text: studentTranscript}, {role: 'model', text: aiResponseText}]);
-        
-        if (audioPlayerRef.current) {
-            audioPlayerRef.current.src = aiResponseAudioDataUri;
-            audioPlayerRef.current.play();
-            setSessionState("speaking");
-        }
-    } catch (error) {
-        toast({ title: "AI 처리 오류", variant: "destructive" });
-        setSessionState("listening"); // Go back to listening if AI fails
-    }
-  };
 
   const handleStopConversation = () => {
     setSessionState("ending");
     cleanup();
     setSessionState("idle");
-    setInterimTranscript(null);
+    setInterimTranscript("");
+    setFinalTranscript("");
     toast({ title: "대화 종료됨" });
   }
 
@@ -210,6 +185,17 @@ export function VadConversationTool() {
       }
       return <Button size="lg" onClick={handleStopConversation} variant="destructive" className="w-full"><StopCircle className="mr-2"/>대화 종료</Button>
   }
+  
+  const getStatusText = () => {
+    switch(sessionState) {
+        case 'speaking': return "AI가 응답 중입니다...";
+        case 'listening': return "네, 듣고 있어요. 편하게 말씀하세요...";
+        case 'processing': return "답변을 처리하고 있습니다...";
+        case 'initializing': return "AI가 첫 인사를 준비 중입니다...";
+        default: return "";
+    }
+  }
+
 
   return (
     <div className="flex flex-col gap-4">
@@ -219,14 +205,14 @@ export function VadConversationTool() {
               <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground pt-12">
                   <BrainCircuit className="h-12 w-12 mb-4 text-primary"/>
                   <p className="font-semibold">'대화 시작'을 누르면 자동으로 대화가 진행됩니다.</p>
-                  <p className="text-sm">약 6초간 말이 없으면 자동으로 AI에게 턴이 넘어갑니다.</p>
+                  <p className="text-sm">말을 멈추면(약 2초) 자동으로 AI에게 턴이 넘어갑니다.</p>
               </div>
             )}
             {["initializing", "processing"].includes(sessionState) && (
                  <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground pt-12">
                      <Loader2 className="h-12 w-12 mb-4 animate-spin"/>
                      <p className="font-semibold">
-                         {sessionState === 'initializing' ? 'AI가 첫 인사를 준비 중입니다...' : 'AI가 답변을 생각 중입니다...'}
+                         {getStatusText()}
                      </p>
                  </div>
             )}
@@ -251,25 +237,10 @@ export function VadConversationTool() {
       </ScrollArea>
       
       <div className="flex flex-col gap-4">
-        <div className="grid gap-2">
-            <Label htmlFor="sensitivity" className="text-xs text-muted-foreground">
-                마이크 민감도 (왼쪽: 더 민감, 오른쪽: 덜 민감)
-            </Label>
-            <Slider
-                id="sensitivity"
-                min={0.01}
-                max={0.1}
-                step={0.01}
-                value={[silenceThreshold]}
-                onValueChange={(value) => setSilenceThreshold(value[0])}
-                disabled={sessionState !== 'idle'}
-            />
-        </div>
         {getButtonState()}
         {sessionState !== 'idle' && (
             <p className={cn("text-xs text-center", sessionState === 'listening' ? "text-blue-600 font-semibold" : "text-muted-foreground")}>
-                {sessionState === 'speaking' && "AI가 응답 중입니다..."}
-                {sessionState === 'listening' && "네, 듣고 있어요. 편하게 말씀하세요..."}
+                {getStatusText()}
             </p>
         )}
       </div>
@@ -278,4 +249,3 @@ export function VadConversationTool() {
     </div>
   );
 }
-

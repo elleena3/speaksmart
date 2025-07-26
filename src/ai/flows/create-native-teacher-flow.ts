@@ -3,8 +3,9 @@
 
 /**
  * @fileOverview Converts text to speech and handles conversational AI responses for the teacher's tool.
+ * This version is optimized to accept a direct transcript instead of an audio file for faster interaction.
  *
- * - converseWithNativeTeacher - A function that takes user audio, gets a conversational response, and returns AI audio.
+ * - converseWithNativeTeacher - A function that takes a user's transcript, gets a conversational response, and returns AI audio.
  */
 
 import { ai } from '@/ai/genkit';
@@ -17,10 +18,10 @@ import wav from 'wav';
 
 
 const ConverseWithNativeTeacherInputSchema = z.object({
-  studentRecordingDataUri: z
+  studentTranscript: z
     .string()
     .describe(
-      "The user's voice recording as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'"
+      "The user's speech already transcribed to text."
     ).nullable(),
   conversationHistory: z
     .array(ConversationTurnSchema)
@@ -31,7 +32,6 @@ type ConverseWithNativeTeacherInput = z.infer<typeof ConverseWithNativeTeacherIn
 const ConverseWithNativeTeacherOutputSchema = z.object({
   aiResponseText: z.string().describe('The text of the AI conversational partner.'),
   aiResponseAudioDataUri: z.string().describe("The AI's response as a playable audio data URI."),
-  studentTranscript: z.string().describe("The transcript of the user's speech."),
 });
 type ConverseWithNativeTeacherOutput = z.infer<typeof ConverseWithNativeTeacherOutputSchema>;
 
@@ -42,7 +42,6 @@ export async function converseWithNativeTeacher(
   return converseWithNativeTeacherFlow(input);
 }
 
-// 1. Define the prompt for generating the conversational text response
 const conversationalPrompt = ai.definePrompt({
   name: 'nativeTeacherConversationalPrompt',
   model: googleAI.model('gemini-2.5-flash-lite-preview-06-17'),
@@ -61,7 +60,7 @@ Your primary goals are:
 3.  Assess the user's English proficiency level based on their speech.
 4.  Adapt your language to the user's level. If their English is basic, use simpler words and sentence structures. If they are advanced, use more sophisticated language.
 
-IMPORTANT RULE: If the user's transcript is empty or indicates no speech, you MUST ask them to speak again, for example: "Sorry, I didn't catch that. Could you please say that again?" or "I couldn't hear you, can you repeat that?". Do not try to continue the conversation.
+IMPORTANT RULE: If the user's transcript is empty or indicates no speech (e.g., "(The user did not say anything)"), you MUST ask them to speak again, for example: "Sorry, I didn't catch that. Could you please say that again?" or "I couldn't hear you, can you repeat that?". Do not try to continue the conversation.
 
 Conversation History (if any):
 {{#each history}}
@@ -81,7 +80,6 @@ You:
 });
 
 
-// Helper function to convert PCM audio buffer to WAV format
 async function toWav(
   pcmData: Buffer,
   channels = 1,
@@ -109,7 +107,6 @@ async function toWav(
   });
 }
 
-// Function to convert text to speech
 async function textToSpeech(text: string): Promise<string> {
     const ttsResponse = await ai.generate({
         model: googleAI.model('gemini-2.5-flash-preview-tts'),
@@ -137,40 +134,20 @@ async function textToSpeech(text: string): Promise<string> {
     return 'data:audio/wav;base64,' + await toWav(pcmBuffer);
 }
 
-// 2. Define the main flow that orchestrates the entire process
 const converseWithNativeTeacherFlow = ai.defineFlow(
   {
     name: 'converseWithNativeTeacherFlow',
     inputSchema: ConverseWithNativeTeacherInputSchema,
     outputSchema: ConverseWithNativeTeacherOutputSchema,
   },
-  async ({ studentRecordingDataUri, conversationHistory }) => {
-    let studentTranscript = "";
+  async ({ studentTranscript, conversationHistory }) => {
     let aiResponseText = "";
-
-    // Step 1: Transcribe student's audio if it exists.
-    if (studentRecordingDataUri) {
-      const sttResponse = await ai.generate({
-        model: googleAI.model('gemini-2.5-flash'),
-        prompt: [
-          { text: 'Transcribe this English audio.' },
-          { media: { url: studentRecordingDataUri } },
-        ],
-      });
-      studentTranscript = sttResponse.text;
-      if (!studentTranscript?.trim()) {
-          console.warn("Transcription result was empty.");
-          studentTranscript = "(The user did not say anything)"; 
-      }
-    }
-
-    // Pre-process history for the template helper
+    
     const historyForPrompt = conversationHistory.map(turn => ({
       ...turn,
       isUser: turn.role === 'user',
     }));
 
-    // Step 2: Generate AI's text response based on transcript and history
     const { output } = await conversationalPrompt({
       history: historyForPrompt,
       studentTranscript: studentTranscript || undefined, 
@@ -180,16 +157,12 @@ const converseWithNativeTeacherFlow = ai.defineFlow(
 
     if (!aiResponseText) {
         console.error("AI did not generate a text response. Received:", output);
-        // If AI fails to respond, generate a safe fallback response.
         aiResponseText = "Sorry, I'm having a little trouble right now. Could you say that again?";
     }
 
-    // Step 3: Convert AI's text response to speech (TTS)
     const aiResponseAudioDataUri = await textToSpeech(aiResponseText);
 
-    // Step 4: Return all the generated data
     return {
-      studentTranscript: studentTranscript === "(The user did not say anything)" ? "" : studentTranscript,
       aiResponseText,
       aiResponseAudioDataUri,
     };
