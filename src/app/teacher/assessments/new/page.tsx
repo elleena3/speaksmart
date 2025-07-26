@@ -77,7 +77,7 @@ function FilterCombobox({ label, options, value, onSelect }: { label: string, op
 const promptExamples = [
   {
     prompt: "공원 벤치에 앉아 책을 읽고 있는 할머니, 따뜻한 색감의 수채화 스타일",
-    image: "https://firebasestorage.googleapis.com/v0/b/speaksmart-evaluator2.appspot.com/o/image%2FGemini_Generated_Image_tegrq6tegrq6tegr.png?alt=media&token=e93a61f2-1a48-4e8c-84e5-4f40036a1170",
+    image: "https://firebasestorage.googleapis.com/v0/b/speaksmart-evaluator2.firebasestorage.app/o/image%2FGemini_Generated_Image_tegrq6teg.png?alt=media&token=def04b4c-2d30-4194-9e40-871caf273954",
     hint: "grandmother reading park",
   },
   {
@@ -991,6 +991,7 @@ export default function NewAssessmentPage() {
     </Card>
   );
 }
+
 
 
 
