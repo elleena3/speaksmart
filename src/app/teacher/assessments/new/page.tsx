@@ -451,20 +451,27 @@ export default function NewAssessmentPage() {
                                 <Separator />
                                 <CardContent className="p-4 grid grid-cols-2 md:grid-cols-3 gap-2">
                                     {mockStudents.map((item) => (
-                                        <FormItem key={item.uid} className="flex flex-row items-center space-x-2 space-y-0">
-                                            <FormControl>
-                                                <Checkbox
-                                                checked={field.value?.includes(item.uid)}
-                                                onCheckedChange={(checked) => {
-                                                    const currentIds = field.value || [];
-                                                    return checked
-                                                    ? field.onChange([...currentIds, item.uid])
-                                                    : field.onChange(currentIds.filter(value => value !== item.uid));
-                                                }}
-                                                />
-                                            </FormControl>
-                                            <FormLabel className="font-normal text-sm">{item.displayName}</FormLabel>
-                                        </FormItem>
+                                      <FormField
+                                        key={item.uid}
+                                        control={form.control}
+                                        name="targetStudentIds"
+                                        render={({ field: innerField }) => (
+                                            <FormItem className="flex flex-row items-center space-x-2 space-y-0">
+                                                <FormControl>
+                                                    <Checkbox
+                                                        checked={innerField.value?.includes(item.uid)}
+                                                        onCheckedChange={(checked) => {
+                                                            const currentIds = innerField.value || [];
+                                                            return checked
+                                                            ? innerField.onChange([...currentIds, item.uid])
+                                                            : innerField.onChange(currentIds.filter(value => value !== item.uid));
+                                                        }}
+                                                    />
+                                                </FormControl>
+                                                <FormLabel className="font-normal text-sm">{item.displayName}</FormLabel>
+                                            </FormItem>
+                                        )}
+                                      />
                                     ))}
                                 </CardContent>
                             </Card>
@@ -495,20 +502,27 @@ export default function NewAssessmentPage() {
                                 <Separator />
                                 <CardContent className="p-4 grid grid-cols-2 md:grid-cols-3 gap-2">
                                     {registeredStudents.length > 0 ? registeredStudents.map((item) => (
-                                        <FormItem key={item.uid} className="flex flex-row items-center space-x-2 space-y-0">
-                                            <FormControl>
-                                                <Checkbox
-                                                checked={field.value?.includes(item.uid)}
-                                                onCheckedChange={(checked) => {
-                                                    const currentIds = field.value || [];
-                                                    return checked
-                                                    ? field.onChange([...currentIds, item.uid])
-                                                    : field.onChange(currentIds.filter(value => value !== item.uid));
-                                                }}
-                                                />
-                                            </FormControl>
-                                            <FormLabel className="font-normal text-sm">{item.displayName}</FormLabel>
-                                        </FormItem>
+                                        <FormField
+                                            key={item.uid}
+                                            control={form.control}
+                                            name="targetStudentIds"
+                                            render={({ field: innerField }) => (
+                                                <FormItem className="flex flex-row items-center space-x-2 space-y-0">
+                                                    <FormControl>
+                                                        <Checkbox
+                                                            checked={innerField.value?.includes(item.uid)}
+                                                            onCheckedChange={(checked) => {
+                                                                const currentIds = innerField.value || [];
+                                                                return checked
+                                                                ? innerField.onChange([...currentIds, item.uid])
+                                                                : innerField.onChange(currentIds.filter(value => value !== item.uid));
+                                                            }}
+                                                        />
+                                                    </FormControl>
+                                                    <FormLabel className="font-normal text-sm">{item.displayName}</FormLabel>
+                                                </FormItem>
+                                            )}
+                                        />
                                     )) : <p className="text-sm text-muted-foreground col-span-full text-center">가입한 학생이 없습니다.</p>}
                                 </CardContent>
                             </Card>
