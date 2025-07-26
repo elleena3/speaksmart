@@ -20,7 +20,7 @@ export const firebaseConfig = {
   apiKey: "AIzaSyAieUKTGnuh0f9zWJYjgYM77j4mEshxWCg",
   authDomain: "speaksmart-evaluator2.firebaseapp.com",
   projectId: "speaksmart-evaluator2",
-  storageBucket: "speaksmart-evaluator2.firebasestorage.app",
+  storageBucket: "speaksmart-evaluator2.appspot.com",
   messagingSenderId: "60227542963",
   appId: "1:60227542963:web:f5d6c51046eb572a9c35c6",
   measurementId: "G-M20FDF494Y",

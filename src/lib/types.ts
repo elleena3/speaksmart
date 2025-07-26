@@ -73,6 +73,7 @@ export type TeacherAssessment = {
   title: string;
   topic: string;
   prompt: string;
+  imageUrl?: string; // For image-based assessments
   averageScore: number;
   submissionCount: number;
   dateCreated: string;

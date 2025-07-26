@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, CalendarIcon, ChevronsUpDown, Check, Info, Users, Type, Image as ImageIcon, LayoutGrid } from "lucide-react";
+import { Loader2, CalendarIcon, ChevronsUpDown, Check, Info, Users, Type, Image as ImageIcon, LayoutGrid, Wand2 } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -27,10 +27,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { scenarios, type TeacherAssessment, femaleVoices, maleVoices, allVoices, evaluationModels, voiceDescriptions, type AiVoice, monologueTypes } from "@/lib/types";
 import { useAuth, mockStudents } from "@/context/auth-context";
 import { addDoc, collection, getDocs, query, where } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db, storage } from "@/lib/firebase";
+import { ref, uploadString, getDownloadURL } from "firebase/storage";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Separator } from "@/components/ui/separator";
+import { generateImage } from "@/ai/flows/generate-image-flow";
+import Image from 'next/image';
 
+// ... (FilterCombobox and other imports remain the same)
 function FilterCombobox({ label, options, value, onSelect }: { label: string, options: string[], value: string, onSelect: (value: string) => void }) {
   const [open, setOpen] = useState(false);
   const displayValue = value === 'all' ? `모든 ${label}` : `${value}${label.endsWith('반') ? '반' : '학년'}`;
@@ -83,6 +87,10 @@ export default function NewAssessmentPage() {
   const [registeredStudents, setRegisteredStudents] = useState<UserData[]>([]);
   const [isLoadingStudents, setIsLoadingStudents] = useState(true);
   const [studentFilter, setStudentFilter] = useState<{ grade: string, class: string }>({ grade: 'all', class: 'all' });
+  
+  const [imagePrompt, setImagePrompt] = useState("");
+  const [generatedImageDataUri, setGeneratedImageDataUri] = useState<string | null>(null);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
 
   const formSchema = useMemo(() => z.object({
     title: z.string().optional(),
@@ -115,7 +123,11 @@ export default function NewAssessmentPage() {
       }
     }
     
-    if (data.assessmentType === 'monologue' && !data.expectedFormat && !data.useRubric) {
+    if (data.assessmentType === 'monologue' && data.monologueType === 'image' && !generatedImageDataUri) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "이미지를 먼저 생성해주세요.", path: ['monologueType'] });
+    }
+    
+    if (data.assessmentType === 'monologue' && data.monologueType === 'text' && !data.expectedFormat && !data.useRubric) {
         ctx.addIssue({ code: z.ZodIssueCode.custom, message: t.teacherAssessmentForm.errors.expectedFormatRequired, path: ['expectedFormat'] });
     }
 
@@ -126,7 +138,7 @@ export default function NewAssessmentPage() {
     if (data.startDate && data.endDate && data.endDate < data.startDate) {
       ctx.addIssue({ message: t.teacherAssessmentForm.errors.endDate, path: ["endDate"] });
     }
-  }), [t]);
+  }), [t, generatedImageDataUri]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -148,6 +160,7 @@ export default function NewAssessmentPage() {
   });
 
   const assessmentType = form.watch("assessmentType");
+  const monologueType = form.watch("monologueType");
   const targetType = form.watch("targetType");
   const scenario = form.watch("scenario");
   const isFreeTalkDialogue = assessmentType === 'dialogue' && scenario === 'free-talk';
@@ -162,7 +175,7 @@ export default function NewAssessmentPage() {
             setIsLoadingStudents(true);
             const q = query(collection(db, "users"), where("role", "==", "student"));
             const querySnapshot = await getDocs(q);
-            const studentList = querySnapshot.docs.map(doc => ({ ...doc.data(), uid: doc.id }) as UserData);
+            const studentList = querySnapshot.docs.map(doc => ({ ...doc.data(), docId: doc.id }) as UserData & { docId: string });
             setRegisteredStudents(studentList);
             setIsLoadingStudents(false);
         }
@@ -190,12 +203,41 @@ export default function NewAssessmentPage() {
     });
   }, [registeredStudents, studentFilter]);
 
+  const handleGenerateImage = async () => {
+      if (!imagePrompt) {
+          toast({ title: "프롬프트 입력 필요", description: "이미지를 생성할 프롬프트를 입력해주세요.", variant: "destructive" });
+          return;
+      }
+      setIsGeneratingImage(true);
+      setGeneratedImageDataUri(null);
+      try {
+          const result = await generateImage({ prompt: imagePrompt });
+          setGeneratedImageDataUri(result.imageDataUri);
+          toast({ title: "이미지 생성 완료", description: "AI가 이미지를 성공적으로 그렸습니다." });
+      } catch (e) {
+          toast({ title: "이미지 생성 실패", description: "이미지 생성 중 오류가 발생했습니다.", variant: "destructive" });
+          console.error(e);
+      } finally {
+          setIsGeneratingImage(false);
+      }
+  };
+
   const proceedToSubmit = async (values: z.infer<typeof formSchema>) => {
     if (!user) return;
     setIsSubmitting(true);
     
     try {
-        let submissionValues: any = { ...values };
+        let imageUrl = "";
+        if (values.monologueType === 'image' && generatedImageDataUri) {
+            toast({title: "이미지 업로드 중..."});
+            const imageRef = ref(storage, `assessment-images/${user.uid}/${Date.now()}.png`);
+            const uploadResult = await uploadString(imageRef, generatedImageDataUri, 'data_url');
+            imageUrl = await getDownloadURL(uploadResult.ref);
+            toast({title: "이미지 업로드 완료!"});
+        }
+      
+        let submissionValues: any = { ...values, imageUrl: imageUrl || undefined };
+
         if (isFreeTalkDialogue) {
             submissionValues.title = values.title || t.teacherAssessmentForm.scenarios.freeTalk;
             submissionValues.topic = values.topic || t.teacherAssessmentForm.freeTalkDefaults.topic;
@@ -360,6 +402,43 @@ export default function NewAssessmentPage() {
                   />
               )}
             </div>
+            
+            {monologueType === 'image' && assessmentType === 'monologue' && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle>AI 이미지 생성</CardTitle>
+                        <CardDescription>평가에 사용할 이미지를 AI에게 그려달라고 요청하세요.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="image-prompt">이미지 생성 프롬프트</Label>
+                                <Textarea 
+                                    id="image-prompt"
+                                    placeholder="예: a cute cat playing with a yarn ball, cartoon style"
+                                    value={imagePrompt}
+                                    onChange={(e) => setImagePrompt(e.target.value)}
+                                    rows={4}
+                                />
+                                <Button type="button" onClick={handleGenerateImage} disabled={isGeneratingImage} className="w-full">
+                                    {isGeneratingImage ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Wand2 className="mr-2 h-4 w-4"/>}
+                                    {isGeneratingImage ? "이미지 생성 중..." : "AI로 이미지 그리기"}
+                                </Button>
+                            </div>
+                            <div className="flex items-center justify-center p-2 border rounded-lg bg-muted/50 min-h-[200px] aspect-square">
+                                {isGeneratingImage && <Loader2 className="h-8 w-8 animate-spin text-primary"/>}
+                                {generatedImageDataUri && !isGeneratingImage && (
+                                    <Image src={generatedImageDataUri} alt="Generated by AI" width={300} height={300} className="rounded-md object-contain"/>
+                                )}
+                                {!generatedImageDataUri && !isGeneratingImage && (
+                                    <p className="text-sm text-muted-foreground text-center">프롬프트를 입력하고 버튼을 누르면 여기에 이미지가 나타납니다.</p>
+                                )}
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+
 
             <Separator/>
 

@@ -13,6 +13,7 @@ import '@/ai/flows/summarize-student-feedback.ts';
 import '@/ai/flows/text-to-speech.ts';
 import '@/ai/flows/transcribe-file.ts';
 import '@/ai/flows/analyze-pronunciation.ts'; // New flow for the main page tool
+import '@/ai/flows/generate-image-flow.ts'; // For assessment creation
 
 // New, separated flows for monologue and dialogue analysis
 import '@/ai/flows/generate-monologue-analysis-flow';

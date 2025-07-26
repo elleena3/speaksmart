@@ -4,11 +4,12 @@
 import { useState, useRef, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Mic, StopCircle, Loader2, Timer, Send, RefreshCw } from "lucide-react"
+import { Mic, StopCircle, Loader2, Timer, Send, RefreshCw, Image as ImageIcon } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { type TeacherAssessment } from "@/lib/types"
 import { useAuth } from "@/context/auth-context"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import Image from "next/image"
 
 type RecordingState = "idle" | "countdown" | "recording" | "recorded" | "submitting";
 
@@ -342,8 +343,22 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
     }
   }
 
+  const isImageAssessment = assessmentDetails.monologueType === 'image' && assessmentDetails.imageUrl;
+
   return (
     <div className="flex flex-col items-center gap-6 p-8 border rounded-lg bg-muted/50 min-h-[350px] justify-center">
+      {isImageAssessment && (
+        <Card className="w-full mb-4">
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg"><ImageIcon/> 제시된 이미지</CardTitle>
+                <CardDescription>아래 이미지를 보고 영어로 묘사해주세요.</CardDescription>
+            </CardHeader>
+            <CardContent className="flex justify-center items-center">
+                <Image src={assessmentDetails.imageUrl!} alt="Assessment Image" width={400} height={400} className="rounded-md object-contain max-h-[400px]"/>
+            </CardContent>
+        </Card>
+      )}
+
       {timeLimit && recordingState !== 'submitting' && (
         <div className={`flex items-center gap-2 text-lg font-semibold text-muted-foreground ${recordingState === 'recorded' ? 'mb-4' : ''}`}>
           <Timer className="h-6 w-6" />
