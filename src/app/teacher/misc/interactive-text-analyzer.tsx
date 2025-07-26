@@ -9,7 +9,7 @@ import { Loader2, BookOpen, Brain, MessageSquare, Speaker, Info, Wand2 } from 'l
 import { enhanceSelectedText, type EnhanceSelectedTextOutput } from '@/ai/flows/enhance-selected-text-flow';
 import { readAloudText } from '@/ai/flows/text-to-speech';
 import { sampleTexts } from '@/lib/book';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Popover, PopoverContent } from '@/components/ui/popover';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Separator } from '@/components/ui/separator';
 
@@ -20,7 +20,7 @@ type AnalysisAction = 'translate' | 'define' | 'explain';
 export function InteractiveTextAnalyzer() {
     const [selectedText, setSelectedText] = useState<string>(sampleTexts.beginner.text);
     const [popoverOpen, setPopoverOpen] = useState(false);
-    const [popoverTarget, setPopoverTarget] = useState<HTMLElement | null>(null);
+    const [selectionRect, setSelectionRect] = useState<DOMRect | null>(null);
     const [currentSelection, setCurrentSelection] = useState('');
     const [analysisResult, setAnalysisResult] = useState<EnhanceSelectedTextOutput | null>(null);
     const [isCardLoading, setIsCardLoading] = useState(false);
@@ -41,14 +41,14 @@ export function InteractiveTextAnalyzer() {
     const handleTextSelection = () => {
         const selection = window.getSelection();
         const text = selection?.toString().trim();
+        
         if (text && text.length > 1) {
             const range = selection?.getRangeAt(0);
             if (range) {
-                const virtualEl = { getBoundingClientRect: () => range.getBoundingClientRect() };
-                setPopoverTarget(virtualEl as HTMLElement);
+                setSelectionRect(range.getBoundingClientRect());
                 setCurrentSelection(text);
                 setPopoverOpen(true);
-                setAnalysisResult(null);
+                setAnalysisResult(null); // Clear previous analysis
             }
         } else {
             setPopoverOpen(false);
@@ -102,7 +102,7 @@ export function InteractiveTextAnalyzer() {
         return () => {
             audioEl?.removeEventListener('ended', onEnded);
         }
-    }, [audioPlayerRef]);
+    }, []);
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -127,17 +127,18 @@ export function InteractiveTextAnalyzer() {
                         <CardDescription>아래 지문에서 궁금한 단어, 구, 문장을 드래그하여 AI 분석 기능을 사용해보세요.</CardDescription>
                     </CardHeader>
                     <CardContent>
+                        <div ref={textContainerRef} onMouseUp={handleTextSelection} className="p-4 bg-muted/50 rounded-lg text-lg font-serif leading-relaxed h-96 overflow-y-auto select-text">
+                            {selectedText}
+                        </div>
                         <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
-                            <PopoverTrigger asChild>
-                                <div ref={textContainerRef} onMouseUp={handleTextSelection} onBlur={() => setPopoverOpen(false)} className="p-4 bg-muted/50 rounded-lg text-lg font-serif leading-relaxed h-96 overflow-y-auto select-text">
-                                    {selectedText}
-                                </div>
-                            </PopoverTrigger>
                             <PopoverContent 
-                                virtualRef={popoverTarget} 
                                 className="w-auto p-1" 
-                                side="top" 
-                                align="center"
+                                style={selectionRect ? { 
+                                    position: 'fixed',
+                                    top: `${selectionRect.top - 50}px`,
+                                    left: `${selectionRect.left + selectionRect.width / 2}px`,
+                                    transform: 'translateX(-50%)',
+                                } : {}}
                                 onOpenAutoFocus={(e) => e.preventDefault()}
                             >
                                 <div className="flex gap-1">
@@ -181,7 +182,7 @@ export function InteractiveTextAnalyzer() {
                      </CardContent>
                  </Card>
             </div>
-            <audio ref={audioPlayerRef} className="hidden"/>
+            <audio ref={audioPlayerRef} onEnded={() => setIsReadingAloud(false)} className="hidden"/>
         </div>
     );
 }
