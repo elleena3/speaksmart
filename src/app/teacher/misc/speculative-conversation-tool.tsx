@@ -76,13 +76,14 @@ export function SpeculativeConversationTool() {
             conversationHistory: conversation,
         });
 
+        // The key change: update the conversation with the *final* transcript from the server
         const newHistory: ConversationTurn[] = [
             ...conversation,
-            { role: 'user', text: finalStudentTranscript },
+            { role: 'user', text: finalStudentTranscript || "(음성 인식 안됨)" },
             { role: 'model', text: aiResponseText },
         ];
         setConversation(newHistory);
-        setInterimTranscript("");
+        setInterimTranscript(""); // Clear the interim VAD transcript
         setSessionState("speaking");
 
         if (audioPlayerRef.current) {
