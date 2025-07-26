@@ -22,6 +22,8 @@ export function VadConversationTool() {
   const [interimTranscript, setInterimTranscript] = useState<string>("");
   const [finalTranscript, setFinalTranscript] = useState<string>("");
   
+  const [silenceThreshold, setSilenceThreshold] = useState(0.03); // Default to a less sensitive value
+
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
@@ -237,6 +239,18 @@ export function VadConversationTool() {
       </ScrollArea>
       
       <div className="flex flex-col gap-4">
+        <div className="space-y-2">
+            <Label htmlFor="mic-sensitivity" className="text-xs">마이크 민감도 (오른쪽으로 갈수록 둔감)</Label>
+            <Slider
+                id="mic-sensitivity"
+                min={0.01}
+                max={0.1}
+                step={0.01}
+                value={[silenceThreshold]}
+                onValueChange={(value) => setSilenceThreshold(value[0])}
+                disabled={sessionState !== 'idle'}
+            />
+        </div>
         {getButtonState()}
         {sessionState !== 'idle' && (
             <p className={cn("text-xs text-center", sessionState === 'listening' ? "text-blue-600 font-semibold" : "text-muted-foreground")}>
