@@ -10,9 +10,11 @@
 import { ai } from '@/ai/genkit';
 import { googleAI } from '@genkit-ai/googleai';
 import { z } from 'zod';
+import { imageGenerationModels } from '@/lib/types';
 
 const GenerateImageInputSchema = z.object({
   prompt: z.string().describe('A text prompt describing the image to generate.'),
+  imageModel: z.enum(imageGenerationModels).optional().default('gemini-2.0-flash-preview-image-generation'),
 });
 export type GenerateImageInput = z.infer<typeof GenerateImageInputSchema>;
 
@@ -31,9 +33,12 @@ const generateImageFlow = ai.defineFlow(
     inputSchema: GenerateImageInputSchema,
     outputSchema: GenerateImageOutputSchema,
   },
-  async ({ prompt }) => {
+  async ({ prompt, imageModel }) => {
+    
+    const modelToUse = imageModel || 'gemini-2.0-flash-preview-image-generation';
+
     const { media } = await ai.generate({
-      model: googleAI.model('gemini-2.0-flash-preview-image-generation'),
+      model: googleAI.model(modelToUse as any),
       prompt: `A high-quality, clear, simple illustration suitable for an English speaking test. The image should be in a square aspect ratio. Prompt: ${prompt}`,
       config: {
         responseModalities: ['TEXT', 'IMAGE'],

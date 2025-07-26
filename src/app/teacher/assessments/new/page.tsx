@@ -22,7 +22,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { scenarios, type TeacherAssessment, femaleVoices, maleVoices, allVoices, evaluationModels, voiceDescriptions, type AiVoice, monologueTypes, type UserData } from "@/lib/types";
+import { scenarios, type TeacherAssessment, femaleVoices, maleVoices, allVoices, evaluationModels, voiceDescriptions, type AiVoice, monologueTypes, type UserData, imageGenerationModels } from "@/lib/types";
 import { useAuth, mockStudents } from "@/context/auth-context";
 import { addDoc, collection, getDocs, query, where } from "firebase/firestore";
 import { db, storage } from "@/lib/firebase";
@@ -124,8 +124,9 @@ export default function NewAssessmentPage() {
     scenario: z.enum(scenarios).optional(),
     recordingTimeLimit: z.coerce.number().int().min(0).optional(),
     aiVoice: z.enum(allVoices).optional().default('algenib'),
-    evaluationModel: z.enum(evaluationModels).optional().default('gemini-2.5-flash'),
+    evaluationModel: z.enum(evaluationModels).optional().default('gemini-2.5-pro'),
     useRubric: z.boolean().default(false),
+    imageGenerationModel: z.enum(imageGenerationModels).optional().default('gemini-2.0-flash-preview-image-generation'),
   }).superRefine((data, ctx) => {
     const isFreeTalkDialogue = data.assessmentType === 'dialogue' && data.scenario === 'free-talk';
 
@@ -176,8 +177,9 @@ export default function NewAssessmentPage() {
       scenario: "free-talk",
       recordingTimeLimit: 0,
       aiVoice: 'algenib',
-      evaluationModel: 'gemini-2.5-flash',
+      evaluationModel: 'gemini-2.5-pro',
       useRubric: false,
+      imageGenerationModel: 'gemini-2.0-flash-preview-image-generation',
     },
   });
   
@@ -256,7 +258,8 @@ export default function NewAssessmentPage() {
       setIsGeneratingImage(true);
       setGeneratedImageDataUri(null);
       try {
-          const result = await generateImage({ prompt: imagePrompt });
+          const imageModel = form.getValues('imageGenerationModel');
+          const result = await generateImage({ prompt: imagePrompt, imageModel });
           setGeneratedImageDataUri(result.imageDataUri);
           toast({ title: "이미지 생성 완료", description: "AI가 이미지를 성공적으로 그렸습니다." });
       } catch (e) {
@@ -617,6 +620,28 @@ export default function NewAssessmentPage() {
                                     onChange={(e) => setImagePrompt(e.target.value)}
                                     rows={4}
                                 />
+                                <FormField
+                                  control={form.control}
+                                  name="imageGenerationModel"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel className="text-xs">이미지 생성 모델</FormLabel>
+                                      <Select onValueChange={field.onChange} value={field.value}>
+                                        <FormControl>
+                                          <SelectTrigger>
+                                            <SelectValue />
+                                          </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                          {imageGenerationModels.map(model => (
+                                            <SelectItem key={model} value={model}>{model}</SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
                                 <Button type="button" onClick={handleGenerateImage} disabled={isGeneratingImage} className="w-full">
                                     {isGeneratingImage ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Wand2 className="mr-2 h-4 w-4"/>}
                                     {isGeneratingImage ? "이미지 생성 중..." : "AI로 이미지 그리기"}
@@ -726,7 +751,7 @@ export default function NewAssessmentPage() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>AI 평가 모델 선택</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="평가에 사용할 AI 모델을 선택하세요..." />
