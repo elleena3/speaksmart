@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils"
 import { Label } from "@/components/ui/label"
 import { Slider } from "@/components/ui/slider"
 
-const SILENCE_DURATION_MS = 2000; 
+const SPEECH_END_TIMEOUT_MS = 5000; 
 
 type SessionState = "idle" | "initializing" | "speaking" | "listening" | "processing" | "ending";
 
@@ -20,19 +20,16 @@ export function VadConversationTool() {
   const [sessionState, setSessionState] = useState<SessionState>("idle");
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
   const [interimTranscript, setInterimTranscript] = useState<string>("");
-  const [finalTranscript, setFinalTranscript] = useState<string>("");
   
-  const [silenceThreshold, setSilenceThreshold] = useState(0.03);
-
   const recognitionRef = useRef<SpeechRecognition | null>(null);
-  const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const speechEndTimerRef = useRef<NodeJS.Timeout | null>(null);
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
   const scrollAreaRef = useRef<HTMLDivElement | null>(null);
   
   const { toast } = useToast();
 
   const cleanup = useCallback(() => {
-    if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+    if (speechEndTimerRef.current) clearTimeout(speechEndTimerRef.current);
     if (recognitionRef.current) {
         recognitionRef.current.onresult = null;
         recognitionRef.current.onend = null;
@@ -62,13 +59,12 @@ export function VadConversationTool() {
   }, [conversation, interimTranscript]);
 
   const processFinalTranscript = useCallback(async (transcript: string) => {
-    if (sessionState === 'ending' || !transcript.trim()) {
+    if (sessionState === 'ending') {
         startListening(); // Just listen again if nothing was said.
         return;
     }
     
     setSessionState("processing");
-    // Add user's final transcript to conversation immediately
     const userTurn: ConversationTurn = {role: 'user', text: transcript};
     setConversation(prev => [...prev, userTurn]);
     setInterimTranscript("");
@@ -76,7 +72,7 @@ export function VadConversationTool() {
     try {
         const { aiResponseText, aiResponseAudioDataUri } = await converseWithNativeTeacher({
             studentTranscript: transcript,
-            conversationHistory: [...conversation, userTurn], // Pass the updated conversation history
+            conversationHistory: [...conversation, userTurn],
         });
 
         setConversation(prev => [...prev, {role: 'model', text: aiResponseText}]);
@@ -88,14 +84,13 @@ export function VadConversationTool() {
         }
     } catch (error) {
         toast({ title: "AI 처리 오류", variant: "destructive" });
-        startListening(); // Go back to listening if AI fails
+        startListening(); 
     }
   }, [conversation, sessionState, toast]);
 
   const startListening = useCallback(() => {
     if (sessionState === 'ending') return;
     setSessionState("listening");
-    setFinalTranscript("");
     setInterimTranscript("");
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -121,20 +116,17 @@ export function VadConversationTool() {
             }
         }
         setInterimTranscript(interim);
-        if (final.trim()) {
-            setFinalTranscript(prev => prev + " " + final.trim());
-        }
 
-        if(silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
-        silenceTimerRef.current = setTimeout(() => {
+        if(speechEndTimerRef.current) clearTimeout(speechEndTimerRef.current);
+        speechEndTimerRef.current = setTimeout(() => {
              if (recognitionRef.current) {
                 recognitionRef.current.stop();
              }
-        }, SILENCE_DURATION_MS);
+        }, SPEECH_END_TIMEOUT_MS);
     };
     
     recognitionRef.current.onend = () => {
-        const finalTranscriptToProcess = (finalTranscript + " " + interimTranscript).trim();
+        const finalTranscriptToProcess = interimTranscript.trim();
         if(sessionState !== 'ending' && finalTranscriptToProcess){
             processFinalTranscript(finalTranscriptToProcess);
         } else if (sessionState === 'listening') {
@@ -151,12 +143,11 @@ export function VadConversationTool() {
     
     recognitionRef.current.start();
 
-  }, [sessionState, toast, finalTranscript, processFinalTranscript, interimTranscript]);
+  }, [sessionState, toast, processFinalTranscript, interimTranscript]);
 
   const startConversation = async () => {
     setConversation([]);
     setInterimTranscript("");
-    setFinalTranscript("");
     setSessionState("initializing");
     try {
       const { aiResponseText, aiResponseAudioDataUri } = await converseWithNativeTeacher({
@@ -180,7 +171,6 @@ export function VadConversationTool() {
     cleanup();
     setSessionState("idle");
     setInterimTranscript("");
-    setFinalTranscript("");
     toast({ title: "대화 종료됨" });
   }
 
@@ -201,7 +191,6 @@ export function VadConversationTool() {
     }
   }
 
-
   return (
     <div className="flex flex-col gap-4">
       <ScrollArea className="h-80 w-full rounded-md border p-4" ref={scrollAreaRef}>
@@ -210,7 +199,7 @@ export function VadConversationTool() {
               <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground pt-12">
                   <BrainCircuit className="h-12 w-12 mb-4 text-primary"/>
                   <p className="font-semibold">'대화 시작'을 누르면 자동으로 대화가 진행됩니다.</p>
-                  <p className="text-sm">말을 멈추면(약 2초) 자동으로 AI에게 턴이 넘어갑니다.</p>
+                  <p className="text-sm">말을 멈추면(약 5초) 자동으로 AI에게 턴이 넘어갑니다.</p>
               </div>
             )}
             {["initializing", "processing"].includes(sessionState) && (
@@ -242,18 +231,6 @@ export function VadConversationTool() {
       </ScrollArea>
       
       <div className="flex flex-col gap-4">
-        <div className="space-y-2">
-            <Label htmlFor="mic-sensitivity" className="text-xs">마이크 민감도 (오른쪽으로 갈수록 둔감)</Label>
-            <Slider
-                id="mic-sensitivity"
-                min={0.01}
-                max={0.1}
-                step={0.01}
-                value={[silenceThreshold]}
-                onValueChange={(value) => setSilenceThreshold(value[0])}
-                disabled={sessionState !== 'idle'}
-            />
-        </div>
         {getButtonState()}
         {sessionState !== 'idle' && (
             <p className={cn("text-xs text-center", sessionState === 'listening' ? "text-blue-600 font-semibold" : "text-muted-foreground")}>
