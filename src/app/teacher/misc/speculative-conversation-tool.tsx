@@ -11,14 +11,16 @@ import { converseWithSpeculativeTeacher } from "@/ai/flows/create-speculative-te
 import { cn } from "@/lib/utils";
 
 const mimeType = 'audio/webm;codecs=opus';
-const SPEECH_END_TIMEOUT_MS = 2500; // 2.5 seconds of silence
-const MIN_SPEECH_DURATION_MS = 500; // Minimum duration of speech to be considered valid
+const SPEECH_END_TIMEOUT_MS = 2500; 
+const MIN_SPEECH_DURATION_MS = 500; 
 
 type SessionState = "idle" | "initializing" | "speaking" | "listening" | "processing" | "ending" | "finished";
+type TurnWithAnimation = ConversationTurn & { justUpdated?: boolean };
+
 
 export function SpeculativeConversationTool() {
   const [sessionState, setSessionState] = useState<SessionState>("idle");
-  const [conversation, setConversation] = useState<ConversationTurn[]>([]);
+  const [conversation, setConversation] = useState<TurnWithAnimation[]>([]);
   const [interimTranscript, setInterimTranscript] = useState<string>("");
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -30,6 +32,7 @@ export function SpeculativeConversationTool() {
   const speechRecognitionRef = useRef<SpeechRecognition | null>(null);
   const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const speechStartTimeRef = useRef<number | null>(null);
+  const currentInterimTurnId = useRef<number | null>(null);
 
   const cleanup = useCallback(() => {
     if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
@@ -45,12 +48,10 @@ export function SpeculativeConversationTool() {
     }
     audioChunksRef.current = [];
     speechStartTimeRef.current = null;
-    setInterimTranscript("");
   }, []);
 
   const processAudio = useCallback(async (audioBlob: Blob) => {
     setSessionState("processing");
-    setInterimTranscript("처리 중...");
     
     // Create initial chunk for speculation
     const initialChunkBlob = new Blob(audioChunksRef.current.slice(0, 10), { type: mimeType });
@@ -76,34 +77,33 @@ export function SpeculativeConversationTool() {
             conversationHistory: conversation,
         });
 
-        // The key change: update the conversation with the *final* transcript from the server
-        const newHistory: ConversationTurn[] = [
-            ...conversation,
-            { role: 'user', text: finalStudentTranscript || "(음성 인식 안됨)" },
-            { role: 'model', text: aiResponseText },
-        ];
-        setConversation(newHistory);
-        setInterimTranscript(""); // Clear the interim VAD transcript
+        // Replace the interim turn with the final, corrected one from the server
+        setConversation(prev => {
+            const newHistory = prev.filter(turn => turn.role !== 'user_interim');
+            newHistory.push({ role: 'user', text: finalStudentTranscript || "(음성 인식 안됨)", justUpdated: true });
+            newHistory.push({ role: 'model', text: aiResponseText });
+            return newHistory;
+        });
+
         setSessionState("speaking");
 
         if (audioPlayerRef.current) {
             audioPlayerRef.current.src = aiResponseAudioDataUri;
             await audioPlayerRef.current.play().catch(() => {
                  toast({ title: "오디오 재생 오류", variant: "destructive" });
-                 (window as any)._startListeningVAD?.(); // Fallback to listening
+                 (window as any)._startListeningVAD?.();
             });
         }
     } catch(err) {
         toast({ title: "AI 처리 오류", description: (err as Error).message, variant: "destructive" });
-        setSessionState('speaking'); // Let user try again by speaking
+        setConversation(prev => prev.filter(turn => turn.role !== 'user_interim'));
+        setSessionState('speaking');
     }
-
   }, [conversation, toast]);
   
 
   const startListeningVAD = useCallback(() => {
     setSessionState("listening");
-    setInterimTranscript("");
     cleanup();
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -123,12 +123,9 @@ export function SpeculativeConversationTool() {
             };
             mediaRecorderRef.current.onstop = () => {
                 const fullAudioBlob = new Blob(audioChunksRef.current, { type: mimeType });
-                if (fullAudioBlob.size > 2000) { // Basic validation for audio data
+                const currentSessionState = (window as any)._sessionState;
+                if (fullAudioBlob.size > 1000 && currentSessionState === 'listening') { 
                     processAudio(fullAudioBlob);
-                } else if (sessionState !== 'ending' && sessionState !== 'idle' && sessionState !== 'finished') {
-                    // If no valid audio, just go back to listening without processing
-                    toast({ title: "음성 감지 안됨", description: "AI가 다시 듣습니다. 말씀해주세요.", variant: 'default' });
-                    startListeningVAD();
                 }
                 stream.getTracks().forEach(track => track.stop());
             };
@@ -141,12 +138,8 @@ export function SpeculativeConversationTool() {
             recognition.lang = 'en-US';
             
             const stopAll = () => {
-                if (speechRecognitionRef.current) {
-                    speechRecognitionRef.current.stop();
-                }
-                if (mediaRecorderRef.current?.state === 'recording') {
-                    mediaRecorderRef.current.stop();
-                }
+                if (speechRecognitionRef.current) speechRecognitionRef.current.stop();
+                if (mediaRecorderRef.current?.state === 'recording') mediaRecorderRef.current.stop();
             }
 
             const resetSilenceTimer = () => {
@@ -155,7 +148,6 @@ export function SpeculativeConversationTool() {
                     if (speechStartTimeRef.current && (Date.now() - speechStartTimeRef.current > MIN_SPEECH_DURATION_MS)) {
                        stopAll();
                     } else {
-                       // Speech too short, just reset timer and continue listening
                        resetSilenceTimer();
                     }
                 }, SPEECH_END_TIMEOUT_MS);
@@ -166,22 +158,31 @@ export function SpeculativeConversationTool() {
                 for (let i = event.resultIndex; i < event.results.length; ++i) {
                      interim += event.results[i][0].transcript;
                 }
-                setInterimTranscript(interim);
+                
                 if (interim && !speechStartTimeRef.current) {
                     speechStartTimeRef.current = Date.now();
+                    const newInterimTurn = { role: 'user_interim', text: interim, id: Date.now() };
+                    currentInterimTurnId.current = newInterimTurn.id;
+                    setConversation(prev => [...prev, newInterimTurn]);
+                } else if (currentInterimTurnId.current) {
+                    setConversation(prev => prev.map(t => t.id === currentInterimTurnId.current ? {...t, text: interim} : t));
                 }
+
                 if (interim) {
                     resetSilenceTimer();
                 }
             };
             
             recognition.onend = () => {
-                 stopAll();
+                // Ensure media recorder also stops when speech recognition ends for any reason
+                if (mediaRecorderRef.current?.state === 'recording') {
+                     mediaRecorderRef.current.stop();
+                }
             }
 
             recognition.onerror = (event) => {
                 if (event.error !== 'no-speech' && event.error !== 'aborted') {
-                    toast({title: "음성 인식 오류", description: `오류: ${event.error}`, variant: "destructive"});
+                    toast({title: "음성 인식 오류", variant: "destructive"});
                     setSessionState("idle");
                 }
             };
@@ -196,12 +197,13 @@ export function SpeculativeConversationTool() {
         toast({ title: "음성 인식 시작 오류", variant: "destructive" });
         setSessionState("idle");
     }
-  }, [cleanup, processAudio, toast, sessionState]);
-
+  }, [cleanup, processAudio, toast]);
+  
   useEffect(() => {
-    (window as any)._startListeningVAD = startListeningVAD;
-    return () => { delete (window as any)._startListeningVAD; }
-  }, [startListeningVAD]);
+      (window as any)._startListeningVAD = startListeningVAD;
+      (window as any)._sessionState = sessionState;
+      return () => { delete (window as any)._startListeningVAD; delete (window as any)._sessionState; }
+  }, [startListeningVAD, sessionState]);
   
   useEffect(() => {
     return () => cleanup();
@@ -284,23 +286,24 @@ export function SpeculativeConversationTool() {
                   <p className="font-semibold">대화가 종료되었습니다.</p>
               </div>
             )}
-            {conversation.map((turn, index) => (
-              <div key={index} className={cn("flex items-start gap-3", turn.role === 'user' ? 'justify-start' : 'justify-end')}>
-                 {turn.role === 'user' && <div className="p-2 rounded-full bg-muted"><User className="h-5 w-5" /></div>}
-                 <div className={cn("p-3 rounded-lg max-w-[80%]", turn.role === 'user' ? 'bg-muted' : 'bg-primary text-primary-foreground')}>
-                   <p className="text-sm">{turn.text}</p>
-                 </div>
-                 {turn.role === 'model' && <div className="p-2 rounded-full bg-primary text-primary-foreground"><Bot className="h-5 w-5" /></div>}
-              </div>
-            ))}
-             {interimTranscript && (sessionState === 'listening' || sessionState === 'processing') && (
-                <div className="flex items-start gap-3 justify-start">
-                    <div className="p-2 rounded-full bg-muted"><User className="h-5 w-5" /></div>
-                    <div className="p-3 rounded-lg max-w-[80%] bg-muted">
-                        <p className="text-sm text-muted-foreground italic">{interimTranscript}</p>
+            {conversation.map((turn, index) => {
+                 const isUser = turn.role === 'user' || turn.role === 'user_interim';
+                 const isInterim = turn.role === 'user_interim';
+                 
+                 return (
+                    <div key={turn.id || index} className={cn("flex items-start gap-3", isUser ? 'justify-start' : 'justify-end')}>
+                        {isUser && <div className="p-2 rounded-full bg-muted"><User className="h-5 w-5" /></div>}
+                        <div className={cn(
+                            "p-3 rounded-lg max-w-[80%]", 
+                            isUser ? 'bg-muted' : 'bg-primary text-primary-foreground',
+                            turn.justUpdated && 'animate-glow-once'
+                        )}>
+                        <p className={cn("text-sm", isInterim && "text-muted-foreground italic")}>{turn.text}</p>
+                        </div>
+                        {turn.role === 'model' && <div className="p-2 rounded-full bg-primary text-primary-foreground"><Bot className="h-5 w-5" /></div>}
                     </div>
-                </div>
-            )}
+                )
+             })}
         </div>
       </ScrollArea>
       <div className="flex flex-col gap-2">

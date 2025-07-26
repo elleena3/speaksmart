@@ -141,4 +141,19 @@ body {
   .font-headline {
     font-family: var(--font-noto-sans-kr), sans-serif;
   }
+  .animate-glow-once {
+    animation: glow-once 1s ease-out;
+  }
+}
+
+@keyframes glow-once {
+  0% {
+    box-shadow: 0 0 0 0 hsl(var(--primary) / 0.4);
+  }
+  50% {
+    box-shadow: 0 0 10px 3px hsl(var(--primary) / 0.4);
+  }
+  100% {
+    box-shadow: 0 0 0 0 hsl(var(--primary) / 0);
+  }
 }
