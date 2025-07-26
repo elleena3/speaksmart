@@ -11,7 +11,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, CalendarIcon, ChevronsUpDown, Check, Info, Type, Image as ImageIcon, LayoutGrid, Wand2, Copy } from "lucide-react";
+import { Loader2, CalendarIcon, ChevronsUpDown, Check, Info, Type, Image as ImageIcon, LayoutGrid, Wand2, Copy, BookOpen } from "lucide-react";
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -329,10 +329,6 @@ export default function NewAssessmentPage() {
                                 <FormItem className="flex items-center space-x-3 space-y-0">
                                     <FormControl><RadioGroupItem value="image"/></FormControl>
                                     <FormLabel className="font-normal flex items-center gap-2"><ImageIcon/>Describing a picture(이미지 설명하기)</FormLabel>
-                                </FormItem>
-                                <FormItem className="flex items-center space-x-3 space-y-0">
-                                    <FormControl><RadioGroupItem value="comic" /></FormControl>
-                                    <FormLabel className="font-normal flex items-center gap-2"><LayoutGrid/>네 컷 만화 설명</FormLabel>
                                 </FormItem>
                            </RadioGroup>
                          </FormControl>
@@ -890,3 +886,4 @@ export default function NewAssessmentPage() {
     </Card>
   );
 }
+
