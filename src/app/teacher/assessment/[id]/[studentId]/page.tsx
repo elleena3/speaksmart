@@ -6,7 +6,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useRouter, notFound } from "next/navigation";
 import { type TeacherAssessment, type StudentResult, type ResultSummary, type RubricScores } from "@/lib/types";
 import { useAuth, mockStudents } from "@/context/auth-context";
-import { Loader2, User, Sparkles, TrendingUp, DraftingCompass } from "lucide-react";
+import { Loader2, User, Sparkles, TrendingUp, DraftingCompass, RefreshCw } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
 import { useToast } from "@/hooks/use-toast";
@@ -18,6 +18,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
 import { generateGrowthFeedback, type GenerateGrowthFeedbackOutput } from "@/ai/flows/generate-growth-feedback-flow";
+import { Button } from "@/components/ui/button";
 
 
 function AttemptDetailView({ result, assessment, attemptNumber }: { result: StudentResult, assessment: TeacherAssessment, attemptNumber: number }) {
@@ -232,57 +233,61 @@ function TeacherGrowthView({ results, assessment }: { results: StudentResult[], 
         return data;
     }, [latestResult.historicalScores, results, rubricSubjects]);
 
-     useEffect(() => {
-        if (results.length > 1) {
-            if (latestResult.growthFeedback && latestResult.growthFeedbackForAttempts === results.length) {
-                setGrowthFeedback({
-                    growthFeedback: latestResult.growthFeedback,
-                    teacherGuidance: latestResult.growthTeacherGuidance || "",
-                    curricularRemarks: latestResult.growthCurricularRemarks || ""
-                });
-                setIsLoadingFeedback(false);
-            } else {
-                const fetchGrowthFeedback = async () => {
-                    setIsLoadingFeedback(true);
-                    try {
-                        const attempts: ResultSummary[] = results.map((r, index) => ({
-                          attemptNumber: index + 1,
-                          contentScore: r.contentScore ?? 0,
-                          pronunciationScore: r.pronunciationScore ?? 0,
-                          transcript: r.studentTranscript ?? "",
-                          aiFeedback: r.aiFeedback ?? "",
-                          curricularRemarks: r.curricularRemarks ?? "",
-                        }));
+    const fetchGrowthFeedback = useCallback(async (forceRefetch = false) => {
+        setIsLoadingFeedback(true);
+        if (!forceRefetch && latestResult.growthFeedback && latestResult.growthFeedbackForAttempts === results.length) {
+            setGrowthFeedback({
+                growthFeedback: latestResult.growthFeedback,
+                teacherGuidance: latestResult.growthTeacherGuidance || "",
+                curricularRemarks: latestResult.growthCurricularRemarks || ""
+            });
+            setIsLoadingFeedback(false);
+            return;
+        }
 
-                        const feedback = await generateGrowthFeedback({ attempts: attempts, assessmentTitle: assessment.title, });
-                        setGrowthFeedback(feedback);
-                        
-                        const resultRef = doc(db, "results", latestResult.id);
-                        await updateDoc(resultRef, {
-                            growthFeedback: feedback.growthFeedback,
-                            growthTeacherGuidance: feedback.teacherGuidance,
-                            curricularRemarks: feedback.curricularRemarks,
-                            growthFeedbackForAttempts: results.length
-                        });
-                        toast({ title: "AI 종합 분석 완료", description: "학생의 성장 과정에 대한 종합 분석이 완료되었습니다."});
+        try {
+            toast({ title: "AI 종합 분석 중...", description: "학생의 모든 시도를 종합하여 분석하고 있습니다." });
+            const attempts: ResultSummary[] = results.map((r, index) => ({
+                attemptNumber: index + 1,
+                contentScore: r.contentScore ?? 0,
+                pronunciationScore: r.pronunciationScore ?? 0,
+                transcript: r.studentTranscript ?? "",
+                aiFeedback: r.aiFeedback ?? "",
+                curricularRemarks: r.curricularRemarks ?? "",
+            }));
 
-                    } catch (error) {
-                        console.error("Error generating growth feedback:", error);
-                        setGrowthFeedback({ 
-                            growthFeedback: "성장 피드백 생성 중 오류 발생",
-                            teacherGuidance: "교사 조언 생성 중 오류 발생",
-                            curricularRemarks: "생활기록부 교과 특기 사항 생성 중 오류 발생"
-                         });
-                    } finally {
-                        setIsLoadingFeedback(false);
-                    }
-                };
-                fetchGrowthFeedback();
-            }
-        } else {
+            const feedback = await generateGrowthFeedback({ attempts, assessmentTitle: assessment.title });
+            setGrowthFeedback(feedback);
+            
+            const resultRef = doc(db, "results", latestResult.id);
+            await updateDoc(resultRef, {
+                growthFeedback: feedback.growthFeedback,
+                growthTeacherGuidance: feedback.teacherGuidance,
+                curricularRemarks: feedback.curricularRemarks,
+                growthFeedbackForAttempts: results.length
+            });
+            toast({ title: "AI 종합 분석 완료", description: "학생의 성장 과정에 대한 종합 분석이 완료되었습니다." });
+
+        } catch (error) {
+            console.error("Error generating growth feedback:", error);
+            setGrowthFeedback({ 
+                growthFeedback: "성장 피드백 생성 중 오류 발생",
+                teacherGuidance: "교사 조언 생성 중 오류 발생",
+                curricularRemarks: "생활기록부 교과 특기 사항 생성 중 오류 발생"
+            });
+            toast({ title: "오류", description: "종합 분석 생성 중 오류가 발생했습니다.", variant: "destructive" });
+        } finally {
             setIsLoadingFeedback(false);
         }
     }, [results, assessment.title, toast, latestResult]);
+
+     useEffect(() => {
+        if (results.length > 1) {
+            fetchGrowthFeedback();
+        } else {
+            setIsLoadingFeedback(false);
+        }
+    }, [results.length, fetchGrowthFeedback]);
 
     const RemarksCard = ({ title, content }: { title: string, content?: string }) => (
       <Card>
@@ -346,7 +351,13 @@ function TeacherGrowthView({ results, assessment }: { results: StudentResult[], 
             )}
             <Card>
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2"><Sparkles />AI 종합 성장 피드백</CardTitle>
+                    <div className="flex justify-between items-center">
+                        <CardTitle className="flex items-center gap-2"><Sparkles />AI 종합 성장 피드백</CardTitle>
+                        <Button variant="secondary" size="sm" onClick={() => fetchGrowthFeedback(true)} disabled={isLoadingFeedback}>
+                           {isLoadingFeedback ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <RefreshCw className="mr-2 h-4 w-4" />}
+                            종합 분석 재생성
+                        </Button>
+                    </div>
                     <CardDescription>모든 시도를 종합하여 AI가 분석한 학생의 성장 과정입니다.</CardDescription>
                 </CardHeader>
                 <CardContent>
