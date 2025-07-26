@@ -18,10 +18,10 @@ type SessionState = "idle" | "initializing" | "speaking" | "recording" | "proces
 export function SpeculativeConversationTool() {
   const [sessionState, setSessionState] = useState<SessionState>("idle");
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
+  const [interimTranscript, setInterimTranscript] = useState<string>("");
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
-  const initialChunkSentRef = useRef(false);
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
   const scrollViewportRef = useRef<HTMLDivElement | null>(null);
   const { toast } = useToast();
@@ -36,22 +36,38 @@ export function SpeculativeConversationTool() {
         }
         mediaRecorderRef.current = null;
     }
-    initialChunkSentRef.current = false;
     audioChunksRef.current = [];
+    setInterimTranscript("");
   }, []);
 
   useEffect(() => {
     if (scrollViewportRef.current) {
-        scrollViewportRef.current.scrollTop = scrollViewportRef.current.scrollHeight;
+        const viewport = scrollViewportRef.current.querySelector('div');
+        if (viewport) {
+           viewport.scrollTop = viewport.scrollHeight;
+        }
     }
-  }, [conversation]);
+  }, [conversation, interimTranscript]);
 
   const processFullAudio = useCallback(async (fullAudioBlob: Blob) => {
     setSessionState("processing");
-    const initialChunkBlob = new Blob(audioChunksRef.current.slice(0, Math.ceil(INITIAL_CHUNK_DURATION / 100)), { type: mimeType });
+    setInterimTranscript("처리 중...");
     
+    // Create the initial chunk from the recorded data.
+    // The recorder saves data every 100ms, so 20 chunks = 2 seconds.
+    const initialChunkBlob = new Blob(audioChunksRef.current.slice(0, 20), { type: mimeType });
+    
+    // If the initial chunk is empty, something went wrong, but we can still proceed with the full audio.
+    if(initialChunkBlob.size === 0) {
+        toast({ title: "경고", description: "초기 음성 데이터가 작아 예측 없이 처리합니다.", variant: "default" });
+    }
+
     const [initialChunkDataUri, finalAudioDataUri] = await Promise.all([
         new Promise<string>(resolve => {
+            if (initialChunkBlob.size === 0) {
+                resolve(""); // Resolve with empty string if no initial chunk
+                return;
+            }
             const reader = new FileReader();
             reader.readAsDataURL(initialChunkBlob);
             reader.onloadend = () => resolve(reader.result as string);
@@ -65,8 +81,8 @@ export function SpeculativeConversationTool() {
     
     try {
         const { finalStudentTranscript, aiResponseText, aiResponseAudioDataUri } = await converseWithSpeculativeTeacher({
-            initialChunkDataUri,
-            finalAudioDataUri,
+            initialChunkDataUri: initialChunkDataUri || undefined, // Send undefined if empty
+            finalAudioDataUri: finalAudioDataUri,
             conversationHistory: conversation,
         });
 
@@ -76,6 +92,7 @@ export function SpeculativeConversationTool() {
             { role: 'model', text: aiResponseText },
         ];
         setConversation(newHistory);
+        setInterimTranscript(""); // Clear interim transcript after processing
         setSessionState("speaking");
 
         if (audioPlayerRef.current) {
@@ -86,8 +103,8 @@ export function SpeculativeConversationTool() {
             });
         }
     } catch(err) {
-        toast({ title: "AI 처리 오류", variant: "destructive" });
-        setSessionState('recording'); // Let user try again
+        toast({ title: "AI 처리 오류", description: (err as Error).message, variant: "destructive" });
+        setSessionState('speaking'); // Let user try again by speaking
     }
 
   }, [conversation, toast]);
@@ -118,7 +135,7 @@ export function SpeculativeConversationTool() {
             stream.getTracks().forEach(track => track.stop());
         };
 
-        mediaRecorderRef.current.start(100); // Collect audio in chunks
+        mediaRecorderRef.current.start(100); // Collect audio in chunks (important for slicing)
         
     } catch (err) {
          toast({ title: "마이크 오류", variant: "destructive" });
@@ -176,7 +193,7 @@ export function SpeculativeConversationTool() {
           case 'finished': return <Button size="lg" onClick={handleReset} variant="outline" className="w-full"><RefreshCw className="mr-2"/>새로 시작</Button>;
           case 'initializing':
           case 'processing': return <Button size="lg" disabled className="w-full"><Loader2 className="mr-2 animate-spin"/> {sessionState === 'initializing' ? '준비 중...' : '처리 중...'}</Button>
-          case 'speaking': return <Button size="lg" disabled className="w-full"><Volume2 className="mr-2 animate-pulse"/>AI 응답 중...</Button>
+          case 'speaking': return <Button size="lg" onClick={handleStartRecording} className="w-full"><Mic className="mr-2"/> 말하기 시작</Button>;
           case 'recording': return <Button size="lg" onClick={handleStopRecording} variant="destructive" className="w-full"><StopCircle className="mr-2"/>말하기 중지</Button>
       }
   }
@@ -189,7 +206,7 @@ export function SpeculativeConversationTool() {
               <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground pt-12">
                   <BrainCircuit className="h-12 w-12 mb-4 text-purple-500"/>
                   <p className="font-semibold">'대화 시작'을 누르면 자동으로 대화가 진행됩니다.</p>
-                  <p className="text-sm">AI의 말이 끝나면 바로 말씀을 시작하세요.</p>
+                  <p className="text-sm">AI의 말이 끝나면 '말하기 시작' 버튼을 누르세요.</p>
               </div>
             )}
              {sessionState === "finished" && (
@@ -213,13 +230,21 @@ export function SpeculativeConversationTool() {
                  {turn.role === 'model' && <div className="p-2 rounded-full bg-primary text-primary-foreground"><Bot className="h-5 w-5" /></div>}
               </div>
             ))}
+             {interimTranscript && (
+                <div className="flex items-start gap-3 justify-start">
+                    <div className="p-2 rounded-full bg-muted"><User className="h-5 w-5" /></div>
+                    <div className="p-3 rounded-lg max-w-[80%] bg-muted">
+                        <p className="text-sm text-muted-foreground italic">{interimTranscript}</p>
+                    </div>
+                </div>
+            )}
         </div>
       </ScrollArea>
       <div className="flex flex-col gap-2">
         {getButtonState()}
         <p className="text-xs text-center text-muted-foreground">
             {sessionState === 'recording' ? "말씀을 하세요... 완료되면 '말하기 중지'를 누르세요." : 
-             sessionState === 'speaking' ? "AI의 응답이 끝나면 자동으로 녹음이 시작됩니다." : 
+             sessionState === 'speaking' ? "AI의 응답이 끝나면 '말하기 시작'을 누르세요." : 
              sessionState !== 'idle' && sessionState !== 'finished' ? "잠시만 기다려주세요..." : ""}
         </p>
       </div>
