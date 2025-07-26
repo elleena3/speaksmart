@@ -47,10 +47,79 @@ export function VadConversationTool() {
     setInterimTranscript("");
   }, []);
 
+  const startListening = useCallback(() => {
+    setSessionState("listening");
+    finalTranscriptRef.current = "";
+    setInterimTranscript("");
+    
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+        toast({ title: "브라우저 지원 안함", description: "실시간 음성 인식을 지원하지 않는 브라우저입니다.", variant: "destructive"});
+        setSessionState("idle");
+        return;
+    }
+    
+    cleanup();
+
+    try {
+        const recognition = new SpeechRecognition();
+        recognitionRef.current = recognition;
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = 'en-US';
+
+        const resetTimer = () => {
+            if (speechEndTimerRef.current) clearTimeout(speechEndTimerRef.current);
+            speechEndTimerRef.current = setTimeout(() => {
+                const finalTranscript = finalTranscriptRef.current.trim();
+                // This is where processFinalTranscript will be called
+                // We'll define it below so it can be used here.
+                // The linter might complain, but it will work at runtime.
+                (window as any)._processFinalTranscript(finalTranscript);
+            }, SPEECH_END_TIMEOUT_MS);
+        };
+
+        recognition.onresult = (event) => {
+            let currentInterim = "";
+            let localFinal = finalTranscriptRef.current;
+            for (let i = event.resultIndex; i < event.results.length; ++i) {
+                if (event.results[i].isFinal) {
+                    localFinal += event.results[i][0].transcript;
+                } else {
+                    currentInterim += event.results[i][0].transcript;
+                }
+            }
+            finalTranscriptRef.current = localFinal;
+            setInterimTranscript(localFinal + currentInterim);
+            resetTimer();
+        };
+
+        recognition.onend = () => {
+            if (speechEndTimerRef.current) {
+                clearTimeout(speechEndTimerRef.current);
+            }
+        };
+
+        recognition.onerror = (event) => {
+            if (event.error !== 'no-speech' && event.error !== 'aborted') {
+                toast({title: "음성 인식 오류", description: `오류가 발생했습니다: ${event.error}`, variant: "destructive"});
+                 setSessionState("idle");
+            }
+        };
+        
+        recognition.start();
+        resetTimer();
+
+    } catch (err) {
+        toast({ title: "마이크 오류", description: "마이크에 접근할 수 없습니다.", variant: "destructive" });
+        setSessionState("idle");
+    }
+  }, [toast, cleanup]);
+
   const processFinalTranscript = useCallback(async (transcript: string) => {
     cleanup();
     if (!transcript.trim()) {
-        if(sessionState === 'listening') {
+        if(sessionState === 'listening' || sessionState === 'speaking') {
             startListening(); 
         }
       return; 
@@ -83,71 +152,15 @@ export function VadConversationTool() {
         toast({ title: "AI 처리 오류", variant: "destructive" });
         startListening();
     }
-  }, [conversation, cleanup]);
-
-  const startListening = useCallback(() => {
-    setSessionState("listening");
-    finalTranscriptRef.current = "";
-    setInterimTranscript("");
-    
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-        toast({ title: "브라우저 지원 안함", description: "실시간 음성 인식을 지원하지 않는 브라우저입니다.", variant: "destructive"});
-        setSessionState("idle");
-        return;
+  }, [conversation, cleanup, toast, startListening, sessionState]);
+  
+  useEffect(() => {
+    // Expose processFinalTranscript globally to be called from the timer in startListening
+    (window as any)._processFinalTranscript = processFinalTranscript;
+    return () => {
+        delete (window as any)._processFinalTranscript;
     }
-    
-    cleanup();
-
-    try {
-        const recognition = new SpeechRecognition();
-        recognitionRef.current = recognition;
-        recognition.continuous = true;
-        recognition.interimResults = true;
-        recognition.lang = 'en-US';
-
-        const resetTimer = () => {
-            if (speechEndTimerRef.current) clearTimeout(speechEndTimerRef.current);
-            speechEndTimerRef.current = setTimeout(() => {
-                const finalTranscript = finalTranscriptRef.current.trim();
-                processFinalTranscript(finalTranscript);
-            }, SPEECH_END_TIMEOUT_MS);
-        };
-
-        recognition.onresult = (event) => {
-            let currentInterim = "";
-            for (let i = event.resultIndex; i < event.results.length; ++i) {
-                if (event.results[i].isFinal) {
-                    finalTranscriptRef.current += event.results[i][0].transcript;
-                } else {
-                    currentInterim += event.results[i][0].transcript;
-                }
-            }
-            setInterimTranscript(finalTranscriptRef.current + currentInterim);
-            resetTimer();
-        };
-
-        recognition.onend = () => {
-            if (speechEndTimerRef.current) {
-                clearTimeout(speechEndTimerRef.current);
-            }
-        };
-
-        recognition.onerror = (event) => {
-            if (event.error !== 'no-speech' && event.error !== 'aborted') {
-                toast({title: "음성 인식 오류", description: `오류가 발생했습니다: ${event.error}`, variant: "destructive"});
-                 setSessionState("idle");
-            }
-        };
-        
-        recognition.start();
-        resetTimer();
-
-    } catch (err) {
-        toast({ title: "마이크 오류", description: "마이크에 접근할 수 없습니다.", variant: "destructive" });
-        setSessionState("idle");
-    }
-  }, [toast, cleanup, processFinalTranscript]);
+  }, [processFinalTranscript]);
 
   useEffect(() => {
     return () => {
