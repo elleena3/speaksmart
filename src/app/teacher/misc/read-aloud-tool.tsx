@@ -6,19 +6,15 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Mic, StopCircle, RefreshCw, Sparkles, BookOpen, Brain, MessageSquare, AudioLines, Speaker, AlertTriangle, Info } from 'lucide-react';
+import { Loader2, Mic, StopCircle, RefreshCw, Sparkles } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { analyzeReadAloud, type AnalyzeReadAloudOutput } from '@/ai/flows/analyze-read-aloud-flow';
-import { enhanceSelectedText, type EnhanceSelectedTextOutput } from '@/ai/flows/enhance-selected-text-flow';
-import { readAloudText } from '@/ai/flows/text-to-speech';
 import { sampleTexts } from '@/lib/book';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 type RecordingState = 'idle' | 'recording' | 'recorded' | 'analyzing';
 type Difficulty = 'beginner' | 'intermediate' | 'advanced';
-type AnalysisAction = 'translate' | 'define' | 'explain';
 const mimeType = 'audio/webm;codecs=opus';
 
 const ScoreDisplay = ({ label, value }: { label: string; value: number }) => (
@@ -35,24 +31,16 @@ export function ReadAloudTool() {
     const [recordingState, setRecordingState] = useState<RecordingState>('idle');
     const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
     const [selectedText, setSelectedText] = useState<string>(sampleTexts.beginner.text);
+    const [editableText, setEditableText] = useState<string>(sampleTexts.beginner.text);
     const [analysisResult, setAnalysisResult] = useState<AnalyzeReadAloudOutput | null>(null);
     
-    // State for interactive features
-    const [popoverOpen, setPopoverOpen] = useState(false);
-    const [selectionRect, setSelectionRect] = useState<DOMRect | null>(null);
-    const [currentSelection, setCurrentSelection] = useState('');
-    const [analysisCardContent, setAnalysisCardContent] = useState<EnhanceSelectedTextOutput | null>(null);
-    const [isCardLoading, setIsCardLoading] = useState(false);
-    const [isReadingAloud, setIsReadingAloud] = useState(false);
-    const audioPlayerRef = useRef<HTMLAudioElement>(null);
-
-
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const audioChunksRef = useRef<Blob[]>([]);
     const { toast } = useToast();
 
     // Reset everything when text changes
     useEffect(() => {
+        setEditableText(selectedText);
         handleReset(false);
     }, [selectedText]);
 
@@ -64,71 +52,12 @@ export function ReadAloudTool() {
         audioChunksRef.current = [];
     }, []);
 
-    const handleTextSelection = () => {
-        const selection = window.getSelection();
-        const text = selection?.toString().trim();
-        if (text && text.length > 1) {
-            const range = selection?.getRangeAt(0);
-            if (range) {
-                setSelectionRect(range.getBoundingClientRect());
-                setCurrentSelection(text);
-                setPopoverOpen(true);
-                setAnalysisCardContent(null);
-            }
-        } else {
-            setPopoverOpen(false);
-        }
-    };
-
-    const handleActionClick = async (action: AnalysisAction) => {
-        setPopoverOpen(false);
-        setIsCardLoading(true);
-        setAnalysisCardContent(null);
-        
-        try {
-            const selection = window.getSelection();
-            const range = selection?.getRangeAt(0);
-            if (!range) throw new Error("No text selected.");
-
-            const surroundingNode = range.commonAncestorContainer;
-            const fullSentenceContext = surroundingNode.textContent || '';
-            
-            const result = await enhanceSelectedText({
-                selectedText: currentSelection,
-                fullSentenceContext,
-                action,
-            });
-            setAnalysisCardContent(result);
-        } catch (e: any) {
-            toast({ title: "분석 오류", description: e.message, variant: "destructive" });
-        } finally {
-            setIsCardLoading(false);
-        }
-    };
-    
-    const handleReadAloudClick = async () => {
-        setPopoverOpen(false);
-        setIsReadingAloud(true);
-        try {
-            const textToRead = currentSelection;
-            const { audioDataUri } = await readAloudText({ text: textToRead });
-            if (audioPlayerRef.current) {
-                audioPlayerRef.current.src = audioDataUri;
-                audioPlayerRef.current.play();
-            }
-        } catch (e: any) {
-             toast({ title: "AI 리딩 오류", description: e.message, variant: "destructive" });
-             setIsReadingAloud(false);
-        }
-    }
-
-
     const handleSelectText = (difficulty: Difficulty) => {
         setSelectedText(sampleTexts[difficulty].text);
     }
 
     const handleStartRecording = async () => {
-        handleReset();
+        handleReset(false);
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             mediaRecorderRef.current = new MediaRecorder(stream, { mimeType });
@@ -157,7 +86,7 @@ export function ReadAloudTool() {
             const reader = new FileReader();
             reader.readAsDataURL(audioBlob);
             reader.onloadend = async () => {
-                const result = await analyzeReadAloud({ audioDataUri: reader.result as string, originalText: selectedText });
+                const result = await analyzeReadAloud({ audioDataUri: reader.result as string, originalText: editableText });
                 setAnalysisResult(result);
                 toast({ title: "분석 완료", description: "AI 낭독 분석이 완료되었습니다." });
                 setRecordingState('recorded');
@@ -172,9 +101,6 @@ export function ReadAloudTool() {
         setRecordingState('idle');
         setAudioBlob(null);
         setAnalysisResult(null);
-        setPopoverOpen(false);
-        setCurrentSelection('');
-        setAnalysisCardContent(null);
         cleanupRecorder();
         if(showToast) toast({ title: "초기화 완료", description: "새로운 낭독 연습을 시작할 수 있습니다." });
     };
@@ -193,32 +119,11 @@ export function ReadAloudTool() {
                         <Button variant={selectedText === sampleTexts.intermediate.text ? 'default' : 'outline'} onClick={() => handleSelectText('intermediate')}>중급</Button>
                         <Button variant={selectedText === sampleTexts.advanced.text ? 'default' : 'outline'} onClick={() => handleSelectText('advanced')}>고급</Button>
                     </div>
-                    <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
-                        <PopoverTrigger asChild>
-                            <div
-                                onMouseUp={handleTextSelection}
-                                className="p-4 bg-muted/50 rounded-lg text-lg font-serif leading-relaxed h-96 overflow-y-auto select-text"
-                            >
-                                {selectedText}
-                            </div>
-                        </PopoverTrigger>
-                        <PopoverContent
-                            className="w-auto p-1"
-                            style={selectionRect ? { top: `${selectionRect.top - 50}px`, left: `${selectionRect.left}px` } : {}}
-                            onOpenAutoFocus={(e) => e.preventDefault()}
-                        >
-                            <div className="flex gap-1">
-                                <Button variant="ghost" size="sm" onClick={() => handleActionClick('translate')}><BookOpen className="mr-1 h-4 w-4"/>번역</Button>
-                                <Button variant="ghost" size="sm" onClick={() => handleActionClick('define')}><Brain className="mr-1 h-4 w-4"/>사전</Button>
-                                <Button variant="ghost" size="sm" onClick={() => handleActionClick('explain')}><MessageSquare className="mr-1 h-4 w-4"/>해설</Button>
-                                <Button variant="ghost" size="sm" onClick={handleReadAloudClick} disabled={isReadingAloud}>
-                                    {isReadingAloud ? <Loader2 className="animate-spin h-4 w-4"/> : <Speaker className="mr-1 h-4 w-4"/>}
-                                    리딩
-                                </Button>
-                                 <audio ref={audioPlayerRef} onEnded={() => setIsReadingAloud(false)} className="hidden"/>
-                            </div>
-                        </PopoverContent>
-                    </Popover>
+                    <Textarea 
+                        value={editableText}
+                        onChange={(e) => setEditableText(e.target.value)}
+                        className="p-4 bg-muted/50 rounded-lg text-lg font-serif leading-relaxed h-96 overflow-y-auto"
+                    />
                 </CardContent>
             </Card>
             
@@ -284,27 +189,13 @@ export function ReadAloudTool() {
                     </CardContent>
                 </Card>
             ) : (
-                 <Card className="sticky top-4">
-                     <CardHeader>
-                         <CardTitle className="flex items-center gap-2">
-                             {isCardLoading || analysisCardContent ? <AudioLines/> : <Info/>}
-                             텍스트 분석 도구
-                         </CardTitle>
-                         <CardDescription>지문에서 단어나 구를 선택하여 번역, 사전, 해설, 리딩 기능을 사용해보세요.</CardDescription>
-                     </CardHeader>
-                     <CardContent className="min-h-[200px]">
-                         {isCardLoading ? (
-                             <div className="flex items-center justify-center h-full"><Loader2 className="animate-spin" /></div>
-                         ) : analysisCardContent ? (
-                             <div className="space-y-4">
-                                 <p className="font-semibold text-primary">"{analysisCardContent.correctedText}"</p>
-                                 <p className="text-sm">{analysisCardContent.result}</p>
-                             </div>
-                         ) : (
-                             <div className="text-center text-muted-foreground pt-10">결과가 여기에 표시됩니다.</div>
-                         )}
-                     </CardContent>
-                 </Card>
+                <div className="h-full flex items-center justify-center">
+                    <div className="text-center text-muted-foreground p-8 border-2 border-dashed rounded-lg">
+                        <Sparkles className="mx-auto h-12 w-12 mb-4" />
+                        <h3 className="text-lg font-semibold">분석 결과 대기 중</h3>
+                        <p className="text-sm">낭독을 녹음하고 'AI 분석' 버튼을 누르면 결과가 여기에 표시됩니다.</p>
+                    </div>
+                </div>
             )}
         </div>
     </div>
