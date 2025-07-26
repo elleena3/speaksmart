@@ -31,7 +31,7 @@ export function VadConversationTool() {
   const audioStreamRef = useRef<MediaStream | null>(null);
   const animationFrameRef = useRef<number | null>(null);
 
-  const scrollAreaRef = useRef<HTMLDivElement | null>(null);
+  const scrollViewportRef = useRef<HTMLDivElement | null>(null);
   
   const { toast } = useToast();
   
@@ -59,89 +59,12 @@ export function VadConversationTool() {
     }
   }, []);
 
-  const startListening = useCallback(async () => {
-    setSessionState("listening");
-    let finalTranscript = "";
-
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-        toast({ title: "브라우저 지원 안함", description: "실시간 음성 인식을 지원하지 않는 브라우저입니다.", variant: "destructive"});
-        setSessionState("idle");
-        return;
-    }
-    
-    cleanup();
-
-    try {
-        audioStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
-        
-        recognitionRef.current = new SpeechRecognition();
-        recognitionRef.current.continuous = true;
-        recognitionRef.current.interimResults = true;
-        recognitionRef.current.lang = 'en-US';
-        
-        const resetTimer = () => {
-            if(speechEndTimerRef.current) clearTimeout(speechEndTimerRef.current);
-            speechEndTimerRef.current = setTimeout(() => {
-                if (recognitionRef.current) {
-                     recognitionRef.current.stop();
-                }
-            }, SPEECH_END_TIMEOUT_MS);
-        };
-
-        recognitionRef.current.onresult = (event) => {
-            let currentInterim = "";
-            let hasFinalResult = false;
-
-            for (let i = event.resultIndex; i < event.results.length; ++i) {
-                const transcript = event.results[i][0].transcript;
-                 if (event.results[i].isFinal) {
-                    finalTranscript = (finalTranscript + " " + transcript).trim();
-                    hasFinalResult = true;
-                } else {
-                    currentInterim += transcript;
-                }
-            }
-            
-            if (hasFinalResult || currentInterim.trim()) {
-                resetTimer();
-            }
-            
-            setInterimTranscript((finalTranscript + " " + currentInterim).trim());
-        };
-        
-        recognitionRef.current.onend = () => {
-            const fullTranscript = (finalTranscript + " " + interimTranscript).trim();
-            if (fullTranscript) {
-                processFinalTranscript(fullTranscript);
-            }
-        };
-
-        recognitionRef.current.onerror = (event) => {
-            if (event.error !== 'no-speech' && event.error !== 'aborted') {
-                toast({title: "음성 인식 오류", description: `오류가 발생했습니다: ${event.error}`, variant: "destructive"});
-            }
-             cleanup();
-        };
-        
-        recognitionRef.current.start();
-        resetTimer();
-
-    } catch (err) {
-        toast({ title: "마이크 오류", description: "마이크에 접근할 수 없습니다.", variant: "destructive" });
-        setSessionState("idle");
-    }
-
-  }, [toast, cleanup]);
-
-
-  // This function is now responsible for processing the final transcript and getting AI response.
   const processFinalTranscript = useCallback(async (transcript: string) => {
     if (!transcript.trim()) {
-        if (sessionState === 'listening') {
-          startListening();
-        }
-        return;
+      if (sessionState === 'listening') {
+        // restart listening if nothing was said.
+      }
+      return;
     }
     
     setSessionState("processing");
@@ -164,16 +87,94 @@ export function VadConversationTool() {
             audioPlayerRef.current.play().catch(e => {
                 console.error("Audio play error:", e);
                 toast({title: "오디오 재생 오류", variant: "destructive"});
-                if (sessionState !== 'ending') startListening();
+                setSessionState("listening"); // Go back to listening if play fails
             });
         } else {
-             if (sessionState !== 'ending') startListening();
+            setSessionState("listening");
         }
     } catch (error) {
         toast({ title: "AI 처리 오류", variant: "destructive" });
-        if (sessionState !== 'ending') startListening();
+        setSessionState("listening");
     }
-  }, [conversation, toast, startListening, sessionState]);
+  }, [conversation, toast, sessionState]);
+
+  const startListening = useCallback(() => {
+    setSessionState("listening");
+    let finalTranscript = "";
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+        toast({ title: "브라우저 지원 안함", description: "실시간 음성 인식을 지원하지 않는 브라우저입니다.", variant: "destructive"});
+        setSessionState("idle");
+        return;
+    }
+    
+    cleanup();
+
+    try {
+        const recognition = new SpeechRecognition();
+        recognitionRef.current = recognition;
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = 'en-US';
+        
+        const resetTimer = () => {
+            if(speechEndTimerRef.current) clearTimeout(speechEndTimerRef.current);
+            speechEndTimerRef.current = setTimeout(() => {
+                if (recognitionRef.current) {
+                     recognitionRef.current.stop();
+                }
+            }, SPEECH_END_TIMEOUT_MS);
+        };
+
+        recognition.onresult = (event) => {
+            let currentInterim = "";
+            let hasFinalResult = false;
+
+            for (let i = event.resultIndex; i < event.results.length; ++i) {
+                const transcript = event.results[i][0].transcript;
+                 if (event.results[i].isFinal) {
+                    finalTranscript = (finalTranscript + " " + transcript).trim();
+                    hasFinalResult = true;
+                } else {
+                    currentInterim += transcript;
+                }
+            }
+            
+            if (hasFinalResult || currentInterim.trim()) {
+                resetTimer();
+            }
+            
+            setInterimTranscript((finalTranscript + " " + currentInterim).trim());
+        };
+        
+        recognition.onend = () => {
+            const fullTranscript = (finalTranscript + " " + interimTranscript).trim();
+            if (fullTranscript) {
+                processFinalTranscript(fullTranscript);
+            } else if (sessionState === 'listening') {
+                // If nothing was said, just loop back to listening without processing.
+                startListening();
+            }
+        };
+
+        recognition.onerror = (event) => {
+            if (event.error !== 'no-speech' && event.error !== 'aborted') {
+                toast({title: "음성 인식 오류", description: `오류가 발생했습니다: ${event.error}`, variant: "destructive"});
+            }
+             cleanup();
+        };
+        
+        recognition.start();
+        resetTimer();
+
+    } catch (err) {
+        toast({ title: "마이크 오류", description: "마이크에 접근할 수 없습니다.", variant: "destructive" });
+        setSessionState("idle");
+    }
+
+  }, [toast, cleanup, processFinalTranscript, sessionState, interimTranscript]);
+
 
   useEffect(() => {
     return () => {
@@ -186,11 +187,8 @@ export function VadConversationTool() {
   }, [cleanup]);
 
   useEffect(() => {
-    if (scrollAreaRef.current) {
-        const scrollableView = scrollAreaRef.current.querySelector('div');
-        if (scrollableView) {
-            scrollableView.scrollTop = scrollableView.scrollHeight;
-        }
+    if (scrollViewportRef.current) {
+        scrollViewportRef.current.scrollTop = scrollViewportRef.current.scrollHeight;
     }
   }, [conversation, interimTranscript]);
 
@@ -207,10 +205,10 @@ export function VadConversationTool() {
       setSessionState("speaking");
       if (audioPlayerRef.current) {
         audioPlayerRef.current.src = aiResponseAudioDataUri;
-        audioPlayerRef.current.play().catch(e => {
+        await audioPlayerRef.current.play().catch(e => {
             console.error("Audio play error:", e);
             toast({title: "오디오 재생 오류", variant: "destructive"});
-            startListening();
+            startListening(); // If play fails, go to listening
         });
       }
     } catch (error) {
@@ -260,8 +258,8 @@ export function VadConversationTool() {
 
   return (
     <div className="flex flex-col gap-4">
-      <ScrollArea className="h-80 w-full rounded-md border p-4" ref={scrollAreaRef}>
-        <div className="space-y-4">
+       <ScrollArea className="h-80 w-full rounded-md border">
+        <div className="p-4 space-y-4" ref={scrollViewportRef}>
             {sessionState === "idle" && (
               <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground pt-12">
                   <BrainCircuit className="h-12 w-12 mb-4 text-primary"/>
@@ -306,7 +304,7 @@ export function VadConversationTool() {
       
       <div className="flex flex-col gap-4">
         <div className="space-y-2">
-            <Label htmlFor="sensitivity">마이크 민감도 (둔감 &lt;-&gt; 민감)</Label>
+            <Label htmlFor="sensitivity">마이크 민감도 (조용한 환경 🤫 &lt;-&gt; 🗣️ 시끄러운 환경)</Label>
             <Slider
                 id="sensitivity"
                 min={0.005}
@@ -325,7 +323,9 @@ export function VadConversationTool() {
         )}
       </div>
 
-      <audio ref={audioPlayerRef} onEnded={() => {if(sessionState !== 'ending' && sessionState === 'speaking') startListening()}} className="hidden" />
+      <audio ref={audioPlayerRef} onEnded={() => {if (sessionState === 'speaking') { startListening(); }}} className="hidden" />
     </div>
   );
 }
+
+    
