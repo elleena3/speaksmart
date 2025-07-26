@@ -19,7 +19,20 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  webpack: (config, { isServer }) => {
+    // 'async_hooks' is a Node.js-specific module. This tells webpack to ignore it
+    // when building for the browser environment.
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        async_hooks: false,
+      };
+    }
+
+    return config;
+  },
 };
 
 export default nextConfig;
+
 
