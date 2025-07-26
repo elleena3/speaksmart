@@ -77,7 +77,7 @@ export function AppLayout({ children, navItems, titleKey }: AppLayoutProps) {
         <SidebarFooter>
           <div className="flex items-center gap-3 p-2">
              <Avatar className="h-8 w-8">
-                <AvatarImage src={user?.photoURL || ""} alt={user?.displayName || "User"}/>
+                <AvatarImage src={user?.photoURL || undefined} alt={user?.displayName || "User"}/>
                 <AvatarFallback>{user?.displayName?.charAt(0) || "U"}</AvatarFallback>
             </Avatar>
             <div className="flex flex-col overflow-hidden">
