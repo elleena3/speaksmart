@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, CalendarIcon, ChevronsUpDown, Check, Info, Users, Type, Image as ImageIcon, LayoutGrid, Wand2 } from "lucide-react";
+import { Loader2, CalendarIcon, ChevronsUpDown, Check, Info, Users, Type, Image as ImageIcon, LayoutGrid, Wand2, Upload, BookOpen, Copy } from "lucide-react";
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -25,7 +25,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { scenarios, type TeacherAssessment, femaleVoices, maleVoices, allVoices, evaluationModels, voiceDescriptions, type AiVoice, monologueTypes } from "@/lib/types";
-import { useAuth, mockStudents } from "@/context/auth-context";
+import { useAuth } from "@/context/auth-context";
 import { addDoc, collection, getDocs, query, where } from "firebase/firestore";
 import { db, storage } from "@/lib/firebase";
 import { ref, uploadString, getDownloadURL } from "firebase/storage";
@@ -34,7 +34,6 @@ import { Separator } from "@/components/ui/separator";
 import { generateImage } from "@/ai/flows/generate-image-flow";
 import Image from 'next/image';
 
-// ... (FilterCombobox and other imports remain the same)
 function FilterCombobox({ label, options, value, onSelect }: { label: string, options: string[], value: string, onSelect: (value: string) => void }) {
   const [open, setOpen] = useState(false);
   const displayValue = value === 'all' ? `모든 ${label}` : `${value}${label.endsWith('반') ? '반' : '학년'}`;
@@ -73,6 +72,24 @@ function FilterCombobox({ label, options, value, onSelect }: { label: string, op
     </Popover>
   );
 }
+
+const promptExamples = [
+  {
+    prompt: "공원 벤치에 앉아 책을 읽고 있는 할머니, 따뜻한 색감의 수채화 스타일",
+    image: "https://placehold.co/400x400.png",
+    hint: "grandmother reading park",
+  },
+  {
+    prompt: "로켓을 타고 달로 날아가는 우주비행사, 뒤에는 지구가 보인다, 단순한 만화 스타일",
+    image: "https://placehold.co/400x400.png",
+    hint: "astronaut rocket moon",
+  },
+  {
+    prompt: "산 정상에서 일출을 보고 있는 등산객의 뒷모습, 장엄한 풍경, 사실적인 사진 스타일",
+    image: "https://placehold.co/400x400.png",
+    hint: "hiker sunrise mountain",
+  },
+];
 
 
 export default function NewAssessmentPage() {
@@ -406,8 +423,45 @@ export default function NewAssessmentPage() {
             {monologueType === 'image' && assessmentType === 'monologue' && (
                 <Card>
                     <CardHeader>
-                        <CardTitle>AI 이미지 생성</CardTitle>
-                        <CardDescription>평가에 사용할 이미지를 AI에게 그려달라고 요청하세요.</CardDescription>
+                        <div className="flex justify-between items-center">
+                            <div>
+                                <CardTitle>AI 이미지 생성</CardTitle>
+                                <CardDescription>평가에 사용할 이미지를 AI에게 그려달라고 요청하세요.</CardDescription>
+                            </div>
+                            <Dialog>
+                                <DialogTrigger asChild>
+                                    <Button type="button" variant="outline"><BookOpen className="mr-2 h-4 w-4"/> 프롬프트 예시 보기</Button>
+                                </DialogTrigger>
+                                <DialogContent className="max-w-4xl">
+                                    <DialogHeader>
+                                        <DialogTitle>이미지 생성 프롬프트 예시</DialogTitle>
+                                    </DialogHeader>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 py-4">
+                                        {promptExamples.map((example, index) => (
+                                            <div key={index} className="space-y-2">
+                                                <div className="border rounded-lg overflow-hidden">
+                                                    <Image src={example.image} alt={example.prompt} width={400} height={400} className="object-cover" data-ai-hint={example.hint}/>
+                                                </div>
+                                                <div className="text-sm p-2 bg-muted rounded-md relative">
+                                                    <p className="pr-10">“{example.prompt}”</p>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="absolute top-1 right-1 h-7 w-7"
+                                                        onClick={() => {
+                                                            navigator.clipboard.writeText(example.prompt);
+                                                            toast({ title: "프롬프트 복사됨" });
+                                                        }}
+                                                    >
+                                                        <Copy className="h-4 w-4"/>
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </DialogContent>
+                            </Dialog>
+                        </div>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -415,7 +469,7 @@ export default function NewAssessmentPage() {
                                 <Label htmlFor="image-prompt">이미지 생성 프롬프트</Label>
                                 <Textarea 
                                     id="image-prompt"
-                                    placeholder="예: a cute cat playing with a yarn ball, cartoon style"
+                                    placeholder="예: 공원에서 책을 읽고 있는 할머니, 수채화 스타일"
                                     value={imagePrompt}
                                     onChange={(e) => setImagePrompt(e.target.value)}
                                     rows={4}
@@ -936,3 +990,4 @@ export default function NewAssessmentPage() {
     </Card>
   );
 }
+
