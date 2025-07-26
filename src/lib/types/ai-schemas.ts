@@ -7,7 +7,7 @@ import type { StudentResult } from '@/lib/types';
 
 // Define the structure for a single message in the conversation history
 export const ConversationTurnSchema = z.object({
-  role: z.enum(['user', 'model']),
+  role: z.enum(['user', 'model', 'user_interim']),
   text: z.string(),
 });
 export type ConversationTurn = z.infer<typeof ConversationTurnSchema>;
@@ -144,22 +144,28 @@ export const RetryAnalysisInputSchema = z.object({
 });
 export type RetryAnalysisInput = z.infer<typeof RetryAnalysisInputSchema>;
 
-
 // ##############################################################
-// ##         OBSOLETE SCHEMAS - TO BE DELETED LATER           ##
+// ##        SCHEMAS FOR READ ALOUD TOOL 2.0 (ENHANCED)        ##
 // ##############################################################
-
-// These schemas were part of the old, combined `generateSpeakingAnalysis` flow.
-// They are kept for reference but are no longer used by the new, separated flows.
-export const PronunciationAnalysisInputSchema = z.object({
-    studentRecordingGcsUri: z.string(),
-    studentTranscript: z.string(),
+export const EnhanceSelectedTextInputSchema = z.object({
+  selectedText: z.string().describe("The (potentially imprecise) text snippet selected by the user."),
+  fullSentenceContext: z.string().describe("The full sentence or paragraph containing the selected text, for context."),
+  action: z.enum(['translate', 'define', 'explain']).describe("The action to perform on the corrected text."),
 });
+export type EnhanceSelectedTextInput = z.infer<typeof EnhanceSelectedTextInputSchema>;
 
-export const ContentAnalysisInputSchema = z.object({
-    studentTranscript: z.string(),
-    activityPrompt: z.string(),
-    expectedFormat: z.string(),
-    studentName: z.string(),
-    assessmentTitle: z.string(),
+export const EnhanceSelectedTextOutputSchema = z.object({
+  correctedText: z.string().describe("The most likely word or phrase the user intended to select."),
+  result: z.string().describe("The result of the requested action (translation, definition, or explanation) in Korean."),
 });
+export type EnhanceSelectedTextOutput = z.infer<typeof EnhanceSelectedTextOutputSchema>;
+
+export const ReadAloudInputSchema = z.object({
+    text: z.string().describe("The text to be read aloud.")
+});
+export type ReadAloudInput = z.infer<typeof ReadAloudInputSchema>;
+
+export const ReadAloudOutputSchema = z.object({
+    audioDataUri: z.string().describe("The AI's reading of the text as a playable audio data URI.")
+});
+export type ReadAloudOutput = z.infer<typeof ReadAloudOutputSchema>;

@@ -27,6 +27,7 @@ import '@/ai/flows/create-speculative-teacher-flow'; // New flow for speculative
 
 // New flow for the Misc page's read-aloud tool
 import '@/ai/flows/analyze-read-aloud-flow';
+import '@/ai/flows/enhance-selected-text-flow'; // New flow for Read Aloud Tool 2.0
 
 // New flow for the Misc page's handwriting analysis tool
 import '@/ai/flows/analyze-handwriting-flow';

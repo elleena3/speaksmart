@@ -4,8 +4,10 @@
 
 /**
  * @fileOverview Converts text to speech and handles conversational AI responses.
+ * Also includes a dedicated function for the Read Aloud tool.
  *
  * - converseWithStudent - A function that takes student audio, gets a conversational response, and returns AI audio.
+ * - readAloudText - A function that converts a given text to speech.
  */
 
 import { ai } from '@/ai/genkit';
@@ -17,6 +19,10 @@ import {
   ConverseWithStudentOutput,
   ConverseWithStudentOutputSchema,
   ConversationTurnSchema,
+  ReadAloudInputSchema,
+  ReadAloudOutputSchema,
+  type ReadAloudInput,
+  type ReadAloudOutput,
 } from '@/lib/types/ai-schemas';
 import wav from 'wav';
 import { evaluationModels } from '@/lib/types';
@@ -43,14 +49,70 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 2, delay = 1500): Pr
   throw lastError;
 }
 
+// Helper function to convert PCM audio buffer to WAV format
+async function toWav(
+  pcmData: Buffer,
+  channels = 1,
+  rate = 24000,
+  sampleWidth = 2
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const writer = new wav.Writer({
+      channels,
+      sampleRate: rate,
+      bitDepth: sampleWidth * 8,
+    });
 
+    const bufs: any[] = [];
+    writer.on('error', reject);
+    writer.on('data', function (d) {
+      bufs.push(d);
+    });
+    writer.on('end', function () {
+      resolve(Buffer.concat(bufs).toString('base64'));
+    });
+
+    writer.write(pcmData);
+    writer.end();
+  });
+}
+
+// Reusable function to convert text to speech
+async function textToSpeech(text: string, voiceName: string = 'algenib'): Promise<string> {
+    const ttsResponse = await withRetry(() => ai.generate({
+        model: googleAI.model('gemini-2.5-flash-preview-tts'),
+        config: {
+            responseModalities: ['AUDIO'],
+            speechConfig: {
+                voiceConfig: {
+                    prebuiltVoiceConfig: { voiceName: voiceName as any }, 
+                },
+            },
+        },
+        prompt: text,
+    }));
+
+    const audioMedia = ttsResponse.media;
+    if (!audioMedia) {
+        throw new Error('TTS did not return any audio media.');
+    }
+
+    const pcmBuffer = Buffer.from(
+        audioMedia.url.substring(audioMedia.url.indexOf(',') + 1),
+        'base64'
+    );
+    
+    return 'data:audio/wav;base64,' + await toWav(pcmBuffer);
+}
+
+
+// ====== Flow for Dialogue Assessments ======
 export async function converseWithStudent(
   input: ConverseWithStudentInput
 ): Promise<ConverseWithStudentOutput> {
   return converseWithStudentFlow(input);
 }
 
-// 1. Define the prompt for generating the conversational text response
 const createConversationalPrompt = (modelName: z.infer<typeof evaluationModels[number]>) => {
     return ai.definePrompt({
       name: `conversationalPrompt_${modelName.replace(/[-.]/g, '_')}`,
@@ -103,64 +165,6 @@ const createConversationalPrompt = (modelName: z.infer<typeof evaluationModels[n
     });
 }
 
-
-// Helper function to convert PCM audio buffer to WAV format
-async function toWav(
-  pcmData: Buffer,
-  channels = 1,
-  rate = 24000,
-  sampleWidth = 2
-): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const writer = new wav.Writer({
-      channels,
-      sampleRate: rate,
-      bitDepth: sampleWidth * 8,
-    });
-
-    const bufs: any[] = [];
-    writer.on('error', reject);
-    writer.on('data', function (d) {
-      bufs.push(d);
-    });
-    writer.on('end', function () {
-      resolve(Buffer.concat(bufs).toString('base64'));
-    });
-
-    writer.write(pcmData);
-    writer.end();
-  });
-}
-
-// Function to convert text to speech
-async function textToSpeech(text: string, voiceName: string = 'algenib'): Promise<string> {
-    const ttsResponse = await withRetry(() => ai.generate({
-        model: googleAI.model('gemini-2.5-flash-preview-tts'),
-        config: {
-            responseModalities: ['AUDIO'],
-            speechConfig: {
-                voiceConfig: {
-                    prebuiltVoiceConfig: { voiceName: voiceName as any }, 
-                },
-            },
-        },
-        prompt: text,
-    }));
-
-    const audioMedia = ttsResponse.media;
-    if (!audioMedia) {
-        throw new Error('TTS did not return any audio media.');
-    }
-
-    const pcmBuffer = Buffer.from(
-        audioMedia.url.substring(audioMedia.url.indexOf(',') + 1),
-        'base64'
-    );
-    
-    return 'data:audio/wav;base64,' + await toWav(pcmBuffer);
-}
-
-// 2. Define the main flow that orchestrates the entire process
 const converseWithStudentFlow = ai.defineFlow(
   {
     name: 'converseWithStudentFlow',
@@ -174,8 +178,6 @@ const converseWithStudentFlow = ai.defineFlow(
     const model = evaluationModel || 'gemini-2.5-flash';
     const conversationalPrompt = createConversationalPrompt(model);
 
-
-    // Step 1: Transcribe student's audio if it exists.
     if (studentRecordingDataUri) {
       const sttResponse = await withRetry(() => ai.generate({
         model: googleAI.model(model),
@@ -191,13 +193,11 @@ const converseWithStudentFlow = ai.defineFlow(
       }
     }
 
-    // Pre-process history for the template helper
     const historyForPrompt = conversationHistory.map(turn => ({
       ...turn,
       isUser: turn.role === 'user',
     }));
 
-    // Step 2: Generate AI's text response based on transcript and history
     const { output } = await withRetry(() => conversationalPrompt({
       history: historyForPrompt,
       studentTranscript: studentTranscript || undefined, 
@@ -207,22 +207,36 @@ const converseWithStudentFlow = ai.defineFlow(
       aiVoice: aiVoice || 'algenib',
     }));
 
-    aiResponseText = output?.aiResponseText || "";
+    aiResponseText = output?.aiResponseText || "Sorry, I'm having a little trouble right now. Could you say that again?";
 
-    if (!aiResponseText) {
-        console.error("AI did not generate a text response. Received:", output);
-        // If AI fails to respond, generate a safe fallback response.
-        aiResponseText = "Sorry, I'm having a little trouble right now. Could you say that again?";
-    }
-
-    // Step 3: Convert AI's text response to speech (TTS)
     const aiResponseAudioDataUri = await textToSpeech(aiResponseText, aiVoice);
 
-    // Step 4: Return all the generated data
     return {
       studentTranscript: studentTranscript === "(The user did not say anything)" ? "" : studentTranscript,
       aiResponseText,
       aiResponseAudioDataUri,
     };
   }
+);
+
+
+// ====== Flow for Read Aloud Tool ======
+export async function readAloudText(input: ReadAloudInput): Promise<ReadAloudOutput> {
+    return readAloudTextFlow(input);
+}
+
+const readAloudTextFlow = ai.defineFlow(
+    {
+        name: 'readAloudTextFlow',
+        inputSchema: ReadAloudInputSchema,
+        outputSchema: ReadAloudOutputSchema,
+    },
+    async ({ text }) => {
+        if (!text.trim()) {
+            throw new Error("Cannot read empty text.");
+        }
+        // Using a standard, clear male voice for reading.
+        const audioDataUri = await textToSpeech(text, 'puck');
+        return { audioDataUri };
+    }
 );
