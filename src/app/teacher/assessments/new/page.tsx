@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useRouter } from "next/navigation";
@@ -82,7 +81,7 @@ const promptExamples = [
   },
   {
     prompt: "로켓을 타고 달로 날아가는 우주비행사, 뒤에는 지구가 보인다, 단순한 만화 스타일",
-    image: "https://placehold.co/400x400.png",
+    image: "https://firebasestorage.googleapis.com/v0/b/speaksmart-evaluator2.firebasestorage.app/o/image%2FGemini_Generated_Image_unh72munh.png?alt=media&token=8bd0265c-3afe-46e5-80d0-d8d8fbe748b2",
     hint: "astronaut rocket moon",
   },
   {
@@ -991,6 +990,7 @@ export default function NewAssessmentPage() {
     </Card>
   );
 }
+
 
 
 
