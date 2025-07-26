@@ -6,27 +6,12 @@
  * It corrects imprecise selections and provides translation, definition, or explanation.
  *
  * - enhanceSelectedText - The main function to call for this feature.
- * - EnhanceSelectedTextInput - The input type for the flow.
- * - EnhanceSelectedTextOutput - The output type for the flow.
  */
 
 import { ai } from '@/ai/genkit';
 import { googleAI } from '@genkit-ai/googleai';
 import { z } from 'zod';
-
-export const EnhanceSelectedTextInputSchema = z.object({
-  selectedText: z.string().describe("The (potentially imprecise) text snippet selected by the user."),
-  fullSentenceContext: z.string().describe("The full sentence or paragraph containing the selected text, for context."),
-  action: z.enum(['translate', 'define', 'explain']).describe("The action to perform on the corrected text."),
-});
-export type EnhanceSelectedTextInput = z.infer<typeof EnhanceSelectedTextInputSchema>;
-
-export const EnhanceSelectedTextOutputSchema = z.object({
-  correctedText: z.string().describe("The most likely word or phrase the user intended to select."),
-  result: z.string().describe("The result of the requested action (translation, definition, or explanation) in Korean."),
-});
-export type EnhanceSelectedTextOutput = z.infer<typeof EnhanceSelectedTextOutputSchema>;
-
+import { EnhanceSelectedTextInputSchema, EnhanceSelectedTextOutputSchema, EnhanceSelectedTextInput, EnhanceSelectedTextOutput } from '@/lib/types/ai-schemas';
 
 export async function enhanceSelectedText(input: EnhanceSelectedTextInput): Promise<EnhanceSelectedTextOutput> {
   const result = await enhanceSelectedTextFlow(input);
