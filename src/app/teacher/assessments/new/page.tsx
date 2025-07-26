@@ -11,7 +11,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, CalendarIcon, ChevronsUpDown, Check, Info, Type, Image as ImageIcon, LayoutGrid, Wand2, Copy, BookOpen } from "lucide-react";
+import { Loader2, CalendarIcon, ChevronsUpDown, Check, Info, Type, ImageIcon, Wand2, Copy, BookOpen } from "lucide-react";
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -30,6 +30,7 @@ import { ref, uploadString, getDownloadURL } from "firebase/storage";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { generateImage } from "@/ai/flows/generate-image-flow";
 import Image from 'next/image';
+import { Label } from "@/components/ui/label";
 
 const promptExamples = [
   {
@@ -569,6 +570,7 @@ export default function NewAssessmentPage() {
                     {mockStudents.map((item) => (
                       <React.Fragment key={item.uid}>
                         <FormField
+                          key={item.uid}
                           control={form.control}
                           name="targetStudentIds"
                           render={({ field }) => {
@@ -886,4 +888,3 @@ export default function NewAssessmentPage() {
     </Card>
   );
 }
-
