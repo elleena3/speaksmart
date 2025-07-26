@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, CalendarIcon, ChevronsUpDown, Check, Info, Users, TestTube2, Type, Image as ImageIcon, LayoutGrid } from "lucide-react";
+import { Loader2, CalendarIcon, ChevronsUpDown, Check, Info, Users, Type, Image as ImageIcon, LayoutGrid } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -24,7 +24,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { scenarios, type TeacherAssessment, femaleVoices, maleVoices, allVoices, evaluationModels, voiceDescriptions, type AiVoice, type UserData, monologueTypes } from "@/lib/types";
+import { scenarios, type TeacherAssessment, femaleVoices, maleVoices, allVoices, evaluationModels, voiceDescriptions, type AiVoice, monologueTypes } from "@/lib/types";
 import { useAuth, mockStudents } from "@/context/auth-context";
 import { addDoc, collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -346,7 +346,7 @@ export default function NewAssessmentPage() {
                                 </FormItem>
                                 <FormItem className="flex items-center space-x-3 space-y-0">
                                     <FormControl><RadioGroupItem value="image"/></FormControl>
-                                    <FormLabel className="font-normal flex items-center gap-2"><ImageIcon/>이미지 묘사</FormLabel>
+                                    <FormLabel className="font-normal flex items-center gap-2"><ImageIcon/>Describing a picture(이미지 설명하기)</FormLabel>
                                 </FormItem>
                                 <FormItem className="flex items-center space-x-3 space-y-0">
                                     <FormControl><RadioGroupItem value="comic" /></FormControl>
@@ -520,60 +520,7 @@ export default function NewAssessmentPage() {
                         <div className="space-y-4">
                             <Card>
                                 <CardHeader className="flex flex-row items-center justify-between p-4">
-                                    <div className="flex items-center gap-2">
-                                        <TestTube2 className="h-5 w-5 text-blue-500"/>
-                                        <CardTitle className="text-base">목업 계정</CardTitle>
-                                    </div>
-                                    <div className="flex items-center space-x-2">
-                                        <Label htmlFor="select-all-mock">전체 선택</Label>
-                                        <Checkbox
-                                            id="select-all-mock"
-                                            onCheckedChange={(checked) => {
-                                                const currentIds = form.getValues("targetStudentIds") || [];
-                                                const mockIds = mockStudents.map(s => s.uid);
-                                                if (checked) {
-                                                    form.setValue("targetStudentIds", [...new Set([...currentIds, ...mockIds])]);
-                                                } else {
-                                                    form.setValue("targetStudentIds", currentIds.filter(id => !mockIds.includes(id)));
-                                                }
-                                            }}
-                                            checked={mockStudents.every(s => form.getValues("targetStudentIds")?.includes(s.uid))}
-                                        />
-                                    </div>
-                                </CardHeader>
-                                <Separator />
-                                <CardContent className="p-4 grid grid-cols-2 md:grid-cols-3 gap-2">
-                                    {mockStudents.map((item) => (
-                                      <FormField
-                                        key={item.uid}
-                                        control={form.control}
-                                        name="targetStudentIds"
-                                        render={({ field }) => (
-                                            <FormItem className="flex flex-row items-center space-x-2 space-y-0">
-                                                <FormControl>
-                                                    <Checkbox
-                                                        checked={field.value?.includes(item.uid)}
-                                                        onCheckedChange={(checked) => {
-                                                            const currentIds = field.value || [];
-                                                            return checked
-                                                            ? field.onChange([...currentIds, item.uid])
-                                                            : field.onChange(currentIds.filter(value => value !== item.uid));
-                                                        }}
-                                                    />
-                                                </FormControl>
-                                                <FormLabel className="font-normal text-sm">{item.displayName}</FormLabel>
-                                            </FormItem>
-                                        )}
-                                      />
-                                    ))}
-                                </CardContent>
-                            </Card>
-                            <Card>
-                                 <CardHeader className="flex flex-row items-center justify-between p-4">
-                                    <div className="flex items-center gap-2">
-                                        <Users className="h-5 w-5 text-green-600"/>
-                                        <CardTitle className="text-base">가입한 학생</CardTitle>
-                                    </div>
+                                    <CardTitle className="text-base">등록된 학생</CardTitle>
                                     <div className="flex items-center gap-2">
                                         <FilterCombobox label="학년" options={uniqueGrades} value={studentFilter.grade} onSelect={(value) => setStudentFilter({ grade: value, class: 'all' })} />
                                         <FilterCombobox label="반" options={uniqueClasses} value={studentFilter.class} onSelect={(value) => setStudentFilter(prev => ({ ...prev, class: value }))} />

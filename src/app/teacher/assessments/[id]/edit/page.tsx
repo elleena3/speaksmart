@@ -56,9 +56,9 @@ export default function EditAssessmentPage() {
     evaluationModel: z.enum(evaluationModels).optional().default('gemini-2.5-pro'),
     useRubric: z.boolean().default(false),
   }).superRefine((data, ctx) => {
-    const isFreeTalk = data.assessmentType === 'dialogue' && data.scenario === 'free-talk';
+    const isFreeTalkDialogue = data.assessmentType === 'dialogue' && data.scenario === 'free-talk';
 
-    if (!isFreeTalk) {
+    if (!isFreeTalkDialogue) {
       if (!data.title) {
         ctx.addIssue({ code: z.ZodIssueCode.custom, message: t.teacherAssessmentForm.errors.titleRequired, path: ['title'] });
       }
