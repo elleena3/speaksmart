@@ -20,7 +20,6 @@ export function VadConversationTool() {
   const [sessionState, setSessionState] = useState<SessionState>("idle");
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
   const [interimTranscript, setInterimTranscript] = useState<string>("");
-  const [silenceThreshold, setSilenceThreshold] = useState(0.01);
   
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const speechEndTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -44,18 +43,22 @@ export function VadConversationTool() {
   }, []);
 
   const processFinalTranscript = useCallback(async (transcript: string) => {
-    if (!transcript.trim() && sessionState === 'listening') {
-      return; // Do nothing if transcript is empty and we were just listening
+    if (!transcript.trim()) {
+      if (sessionState === 'listening') {
+        // If we were listening and got no speech, just go back to listening.
+        startListening(); 
+      }
+      return; 
     }
     
     setSessionState("processing");
-    const newHistory = transcript.trim() ? [...conversation, {role: 'user', text: transcript}] : [...conversation];
+    const newHistory = [...conversation, {role: 'user', text: transcript}];
     setConversation(newHistory);
     setInterimTranscript("");
     
     try {
         const { aiResponseText, aiResponseAudioDataUri } = await converseWithNativeTeacher({
-            studentTranscript: transcript,
+            studentTranscript: transcript.trim(),
             conversationHistory: newHistory, // Pass the most up-to-date history
         });
 
@@ -76,7 +79,7 @@ export function VadConversationTool() {
         toast({ title: "AI 처리 오류", variant: "destructive" });
         setSessionState("listening");
     }
-  }, [conversation, toast, sessionState]);
+  }, [conversation, sessionState, toast, startListening]);
 
   const startListening = useCallback(() => {
     setSessionState("listening");
@@ -109,10 +112,7 @@ export function VadConversationTool() {
         recognition.onresult = (event) => {
             let tempInterim = "";
             for (let i = event.resultIndex; i < event.results.length; ++i) {
-                if (event.results[i].isFinal) {
-                    // This part seems to be causing issues with continuous recognition.
-                    // Let's rely on interim results and the onend event.
-                } else {
+                if (event.results[i][0].transcript) {
                     tempInterim += event.results[i][0].transcript;
                 }
             }
@@ -123,7 +123,10 @@ export function VadConversationTool() {
         };
         
         recognition.onend = () => {
-             processFinalTranscript(interimTranscript);
+             // Only process if we are in a listening state, to avoid conflicts
+            if(sessionState === 'listening') {
+                 processFinalTranscript(interimTranscript);
+            }
         };
 
         recognition.onerror = (event) => {
@@ -141,7 +144,7 @@ export function VadConversationTool() {
         setSessionState("idle");
     }
 
-  }, [toast, cleanup, processFinalTranscript, interimTranscript]);
+  }, [toast, cleanup, processFinalTranscript, interimTranscript, sessionState]);
 
 
   useEffect(() => {
@@ -284,8 +287,7 @@ export function VadConversationTool() {
                 min={0.005}
                 max={0.05}
                 step={0.001}
-                value={[silenceThreshold]}
-                onValueChange={(value) => setSilenceThreshold(value[0])}
+                defaultValue={[0.01]}
                 disabled={sessionState !== 'idle' && sessionState !== 'finished'}
             />
         </div>
