@@ -41,45 +41,7 @@ export function VadConversationTool() {
         recognitionRef.current = null;
     }
   }, []);
-
-  const processFinalTranscript = useCallback(async (transcript: string) => {
-    if (!transcript.trim()) {
-      if (sessionState === 'listening') {
-        startListening(); 
-      }
-      return; 
-    }
-    
-    setSessionState("processing");
-    const newHistory = [...conversation, {role: 'user', text: transcript}];
-    setConversation(newHistory);
-    setInterimTranscript("");
-    
-    try {
-        const { aiResponseText, aiResponseAudioDataUri } = await converseWithNativeTeacher({
-            studentTranscript: transcript.trim(),
-            conversationHistory: newHistory,
-        });
-
-        setConversation(prev => [...prev, {role: 'model', text: aiResponseText}]);
-        setSessionState("speaking");
-        
-        if (audioPlayerRef.current) {
-            audioPlayerRef.current.src = aiResponseAudioDataUri;
-            audioPlayerRef.current.play().catch(e => {
-                console.error("Audio play error:", e);
-                toast({title: "오디오 재생 오류", variant: "destructive"});
-                startListening();
-            });
-        } else {
-            startListening();
-        }
-    } catch (error) {
-        toast({ title: "AI 처리 오류", variant: "destructive" });
-        startListening();
-    }
-  }, [conversation, sessionState, toast]);
-
+  
   const startListening = useCallback(() => {
     setSessionState("listening");
     
@@ -122,7 +84,9 @@ export function VadConversationTool() {
         };
         
         recognition.onend = () => {
-            if(sessionState === 'listening') {
+             // Only process if we are still in listening state.
+            // This prevents race conditions if the user clicks "Stop"
+            if (recognitionRef.current?.onend) { // Check if we are still 'alive'
                  processFinalTranscript(interimTranscript);
             }
         };
@@ -135,13 +99,56 @@ export function VadConversationTool() {
         };
         
         recognition.start();
-        resetTimer();
 
     } catch (err) {
         toast({ title: "마이크 오류", description: "마이크에 접근할 수 없습니다.", variant: "destructive" });
         setSessionState("idle");
     }
-  }, [toast, cleanup, processFinalTranscript, interimTranscript, sessionState]);
+  }, [toast, cleanup]);
+
+
+  const processFinalTranscript = useCallback(async (transcript: string) => {
+    // If we are not in the listening state, it means user clicked stop, so we bail.
+    if (sessionState !== 'listening') {
+      return;
+    }
+    
+    if (!transcript.trim()) {
+      startListening(); 
+      return; 
+    }
+    
+    setSessionState("processing");
+    const newHistory = [...conversation, {role: 'user', text: transcript}];
+    setConversation(newHistory);
+    setInterimTranscript("");
+    
+    try {
+        const { aiResponseText, aiResponseAudioDataUri } = await converseWithNativeTeacher({
+            studentTranscript: transcript.trim(),
+            conversationHistory: newHistory,
+        });
+
+        setConversation(prev => [...prev, {role: 'model', text: aiResponseText}]);
+        setSessionState("speaking");
+        
+        if (audioPlayerRef.current) {
+            audioPlayerRef.current.src = aiResponseAudioDataUri;
+            audioPlayerRef.current.play().catch(e => {
+                console.error("Audio play error:", e);
+                toast({title: "오디오 재생 오류", variant: "destructive"});
+                startListening();
+            });
+        } else {
+            // Failsafe in case audio player isn't ready
+            startListening();
+        }
+    } catch (error) {
+        toast({ title: "AI 처리 오류", variant: "destructive" });
+        startListening();
+    }
+  }, [conversation, sessionState, toast, startListening]);
+
 
   useEffect(() => {
     return () => {
