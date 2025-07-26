@@ -9,15 +9,17 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { type ConversationTurn } from "@/lib/types/ai-schemas";
 import { converseWithParallelTeacher } from "@/ai/flows/create-parallel-teacher-flow"
 import { cn } from "@/lib/utils"
+import { Label } from "@/components/ui/label"
+import { Slider } from "@/components/ui/slider"
 
 const mimeType = 'audio/webm;codecs=opus';
-const SILENCE_TIMEOUT_MS = 2500; // 2.5초
 
 type SessionState = "idle" | "initializing" | "listening" | "processing" | "speaking" | "finished";
 
 export function ParallelConversationTool() {
   const [sessionState, setSessionState] = useState<SessionState>("idle");
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
+  const [speechEndTimeout, setSpeechEndTimeout] = useState(2500);
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -50,43 +52,6 @@ export function ParallelConversationTool() {
     }
   }, [conversation]);
   
-  const startListening = useCallback(() => {
-    setSessionState("listening");
-
-    const startRecording = async () => {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            mediaRecorderRef.current = new MediaRecorder(stream, { mimeType });
-            audioChunksRef.current = [];
-
-            mediaRecorderRef.current.ondataavailable = (event) => {
-                if (event.data.size > 0) audioChunksRef.current.push(event.data);
-            };
-
-            mediaRecorderRef.current.onstop = () => {
-                stream.getTracks().forEach(track => track.stop());
-                if(audioChunksRef.current.length > 0) {
-                    const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
-                    processAudio(audioBlob);
-                }
-            };
-            
-            mediaRecorderRef.current.start(100); // Collect audio in chunks
-
-            if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
-            silenceTimerRef.current = setTimeout(() => {
-                if (mediaRecorderRef.current?.state === 'recording') {
-                    mediaRecorderRef.current.stop();
-                }
-            }, SILENCE_TIMEOUT_MS);
-        } catch (err) {
-            toast({ title: "마이크 오류", description: "마이크에 접근할 수 없습니다.", variant: "destructive" });
-            setSessionState('idle');
-        }
-    }
-    startRecording();
-  }, [toast]);
-
   const processAudio = useCallback(async (audioBlob: Blob) => {
     setSessionState("processing");
     const reader = new FileReader();
@@ -122,7 +87,56 @@ export function ParallelConversationTool() {
             startListening();
         }
     };
-  }, [conversation, toast, startListening]);
+  }, [conversation, toast]);
+  
+  const startListening = useCallback(() => {
+    setSessionState("listening");
+
+    const startRecording = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorderRef.current = new MediaRecorder(stream, { mimeType });
+            audioChunksRef.current = [];
+
+            const handleDataAvailable = (event: BlobEvent) => {
+                if (event.data.size > 0) {
+                    audioChunksRef.current.push(event.data);
+                    if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+                    silenceTimerRef.current = setTimeout(() => {
+                        if (mediaRecorderRef.current?.state === 'recording') {
+                            mediaRecorderRef.current.stop();
+                        }
+                    }, speechEndTimeout);
+                }
+            };
+            
+            mediaRecorderRef.current.addEventListener("dataavailable", handleDataAvailable);
+
+            mediaRecorderRef.current.onstop = () => {
+                stream.getTracks().forEach(track => track.stop());
+                mediaRecorderRef.current?.removeEventListener("dataavailable", handleDataAvailable);
+                if(audioChunksRef.current.length > 0) {
+                    const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+                    processAudio(audioBlob);
+                }
+            };
+            
+            mediaRecorderRef.current.start(250); // Collect audio in chunks
+
+            if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+            silenceTimerRef.current = setTimeout(() => {
+                if (mediaRecorderRef.current?.state === 'recording') {
+                    mediaRecorderRef.current.stop();
+                }
+            }, speechEndTimeout);
+
+        } catch (err) {
+            toast({ title: "마이크 오류", description: "마이크에 접근할 수 없습니다.", variant: "destructive" });
+            setSessionState('idle');
+        }
+    }
+    startRecording();
+  }, [toast, speechEndTimeout, processAudio]);
   
   const startConversation = async () => {
     setConversation([]);
@@ -204,20 +218,35 @@ export function ParallelConversationTool() {
         </div>
       </ScrollArea>
       
-      <div className="flex items-center justify-center gap-4 h-10">
-        {sessionState === 'idle' && <Button size="lg" onClick={startConversation} className="w-full"><Play className="mr-2"/>대화 시작</Button>}
-        {sessionState === 'finished' && <Button size="lg" onClick={handleReset} variant="outline" className="w-full"><RefreshCw className="mr-2"/>새로 시작</Button>}
-        {['listening', 'speaking', 'processing', 'initializing'].includes(sessionState) && (
-            <>
-                <div className="flex items-center gap-2 text-sm font-medium">
-                    {sessionState === 'listening' && <><Mic className="h-5 w-5 text-blue-500 animate-pulse"/><span>듣는 중...</span></>}
-                    {sessionState === 'speaking' && <><Volume2 className="h-5 w-5 text-green-500 animate-pulse"/><span>AI 응답 중...</span></>}
-                    {(sessionState === 'processing' || sessionState === 'initializing') && <><Loader2 className="h-5 w-5 animate-spin"/><span>처리 중...</span></>}
-                </div>
-                <Button size="lg" onClick={handleStopConversation} variant="destructive" className="w-full"><StopCircle className="mr-2"/>대화 종료</Button>
-            </>
-        )}
-      </div>
+        <div className="flex flex-col gap-4">
+            <div className="space-y-2">
+                <Label htmlFor="sensitivity">침묵 감지 시간 (ms): {speechEndTimeout}</Label>
+                <Slider
+                    id="sensitivity"
+                    min={1000}
+                    max={5000}
+                    step={500}
+                    defaultValue={[speechEndTimeout]}
+                    onValueChange={(value) => setSpeechEndTimeout(value[0])}
+                    disabled={sessionState !== 'idle' && sessionState !== 'finished'}
+                />
+                <p className="text-xs text-muted-foreground">말을 마친 후, 여기서 설정된 시간만큼 침묵이 이어지면 AI에게 턴이 넘어갑니다.</p>
+            </div>
+            <div className="flex items-center justify-center gap-4 h-10">
+                {sessionState === 'idle' && <Button size="lg" onClick={startConversation} className="w-full"><Play className="mr-2"/>대화 시작</Button>}
+                {sessionState === 'finished' && <Button size="lg" onClick={handleReset} variant="outline" className="w-full"><RefreshCw className="mr-2"/>새로 시작</Button>}
+                {['listening', 'speaking', 'processing', 'initializing'].includes(sessionState) && (
+                    <>
+                        <div className="flex items-center gap-2 text-sm font-medium">
+                            {sessionState === 'listening' && <><Mic className="h-5 w-5 text-blue-500 animate-pulse"/><span>듣는 중...</span></>}
+                            {sessionState === 'speaking' && <><Volume2 className="h-5 w-5 text-green-500 animate-pulse"/><span>AI 응답 중...</span></>}
+                            {(sessionState === 'processing' || sessionState === 'initializing') && <><Loader2 className="h-5 w-5 animate-spin"/><span>처리 중...</span></>}
+                        </div>
+                        <Button size="lg" onClick={handleStopConversation} variant="destructive" className="w-full"><StopCircle className="mr-2"/>대화 종료</Button>
+                    </>
+                )}
+            </div>
+        </div>
 
       <audio ref={audioPlayerRef} onEnded={handleAudioEnded} className="hidden" />
     </div>
