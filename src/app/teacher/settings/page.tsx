@@ -21,16 +21,16 @@ export default function SettingsPage() {
     const router = useRouter();
     const { toast } = useToast();
 
-    const [displayName, setDisplayName] = useState(user?.displayName || '');
-    const [email, setEmail] = useState(user?.email || '');
+    const [displayName, setDisplayName] = useState('');
+    const [email, setEmail] = useState('');
     const [isUpdating, setIsUpdating] = useState(false);
 
     useEffect(() => {
-        if(!loading && !user) {
+        if (!loading && !user) {
             router.push('/');
         } else if (user) {
-            setDisplayName(user.displayName);
-            setEmail(user.email);
+            setDisplayName(user.displayName || '');
+            setEmail(user.email || '');
         }
     }, [user, loading, router]);
 
