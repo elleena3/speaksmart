@@ -5,13 +5,15 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, BookOpen, Brain, MessageSquare, Speaker, Info, Wand2 } from 'lucide-react';
+import { Loader2, BookOpen, Brain, MessageSquare, Speaker, Info, Wand2, Upload } from 'lucide-react';
 import { enhanceSelectedText, type EnhanceSelectedTextOutput } from '@/ai/flows/enhance-selected-text-flow';
 import { readAloudText } from '@/ai/flows/text-to-speech';
+import { extractTextFromFile } from '@/ai/flows/extract-text-from-file';
 import { sampleTexts } from '@/lib/book';
 import { Popover, PopoverContent } from '@/components/ui/popover';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Separator } from '@/components/ui/separator';
+import { Input } from '@/components/ui/input';
 
 type Difficulty = 'beginner' | 'intermediate' | 'advanced';
 type AnalysisAction = 'translate' | 'define' | 'explain';
@@ -25,9 +27,11 @@ export function InteractiveTextAnalyzer() {
     const [analysisResult, setAnalysisResult] = useState<EnhanceSelectedTextOutput | null>(null);
     const [isCardLoading, setIsCardLoading] = useState(false);
     const [isReadingAloud, setIsReadingAloud] = useState(false);
+    const [isExtractingText, setIsExtractingText] = useState(false);
     
     const audioPlayerRef = useRef<HTMLAudioElement>(null);
     const textContainerRef = useRef<HTMLDivElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const { toast } = useToast();
     
     const handleDifficultyChange = (difficulty: Difficulty) => {
@@ -78,19 +82,17 @@ export function InteractiveTextAnalyzer() {
     
     const handleReadAloudClick = async () => {
         if (!currentSelection || !textContainerRef.current) return;
-
+        
         setPopoverOpen(false);
         setIsReadingAloud(true);
 
         try {
-            // First, get the corrected text from the AI
             const { correctedText } = await enhanceSelectedText({
                 selectedText: currentSelection,
                 fullSentenceContext: textContainerRef.current.innerText,
-                action: 'translate', // Action doesn't matter here, we just need correctedText
+                action: 'translate', 
             });
 
-            // Then, use the corrected text for TTS
             const { audioDataUri } = await readAloudText({ text: correctedText });
             if (audioPlayerRef.current) {
                 audioPlayerRef.current.src = audioDataUri;
@@ -102,6 +104,32 @@ export function InteractiveTextAnalyzer() {
         }
     }
     
+    const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        setIsExtractingText(true);
+        toast({ title: "파일 처리 중...", description: "파일에서 텍스트를 추출하고 있습니다."});
+        
+        try {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = async () => {
+                const dataUri = reader.result as string;
+                const { extractedText } = await extractTextFromFile({ fileDataUri: dataUri });
+                setSelectedText(extractedText);
+                toast({ title: "텍스트 추출 완료", description: "파일의 내용이 지문으로 설정되었습니다."});
+                setIsExtractingText(false);
+            };
+        } catch (e: any) {
+            toast({ title: "파일 분석 오류", description: e.message, variant: "destructive" });
+            setIsExtractingText(false);
+        } finally {
+            // Reset file input to allow re-uploading the same file
+            if(fileInputRef.current) fileInputRef.current.value = "";
+        }
+    };
+
     useEffect(() => {
         const audioEl = audioPlayerRef.current;
         const onEnded = () => setIsReadingAloud(false);
@@ -117,21 +145,33 @@ export function InteractiveTextAnalyzer() {
             <div className="space-y-4">
                 <Card>
                     <CardHeader>
-                        <CardTitle>1. 지문 선택</CardTitle>
-                        <CardDescription>연습할 난이도의 지문을 선택하세요.</CardDescription>
+                        <CardTitle>1. 지문 준비</CardTitle>
+                        <CardDescription>연습할 지문을 선택하거나, 직접 파일을 업로드하세요.</CardDescription>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="flex flex-wrap gap-2">
                         <ToggleGroup type="single" defaultValue="beginner" onValueChange={handleDifficultyChange} aria-label="Text difficulty">
                             <ToggleGroupItem value="beginner" aria-label="Beginner">초급</ToggleGroupItem>
                             <ToggleGroupItem value="intermediate" aria-label="Intermediate">중급</ToggleGroupItem>
                             <ToggleGroupItem value="advanced" aria-label="Advanced">고급</ToggleGroupItem>
                         </ToggleGroup>
+                         <Input
+                            id="file-upload"
+                            type="file"
+                            className="hidden"
+                            ref={fileInputRef}
+                            onChange={handleFileUpload}
+                            accept=".txt,.pdf,image/*"
+                         />
+                        <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={isExtractingText}>
+                            {isExtractingText ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Upload className="mr-2 h-4 w-4"/>}
+                            파일 업로드
+                        </Button>
                     </CardContent>
                 </Card>
 
                  <Card>
                     <CardHeader>
-                        <CardTitle>2. 텍스트 선택</CardTitle>
+                        <CardTitle>2. 텍스트 선택 및 분석</CardTitle>
                         <CardDescription>아래 지문에서 궁금한 단어, 구, 문장을 드래그하여 AI 분석 기능을 사용해보세요.</CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -140,7 +180,13 @@ export function InteractiveTextAnalyzer() {
                              onMouseUp={handleTextSelection} 
                              className="p-4 bg-muted/50 rounded-lg text-lg font-serif leading-relaxed h-96 overflow-y-auto select-text"
                         >
-                            {selectedText}
+                            {isExtractingText ? (
+                                <div className="flex items-center justify-center h-full text-muted-foreground">
+                                    <Loader2 className="mr-2 h-5 w-5 animate-spin"/> 텍스트 추출 중...
+                                </div>
+                            ) : (
+                                selectedText
+                            )}
                         </div>
                         <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
                             <PopoverContent 
