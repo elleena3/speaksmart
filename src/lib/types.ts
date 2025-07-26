@@ -33,6 +33,10 @@ export const voiceDescriptions: Record<AiVoice, string> = {
 export const evaluationModels = ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.5-flash-lite-preview-06-17", "gemini-2.0-flash"] as const;
 export type EvaluationModel = (typeof evaluationModels)[number];
 
+export const monologueTypes = ["text", "image", "comic"] as const;
+export type MonologueType = (typeof monologueTypes)[number];
+
+
 // New UserData type for Firestore
 export type UserData = {
     uid: string;
@@ -75,6 +79,7 @@ export type TeacherAssessment = {
   startDate?: string;
   endDate?: string;
   assessmentType: 'monologue' | 'dialogue';
+  monologueType?: MonologueType;
   scenario?: Scenario;
   aiVoice?: AiVoice;
   evaluationModel?: EvaluationModel;

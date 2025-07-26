@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, CalendarIcon, ChevronsUpDown, Check, Info, Users, TestTube2 } from "lucide-react";
+import { Loader2, CalendarIcon, ChevronsUpDown, Check, Info, Users, TestTube2, Type, Image as ImageIcon, Comics } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -25,7 +25,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { scenarios, type TeacherAssessment, femaleVoices, maleVoices, allVoices, evaluationModels, voiceDescriptions, type AiVoice, type UserData } from "@/lib/types";
+import { scenarios, type TeacherAssessment, femaleVoices, maleVoices, allVoices, evaluationModels, voiceDescriptions, type AiVoice, type UserData, monologueTypes } from "@/lib/types";
 import { useAuth, mockStudents } from "@/context/auth-context";
 import { addDoc, collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -93,6 +93,7 @@ export default function NewAssessmentPage() {
     startDate: z.date().optional(),
     endDate: z.date().optional(),
     assessmentType: z.enum(["monologue", "dialogue"]),
+    monologueType: z.enum(monologueTypes).optional(),
     targetType: z.enum(["all", "specific"]).default("all"),
     targetStudentIds: z.array(z.string()).optional(),
     scenario: z.enum(scenarios).optional(),
@@ -136,6 +137,7 @@ export default function NewAssessmentPage() {
       prompt: "",
       expectedFormat: "",
       assessmentType: "monologue",
+      monologueType: "text",
       targetType: "all",
       targetStudentIds: [],
       scenario: "free-talk",
@@ -227,6 +229,8 @@ export default function NewAssessmentPage() {
         if (values.assessmentType === 'monologue') {
             delete (docData as any).aiVoice;
             delete (docData as any).scenario;
+        } else {
+             delete (docData as any).monologueType;
         }
 
         Object.keys(docData).forEach(key => docData[key as keyof typeof docData] === undefined && delete docData[key as keyof typeof docData]);
@@ -327,41 +331,73 @@ export default function NewAssessmentPage() {
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name="targetType"
-                render={({ field }) => (
-                  <FormItem className="space-y-3">
-                    <FormLabel>{t.teacherAssessmentForm.targetLabel}</FormLabel>
-                    <FormControl>
-                      <RadioGroup
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                        className="flex flex-col space-y-1"
-                      >
-                        <FormItem className="flex items-center space-x-3 space-y-0">
-                          <FormControl>
-                            <RadioGroupItem value="all" />
-                          </FormControl>
-                          <FormLabel className="font-normal">
-                            {t.teacherAssessmentForm.targetAll}
-                          </FormLabel>
-                        </FormItem>
-                        <FormItem className="flex items-center space-x-3 space-y-0">
-                          <FormControl>
-                            <RadioGroupItem value="specific" />
-                          </FormControl>
-                          <FormLabel className="font-normal">
-                            {t.teacherAssessmentForm.targetSpecific}
-                          </FormLabel>
-                        </FormItem>
-                      </RadioGroup>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              
+              {assessmentType === 'monologue' && (
+                  <FormField
+                    control={form.control}
+                    name="monologueType"
+                    render={({ field }) => (
+                      <FormItem className="space-y-3">
+                        <FormLabel>혼자 말하기 유형</FormLabel>
+                         <FormControl>
+                           <RadioGroup onValueChange={field.onChange} value={field.value} className="flex flex-col space-y-1">
+                                <FormItem className="flex items-center space-x-3 space-y-0">
+                                    <FormControl><RadioGroupItem value="text"/></FormControl>
+                                    <FormLabel className="font-normal flex items-center gap-2"><Type/>주제/텍스트 제시</FormLabel>
+                                </FormItem>
+                                <FormItem className="flex items-center space-x-3 space-y-0">
+                                    <FormControl><RadioGroupItem value="image"/></FormControl>
+                                    <FormLabel className="font-normal flex items-center gap-2"><ImageIcon/>이미지 묘사</FormLabel>
+                                </FormItem>
+                                <FormItem className="flex items-center space-x-3 space-y-0">
+                                    <FormControl><RadioGroupItem value="comic" /></FormControl>
+                                    <FormLabel className="font-normal flex items-center gap-2"><Comics/>네 컷 만화 설명</FormLabel>
+                                </FormItem>
+                           </RadioGroup>
+                         </FormControl>
+                         <FormMessage/>
+                      </FormItem>
+                    )}
+                  />
+              )}
             </div>
+
+            <Separator/>
+
+            <FormField
+              control={form.control}
+              name="targetType"
+              render={({ field }) => (
+                <FormItem className="space-y-3">
+                  <FormLabel>{t.teacherAssessmentForm.targetLabel}</FormLabel>
+                  <FormControl>
+                    <RadioGroup
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                      className="flex space-x-4"
+                    >
+                      <FormItem className="flex items-center space-x-3 space-y-0">
+                        <FormControl>
+                          <RadioGroupItem value="all" />
+                        </FormControl>
+                        <FormLabel className="font-normal">
+                          {t.teacherAssessmentForm.targetAll}
+                        </FormLabel>
+                      </FormItem>
+                      <FormItem className="flex items-center space-x-3 space-y-0">
+                        <FormControl>
+                          <RadioGroupItem value="specific" />
+                        </FormControl>
+                        <FormLabel className="font-normal">
+                          {t.teacherAssessmentForm.targetSpecific}
+                        </FormLabel>
+                      </FormItem>
+                    </RadioGroup>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             
             {assessmentType === 'dialogue' && (
               <FormField
