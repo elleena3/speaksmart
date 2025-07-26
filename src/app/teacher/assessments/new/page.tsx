@@ -469,7 +469,7 @@ export default function NewAssessmentPage() {
                                 <Label htmlFor="image-prompt">이미지 생성 프롬프트</Label>
                                 <Textarea 
                                     id="image-prompt"
-                                    placeholder="예: 공원에서 책을 읽고 있는 할머니, 수채화 스타일"
+                                    placeholder="예: 부엌에서 함께 요리하는 가족, 따뜻하고 아늑한 분위기의 일러스트"
                                     value={imagePrompt}
                                     onChange={(e) => setImagePrompt(e.target.value)}
                                     rows={4}
