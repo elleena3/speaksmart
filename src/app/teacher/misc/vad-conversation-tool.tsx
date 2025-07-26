@@ -26,11 +26,6 @@ export function VadConversationTool() {
   const speechEndTimerRef = useRef<NodeJS.Timeout | null>(null);
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
   
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const audioStreamRef = useRef<MediaStream | null>(null);
-  const animationFrameRef = useRef<number | null>(null);
-
   const scrollViewportRef = useRef<HTMLDivElement | null>(null);
   
   const { toast } = useToast();
@@ -46,37 +41,22 @@ export function VadConversationTool() {
         recognitionRef.current.stop();
         recognitionRef.current = null;
     }
-    if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-    }
-    if (audioStreamRef.current) {
-        audioStreamRef.current.getTracks().forEach(track => track.stop());
-        audioStreamRef.current = null;
-    }
-    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-        audioContextRef.current.close().catch(console.error);
-        audioContextRef.current = null;
-    }
   }, []);
 
   const processFinalTranscript = useCallback(async (transcript: string) => {
-    if (!transcript.trim()) {
-      if (sessionState === 'listening') {
-        // restart listening if nothing was said.
-      }
-      return;
+    if (!transcript.trim() && sessionState === 'listening') {
+      return; // Do nothing if transcript is empty and we were just listening
     }
     
     setSessionState("processing");
-    const userTurn: ConversationTurn = {role: 'user', text: transcript};
-    const newConversationHistory = [...conversation, userTurn];
-    setConversation(newConversationHistory);
+    const newHistory = transcript.trim() ? [...conversation, {role: 'user', text: transcript}] : [...conversation];
+    setConversation(newHistory);
     setInterimTranscript("");
     
     try {
         const { aiResponseText, aiResponseAudioDataUri } = await converseWithNativeTeacher({
             studentTranscript: transcript,
-            conversationHistory: newConversationHistory,
+            conversationHistory: newHistory, // Pass the most up-to-date history
         });
 
         setConversation(prev => [...prev, {role: 'model', text: aiResponseText}]);
@@ -100,8 +80,7 @@ export function VadConversationTool() {
 
   const startListening = useCallback(() => {
     setSessionState("listening");
-    let finalTranscript = "";
-
+    
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
         toast({ title: "브라우저 지원 안함", description: "실시간 음성 인식을 지원하지 않는 브라우저입니다.", variant: "destructive"});
@@ -128,41 +107,30 @@ export function VadConversationTool() {
         };
 
         recognition.onresult = (event) => {
-            let currentInterim = "";
-            let hasFinalResult = false;
-
+            let tempInterim = "";
             for (let i = event.resultIndex; i < event.results.length; ++i) {
-                const transcript = event.results[i][0].transcript;
-                 if (event.results[i].isFinal) {
-                    finalTranscript = (finalTranscript + " " + transcript).trim();
-                    hasFinalResult = true;
+                if (event.results[i].isFinal) {
+                    // This part seems to be causing issues with continuous recognition.
+                    // Let's rely on interim results and the onend event.
                 } else {
-                    currentInterim += transcript;
+                    tempInterim += event.results[i][0].transcript;
                 }
             }
-            
-            if (hasFinalResult || currentInterim.trim()) {
-                resetTimer();
+            if(tempInterim.trim()){
+              setInterimTranscript(tempInterim);
+              resetTimer();
             }
-            
-            setInterimTranscript((finalTranscript + " " + currentInterim).trim());
         };
         
         recognition.onend = () => {
-            const fullTranscript = (finalTranscript + " " + interimTranscript).trim();
-            if (fullTranscript) {
-                processFinalTranscript(fullTranscript);
-            } else if (sessionState === 'listening') {
-                // If nothing was said, just loop back to listening without processing.
-                startListening();
-            }
+             processFinalTranscript(interimTranscript);
         };
 
         recognition.onerror = (event) => {
             if (event.error !== 'no-speech' && event.error !== 'aborted') {
                 toast({title: "음성 인식 오류", description: `오류가 발생했습니다: ${event.error}`, variant: "destructive"});
+                 setSessionState("idle");
             }
-             cleanup();
         };
         
         recognition.start();
@@ -173,7 +141,7 @@ export function VadConversationTool() {
         setSessionState("idle");
     }
 
-  }, [toast, cleanup, processFinalTranscript, sessionState, interimTranscript]);
+  }, [toast, cleanup, processFinalTranscript, interimTranscript]);
 
 
   useEffect(() => {
@@ -208,7 +176,7 @@ export function VadConversationTool() {
         await audioPlayerRef.current.play().catch(e => {
             console.error("Audio play error:", e);
             toast({title: "오디오 재생 오류", variant: "destructive"});
-            startListening(); // If play fails, go to listening
+            startListening();
         });
       }
     } catch (error) {
@@ -255,6 +223,12 @@ export function VadConversationTool() {
         default: return "";
     }
   }
+
+  const handleAudioEnded = () => {
+      if (sessionState === 'speaking') {
+          startListening();
+      }
+  };
 
   return (
     <div className="flex flex-col gap-4">
@@ -323,9 +297,7 @@ export function VadConversationTool() {
         )}
       </div>
 
-      <audio ref={audioPlayerRef} onEnded={() => {if (sessionState === 'speaking') { startListening(); }}} className="hidden" />
+      <audio ref={audioPlayerRef} onEnded={handleAudioEnded} className="hidden" />
     </div>
   );
 }
-
-    
