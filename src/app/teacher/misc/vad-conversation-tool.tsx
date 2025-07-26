@@ -9,9 +9,10 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { type ConversationTurn } from "@/lib/types/ai-schemas";
 import { converseWithNativeTeacher } from "@/ai/flows/create-native-teacher-flow"
 import { cn } from "@/lib/utils"
+import { Label } from "@/components/ui/label"
+import { Slider } from "@/components/ui/slider"
 
 const mimeType = 'audio/webm;codecs=opus';
-const SILENCE_THRESHOLD = 0.03; // Sensitivity for silence detection (increased from 0.01)
 const SILENCE_DURATION_MS = 6000; // 6 seconds of silence to trigger turn end
 
 type SessionState = "idle" | "initializing" | "speaking" | "listening" | "processing" | "ending";
@@ -20,6 +21,7 @@ export function VadConversationTool() {
   const [sessionState, setSessionState] = useState<SessionState>("idle");
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
   const [interimTranscript, setInterimTranscript] = useState<string | null>(null);
+  const [silenceThreshold, setSilenceThreshold] = useState(0.03);
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -113,7 +115,11 @@ export function VadConversationTool() {
             
             const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
             analyserRef.current.getByteFrequencyData(dataArray);
-            const isSpeaking = dataArray.some(v => v > 0);
+            
+            // A more robust way to check for speaking activity
+            const sum = dataArray.reduce((acc, val) => acc + val, 0);
+            const avg = sum / dataArray.length;
+            const isSpeaking = avg > (silenceThreshold * 10); // scale threshold for this calculation
 
             if (isSpeaking) {
                 if (mediaRecorderRef.current?.state === 'inactive') {
@@ -142,7 +148,7 @@ export function VadConversationTool() {
         toast({ title: "마이크 오류", description: "마이크 접근 권한을 허용해주세요.", variant: "destructive" });
         setSessionState("idle");
     }
-  }, [sessionState, toast]);
+  }, [sessionState, toast, silenceThreshold]);
 
   const startConversation = async () => {
     setConversation([]);
@@ -244,7 +250,21 @@ export function VadConversationTool() {
         </div>
       </ScrollArea>
       
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-4">
+        <div className="grid gap-2">
+            <Label htmlFor="sensitivity" className="text-xs text-muted-foreground">
+                마이크 민감도 (왼쪽: 더 민감, 오른쪽: 덜 민감)
+            </Label>
+            <Slider
+                id="sensitivity"
+                min={0.01}
+                max={0.1}
+                step={0.01}
+                value={[silenceThreshold]}
+                onValueChange={(value) => setSilenceThreshold(value[0])}
+                disabled={sessionState !== 'idle'}
+            />
+        </div>
         {getButtonState()}
         {sessionState !== 'idle' && (
             <p className={cn("text-xs text-center", sessionState === 'listening' ? "text-blue-600 font-semibold" : "text-muted-foreground")}>
@@ -258,3 +278,4 @@ export function VadConversationTool() {
     </div>
   );
 }
+
