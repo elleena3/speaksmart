@@ -146,8 +146,8 @@ export default function ProcessingPage() {
             console.log(`[Processing Page] Created preliminary result document: ${newResultDocRef.id}`);
 
             // 상태 변경 감지 리스너 설정
-            unsubscribeRef.current = onSnapshot(newResultDocRef, (doc) => {
-                const resultData = doc.data() as StudentResult;
+            unsubscribeRef.current = onSnapshot(newResultDocRef, (docSnapshot) => {
+                const resultData = docSnapshot.data() as StudentResult;
                 if (!resultData) return;
 
                 console.log(`[Processing Page Snapshot] Detected status change: ${resultData.status}`);
@@ -170,7 +170,7 @@ export default function ProcessingPage() {
                                 );
                                 const querySnapshot = await getDocs(resultsQuery);
 
-                                const allAttempts = querySnapshot.docs.map(doc => doc.data() as StudentResult);
+                                const allAttempts = querySnapshot.docs.map(d => d.data() as StudentResult);
                                 const scores = allAttempts.map(d => d.contentScore || 0);
                                 const studentIds = new Set(allAttempts.map(r => r.studentId));
 
