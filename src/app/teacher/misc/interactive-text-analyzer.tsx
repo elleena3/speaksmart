@@ -9,8 +9,7 @@ import { Loader2, BookOpen, Brain, MessageSquare, Speaker, Info, Wand2 } from 'l
 import { enhanceSelectedText, type EnhanceSelectedTextOutput } from '@/ai/flows/enhance-selected-text-flow';
 import { readAloudText } from '@/ai/flows/text-to-speech';
 import { sampleTexts } from '@/lib/book';
-import { cn } from '@/lib/utils';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Popover, PopoverContent } from '@/components/ui/popover';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Separator } from '@/components/ui/separator';
 
@@ -36,11 +35,21 @@ export function InteractiveTextAnalyzer() {
         setPopoverState({ open: false, target: null, selection: '' });
     };
 
-    const handleWordClick = (event: React.MouseEvent<HTMLSpanElement>) => {
-        const clickedWord = event.currentTarget.innerText;
-        setAnalysisResult(null);
-        setPopoverState({ open: true, target: event.currentTarget, selection: clickedWord });
-    }
+    const handleTextSelection = () => {
+        const selection = window.getSelection();
+        const text = selection?.toString().trim();
+        if (text && text.length > 1) {
+            const range = selection?.getRangeAt(0);
+            if (range) {
+                const rect = range.getBoundingClientRect();
+                const virtualEl = { getBoundingClientRect: () => rect };
+                setPopoverState({ open: true, target: virtualEl as HTMLElement, selection: text });
+                setAnalysisResult(null);
+            }
+        } else {
+            setPopoverState(prev => ({ ...prev, open: false }));
+        }
+    };
 
     const handleActionClick = async (action: AnalysisAction) => {
         if (!popoverState.selection || !textContainerRef.current) return;
@@ -100,21 +109,21 @@ export function InteractiveTextAnalyzer() {
 
                  <Card>
                     <CardHeader>
-                        <CardTitle>2. 단어 클릭</CardTitle>
-                        <CardDescription>아래 지문에서 궁금한 단어를 클릭하여 AI 분석 기능을 사용해보세요.</CardDescription>
+                        <CardTitle>2. 텍스트 선택</CardTitle>
+                        <CardDescription>아래 지문에서 궁금한 단어, 구, 문장을 드래그하여 AI 분석 기능을 사용해보세요.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <Popover open={popoverState.open} onOpenChange={(open) => setPopoverState(prev => ({...prev, open}))}>
-                            <PopoverTrigger asChild>
-                                <div ref={textContainerRef} className="p-4 bg-muted/50 rounded-lg text-lg font-serif leading-relaxed h-96 overflow-y-auto cursor-pointer">
-                                    {selectedText.split(/(\s+)/).map((word, index) => (
-                                        word.trim() ? 
-                                        <span key={index} onClick={handleWordClick} className="hover:bg-blue-200 rounded p-0.5">{word}</span>
-                                        : <span key={index}>{word}</span>
-                                    ))}
-                                </div>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-1" side="top" align="center">
+                            <div ref={textContainerRef} onMouseUp={handleTextSelection} className="p-4 bg-muted/50 rounded-lg text-lg font-serif leading-relaxed h-96 overflow-y-auto select-text">
+                                {selectedText}
+                            </div>
+                            <PopoverContent 
+                                virtualRef={popoverState.target} 
+                                className="w-auto p-1" 
+                                side="top" 
+                                align="center"
+                                onOpenAutoFocus={(e) => e.preventDefault()}
+                            >
                                 <div className="flex gap-1">
                                     <Button variant="ghost" size="sm" onClick={() => handleActionClick('translate')}><BookOpen className="mr-1 h-4 w-4"/>번역</Button>
                                     <Button variant="ghost" size="sm" onClick={() => handleActionClick('define')}><Brain className="mr-1 h-4 w-4"/>사전</Button>
@@ -137,7 +146,7 @@ export function InteractiveTextAnalyzer() {
                          <CardTitle className="flex items-center gap-2">
                              <Wand2 className="text-primary"/> AI 분석 결과
                          </CardTitle>
-                         <CardDescription>단어를 클릭하면 AI가 분석한 정보가 여기에 표시됩니다.</CardDescription>
+                         <CardDescription>지문에서 텍스트를 선택하면 AI가 분석한 정보가 여기에 표시됩니다.</CardDescription>
                      </CardHeader>
                      <CardContent className="min-h-[300px]">
                          {isCardLoading ? (
@@ -160,5 +169,3 @@ export function InteractiveTextAnalyzer() {
         </div>
     );
 }
-
-    
