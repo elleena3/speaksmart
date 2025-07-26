@@ -35,7 +35,12 @@ export default function SettingsPage() {
     }, [user, loading, router]);
 
     const handleUpdateProfile = async () => {
-        if (!user || !user.docId || !displayName.trim() || !email.trim()) {
+        if (!user || !user.docId) {
+            toast({ title: "오류", description: "사용자 정보를 찾을 수 없습니다.", variant: "destructive" });
+            return;
+        }
+        
+        if (!displayName.trim() || !email.trim()) {
             toast({ title: "오류", description: "이름과 이메일은 비워둘 수 없습니다.", variant: "destructive" });
             return;
         }
@@ -47,7 +52,11 @@ export default function SettingsPage() {
                 const usersRef = collection(db, "users");
                 const q = query(usersRef, where("email", "==", email));
                 const querySnapshot = await getDocs(q);
-                if (!querySnapshot.empty) {
+                
+                // Ensure we are not matching the current user's document
+                const isTaken = querySnapshot.docs.some(doc => doc.id !== user.docId);
+
+                if (isTaken) {
                     toast({ title: "오류", description: "이미 사용 중인 이메일입니다.", variant: "destructive" });
                     setIsUpdating(false);
                     return;
