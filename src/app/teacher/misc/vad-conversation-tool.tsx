@@ -45,7 +45,6 @@ export function VadConversationTool() {
   const processFinalTranscript = useCallback(async (transcript: string) => {
     if (!transcript.trim()) {
       if (sessionState === 'listening') {
-        // If we were listening and got no speech, just go back to listening.
         startListening(); 
       }
       return; 
@@ -59,7 +58,7 @@ export function VadConversationTool() {
     try {
         const { aiResponseText, aiResponseAudioDataUri } = await converseWithNativeTeacher({
             studentTranscript: transcript.trim(),
-            conversationHistory: newHistory, // Pass the most up-to-date history
+            conversationHistory: newHistory,
         });
 
         setConversation(prev => [...prev, {role: 'model', text: aiResponseText}]);
@@ -70,16 +69,16 @@ export function VadConversationTool() {
             audioPlayerRef.current.play().catch(e => {
                 console.error("Audio play error:", e);
                 toast({title: "오디오 재생 오류", variant: "destructive"});
-                setSessionState("listening"); // Go back to listening if play fails
+                startListening();
             });
         } else {
-            setSessionState("listening");
+            startListening();
         }
     } catch (error) {
         toast({ title: "AI 처리 오류", variant: "destructive" });
-        setSessionState("listening");
+        startListening();
     }
-  }, [conversation, sessionState, toast, startListening]);
+  }, [conversation, sessionState, toast]);
 
   const startListening = useCallback(() => {
     setSessionState("listening");
@@ -123,7 +122,6 @@ export function VadConversationTool() {
         };
         
         recognition.onend = () => {
-             // Only process if we are in a listening state, to avoid conflicts
             if(sessionState === 'listening') {
                  processFinalTranscript(interimTranscript);
             }
@@ -143,9 +141,7 @@ export function VadConversationTool() {
         toast({ title: "마이크 오류", description: "마이크에 접근할 수 없습니다.", variant: "destructive" });
         setSessionState("idle");
     }
-
   }, [toast, cleanup, processFinalTranscript, interimTranscript, sessionState]);
-
 
   useEffect(() => {
     return () => {
