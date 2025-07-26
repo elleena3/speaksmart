@@ -219,13 +219,13 @@ export default function NewAssessmentPage() {
 
   const handleSelectAll = (studentsToSelect: UserData[], field: any) => {
     const currentSelection = new Set(Array.isArray(field.value) ? field.value : []);
-    const allIds = new Set(studentsToSelect.map(s => s.uid));
-    const areAllSelected = studentsToSelect.every(s => currentSelection.has(s.uid));
+    const allIds = new Set(studentsToSelect.map(s => s.docId));
+    const areAllSelected = studentsToSelect.every(s => currentSelection.has(s.docId));
 
     if (areAllSelected) {
-        studentsToSelect.forEach(s => currentSelection.delete(s.uid));
+        studentsToSelect.forEach(s => currentSelection.delete(s.docId));
     } else {
-        studentsToSelect.forEach(s => currentSelection.add(s.uid));
+        studentsToSelect.forEach(s => currentSelection.add(s.docId));
     }
     field.onChange(Array.from(currentSelection));
   };
@@ -420,7 +420,7 @@ export default function NewAssessmentPage() {
                                 <Checkbox
                                     id="select-all-real"
                                     onCheckedChange={() => handleSelectAll(filteredRealStudents, field)}
-                                    checked={Array.isArray(field.value) && filteredRealStudents.length > 0 && filteredRealStudents.every(s => field.value.includes(s.uid))}
+                                    checked={Array.isArray(field.value) && filteredRealStudents.length > 0 && filteredRealStudents.every(s => field.value.includes(s.docId!))}
                                 />
                             </div>
                           </div>
@@ -430,27 +430,30 @@ export default function NewAssessmentPage() {
                            filteredRealStudents.length > 0 ? (
                                filteredRealStudents.map((item) => (
                                 <FormField
-                                  key={item.uid}
+                                  key={item.docId}
                                   control={form.control}
                                   name="targetStudentIds"
-                                  render={({ field }) => (
-                                    <FormItem
-                                      className="flex flex-row items-start space-x-3 space-y-0"
-                                    >
-                                    <FormControl>
-                                        <Checkbox
-                                            checked={Array.isArray(field.value) && field.value.includes(item.uid)}
-                                            onCheckedChange={(checked) => {
-                                            const currentIds = Array.isArray(field.value) ? field.value : [];
-                                            return checked
-                                                ? field.onChange([...currentIds, item.uid])
-                                                : field.onChange(currentIds.filter((value) => value !== item.uid))
-                                            }}
-                                        />
-                                        </FormControl>
-                                        <FormLabel className="font-normal">{item.displayName}</FormLabel>
-                                    </FormItem>
-                                  )}
+                                  render={({ field }) => {
+                                    const studentIds = Array.isArray(field.value) ? field.value : [];
+                                    return (
+                                        <FormItem
+                                            key={item.docId}
+                                            className="flex flex-row items-start space-x-3 space-y-0"
+                                        >
+                                        <FormControl>
+                                            <Checkbox
+                                                checked={studentIds.includes(item.docId!)}
+                                                onCheckedChange={(checked) => {
+                                                return checked
+                                                    ? field.onChange([...studentIds, item.docId!])
+                                                    : field.onChange(studentIds.filter((value) => value !== item.docId))
+                                                }}
+                                            />
+                                            </FormControl>
+                                            <FormLabel className="font-normal">{item.displayName}</FormLabel>
+                                        </FormItem>
+                                    )
+                                  }}
                                 />
                                 ))
                            ) : <p className="text-sm text-muted-foreground col-span-full text-center">해당 조건의 학생이 없습니다.</p>}
