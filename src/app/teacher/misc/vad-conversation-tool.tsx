@@ -11,7 +11,7 @@ import { converseWithNativeTeacher } from "@/ai/flows/create-native-teacher-flow
 import { cn } from "@/lib/utils"
 
 const mimeType = 'audio/webm;codecs=opus';
-const SILENCE_THRESHOLD = 0.01; // Sensitivity for silence detection
+const SILENCE_THRESHOLD = 0.03; // Sensitivity for silence detection (increased from 0.01)
 const SILENCE_DURATION_MS = 6000; // 6 seconds of silence to trigger turn end
 
 type SessionState = "idle" | "initializing" | "speaking" | "listening" | "processing" | "ending";
@@ -142,7 +142,7 @@ export function VadConversationTool() {
         toast({ title: "마이크 오류", description: "마이크 접근 권한을 허용해주세요.", variant: "destructive" });
         setSessionState("idle");
     }
-  }, [sessionState]);
+  }, [sessionState, toast]);
 
   const startConversation = async () => {
     setConversation([]);
@@ -258,4 +258,3 @@ export function VadConversationTool() {
     </div>
   );
 }
-
