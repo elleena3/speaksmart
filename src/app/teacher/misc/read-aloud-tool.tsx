@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from 'react';
@@ -7,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Mic, StopCircle, RefreshCw, Sparkles, BookOpen, Brain, MessageSquare, AudioLines, Speaker, AlertTriangle } from 'lucide-react';
+import { Loader2, Mic, StopCircle, RefreshCw, Sparkles, BookOpen, Brain, MessageSquare, AudioLines, Speaker, AlertTriangle, Info } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { analyzeReadAloud, type AnalyzeReadAloudOutput } from '@/ai/flows/analyze-read-aloud-flow';
 import { enhanceSelectedText, type EnhanceSelectedTextOutput } from '@/ai/flows/enhance-selected-text-flow';
@@ -311,4 +310,3 @@ export function ReadAloudTool() {
     </div>
     );
 }
-
