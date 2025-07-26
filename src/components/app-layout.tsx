@@ -16,13 +16,14 @@ import {
   SidebarFooter
 } from "@/components/ui/sidebar"
 import { Logo } from "@/components/icons"
-import { LogOut, Bell } from "lucide-react"
+import { LogOut, Bell, CheckCircle } from "lucide-react"
 import { useLanguage } from "@/context/language-context"
 import { translations } from "@/lib/locales"
 import { useAuth } from "@/context/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import { Avatar, AvatarImage, AvatarFallback } from "./ui/avatar"
 import { Button } from "./ui/button"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "./ui/dropdown-menu"
 
 type NavItem = {
   href: string
@@ -102,14 +103,41 @@ export function AppLayout({ children, navItems, titleKey }: AppLayoutProps) {
           </div>
           <div className="flex items-center gap-2">
             {user?.role === 'teacher' && (
-                <Button variant="ghost" size="icon" className="relative">
-                    <Bell className="h-5 w-5" />
-                    <span className="absolute top-1 right-1 flex h-2 w-2">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-                    </span>
-                    <span className="sr-only">알림 보기</span>
-                </Button>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="relative">
+                            <Bell className="h-5 w-5" />
+                            <span className="absolute top-1 right-1 flex h-2 w-2">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                            </span>
+                            <span className="sr-only">알림 보기</span>
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-80">
+                        <DropdownMenuLabel>알림</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem className="flex items-start gap-3">
+                           <CheckCircle className="h-5 w-5 mt-1 text-green-500 flex-shrink-0" />
+                            <div>
+                                <p className="font-semibold">새로운 제출</p>
+                                <p className="text-xs text-muted-foreground">
+                                    일학생님이 '취미와 관심사' 평가를 완료했습니다.
+                                </p>
+                            </div>
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                         <DropdownMenuItem className="flex items-start gap-3">
+                           <CheckCircle className="h-5 w-5 mt-1 text-green-500 flex-shrink-0" />
+                            <div>
+                                <p className="font-semibold">피드백 수신</p>
+                                <p className="text-xs text-muted-foreground">
+                                    이학생님이 '음식 주문하기' 평가에 대한 피드백을 남겼습니다.
+                                </p>
+                            </div>
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
             )}
             <div className="hidden md:block">
               <SidebarTrigger />

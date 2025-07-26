@@ -10,7 +10,7 @@ const mockTeacher: UserData = {
     uid: 'teacher-mock-uid',
     docId: 'teacher-mock-uid',
     displayName: 'Great Teacher',
-    email: 'teacher@example.com',
+    email: 'elleena3@gmail.com',
     photoURL: `https://placehold.co/40x40.png?text=G`,
     role: 'teacher',
     createdAt: Date.now(),
