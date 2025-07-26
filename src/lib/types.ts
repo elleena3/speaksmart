@@ -46,6 +46,7 @@ export type UserData = {
     password?: string; // Storing password in plaintext for simplicity as requested.
     createdAt: number;
     docId: string; // Firestore document ID
+    isMock?: boolean; // To identify mock users
 };
 
 

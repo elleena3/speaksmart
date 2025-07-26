@@ -10,10 +10,11 @@ import { useLanguage } from '@/context/language-context';
 import { useAuth } from '@/context/auth-context';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Info } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { doc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export default function SettingsPage() {
     const { t } = useLanguage();
@@ -24,6 +25,8 @@ export default function SettingsPage() {
     const [displayName, setDisplayName] = useState('');
     const [email, setEmail] = useState('');
     const [isUpdating, setIsUpdating] = useState(false);
+    
+    const isMockUser = user?.isMock || false;
 
     useEffect(() => {
         if (!loading && !user) {
@@ -35,8 +38,8 @@ export default function SettingsPage() {
     }, [user, loading, router]);
 
     const handleUpdateProfile = async () => {
-        if (!user || !user.docId) {
-            toast({ title: "오류", description: "사용자 정보를 찾을 수 없습니다.", variant: "destructive" });
+        if (!user || !user.docId || isMockUser) {
+            toast({ title: "오류", description: "사용자 정보를 찾을 수 없거나 목업 계정은 수정할 수 없습니다.", variant: "destructive" });
             return;
         }
         
@@ -47,13 +50,11 @@ export default function SettingsPage() {
 
         setIsUpdating(true);
         try {
-            // Check if the new email is already taken by another user
             if (email !== user.email) {
                 const usersRef = collection(db, "users");
                 const q = query(usersRef, where("email", "==", email));
                 const querySnapshot = await getDocs(q);
                 
-                // Ensure we are not matching the current user's document
                 const isTaken = querySnapshot.docs.some(doc => doc.id !== user.docId);
 
                 if (isTaken) {
@@ -69,7 +70,6 @@ export default function SettingsPage() {
                 email: email,
             });
 
-            // Update the user state in the auth context
             const updatedUser = { ...user, displayName, email };
             manualLogin(updatedUser);
 
@@ -101,15 +101,23 @@ export default function SettingsPage() {
                 <CardTitle>{t.teacherSettings.account.title}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+                 {isMockUser && (
+                    <Alert>
+                        <Info className="h-4 w-4" />
+                        <AlertDescription>
+                            현재 목업 계정으로 로그인되어 있습니다. 목업 계정의 프로필 정보는 수정할 수 없습니다.
+                        </AlertDescription>
+                    </Alert>
+                )}
                 <div className="grid gap-2">
                     <Label htmlFor="name">{t.teacherSettings.account.nameLabel}</Label>
-                    <Input id="name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
+                    <Input id="name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} readOnly={isMockUser} />
                 </div>
                 <div className="grid gap-2">
                     <Label htmlFor="email">{t.teacherSettings.account.emailLabel}</Label>
-                    <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+                    <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} readOnly={isMockUser} />
                 </div>
-                 <Button onClick={handleUpdateProfile} disabled={isUpdating}>
+                 <Button onClick={handleUpdateProfile} disabled={isUpdating || isMockUser}>
                     {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
                     {t.teacherSettings.account.updateButton}
                  </Button>
