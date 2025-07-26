@@ -28,6 +28,8 @@ export function VadConversationTool() {
   const scrollViewportRef = useRef<HTMLDivElement | null>(null);
   
   const { toast } = useToast();
+
+  const finalTranscriptRef = useRef("");
   
   const cleanup = useCallback(() => {
     if (speechEndTimerRef.current) {
@@ -41,9 +43,12 @@ export function VadConversationTool() {
         recognitionRef.current.stop();
         recognitionRef.current = null;
     }
+    finalTranscriptRef.current = "";
+    setInterimTranscript("");
   }, []);
 
   const processFinalTranscript = useCallback(async (transcript: string) => {
+    cleanup();
     if (!transcript.trim()) {
         if(sessionState === 'listening') {
             startListening(); 
@@ -54,7 +59,6 @@ export function VadConversationTool() {
     setSessionState("processing");
     const newHistory = [...conversation, {role: 'user', text: transcript}];
     setConversation(newHistory);
-    setInterimTranscript("");
     
     try {
         const { aiResponseText, aiResponseAudioDataUri } = await converseWithNativeTeacher({
@@ -79,10 +83,12 @@ export function VadConversationTool() {
         toast({ title: "AI 처리 오류", variant: "destructive" });
         startListening();
     }
-  }, [conversation, sessionState]);
-  
+  }, [conversation, cleanup]);
+
   const startListening = useCallback(() => {
     setSessionState("listening");
+    finalTranscriptRef.current = "";
+    setInterimTranscript("");
     
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
@@ -99,31 +105,28 @@ export function VadConversationTool() {
         recognition.continuous = true;
         recognition.interimResults = true;
         recognition.lang = 'en-US';
-        
+
         const resetTimer = () => {
-            if(speechEndTimerRef.current) clearTimeout(speechEndTimerRef.current);
+            if (speechEndTimerRef.current) clearTimeout(speechEndTimerRef.current);
             speechEndTimerRef.current = setTimeout(() => {
-                if (recognitionRef.current) {
-                     recognitionRef.current.stop();
-                     // When timer expires, it means user stopped talking.
-                     processFinalTranscript(interimTranscript);
-                }
+                const finalTranscript = finalTranscriptRef.current.trim();
+                processFinalTranscript(finalTranscript);
             }, SPEECH_END_TIMEOUT_MS);
         };
 
         recognition.onresult = (event) => {
-            let tempInterim = "";
+            let currentInterim = "";
             for (let i = event.resultIndex; i < event.results.length; ++i) {
-                if (event.results[i][0].transcript) {
-                    tempInterim += event.results[i][0].transcript;
+                if (event.results[i].isFinal) {
+                    finalTranscriptRef.current += event.results[i][0].transcript;
+                } else {
+                    currentInterim += event.results[i][0].transcript;
                 }
             }
-            if(tempInterim.trim()){
-              setInterimTranscript(tempInterim);
-              resetTimer();
-            }
+            setInterimTranscript(finalTranscriptRef.current + currentInterim);
+            resetTimer();
         };
-        
+
         recognition.onend = () => {
             if (speechEndTimerRef.current) {
                 clearTimeout(speechEndTimerRef.current);
@@ -138,13 +141,13 @@ export function VadConversationTool() {
         };
         
         recognition.start();
-        resetTimer(); // Start timer initially
+        resetTimer();
 
     } catch (err) {
         toast({ title: "마이크 오류", description: "마이크에 접근할 수 없습니다.", variant: "destructive" });
         setSessionState("idle");
     }
-  }, [toast, cleanup, interimTranscript, processFinalTranscript]);
+  }, [toast, cleanup, processFinalTranscript]);
 
   useEffect(() => {
     return () => {
@@ -190,10 +193,6 @@ export function VadConversationTool() {
   const handleStopConversation = () => {
     setSessionState("ending");
     cleanup();
-    if(interimTranscript.trim()){
-         setConversation(prev => [...prev, {role: 'user', text: interimTranscript.trim()}]);
-    }
-    setInterimTranscript("");
     setSessionState("finished");
     toast({ title: "대화 종료됨" });
   }
