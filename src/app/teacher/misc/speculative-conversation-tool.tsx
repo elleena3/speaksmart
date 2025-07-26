@@ -3,7 +3,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { Mic, Bot, User, Play, Volume2, BrainCircuit, Loader2, StopCircle, RefreshCw, CheckCircle2 } from "lucide-react";
+import { Mic, Bot, User, Play, Volume2, BrainCircuit, Loader2, StopCircle, RefreshCw, CheckCircle2, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { type ConversationTurn } from "@/lib/types/ai-schemas";
@@ -21,8 +21,10 @@ type TurnWithAnimation = ConversationTurn & { justUpdated?: boolean; id?: number
 export function SpeculativeConversationTool() {
   const [sessionState, setSessionState] = useState<SessionState>("idle");
   const [conversation, setConversation] = useState<TurnWithAnimation[]>([]);
+  const [sessionBlob, setSessionBlob] = useState<Blob | null>(null);
 
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const mainRecorderRef = useRef<MediaRecorder | null>(null);
+  const turnRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
   const scrollViewportRef = useRef<HTMLDivElement | null>(null);
@@ -38,9 +40,11 @@ export function SpeculativeConversationTool() {
 
   const cleanup = useCallback(() => {
     if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-        mediaRecorderRef.current.stop();
-    }
+    [mainRecorderRef, turnRecorderRef].forEach(ref => {
+        if (ref.current && ref.current.state === 'recording') {
+            ref.current.stop();
+        }
+    });
     if (speechRecognitionRef.current) {
         speechRecognitionRef.current.onresult = null;
         speechRecognitionRef.current.onend = null;
@@ -107,7 +111,11 @@ export function SpeculativeConversationTool() {
 
   const startListeningVAD = useCallback(() => {
     setSessionState("listening");
-    cleanup();
+    finalTranscriptRef.current = "";
+    interimTranscriptRef.current = "";
+    if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+    if (speechRecognitionRef.current) speechRecognitionRef.current.stop();
+    if (turnRecorderRef.current?.state === 'recording') turnRecorderRef.current.stop();
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
@@ -118,13 +126,13 @@ export function SpeculativeConversationTool() {
 
     try {
         navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
-            mediaRecorderRef.current = new MediaRecorder(stream, { mimeType, audioBitsPerSecond: 16000 });
+            turnRecorderRef.current = new MediaRecorder(stream, { mimeType, audioBitsPerSecond: 16000 });
             audioChunksRef.current = [];
 
-            mediaRecorderRef.current.ondataavailable = (event) => {
+            turnRecorderRef.current.ondataavailable = (event) => {
                 if (event.data.size > 0) audioChunksRef.current.push(event.data);
             };
-            mediaRecorderRef.current.onstop = () => {
+            turnRecorderRef.current.onstop = () => {
                 const fullAudioBlob = new Blob(audioChunksRef.current, { type: mimeType });
                 const currentSessionState = (window as any)._sessionState;
                 if (fullAudioBlob.size > 1000 && currentSessionState === 'listening') {
@@ -132,7 +140,7 @@ export function SpeculativeConversationTool() {
                 }
                 stream.getTracks().forEach(track => track.stop());
             };
-            mediaRecorderRef.current.start(200);
+            turnRecorderRef.current.start(200);
 
             const recognition = new SpeechRecognition();
             speechRecognitionRef.current = recognition;
@@ -142,7 +150,7 @@ export function SpeculativeConversationTool() {
 
             const stopAll = () => {
                 if (speechRecognitionRef.current) speechRecognitionRef.current.stop();
-                if (mediaRecorderRef.current?.state === 'recording') mediaRecorderRef.current.stop();
+                if (turnRecorderRef.current?.state === 'recording') turnRecorderRef.current.stop();
             }
 
             const resetSilenceTimer = () => {
@@ -182,9 +190,10 @@ export function SpeculativeConversationTool() {
             };
 
             recognition.onend = () => {
-                if (mediaRecorderRef.current?.state === 'recording') {
-                     mediaRecorderRef.current.stop();
+                if (turnRecorderRef.current?.state === 'recording') {
+                     turnRecorderRef.current.stop();
                 }
+                 speechStartTimeRef.current = null;
             }
 
             recognition.onerror = (event) => {
@@ -204,7 +213,7 @@ export function SpeculativeConversationTool() {
         toast({ title: "음성 인식 시작 오류", variant: "destructive" });
         setSessionState("idle");
     }
-  }, [cleanup, processAudio, toast]);
+  }, [processAudio, toast]);
 
   useEffect(() => {
       (window as any)._startListeningVAD = startListeningVAD;
@@ -225,7 +234,37 @@ export function SpeculativeConversationTool() {
   const startConversation = async () => {
     setConversation([]);
     setSessionState("initializing");
+    setSessionBlob(null);
+
     try {
+      const userStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const audioContext = new AudioContext();
+      const destination = audioContext.createMediaStreamDestination();
+      const micSource = audioContext.createMediaStreamSource(userStream);
+      micSource.connect(destination);
+
+      if (audioPlayerRef.current) {
+        const audioSource = audioContext.createMediaElementSource(audioPlayerRef.current);
+        audioSource.connect(destination);
+        audioSource.connect(audioContext.destination);
+      }
+      
+      mainRecorderRef.current = new MediaRecorder(destination.stream, { mimeType });
+      const mainChunks: Blob[] = [];
+      
+      mainRecorderRef.current.ondataavailable = e => mainChunks.push(e.data);
+      
+      mainRecorderRef.current.onstop = () => {
+          setSessionBlob(new Blob(mainChunks, { type: mimeType }));
+          userStream.getTracks().forEach(t => t.stop());
+          destination.stream.getTracks().forEach(t => t.stop());
+          audioContext.close().catch(e => console.warn("Audio context close failed", e));
+      };
+
+      mainRecorderRef.current.start();
+      toast({ title: "전체 대화 녹음 시작됨" });
+
+
       const { aiResponseText, aiResponseAudioDataUri } = await converseWithSpeculativeTeacher({ isInitialGreeting: true, conversationHistory: [] });
       setConversation([{ role: 'model', text: aiResponseText }]);
       setSessionState("speaking");
@@ -252,6 +291,7 @@ export function SpeculativeConversationTool() {
   const handleReset = () => {
     setSessionState("idle");
     setConversation([]);
+    setSessionBlob(null);
     cleanup();
   }
 
@@ -264,7 +304,20 @@ export function SpeculativeConversationTool() {
   const getButtonState = () => {
     switch(sessionState) {
         case 'idle': return <Button size="lg" onClick={startConversation} className="w-full"><Play className="mr-2"/>대화 시작</Button>;
-        case 'finished': return <Button size="lg" onClick={handleReset} variant="outline" className="w-full"><RefreshCw className="mr-2"/>새로 시작</Button>;
+        case 'finished': 
+            return (
+                <div className="flex gap-2">
+                    {sessionBlob && (
+                        <a href={URL.createObjectURL(sessionBlob)} download={`conversation-${new Date().toISOString()}.webm`}>
+                            <Button size="lg" className="w-full">
+                                <Download className="mr-2 h-5 w-5" />
+                                전체 대화 녹음 다운로드
+                            </Button>
+                        </a>
+                    )}
+                    <Button size="lg" onClick={handleReset} variant="outline" className="w-full"><RefreshCw className="mr-2"/>새로 시작</Button>
+                </div>
+            );
         default: return <Button size="lg" onClick={handleStopConversation} variant="destructive" className="w-full" disabled={sessionState==='ending' || sessionState==='initializing' || sessionState==='processing'}><StopCircle className="mr-2"/>대화 종료</Button>
     }
   }
@@ -288,14 +341,16 @@ export function SpeculativeConversationTool() {
             {sessionState === "idle" && (
               <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground pt-12">
                   <BrainCircuit className="h-12 w-12 mb-4 text-purple-500"/>
-                  <p className="font-semibold">'대화 시작'을 누르면 자동으로 대화가 진행됩니다.</p>
+                  <p className="font-semibold">'대화 시작'을 누르면 AI와 사용자의 모든 음성이 녹음됩니다.</p>
                   <p className="text-sm">침묵이 감지되면 자동으로 턴이 넘어갑니다.</p>
               </div>
             )}
             {sessionState === "finished" && (
               <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground pt-8">
                   <CheckCircle2 className="h-12 w-12 mb-4 text-green-500"/>
-                  <p className="font-semibold">대화가 종료되었습니다.</p>
+                  <p className="font-semibold">대화가 종료 및 녹음 완료되었습니다.</p>
+                  <p className="text-sm">아래에서 전체 대화 녹음 파일을 재생하거나 다운로드하세요.</p>
+                   {sessionBlob && <audio src={URL.createObjectURL(sessionBlob)} controls className="mt-4 w-full max-w-sm"></audio>}
               </div>
             )}
             {sessionState === "initializing" && (
@@ -339,7 +394,7 @@ export function SpeculativeConversationTool() {
         </div>
       </div>
 
-      <audio ref={audioPlayerRef} onEnded={handleAudioEnded} className="hidden" />
+      <audio ref={audioPlayerRef} onEnded={handleAudioEnded} crossOrigin="anonymous" className="hidden" />
     </div>
   );
 }
