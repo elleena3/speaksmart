@@ -12,7 +12,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
 export default function SettingsPage() {
@@ -22,6 +22,7 @@ export default function SettingsPage() {
     const { toast } = useToast();
 
     const [displayName, setDisplayName] = useState(user?.displayName || '');
+    const [email, setEmail] = useState(user?.email || '');
     const [isUpdating, setIsUpdating] = useState(false);
 
     useEffect(() => {
@@ -29,24 +30,38 @@ export default function SettingsPage() {
             router.push('/');
         } else if (user) {
             setDisplayName(user.displayName);
+            setEmail(user.email);
         }
     }, [user, loading, router]);
 
     const handleUpdateProfile = async () => {
-        if (!user || !user.docId || !displayName.trim()) {
-            toast({ title: "오류", description: "사용자 정보가 올바르지 않거나 이름이 비어있습니다.", variant: "destructive" });
+        if (!user || !user.docId || !displayName.trim() || !email.trim()) {
+            toast({ title: "오류", description: "이름과 이메일은 비워둘 수 없습니다.", variant: "destructive" });
             return;
         }
 
         setIsUpdating(true);
         try {
+            // Check if the new email is already taken by another user
+            if (email !== user.email) {
+                const usersRef = collection(db, "users");
+                const q = query(usersRef, where("email", "==", email));
+                const querySnapshot = await getDocs(q);
+                if (!querySnapshot.empty) {
+                    toast({ title: "오류", description: "이미 사용 중인 이메일입니다.", variant: "destructive" });
+                    setIsUpdating(false);
+                    return;
+                }
+            }
+
             const userRef = doc(db, "users", user.docId);
             await updateDoc(userRef, {
                 displayName: displayName,
+                email: email,
             });
 
             // Update the user state in the auth context
-            const updatedUser = { ...user, displayName: displayName };
+            const updatedUser = { ...user, displayName, email };
             manualLogin(updatedUser);
 
             toast({ title: "성공", description: "프로필이 성공적으로 업데이트되었습니다." });
@@ -83,7 +98,7 @@ export default function SettingsPage() {
                 </div>
                 <div className="grid gap-2">
                     <Label htmlFor="email">{t.teacherSettings.account.emailLabel}</Label>
-                    <Input id="email" type="email" defaultValue={user.email || ''} readOnly />
+                    <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
                 </div>
                  <Button onClick={handleUpdateProfile} disabled={isUpdating}>
                     {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
