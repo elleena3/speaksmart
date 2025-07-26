@@ -20,11 +20,16 @@ export function VadConversationTool() {
   const [sessionState, setSessionState] = useState<SessionState>("idle");
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
   const [interimTranscript, setInterimTranscript] = useState<string>("");
+  const [silenceThreshold, setSilenceThreshold] = useState(0.01);
   
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const speechEndTimerRef = useRef<NodeJS.Timeout | null>(null);
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
   const finalTranscriptToProcessRef = useRef<string>("");
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const audioStreamRef = useRef<MediaStream | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
 
   const scrollAreaRef = useRef<HTMLDivElement | null>(null);
   
@@ -41,6 +46,18 @@ export function VadConversationTool() {
         recognitionRef.current.onerror = null;
         recognitionRef.current.stop();
         recognitionRef.current = null;
+    }
+    if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+    }
+    if (audioStreamRef.current) {
+        audioStreamRef.current.getTracks().forEach(track => track.stop());
+        audioStreamRef.current = null;
+    }
+    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+        audioContextRef.current.close().catch(console.error);
+        audioContextRef.current = null;
     }
   }, []);
 
@@ -65,7 +82,7 @@ export function VadConversationTool() {
 
   const processFinalTranscript = useCallback(async (transcript: string) => {
     if (!transcript.trim()) {
-        if (sessionState !== 'ending') {
+        if (sessionState === 'listening') {
           startListening();
         }
         return;
@@ -96,7 +113,7 @@ export function VadConversationTool() {
     }
   }, [conversation, sessionState]);
 
-  const startListening = useCallback(() => {
+  const startListening = useCallback(async () => {
     if (['ending', 'finished', 'processing', 'speaking', 'initializing'].includes(sessionState)) return;
     setSessionState("listening");
     finalTranscriptToProcessRef.current = "";
@@ -110,62 +127,84 @@ export function VadConversationTool() {
     
     cleanup();
 
-    recognitionRef.current = new SpeechRecognition();
-    recognitionRef.current.continuous = true;
-    recognitionRef.current.interimResults = true;
-    recognitionRef.current.lang = 'en-US';
-    
-    const resetTimer = () => {
-        if(speechEndTimerRef.current) clearTimeout(speechEndTimerRef.current);
-        speechEndTimerRef.current = setTimeout(() => {
-            if (recognitionRef.current && sessionState === 'listening') {
-                 recognitionRef.current.stop();
-            }
-        }, SPEECH_END_TIMEOUT_MS);
-    };
+    try {
+        audioStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioContextRef.current = new AudioContext();
+        analyserRef.current = audioContextRef.current.createAnalyser();
+        const source = audioContextRef.current.createMediaStreamSource(audioStreamRef.current);
+        source.connect(analyserRef.current);
 
-    recognitionRef.current.onresult = (event) => {
-        let currentInterim = "";
-        let hasNewText = false;
-        let finalTranscriptSinceLastResult = "";
-
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-            const transcript = event.results[i][0].transcript;
-             if (event.results[i].isFinal) {
-                finalTranscriptSinceLastResult += transcript + ' ';
-            } else {
-                currentInterim += transcript;
-            }
-        }
+        recognitionRef.current = new SpeechRecognition();
+        recognitionRef.current.continuous = true;
+        recognitionRef.current.interimResults = true;
+        recognitionRef.current.lang = 'en-US';
         
-        finalTranscriptToProcessRef.current = (finalTranscriptToProcessRef.current.trim() + ' ' + finalTranscriptSinceLastResult.trim()).trim();
-        setInterimTranscript(finalTranscriptToProcessRef.current + " " + currentInterim);
+        const resetTimer = () => {
+            if(speechEndTimerRef.current) clearTimeout(speechEndTimerRef.current);
+            speechEndTimerRef.current = setTimeout(() => {
+                if (recognitionRef.current && sessionState === 'listening') {
+                     recognitionRef.current.stop();
+                }
+            }, SPEECH_END_TIMEOUT_MS);
+        };
 
-        if (finalTranscriptSinceLastResult.trim() || currentInterim.trim()) {
-            hasNewText = true;
-        }
+        recognitionRef.current.onresult = (event) => {
+            let currentInterim = "";
+            let finalTranscriptSinceLastResult = "";
 
-        if(hasNewText) {
-          resetTimer();
-        }
-    };
-    
-    recognitionRef.current.onend = () => {
-        const finalTranscript = (finalTranscriptToProcessRef.current + " " + interimTranscript).trim();
-        processFinalTranscript(finalTranscript);
-    };
+            for (let i = event.resultIndex; i < event.results.length; ++i) {
+                const transcript = event.results[i][0].transcript;
+                 if (event.results[i].isFinal) {
+                    finalTranscriptSinceLastResult += transcript + ' ';
+                } else {
+                    currentInterim += transcript;
+                }
+            }
+            
+            finalTranscriptToProcessRef.current = (finalTranscriptToProcessRef.current.trim() + ' ' + finalTranscriptSinceLastResult.trim()).trim();
+            setInterimTranscript(finalTranscriptToProcessRef.current + " " + currentInterim);
+        };
+        
+        recognitionRef.current.onend = () => {
+            cleanup();
+            processFinalTranscript((finalTranscriptToProcessRef.current).trim());
+        };
 
-    recognitionRef.current.onerror = (event) => {
-        console.error("SpeechRecognition error", event.error);
-        if (event.error !== 'no-speech' && event.error !== 'aborted') {
-            toast({title: "음성 인식 오류", description: `오류가 발생했습니다: ${event.error}`, variant: "destructive"});
-        }
-    };
-    
-    recognitionRef.current.start();
-    resetTimer();
+        recognitionRef.current.onerror = (event) => {
+            console.error("SpeechRecognition error", event.error);
+            if (event.error !== 'no-speech' && event.error !== 'aborted') {
+                toast({title: "음성 인식 오류", description: `오류가 발생했습니다: ${event.error}`, variant: "destructive"});
+            }
+        };
+        
+        const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
+        const checkForSilence = () => {
+            if (!analyserRef.current) return;
+            analyserRef.current.getByteTimeDomainData(dataArray);
+            let sum = 0;
+            for (let i = 0; i < dataArray.length; i++) {
+                sum += (dataArray[i] - 128) * (dataArray[i] - 128);
+            }
+            const rms = Math.sqrt(sum / dataArray.length) / 128;
+            
+            // If there's new text, always reset timer. Otherwise, only reset if sound is detected.
+            const hasNewText = interimTranscript !== (finalTranscriptToProcessRef.current + " " + "");
+            if (hasNewText || rms > silenceThreshold) {
+                resetTimer();
+            }
 
-  }, [sessionState, toast, processFinalTranscript, cleanup, interimTranscript]);
+            animationFrameRef.current = requestAnimationFrame(checkForSilence);
+        };
+
+        recognitionRef.current.start();
+        checkForSilence();
+
+    } catch (err) {
+        toast({ title: "마이크 오류", description: "마이크에 접근할 수 없습니다.", variant: "destructive" });
+        setSessionState("idle");
+    }
+
+  }, [sessionState, toast, cleanup, silenceThreshold, processFinalTranscript, interimTranscript]);
 
   const startConversation = async () => {
     setConversation([]);
@@ -189,14 +228,10 @@ export function VadConversationTool() {
   };
 
   const handleStopConversation = () => {
-    setSessionState("ending");
     cleanup();
-    
-    const finalTranscript = interimTranscript.trim();
-    if(finalTranscript) {
-      setConversation(prev => [...prev, {role: 'user', text: finalTranscript}]);
+    if (finalTranscriptToProcessRef.current.trim()) {
+      setConversation(prev => [...prev, {role: 'user', text: finalTranscriptToProcessRef.current.trim()}]);
     }
-    
     setInterimTranscript("");
     setSessionState("finished");
     toast({ title: "대화 종료됨" });
@@ -276,6 +311,18 @@ export function VadConversationTool() {
       </ScrollArea>
       
       <div className="flex flex-col gap-4">
+        <div className="space-y-2">
+            <Label htmlFor="sensitivity">마이크 민감도 (낮음 &lt;-&gt; 높음)</Label>
+            <Slider
+                id="sensitivity"
+                min={0.005}
+                max={0.05}
+                step={0.001}
+                value={[silenceThreshold]}
+                onValueChange={(value) => setSilenceThreshold(value[0])}
+                disabled={sessionState !== 'idle' && sessionState !== 'finished'}
+            />
+        </div>
         {getButtonState()}
         {sessionState !== 'idle' && sessionState !== 'finished' && (
             <p className={cn("text-xs text-center", sessionState === 'listening' ? "text-blue-600 font-semibold" : "text-muted-foreground")}>
@@ -288,3 +335,4 @@ export function VadConversationTool() {
     </div>
   );
 }
+
