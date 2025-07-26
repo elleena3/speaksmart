@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useRouter } from "next/navigation";
@@ -15,6 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, CalendarIcon, ChevronsUpDown, Check, Info, Users, TestTube2 } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -30,6 +32,46 @@ import { db } from "@/lib/firebase";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Separator } from "@/components/ui/separator";
 
+function FilterCombobox({ label, options, value, onSelect }: { label: string, options: string[], value: string, onSelect: (value: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const displayValue = value === 'all' ? `모든 ${label}` : `${value}${label.endsWith('반') ? '반' : '학년'}`;
+  
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" role="combobox" aria-expanded={open} className="w-[120px] justify-between text-xs h-8">
+          {displayValue}
+          <ChevronsUpDown className="ml-2 h-3 w-3 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[120px] p-0">
+        <Command>
+          <CommandInput placeholder={`${label} 검색...`} />
+          <CommandList>
+            <CommandEmpty>결과 없음.</CommandEmpty>
+            <CommandGroup>
+              {options.map(option => (
+                <CommandItem
+                  key={option}
+                  value={option}
+                  onSelect={(currentValue) => {
+                    onSelect(currentValue === value ? value : currentValue);
+                    setOpen(false);
+                  }}
+                >
+                  <Check className={`mr-2 h-4 w-4 ${value === option ? 'opacity-100' : 'opacity-0'}`} />
+                  {option === 'all' ? `모든 ${label}` : option}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+
 export default function NewAssessmentPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
@@ -41,6 +83,7 @@ export default function NewAssessmentPage() {
   const [formData, setFormData] = useState<z.infer<typeof formSchema> | null>(null);
   const [registeredStudents, setRegisteredStudents] = useState<UserData[]>([]);
   const [isLoadingStudents, setIsLoadingStudents] = useState(true);
+  const [studentFilter, setStudentFilter] = useState<{ grade: string, class: string }>({ grade: 'all', class: 'all' });
 
   const formSchema = useMemo(() => z.object({
     title: z.string().optional(),
@@ -129,6 +172,22 @@ export default function NewAssessmentPage() {
   useEffect(() => {
     form.trigger();
   }, [language, form]);
+
+  const uniqueGrades = useMemo(() => ['all', ...Array.from(new Set(registeredStudents.map(s => s.grade).filter(Boolean)))], [registeredStudents]);
+  const uniqueClasses = useMemo(() => {
+    const classes = studentFilter.grade === 'all' 
+      ? registeredStudents 
+      : registeredStudents.filter(s => s.grade === studentFilter.grade);
+    return ['all', ...Array.from(new Set(classes.map(s => s.class).filter(Boolean)))];
+  }, [registeredStudents, studentFilter.grade]);
+
+  const filteredRegisteredStudents = useMemo(() => {
+    return registeredStudents.filter(student => {
+      const gradeMatch = studentFilter.grade === 'all' || student.grade === studentFilter.grade;
+      const classMatch = studentFilter.class === 'all' || student.class === studentFilter.class;
+      return gradeMatch && classMatch;
+    });
+  }, [registeredStudents, studentFilter]);
 
   const proceedToSubmit = async (values: z.infer<typeof formSchema>) => {
     if (!user) return;
@@ -480,27 +539,31 @@ export default function NewAssessmentPage() {
                                         <Users className="h-5 w-5 text-green-600"/>
                                         <CardTitle className="text-base">가입한 학생</CardTitle>
                                     </div>
-                                    <div className="flex items-center space-x-2">
-                                        <Label htmlFor="select-all-registered">전체 선택</Label>
-                                        <Checkbox
-                                            id="select-all-registered"
-                                            onCheckedChange={(checked) => {
-                                                const currentIds = form.getValues("targetStudentIds") || [];
-                                                const registeredIds = registeredStudents.map(s => s.uid);
-                                                if (checked) {
-                                                    form.setValue("targetStudentIds", [...new Set([...currentIds, ...registeredIds])]);
-                                                } else {
-                                                    form.setValue("targetStudentIds", currentIds.filter(id => !registeredIds.includes(id)));
-                                                }
-                                            }}
-                                            checked={registeredStudents.length > 0 && registeredStudents.every(s => form.getValues("targetStudentIds")?.includes(s.uid))}
-                                            disabled={registeredStudents.length === 0}
-                                        />
+                                    <div className="flex items-center gap-2">
+                                        <FilterCombobox label="학년" options={uniqueGrades} value={studentFilter.grade} onSelect={(value) => setStudentFilter({ grade: value, class: 'all' })} />
+                                        <FilterCombobox label="반" options={uniqueClasses} value={studentFilter.class} onSelect={(value) => setStudentFilter(prev => ({ ...prev, class: value }))} />
+                                        <div className="flex items-center space-x-2 pl-2">
+                                            <Label htmlFor="select-all-registered">전체 선택</Label>
+                                            <Checkbox
+                                                id="select-all-registered"
+                                                onCheckedChange={(checked) => {
+                                                    const currentIds = form.getValues("targetStudentIds") || [];
+                                                    const filteredIds = filteredRegisteredStudents.map(s => s.uid);
+                                                    if (checked) {
+                                                        form.setValue("targetStudentIds", [...new Set([...currentIds, ...filteredIds])]);
+                                                    } else {
+                                                        form.setValue("targetStudentIds", currentIds.filter(id => !filteredIds.includes(id)));
+                                                    }
+                                                }}
+                                                checked={filteredRegisteredStudents.length > 0 && filteredRegisteredStudents.every(s => form.getValues("targetStudentIds")?.includes(s.uid))}
+                                                disabled={filteredRegisteredStudents.length === 0}
+                                            />
+                                        </div>
                                     </div>
                                 </CardHeader>
                                 <Separator />
-                                <CardContent className="p-4 grid grid-cols-2 md:grid-cols-3 gap-2">
-                                    {registeredStudents.length > 0 ? registeredStudents.map((item) => (
+                                <CardContent className="p-4 grid grid-cols-2 md:grid-cols-3 gap-2 min-h-[100px]">
+                                    {filteredRegisteredStudents.length > 0 ? filteredRegisteredStudents.map((item) => (
                                         <FormField
                                             key={item.uid}
                                             control={form.control}
@@ -522,7 +585,7 @@ export default function NewAssessmentPage() {
                                                 </FormItem>
                                             )}
                                         />
-                                    )) : <p className="text-sm text-muted-foreground col-span-full text-center">가입한 학생이 없습니다.</p>}
+                                    )) : <p className="text-sm text-muted-foreground col-span-full text-center py-8">해당 학년/반에 가입한 학생이 없습니다.</p>}
                                 </CardContent>
                             </Card>
                         </div>
@@ -811,5 +874,7 @@ export default function NewAssessmentPage() {
     </Card>
   );
 }
+
+    
 
     
