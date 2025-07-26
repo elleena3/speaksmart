@@ -9,9 +9,9 @@ import { type UserData } from '@/lib/types';
 const mockTeacher: UserData = {
     uid: 'teacher-mock-uid',
     docId: 'teacher-mock-uid',
-    displayName: '김선생',
+    displayName: 'Great Teacher',
     email: 'teacher@example.com',
-    photoURL: `https://placehold.co/40x40.png?text=김`,
+    photoURL: `https://placehold.co/40x40.png?text=G`,
     role: 'teacher',
     createdAt: Date.now(),
     isMock: true, // Flag to identify mock users
