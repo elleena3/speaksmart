@@ -44,12 +44,6 @@ export type UserData = {
     displayName: string;
     photoURL: string;
     role: 'student' | 'teacher';
-    grade?: string;
-    class?: string;
-    number?: string;
-    password?: string; // Storing password in plaintext for simplicity as requested.
-    createdAt: number;
-    docId: string; // Firestore document ID
     isMock?: boolean; // To identify mock users
 };
 
@@ -119,13 +113,6 @@ export type RubricScores = {
     interaction?: number; // Optional for monologue
 };
 
-export type HistoricalScore = {
-    attempt: number;
-    contentScore: number;
-    pronunciationScore: number;
-    rubricScores?: RubricScores;
-};
-
 export type StudentResult = {
   id: string; // Firestore document ID
   studentId: string; // Student's UID
@@ -149,11 +136,4 @@ export type StudentResult = {
   contentScore: number;
   curricularRemarks: string;
   rubricScores?: RubricScores;
-  // New fields for cached growth feedback
-  growthFeedback?: string;
-  growthTeacherGuidance?: string;
-  growthCurricularRemarks?: string;
-  growthFeedbackForAttempts?: number;
-  // New field for cached chart data
-  historicalScores?: HistoricalScore[];
 }

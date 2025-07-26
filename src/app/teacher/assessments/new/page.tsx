@@ -9,13 +9,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, CalendarIcon, ChevronsUpDown, Check, Info, Users, Type, Image as ImageIcon, LayoutGrid, Wand2, Upload, BookOpen, Copy } from "lucide-react";
+import { Loader2, CalendarIcon, ChevronsUpDown, Check, Info, Type, Image as ImageIcon, LayoutGrid, Wand2, Copy } from "lucide-react";
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -30,63 +28,23 @@ import { addDoc, collection, getDocs, query, where } from "firebase/firestore";
 import { db, storage } from "@/lib/firebase";
 import { ref, uploadString, getDownloadURL } from "firebase/storage";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Separator } from "@/components/ui/separator";
 import { generateImage } from "@/ai/flows/generate-image-flow";
 import Image from 'next/image';
-
-function FilterCombobox({ label, options, value, onSelect }: { label: string, options: string[], value: string, onSelect: (value: string) => void }) {
-  const [open, setOpen] = useState(false);
-  const displayValue = value === 'all' ? `모든 ${label}` : `${value}${label.endsWith('반') ? '반' : '학년'}`;
-  
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button variant="outline" role="combobox" aria-expanded={open} className="w-[120px] justify-between text-xs h-8">
-          {displayValue}
-          <ChevronsUpDown className="ml-2 h-3 w-3 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-[120px] p-0">
-        <Command>
-          <CommandInput placeholder={`${label} 검색...`} />
-          <CommandList>
-            <CommandEmpty>결과 없음.</CommandEmpty>
-            <CommandGroup>
-              {options.map(option => (
-                <CommandItem
-                  key={option}
-                  value={option}
-                  onSelect={(currentValue) => {
-                    onSelect(currentValue === value ? value : currentValue);
-                    setOpen(false);
-                  }}
-                >
-                  <Check className={`mr-2 h-4 w-4 ${value === option ? 'opacity-100' : 'opacity-0'}`} />
-                  {option === 'all' ? `모든 ${label}` : option}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
-  );
-}
 
 const promptExamples = [
   {
     prompt: "공원 벤치에 앉아 책을 읽고 있는 할머니, 따뜻한 색감의 수채화 스타일",
-    image: "https://firebasestorage.googleapis.com/v0/b/speaksmart-evaluator2.firebasestorage.app/o/image%2FGemini_Generated_Image_tegrq6teg.png?alt=media&token=def04b4c-2d30-4194-9e40-871caf273954",
+    image: "https://firebasestorage.googleapis.com/v0/b/speaksmart-evaluator2.appspot.com/o/image%2FGemini_Generated_Image_tegrq6teg.png?alt=media&token=def04b4c-2d30-4194-9e40-871caf273954",
     hint: "grandmother reading park",
   },
   {
     prompt: "로켓을 타고 달로 날아가는 우주비행사, 뒤에는 지구가 보인다, 단순한 만화 스타일",
-    image: "https://firebasestorage.googleapis.com/v0/b/speaksmart-evaluator2.firebasestorage.app/o/image%2FGemini_Generated_Image_unh72munh.png?alt=media&token=8bd0265c-3afe-46e5-80d0-d8d8fbe748b2",
+    image: "https://firebasestorage.googleapis.com/v0/b/speaksmart-evaluator2.appspot.com/o/image%2FGemini_Generated_Image_unh72munh.png?alt=media&token=8bd0265c-3afe-46e5-80d0-d8d8fbe748b2",
     hint: "astronaut rocket moon",
   },
   {
     prompt: "산 정상에서 일출을 보고 있는 등산객의 뒷모습, 장엄한 풍경, 사실적인 사진 스타일",
-    image: "https://firebasestorage.googleapis.com/v0/b/speaksmart-evaluator2.firebasestorage.app/o/image%2FGemini_Generated_Image_96vqrp96v.png?alt=media&token=1e48e934-2bc5-4e29-b199-9f8e96b2c2eb",
+    image: "https://firebasestorage.googleapis.com/v0/b/speaksmart-evaluator2.appspot.com/o/image%2FGemini_Generated_Image_96vqrp96v.png?alt=media&token=1e48e934-2bc5-4e29-b199-9f8e96b2c2eb",
     hint: "hiker sunrise mountain",
   },
 ];
@@ -101,9 +59,6 @@ export default function NewAssessmentPage() {
   const [voicePopoverOpen, setVoicePopoverOpen] = useState(false);
   const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
   const [formData, setFormData] = useState<z.infer<typeof formSchema> | null>(null);
-  const [registeredStudents, setRegisteredStudents] = useState<UserData[]>([]);
-  const [isLoadingStudents, setIsLoadingStudents] = useState(true);
-  const [studentFilter, setStudentFilter] = useState<{ grade: string, class: string }>({ grade: 'all', class: 'all' });
   
   const [imagePrompt, setImagePrompt] = useState("");
   const [generatedImageDataUri, setGeneratedImageDataUri] = useState<string | null>(null);
@@ -119,16 +74,16 @@ export default function NewAssessmentPage() {
     assessmentType: z.enum(["monologue", "dialogue"]),
     monologueType: z.enum(monologueTypes).optional(),
     targetType: z.enum(["all", "specific"]).default("all"),
-    targetStudentIds: z.array(z.string()).optional(),
+    targetStudentIds: z.union([z.literal('all'), z.array(z.string())]),
     scenario: z.enum(scenarios).optional(),
     recordingTimeLimit: z.coerce.number().int().min(0).optional(),
     aiVoice: z.enum(allVoices).optional().default('algenib'),
     evaluationModel: z.enum(evaluationModels).optional().default('gemini-2.5-pro'),
     useRubric: z.boolean().default(false),
   }).superRefine((data, ctx) => {
-    const isFreeTalk = data.assessmentType === 'dialogue' && data.scenario === 'free-talk';
+    const isFreeTalkDialogue = data.assessmentType === 'dialogue' && data.scenario === 'free-talk';
 
-    if (!isFreeTalk) {
+    if (!isFreeTalkDialogue) {
       if (!data.title) {
         ctx.addIssue({ code: z.ZodIssueCode.custom, message: t.teacherAssessmentForm.errors.titleRequired, path: ['title'] });
       }
@@ -148,7 +103,7 @@ export default function NewAssessmentPage() {
         ctx.addIssue({ code: z.ZodIssueCode.custom, message: t.teacherAssessmentForm.errors.expectedFormatRequired, path: ['expectedFormat'] });
     }
 
-    if (data.targetType === 'specific' && (!data.targetStudentIds || data.targetStudentIds.length === 0)) {
+    if (data.targetType === 'specific' && (data.targetStudentIds === 'all' || data.targetStudentIds.length === 0)) {
         ctx.addIssue({ code: z.ZodIssueCode.custom, message: t.teacherAssessmentForm.errors.studentRequired, path: ['targetStudentIds']});
     }
 
@@ -167,11 +122,11 @@ export default function NewAssessmentPage() {
       assessmentType: "monologue",
       monologueType: "text",
       targetType: "all",
-      targetStudentIds: [],
+      targetStudentIds: "all",
       scenario: "free-talk",
       recordingTimeLimit: 0,
-      aiVoice: "algenib",
-      evaluationModel: "gemini-2.5-pro",
+      aiVoice: 'algenib',
+      evaluationModel: 'gemini-2.5-pro',
       useRubric: false,
     },
   });
@@ -186,39 +141,12 @@ export default function NewAssessmentPage() {
   useEffect(() => {
     if (!authLoading && !user) {
         router.push('/');
-    } else if (user) {
-        const fetchStudents = async () => {
-            if (!db) return;
-            setIsLoadingStudents(true);
-            const q = query(collection(db, "users"), where("role", "==", "student"));
-            const querySnapshot = await getDocs(q);
-            const studentList = querySnapshot.docs.map(doc => ({ ...doc.data(), docId: doc.id }) as UserData & { docId: string });
-            setRegisteredStudents(studentList);
-            setIsLoadingStudents(false);
-        }
-        fetchStudents();
     }
   }, [user, authLoading, router]);
 
   useEffect(() => {
     form.trigger();
   }, [language, form]);
-
-  const uniqueGrades = useMemo(() => ['all', ...Array.from(new Set(registeredStudents.map(s => s.grade).filter(Boolean)))], [registeredStudents]);
-  const uniqueClasses = useMemo(() => {
-    const classes = studentFilter.grade === 'all' 
-      ? registeredStudents 
-      : registeredStudents.filter(s => s.grade === studentFilter.grade);
-    return ['all', ...Array.from(new Set(classes.map(s => s.class).filter(Boolean)))];
-  }, [registeredStudents, studentFilter.grade]);
-
-  const filteredRegisteredStudents = useMemo(() => {
-    return registeredStudents.filter(student => {
-      const gradeMatch = studentFilter.grade === 'all' || student.grade === studentFilter.grade;
-      const classMatch = studentFilter.class === 'all' || student.class === studentFilter.class;
-      return gradeMatch && classMatch;
-    });
-  }, [registeredStudents, studentFilter]);
 
   const handleGenerateImage = async () => {
       if (!imagePrompt) {
@@ -316,11 +244,6 @@ export default function NewAssessmentPage() {
     if (!user) {
         toast({ title: "인증 오류", description: "로그인이 필요합니다.", variant: "destructive" });
         return;
-    }
-
-    if (!db) {
-      toast({ title: "DB 오류", description: "Firebase가 설정되지 않아 평가를 생성할 수 없습니다.", variant: "destructive" });
-      return;
     }
     
     const titleToCheck = values.title || (isFreeTalkDialogue ? t.teacherAssessmentForm.scenarios.freeTalk : "");
@@ -494,8 +417,6 @@ export default function NewAssessmentPage() {
             )}
 
 
-            <Separator/>
-
             <FormField
               control={form.control}
               name="targetType"
@@ -506,7 +427,7 @@ export default function NewAssessmentPage() {
                     <RadioGroup
                       onValueChange={field.onChange}
                       defaultValue={field.value}
-                      className="flex space-x-4"
+                      className="flex flex-col space-y-1"
                     >
                       <FormItem className="flex items-center space-x-3 space-y-0">
                         <FormControl>
@@ -612,7 +533,7 @@ export default function NewAssessmentPage() {
                 )}
               />
             )}
-
+            
             <FormField
               control={form.control}
               name="evaluationModel"
@@ -649,68 +570,47 @@ export default function NewAssessmentPage() {
                         {t.teacherAssessmentForm.selectStudentsDescription}
                       </FormDescription>
                     </div>
-                    {isLoadingStudents ? <Loader2 className="animate-spin" /> : (
-                        <div className="space-y-4">
-                            <Card>
-                                <CardHeader className="flex flex-row items-center justify-between p-4">
-                                    <CardTitle className="text-base">등록된 학생</CardTitle>
-                                    <div className="flex items-center gap-2">
-                                        <FilterCombobox label="학년" options={uniqueGrades} value={studentFilter.grade} onSelect={(value) => setStudentFilter({ grade: value, class: 'all' })} />
-                                        <FilterCombobox label="반" options={uniqueClasses} value={studentFilter.class} onSelect={(value) => setStudentFilter(prev => ({ ...prev, class: value }))} />
-                                        <div className="flex items-center space-x-2 pl-2">
-                                            <Label htmlFor="select-all-registered">전체 선택</Label>
-                                            <Checkbox
-                                                id="select-all-registered"
-                                                onCheckedChange={(checked) => {
-                                                    const currentIds = form.getValues("targetStudentIds") || [];
-                                                    const filteredIds = filteredRegisteredStudents.map(s => s.uid);
-                                                    if (checked) {
-                                                        form.setValue("targetStudentIds", [...new Set([...currentIds, ...filteredIds])]);
-                                                    } else {
-                                                        form.setValue("targetStudentIds", currentIds.filter(id => !filteredIds.includes(id)));
-                                                    }
-                                                }}
-                                                checked={filteredRegisteredStudents.length > 0 && filteredRegisteredStudents.every(s => form.getValues("targetStudentIds")?.includes(s.uid))}
-                                                disabled={filteredRegisteredStudents.length === 0}
-                                            />
-                                        </div>
-                                    </div>
-                                </CardHeader>
-                                <Separator />
-                                <CardContent className="p-4 grid grid-cols-2 md:grid-cols-3 gap-2 min-h-[100px]">
-                                    {filteredRegisteredStudents.length > 0 ? filteredRegisteredStudents.map((item) => (
-                                        <React.Fragment key={item.uid}>
-                                            <FormField
-                                                control={form.control}
-                                                name="targetStudentIds"
-                                                render={({ field }) => (
-                                                    <FormItem className="flex flex-row items-center space-x-2 space-y-0">
-                                                        <FormControl>
-                                                            <Checkbox
-                                                                checked={field.value?.includes(item.uid)}
-                                                                onCheckedChange={(checked) => {
-                                                                    const currentIds = field.value || [];
-                                                                    return checked
-                                                                    ? field.onChange([...currentIds, item.uid])
-                                                                    : field.onChange(currentIds.filter(value => value !== item.uid));
-                                                                }}
-                                                            />
-                                                        </FormControl>
-                                                        <FormLabel className="font-normal text-sm">{item.displayName}</FormLabel>
-                                                    </FormItem>
-                                                )}
-                                            />
-                                        </React.Fragment>
-                                    )) : <p className="text-sm text-muted-foreground col-span-full text-center py-8">해당 학년/반에 가입한 학생이 없습니다.</p>}
-                                </CardContent>
-                            </Card>
-                        </div>
-                    )}
+                    {mockStudents.map((item) => (
+                      <React.Fragment key={item.uid}>
+                        <FormField
+                          control={form.control}
+                          name="targetStudentIds"
+                          render={({ field }) => {
+                            const studentIds = Array.isArray(field.value) ? field.value : [];
+                            return (
+                              <FormItem
+                                key={item.uid}
+                                className="flex flex-row items-start space-x-3 space-y-0"
+                              >
+                                <FormControl>
+                                  <Checkbox
+                                    checked={studentIds.includes(item.uid)}
+                                    onCheckedChange={(checked) => {
+                                      return checked
+                                        ? field.onChange([...studentIds, item.uid])
+                                        : field.onChange(
+                                            studentIds.filter(
+                                              (value) => value !== item.uid
+                                            )
+                                          )
+                                    }}
+                                  />
+                                </FormControl>
+                                <FormLabel className="font-normal">
+                                  {item.displayName} ({item.email})
+                                </FormLabel>
+                              </FormItem>
+                            )
+                          }}
+                        />
+                      </React.Fragment>
+                    ))}
                     <FormMessage />
                   </FormItem>
                 )}
               />
             )}
+
 
             {assessmentType === 'dialogue' && (
                <FormField
