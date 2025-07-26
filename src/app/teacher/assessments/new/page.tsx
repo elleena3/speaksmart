@@ -23,7 +23,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { scenarios, type TeacherAssessment, femaleVoices, maleVoices, allVoices, evaluationModels, voiceDescriptions, type AiVoice, monologueTypes, type UserData } from "@/lib/types";
-import { useAuth } from "@/context/auth-context";
+import { useAuth, mockStudents } from "@/context/auth-context";
 import { addDoc, collection, getDocs, query, where } from "firebase/firestore";
 import { db, storage } from "@/lib/firebase";
 import { ref, uploadString, getDownloadURL } from "firebase/storage";
@@ -219,16 +219,29 @@ export default function NewAssessmentPage() {
 
   const handleSelectAll = (studentsToSelect: UserData[], field: any) => {
     const currentSelection = new Set(Array.isArray(field.value) ? field.value : []);
-    const allIds = new Set(studentsToSelect.map(s => s.docId));
-    const areAllSelected = studentsToSelect.every(s => currentSelection.has(s.docId));
+    const allIds = new Set(studentsToSelect.map(s => s.docId!));
+    const areAllSelected = studentsToSelect.every(s => currentSelection.has(s.docId!));
 
     if (areAllSelected) {
-        studentsToSelect.forEach(s => currentSelection.delete(s.docId));
+        studentsToSelect.forEach(s => currentSelection.delete(s.docId!));
     } else {
-        studentsToSelect.forEach(s => currentSelection.add(s.docId));
+        studentsToSelect.forEach(s => currentSelection.add(s.docId!));
     }
     field.onChange(Array.from(currentSelection));
   };
+  
+  const handleSelectAllMock = (field: any) => {
+     const currentSelection = new Set(Array.isArray(field.value) ? field.value : []);
+     const allMockIds = new Set(mockStudents.map(s => s.uid));
+     const areAllSelected = mockStudents.every(s => currentSelection.has(s.uid));
+     
+     if(areAllSelected) {
+         mockStudents.forEach(s => currentSelection.delete(s.uid));
+     } else {
+         mockStudents.forEach(s => currentSelection.add(s.uid));
+     }
+     field.onChange(Array.from(currentSelection));
+  }
 
 
   useEffect(() => {
@@ -408,57 +421,83 @@ export default function NewAssessmentPage() {
                       <FormLabel className="text-base">{t.teacherAssessmentForm.selectStudentsLabel}</FormLabel>
                       <FormDescription>{t.teacherAssessmentForm.selectStudentsDescription}</FormDescription>
                     </div>
-                    
-                    <Card>
-                       <CardHeader className="flex flex-row items-center justify-between p-4">
-                          <CardTitle className="text-lg flex items-center gap-2"><Users className="h-5 w-5"/>가입한 학생</CardTitle>
-                          <div className="flex items-center gap-2">
-                            <FilterCombobox label="학년" options={uniqueGrades} value={studentFilter.grade} onSelect={(value) => setStudentFilter({ grade: value, class: 'all' })} />
-                            <FilterCombobox label="반" options={uniqueClasses} value={studentFilter.class} onSelect={(value) => setStudentFilter({ ...studentFilter, class: value })} />
-                            <div className="flex items-center space-x-2">
-                                <Label htmlFor="select-all-real">전체 선택</Label>
-                                <Checkbox
-                                    id="select-all-real"
-                                    onCheckedChange={() => handleSelectAll(filteredRealStudents, field)}
-                                    checked={Array.isArray(field.value) && filteredRealStudents.length > 0 && filteredRealStudents.every(s => field.value.includes(s.docId!))}
-                                />
-                            </div>
-                          </div>
-                       </CardHeader>
-                       <CardContent className="p-4 grid grid-cols-2 md:grid-cols-4 gap-4">
-                           {isStudentListLoading ? <Loader2 className="animate-spin"/> :
-                           filteredRealStudents.length > 0 ? (
-                               filteredRealStudents.map((item) => (
-                                <FormField
-                                  key={item.docId}
-                                  control={form.control}
-                                  name="targetStudentIds"
-                                  render={({ field }) => {
-                                    const studentIds = Array.isArray(field.value) ? field.value : [];
-                                    return (
-                                        <FormItem
-                                            key={item.docId}
-                                            className="flex flex-row items-start space-x-3 space-y-0"
-                                        >
+                     <div className="space-y-4">
+                        <Card>
+                            <CardHeader className="flex flex-row items-center justify-between p-4">
+                                <CardTitle className="text-lg flex items-center gap-2"><Edit className="h-5 w-5"/>목업 계정</CardTitle>
+                                <div className="flex items-center space-x-2">
+                                    <Label htmlFor="select-all-mock">전체 선택</Label>
+                                    <Checkbox
+                                        id="select-all-mock"
+                                        onCheckedChange={() => handleSelectAllMock(field)}
+                                        checked={Array.isArray(field.value) && mockStudents.every(s => field.value.includes(s.uid))}
+                                    />
+                                </div>
+                            </CardHeader>
+                             <CardContent className="p-4 grid grid-cols-2 md:grid-cols-4 gap-4">
+                                {mockStudents.map(item => (
+                                    <FormItem key={item.uid} className="flex flex-row items-start space-x-3 space-y-0">
                                         <FormControl>
                                             <Checkbox
-                                                checked={studentIds.includes(item.docId!)}
+                                                checked={Array.isArray(field.value) && field.value.includes(item.uid)}
                                                 onCheckedChange={(checked) => {
-                                                return checked
-                                                    ? field.onChange([...studentIds, item.docId!])
-                                                    : field.onChange(studentIds.filter((value) => value !== item.docId))
+                                                    const currentSelection = new Set(Array.isArray(field.value) ? field.value : []);
+                                                    if(checked) {
+                                                        currentSelection.add(item.uid);
+                                                    } else {
+                                                        currentSelection.delete(item.uid);
+                                                    }
+                                                    field.onChange(Array.from(currentSelection));
                                                 }}
                                             />
-                                            </FormControl>
-                                            <FormLabel className="font-normal">{item.displayName}</FormLabel>
-                                        </FormItem>
-                                    )
-                                  }}
-                                />
-                                ))
-                           ) : <p className="text-sm text-muted-foreground col-span-full text-center">해당 조건의 학생이 없습니다.</p>}
-                       </CardContent>
-                    </Card>
+                                        </FormControl>
+                                        <FormLabel className="font-normal">{item.displayName}</FormLabel>
+                                    </FormItem>
+                                ))}
+                            </CardContent>
+                        </Card>
+                        <Card>
+                           <CardHeader className="flex flex-row items-center justify-between p-4">
+                              <CardTitle className="text-lg flex items-center gap-2"><Users className="h-5 w-5"/>가입한 학생</CardTitle>
+                              <div className="flex items-center gap-2">
+                                <FilterCombobox label="학년" options={uniqueGrades} value={studentFilter.grade} onSelect={(value) => setStudentFilter({ grade: value, class: 'all' })} />
+                                <FilterCombobox label="반" options={uniqueClasses} value={studentFilter.class} onSelect={(value) => setStudentFilter({ ...studentFilter, class: value })} />
+                                <div className="flex items-center space-x-2">
+                                    <Label htmlFor="select-all-real">전체 선택</Label>
+                                    <Checkbox
+                                        id="select-all-real"
+                                        onCheckedChange={() => handleSelectAll(filteredRealStudents, field)}
+                                        checked={Array.isArray(field.value) && filteredRealStudents.length > 0 && filteredRealStudents.every(s => field.value.includes(s.docId!))}
+                                    />
+                                </div>
+                              </div>
+                           </CardHeader>
+                           <CardContent className="p-4 grid grid-cols-2 md:grid-cols-4 gap-4">
+                               {isStudentListLoading ? <Loader2 className="animate-spin"/> :
+                               filteredRealStudents.length > 0 ? (
+                                   filteredRealStudents.map((item) => (
+                                    <FormItem key={item.docId} className="flex flex-row items-start space-x-3 space-y-0">
+                                        <FormControl>
+                                            <Checkbox
+                                                checked={Array.isArray(field.value) && field.value.includes(item.docId!)}
+                                                onCheckedChange={(checked) => {
+                                                    const currentSelection = new Set(Array.isArray(field.value) ? field.value : []);
+                                                    if (checked) {
+                                                        currentSelection.add(item.docId!);
+                                                    } else {
+                                                        currentSelection.delete(item.docId!);
+                                                    }
+                                                    field.onChange(Array.from(currentSelection));
+                                                }}
+                                            />
+                                        </FormControl>
+                                        <FormLabel className="font-normal">{item.displayName}</FormLabel>
+                                    </FormItem>
+                                    ))
+                               ) : <p className="text-sm text-muted-foreground col-span-full text-center">해당 조건의 학생이 없습니다.</p>}
+                           </CardContent>
+                        </Card>
+                    </div>
                     <FormMessage />
                   </FormItem>
                 )}
