@@ -20,7 +20,7 @@ export function VadConversationTool() {
   const [sessionState, setSessionState] = useState<SessionState>("idle");
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
   const [interimTranscript, setInterimTranscript] = useState<string>("");
-  const [silenceThreshold, setSilenceThreshold] = useState(0.03); // Increased default for better noise handling
+  const [silenceThreshold, setSilenceThreshold] = useState(0.03);
   
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const speechEndTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -61,20 +61,25 @@ export function VadConversationTool() {
   }, [conversation, interimTranscript]);
 
   const processFinalTranscript = useCallback(async (transcript: string) => {
-    if (sessionState === 'ending' || sessionState === 'finished' || !transcript) {
-        setSessionState('finished');
+    if (sessionState === 'ending' || sessionState === 'finished' || !transcript.trim()) {
+        if (sessionState !== 'ending') {
+          startListening(); // Restart listening if there was no meaningful text
+        } else {
+          setSessionState('finished');
+        }
         return;
     }
     
     setSessionState("processing");
     const userTurn: ConversationTurn = {role: 'user', text: transcript};
-    setConversation(prev => [...prev, userTurn]);
+    const newConversationHistory = [...conversation, userTurn];
+    setConversation(newConversationHistory);
     setInterimTranscript("");
     
     try {
         const { aiResponseText, aiResponseAudioDataUri } = await converseWithNativeTeacher({
             studentTranscript: transcript,
-            conversationHistory: [...conversation, userTurn],
+            conversationHistory: newConversationHistory,
         });
 
         setConversation(prev => [...prev, {role: 'model', text: aiResponseText}]);
@@ -91,7 +96,7 @@ export function VadConversationTool() {
   }, [conversation, sessionState, toast]);
 
   const startListening = useCallback(() => {
-    if (['ending', 'finished', 'processing'].includes(sessionState)) return;
+    if (['ending', 'finished', 'processing', 'speaking', 'initializing'].includes(sessionState)) return;
     setSessionState("listening");
     setInterimTranscript("");
 
@@ -102,6 +107,8 @@ export function VadConversationTool() {
         return;
     }
     
+    cleanup(); // Clean up any previous instance
+
     recognitionRef.current = new SpeechRecognition();
     recognitionRef.current.continuous = true;
     recognitionRef.current.interimResults = true;
@@ -111,38 +118,32 @@ export function VadConversationTool() {
         if(speechEndTimerRef.current) clearTimeout(speechEndTimerRef.current);
         speechEndTimerRef.current = setTimeout(() => {
             if (recognitionRef.current && sessionState === 'listening') {
-                 recognitionRef.current.stop();
+                 recognitionRef.current.stop(); // This will trigger 'onend'
             }
         }, SPEECH_END_TIMEOUT_MS);
     };
 
     recognitionRef.current.onresult = (event) => {
-        let interim = '';
         let hasNewText = false;
+        let currentInterim = "";
         for (let i = event.resultIndex; i < event.results.length; ++i) {
           const newTranscript = event.results[i][0].transcript;
           if (newTranscript.trim()) {
             hasNewText = true;
           }
-          interim += newTranscript;
+          currentInterim += newTranscript;
         }
-        setInterimTranscript(interim);
-
+        
+        setInterimTranscript(currentInterim);
+        
         if(hasNewText) {
           resetTimer();
         }
     };
     
     recognitionRef.current.onend = () => {
-        // This is the crucial part. When recognition ends (due to silence timer or otherwise),
-        // process whatever interim transcript we have.
         const finalTranscriptToProcess = interimTranscript.trim();
-        if(['listening', 'speaking'].includes(sessionState) && finalTranscriptToProcess) {
-            processFinalTranscript(finalTranscriptToProcess);
-        } else if (sessionState === 'listening') {
-            // If it ended without any final text (e.g., user just paused), restart listening.
-             if (recognitionRef.current) recognitionRef.current.start();
-        }
+        processFinalTranscript(finalTranscriptToProcess);
     };
 
     recognitionRef.current.onerror = (event) => {
@@ -155,7 +156,7 @@ export function VadConversationTool() {
     recognitionRef.current.start();
     resetTimer();
 
-  }, [sessionState, toast, processFinalTranscript, interimTranscript]);
+  }, [sessionState, toast, processFinalTranscript, cleanup, interimTranscript]);
 
   const startConversation = async () => {
     setConversation([]);
@@ -196,6 +197,7 @@ export function VadConversationTool() {
     setSessionState("idle");
     setConversation([]);
     setInterimTranscript("");
+    cleanup();
   }
 
   const getButtonState = () => {
@@ -253,7 +255,7 @@ export function VadConversationTool() {
                  {turn.role === 'model' && <div className="p-2 rounded-full bg-primary text-primary-foreground"><Bot className="h-5 w-5" /></div>}
               </div>
             ))}
-             {interimTranscript && (
+             {interimTranscript && sessionState === 'listening' && (
                 <div className="flex items-start gap-3 justify-start">
                     <div className="p-2 rounded-full bg-muted"><User className="h-5 w-5" /></div>
                     <div className="p-3 rounded-lg max-w-[80%] bg-muted">
@@ -290,3 +292,5 @@ export function VadConversationTool() {
     </div>
   );
 }
+
+    
