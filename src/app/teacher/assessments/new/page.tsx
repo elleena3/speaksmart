@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useRouter } from "next/navigation";
@@ -119,7 +118,7 @@ export default function NewAssessmentPage() {
             setIsLoadingStudents(true);
             const q = query(collection(db, "users"), where("role", "==", "student"));
             const querySnapshot = await getDocs(q);
-            const studentList = querySnapshot.docs.map(doc => ({ ...doc.data(), docId: doc.id }) as UserData);
+            const studentList = querySnapshot.docs.map(doc => ({ ...doc.data(), uid: doc.id }) as UserData);
             setRegisteredStudents(studentList);
             setIsLoadingStudents(false);
         }
@@ -415,7 +414,7 @@ export default function NewAssessmentPage() {
               <FormField
                 control={form.control}
                 name="targetStudentIds"
-                render={({ field }) => (
+                render={() => (
                   <FormItem>
                     <div className="mb-4">
                       <FormLabel className="text-base">{t.teacherAssessmentForm.selectStudentsLabel}</FormLabel>
@@ -436,15 +435,15 @@ export default function NewAssessmentPage() {
                                         <Checkbox
                                             id="select-all-mock"
                                             onCheckedChange={(checked) => {
-                                                const currentIds = field.value || [];
+                                                const currentIds = form.getValues("targetStudentIds") || [];
                                                 const mockIds = mockStudents.map(s => s.uid);
                                                 if (checked) {
-                                                    field.onChange([...new Set([...currentIds, ...mockIds])]);
+                                                    form.setValue("targetStudentIds", [...new Set([...currentIds, ...mockIds])]);
                                                 } else {
-                                                    field.onChange(currentIds.filter(id => !mockIds.includes(id)));
+                                                    form.setValue("targetStudentIds", currentIds.filter(id => !mockIds.includes(id)));
                                                 }
                                             }}
-                                            checked={mockStudents.every(s => field.value?.includes(s.uid))}
+                                            checked={mockStudents.every(s => form.getValues("targetStudentIds")?.includes(s.uid))}
                                         />
                                     </div>
                                 </CardHeader>
@@ -455,16 +454,16 @@ export default function NewAssessmentPage() {
                                         key={item.uid}
                                         control={form.control}
                                         name="targetStudentIds"
-                                        render={({ field: innerField }) => (
+                                        render={({ field }) => (
                                             <FormItem className="flex flex-row items-center space-x-2 space-y-0">
                                                 <FormControl>
                                                     <Checkbox
-                                                        checked={innerField.value?.includes(item.uid)}
+                                                        checked={field.value?.includes(item.uid)}
                                                         onCheckedChange={(checked) => {
-                                                            const currentIds = innerField.value || [];
+                                                            const currentIds = field.value || [];
                                                             return checked
-                                                            ? innerField.onChange([...currentIds, item.uid])
-                                                            : innerField.onChange(currentIds.filter(value => value !== item.uid));
+                                                            ? field.onChange([...currentIds, item.uid])
+                                                            : field.onChange(currentIds.filter(value => value !== item.uid));
                                                         }}
                                                     />
                                                 </FormControl>
@@ -486,15 +485,15 @@ export default function NewAssessmentPage() {
                                         <Checkbox
                                             id="select-all-registered"
                                             onCheckedChange={(checked) => {
-                                                const currentIds = field.value || [];
+                                                const currentIds = form.getValues("targetStudentIds") || [];
                                                 const registeredIds = registeredStudents.map(s => s.uid);
                                                 if (checked) {
-                                                    field.onChange([...new Set([...currentIds, ...registeredIds])]);
+                                                    form.setValue("targetStudentIds", [...new Set([...currentIds, ...registeredIds])]);
                                                 } else {
-                                                    field.onChange(currentIds.filter(id => !registeredIds.includes(id)));
+                                                    form.setValue("targetStudentIds", currentIds.filter(id => !registeredIds.includes(id)));
                                                 }
                                             }}
-                                            checked={registeredStudents.length > 0 && registeredStudents.every(s => field.value?.includes(s.uid))}
+                                            checked={registeredStudents.length > 0 && registeredStudents.every(s => form.getValues("targetStudentIds")?.includes(s.uid))}
                                             disabled={registeredStudents.length === 0}
                                         />
                                     </div>
@@ -506,16 +505,16 @@ export default function NewAssessmentPage() {
                                             key={item.uid}
                                             control={form.control}
                                             name="targetStudentIds"
-                                            render={({ field: innerField }) => (
+                                            render={({ field }) => (
                                                 <FormItem className="flex flex-row items-center space-x-2 space-y-0">
                                                     <FormControl>
                                                         <Checkbox
-                                                            checked={innerField.value?.includes(item.uid)}
+                                                            checked={field.value?.includes(item.uid)}
                                                             onCheckedChange={(checked) => {
-                                                                const currentIds = innerField.value || [];
+                                                                const currentIds = field.value || [];
                                                                 return checked
-                                                                ? innerField.onChange([...currentIds, item.uid])
-                                                                : innerField.onChange(currentIds.filter(value => value !== item.uid));
+                                                                ? field.onChange([...currentIds, item.uid])
+                                                                : field.onChange(currentIds.filter(value => value !== item.uid));
                                                             }}
                                                         />
                                                     </FormControl>
@@ -812,3 +811,5 @@ export default function NewAssessmentPage() {
     </Card>
   );
 }
+
+    
