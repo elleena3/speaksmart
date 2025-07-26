@@ -49,7 +49,8 @@ export function SpeculativeConversationTool() {
     setSessionState("processing");
     setInterimTranscript("처리 중...");
     
-    const initialChunkBlob = new Blob(audioChunksRef.current.slice(0, 20), { type: mimeType });
+    // Create initial chunk for speculation
+    const initialChunkBlob = new Blob(audioChunksRef.current.slice(0, 10), { type: mimeType });
     
     const [initialChunkDataUri, finalAudioDataUri] = await Promise.all([
         new Promise<string>(resolve => {
@@ -85,7 +86,7 @@ export function SpeculativeConversationTool() {
             audioPlayerRef.current.src = aiResponseAudioDataUri;
             await audioPlayerRef.current.play().catch(() => {
                  toast({ title: "오디오 재생 오류", variant: "destructive" });
-                 (window as any)._startListeningVAD(); // Fallback to listening
+                 (window as any)._startListeningVAD?.(); // Fallback to listening
             });
         }
     } catch(err) {
@@ -98,6 +99,7 @@ export function SpeculativeConversationTool() {
 
   const startListeningVAD = useCallback(() => {
     setSessionState("listening");
+    setInterimTranscript(""); // Clear previous interim transcript
     cleanup();
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -120,7 +122,7 @@ export function SpeculativeConversationTool() {
                 if (fullAudioBlob.size > 0) {
                     processAudio(fullAudioBlob);
                 } else {
-                    setSessionState('speaking');
+                    setSessionState('speaking'); // Go back to AI turn if no audio
                 }
                 stream.getTracks().forEach(track => track.stop());
             };
@@ -275,7 +277,7 @@ export function SpeculativeConversationTool() {
                  {turn.role === 'model' && <div className="p-2 rounded-full bg-primary text-primary-foreground"><Bot className="h-5 w-5" /></div>}
               </div>
             ))}
-             {interimTranscript && (
+             {interimTranscript && (sessionState === 'listening' || sessionState === 'processing') && (
                 <div className="flex items-start gap-3 justify-start">
                     <div className="p-2 rounded-full bg-muted"><User className="h-5 w-5" /></div>
                     <div className="p-3 rounded-lg max-w-[80%] bg-muted">
