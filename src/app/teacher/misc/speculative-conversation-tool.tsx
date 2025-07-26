@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 
 const mimeType = 'audio/webm;codecs=opus';
 const SPEECH_END_TIMEOUT_MS = 2500; // 2.5 seconds of silence
+const MIN_SPEECH_DURATION_MS = 500; // Minimum duration of speech to be considered valid
 
 type SessionState = "idle" | "initializing" | "speaking" | "listening" | "processing" | "ending" | "finished";
 
@@ -28,6 +29,7 @@ export function SpeculativeConversationTool() {
 
   const speechRecognitionRef = useRef<SpeechRecognition | null>(null);
   const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const speechStartTimeRef = useRef<number | null>(null);
 
   const cleanup = useCallback(() => {
     if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
@@ -42,6 +44,7 @@ export function SpeculativeConversationTool() {
         speechRecognitionRef.current = null;
     }
     audioChunksRef.current = [];
+    speechStartTimeRef.current = null;
     setInterimTranscript("");
   }, []);
 
@@ -99,7 +102,7 @@ export function SpeculativeConversationTool() {
 
   const startListeningVAD = useCallback(() => {
     setSessionState("listening");
-    setInterimTranscript(""); // Clear previous interim transcript
+    setInterimTranscript("");
     cleanup();
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -111,35 +114,48 @@ export function SpeculativeConversationTool() {
 
     try {
         navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
-            // Start MediaRecorder
             mediaRecorderRef.current = new MediaRecorder(stream, { mimeType, audioBitsPerSecond: 16000 });
             audioChunksRef.current = [];
+            
             mediaRecorderRef.current.ondataavailable = (event) => {
                 if (event.data.size > 0) audioChunksRef.current.push(event.data);
             };
             mediaRecorderRef.current.onstop = () => {
                 const fullAudioBlob = new Blob(audioChunksRef.current, { type: mimeType });
-                if (fullAudioBlob.size > 0) {
+                if (fullAudioBlob.size > 2000) { // Basic validation for audio data
                     processAudio(fullAudioBlob);
-                } else {
-                    setSessionState('speaking'); // Go back to AI turn if no audio
+                } else if (sessionState !== 'ending' && sessionState !== 'idle' && sessionState !== 'finished') {
+                    // If no valid audio, just go back to listening without processing
+                    toast({ title: "음성 감지 안됨", description: "AI가 다시 듣습니다. 말씀해주세요.", variant: 'default' });
+                    startListeningVAD();
                 }
                 stream.getTracks().forEach(track => track.stop());
             };
-            mediaRecorderRef.current.start(100);
+            mediaRecorderRef.current.start(200);
 
-            // Start SpeechRecognition
             const recognition = new SpeechRecognition();
             speechRecognitionRef.current = recognition;
             recognition.continuous = true;
             recognition.interimResults = true;
             recognition.lang = 'en-US';
             
+            const stopAll = () => {
+                if (speechRecognitionRef.current) {
+                    speechRecognitionRef.current.stop();
+                }
+                if (mediaRecorderRef.current?.state === 'recording') {
+                    mediaRecorderRef.current.stop();
+                }
+            }
+
             const resetSilenceTimer = () => {
                 if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
                 silenceTimerRef.current = setTimeout(() => {
-                    if (speechRecognitionRef.current) {
-                        speechRecognitionRef.current.stop(); // This will trigger onend
+                    if (speechStartTimeRef.current && (Date.now() - speechStartTimeRef.current > MIN_SPEECH_DURATION_MS)) {
+                       stopAll();
+                    } else {
+                       // Speech too short, just reset timer and continue listening
+                       resetSilenceTimer();
                     }
                 }, SPEECH_END_TIMEOUT_MS);
             };
@@ -150,15 +166,16 @@ export function SpeculativeConversationTool() {
                      interim += event.results[i][0].transcript;
                 }
                 setInterimTranscript(interim);
+                if (interim && !speechStartTimeRef.current) {
+                    speechStartTimeRef.current = Date.now();
+                }
                 if (interim) {
                     resetSilenceTimer();
                 }
             };
             
             recognition.onend = () => {
-                 if (mediaRecorderRef.current?.state === 'recording') {
-                    mediaRecorderRef.current.stop(); // This triggers processAudio
-                }
+                 stopAll();
             }
 
             recognition.onerror = (event) => {
@@ -169,7 +186,6 @@ export function SpeculativeConversationTool() {
             };
 
             recognition.start();
-            resetSilenceTimer(); // Start initial timer
             
         }).catch(err => {
             toast({ title: "마이크 오류", variant: "destructive" });
@@ -179,7 +195,7 @@ export function SpeculativeConversationTool() {
         toast({ title: "음성 인식 시작 오류", variant: "destructive" });
         setSessionState("idle");
     }
-  }, [cleanup, processAudio, toast]);
+  }, [cleanup, processAudio, toast, sessionState]);
 
   useEffect(() => {
     (window as any)._startListeningVAD = startListeningVAD;
@@ -249,7 +265,6 @@ export function SpeculativeConversationTool() {
         default: return null
       }
   }
-
 
   return (
     <div className="flex flex-col gap-4">
