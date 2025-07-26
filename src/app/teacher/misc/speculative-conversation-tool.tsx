@@ -15,13 +15,12 @@ const SPEECH_END_TIMEOUT_MS = 2500;
 const MIN_SPEECH_DURATION_MS = 500; 
 
 type SessionState = "idle" | "initializing" | "speaking" | "listening" | "processing" | "ending" | "finished";
-type TurnWithAnimation = ConversationTurn & { justUpdated?: boolean };
+type TurnWithAnimation = ConversationTurn & { justUpdated?: boolean; id?: number };
 
 
 export function SpeculativeConversationTool() {
   const [sessionState, setSessionState] = useState<SessionState>("idle");
   const [conversation, setConversation] = useState<TurnWithAnimation[]>([]);
-  const [interimTranscript, setInterimTranscript] = useState<string>("");
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -74,7 +73,7 @@ export function SpeculativeConversationTool() {
         const { finalStudentTranscript, aiResponseText, aiResponseAudioDataUri } = await converseWithSpeculativeTeacher({
             initialChunkDataUri: initialChunkDataUri || undefined,
             finalAudioDataUri: finalAudioDataUri,
-            conversationHistory: conversation,
+            conversationHistory: conversation.filter(turn => turn.role !== 'user_interim'),
         });
 
         // Replace the interim turn with the final, corrected one from the server
@@ -124,6 +123,7 @@ export function SpeculativeConversationTool() {
             mediaRecorderRef.current.onstop = () => {
                 const fullAudioBlob = new Blob(audioChunksRef.current, { type: mimeType });
                 const currentSessionState = (window as any)._sessionState;
+                // Only process if we are in a listening state and have enough data
                 if (fullAudioBlob.size > 1000 && currentSessionState === 'listening') { 
                     processAudio(fullAudioBlob);
                 }
@@ -148,7 +148,8 @@ export function SpeculativeConversationTool() {
                     if (speechStartTimeRef.current && (Date.now() - speechStartTimeRef.current > MIN_SPEECH_DURATION_MS)) {
                        stopAll();
                     } else {
-                       resetSilenceTimer();
+                       // if no speech started, don't stop, just keep listening.
+                       // resetSilenceTimer();
                     }
                 }, SPEECH_END_TIMEOUT_MS);
             };
@@ -174,7 +175,6 @@ export function SpeculativeConversationTool() {
             };
             
             recognition.onend = () => {
-                // Ensure media recorder also stops when speech recognition ends for any reason
                 if (mediaRecorderRef.current?.state === 'recording') {
                      mediaRecorderRef.current.stop();
                 }
@@ -209,6 +209,12 @@ export function SpeculativeConversationTool() {
     return () => cleanup();
   }, [cleanup]);
 
+  useEffect(() => {
+    if (scrollViewportRef.current) {
+        scrollViewportRef.current.scrollTop = scrollViewportRef.current.scrollHeight;
+    }
+  }, [conversation]);
+
   const startConversation = async () => {
     setConversation([]);
     setSessionState("initializing");
@@ -239,7 +245,6 @@ export function SpeculativeConversationTool() {
   const handleReset = () => {
     setSessionState("idle");
     setConversation([]);
-    setInterimTranscript("");
     cleanup();
   }
 
@@ -261,7 +266,7 @@ export function SpeculativeConversationTool() {
       switch(sessionState) {
         case 'speaking': return <div className="flex items-center gap-2 text-sm font-medium"><Volume2 className="h-5 w-5 text-green-500 animate-pulse"/><span>AI 응답 중...</span></div>
         case 'listening': return <div className="flex items-center gap-2 text-sm font-medium"><Mic className="h-5 w-5 text-blue-500 animate-pulse"/><span>듣는 중...</span></div>
-        case 'processing': 
+        case 'processing': return <div className="flex items-center gap-2 text-sm font-medium"><Loader2 className="h-5 w-5 animate-spin"/><span>처리 중...</span></div>
         case 'initializing': 
         case 'ending':
            return <div className="flex items-center gap-2 text-sm font-medium"><Loader2 className="h-5 w-5 animate-spin"/><span>처리 중...</span></div>
@@ -285,6 +290,12 @@ export function SpeculativeConversationTool() {
                   <CheckCircle2 className="h-12 w-12 mb-4 text-green-500"/>
                   <p className="font-semibold">대화가 종료되었습니다.</p>
               </div>
+            )}
+            {sessionState === "initializing" && (
+                 <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground pt-12">
+                     <Loader2 className="h-12 w-12 mb-4 animate-spin"/>
+                     <p className="font-semibold">AI가 첫 인사를 준비 중입니다...</p>
+                 </div>
             )}
             {conversation.map((turn, index) => {
                  const isUser = turn.role === 'user' || turn.role === 'user_interim';
