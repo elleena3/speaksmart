@@ -3,7 +3,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Globe, Users, School, Loader2 } from "lucide-react";
+import { Globe, Users, School, Loader2, KeyRound, AlertCircle } from "lucide-react";
 import { Logo } from "@/components/icons";
 import { useLanguage } from "@/context/language-context";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -11,6 +11,8 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 
 
 export default function Home() {
@@ -18,6 +20,9 @@ export default function Home() {
   const { loginAs, loading } = useAuth();
   const router = useRouter();
   const [loadingRole, setLoadingRole] = useState<string | null>(null);
+  const [isTeacherDialogOpen, setIsTeacherDialogOpen] = useState(false);
+  const [teacherPassword, setTeacherPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
 
   const handleMockLogin = (role: string) => {
     setLoadingRole(role);
@@ -28,6 +33,16 @@ export default function Home() {
       router.push(`/student/dashboard`);
     }
   };
+
+  const handleTeacherLoginAttempt = () => {
+    if (teacherPassword === '2918') {
+        setPasswordError('');
+        setIsTeacherDialogOpen(false);
+        handleMockLogin('teacher');
+    } else {
+        setPasswordError('비밀번호가 올바르지 않습니다.');
+    }
+  }
   
   const RoleButton = ({ role, children }: { role: string; children: React.ReactNode }) => (
     <Button
@@ -97,22 +112,67 @@ export default function Home() {
                 </CardContent>
             </Card>
             
-            <Card className="bg-white/70 backdrop-blur-sm shadow-lg hover:shadow-xl transition-shadow">
-                <CardHeader>
-                     <div className="flex items-center gap-3">
-                        <div className="p-3 bg-jeju-sea/10 rounded-full">
-                            <School className="h-6 w-6 text-jeju-sea" />
+            <Dialog open={isTeacherDialogOpen} onOpenChange={setIsTeacherDialogOpen}>
+                <Card className="bg-white/70 backdrop-blur-sm shadow-lg hover:shadow-xl transition-shadow">
+                    <CardHeader>
+                        <div className="flex items-center gap-3">
+                            <div className="p-3 bg-jeju-sea/10 rounded-full">
+                                <School className="h-6 w-6 text-jeju-sea" />
+                            </div>
+                            <div>
+                                <CardTitle className="text-basalt-gray">{t.mainPage.teacherLoginTitle}</CardTitle>
+                                <CardDescription className="text-gray-500">{t.mainPage.teacherLoginDescription}</CardDescription>
+                            </div>
                         </div>
-                        <div>
-                            <CardTitle className="text-basalt-gray">{t.mainPage.teacherLoginTitle}</CardTitle>
-                            <CardDescription className="text-gray-500">{t.mainPage.teacherLoginDescription}</CardDescription>
-                        </div>
+                    </CardHeader>
+                    <CardContent>
+                        <DialogTrigger asChild>
+                            <Button
+                                className="w-full bg-white hover:bg-gray-100 text-basalt-gray border-gray-300"
+                                variant="outline"
+                                size="lg"
+                                disabled={!!loadingRole || loading}
+                            >
+                                {loadingRole === 'teacher' ? (
+                                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                                ) : (
+                                t.mainPage.teacherLoginButton
+                                )}
+                            </Button>
+                        </DialogTrigger>
+                    </CardContent>
+                </Card>
+                 <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2"><KeyRound/>교사 확인</DialogTitle>
+                        <DialogDescription>
+                            교사 포털에 접근하려면 비밀번호를 입력하세요.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                       <Input
+                            id="password"
+                            type="password"
+                            value={teacherPassword}
+                            onChange={(e) => setTeacherPassword(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    handleTeacherLoginAttempt();
+                                }
+                            }}
+                            placeholder="비밀번호"
+                            autoFocus
+                        />
+                        {passwordError && (
+                            <div className="flex items-center text-sm font-medium text-destructive">
+                                <AlertCircle className="h-4 w-4 mr-2" />
+                                {passwordError}
+                            </div>
+                        )}
                     </div>
-                </CardHeader>
-                <CardContent>
-                    <RoleButton role="teacher">{t.mainPage.teacherLoginButton}</RoleButton>
-                </CardContent>
-            </Card>
+                     <Button type="submit" onClick={handleTeacherLoginAttempt}>확인</Button>
+                </DialogContent>
+            </Dialog>
         </div>
       </div>
 
