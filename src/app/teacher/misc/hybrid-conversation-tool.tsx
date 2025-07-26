@@ -35,6 +35,7 @@ export function HybridConversationTool() {
         recognitionRef.current.onresult = null;
         recognitionRef.current.onend = null;
         recognitionRef.current.onerror = null;
+        if(recognitionRef.current.onstart) recognitionRef.current.onstart = null;
         recognitionRef.current.stop();
         recognitionRef.current = null;
     }
@@ -52,7 +53,6 @@ export function HybridConversationTool() {
     reader.onloadend = async () => {
         const audioDataUri = reader.result as string;
         try {
-            // The server now does STT, so we use its transcript as the source of truth
             const { studentTranscript, aiResponseText, aiResponseAudioDataUri } = await converseWithHybridTeacher({
                 studentRecordingDataUri: audioDataUri,
                 conversationHistory: conversation,
@@ -78,6 +78,20 @@ export function HybridConversationTool() {
     };
   }, [conversation, toast]);
   
+  const processFinalTranscript = useCallback((transcript: string) => {
+    cleanup();
+    if (mediaRecorderRef.current?.state === 'recording') {
+        mediaRecorderRef.current.stop();
+    }
+    
+    // The onstop event of mediaRecorder will handle the blob processing.
+    // This function's main job now is just to stop the recognition.
+    if (!transcript.trim()) {
+        setSessionState("speaking"); // Or an appropriate state to allow user to try again
+    }
+
+  }, [cleanup]);
+
 
   const startListening = useCallback(() => {
     setSessionState("listening");
@@ -103,29 +117,28 @@ export function HybridConversationTool() {
         const resetTimer = () => {
             if (speechEndTimerRef.current) clearTimeout(speechEndTimerRef.current);
             speechEndTimerRef.current = setTimeout(() => {
-                if (recognitionRef.current) recognitionRef.current.stop();
+                if (recognitionRef.current) {
+                    const finalTranscript = finalTranscriptRef.current + " " + interimTranscript;
+                    processFinalTranscript(finalTranscript.trim());
+                }
             }, SPEECH_END_TIMEOUT_MS);
         };
 
         recognition.onresult = (event) => {
             let currentInterim = "";
-            let localFinal = "";
             for (let i = event.resultIndex; i < event.results.length; ++i) {
                  if (event.results[i].isFinal) {
-                    localFinal += event.results[i][0].transcript;
+                    finalTranscriptRef.current += event.results[i][0].transcript + ' ';
                 } else {
                     currentInterim += event.results[i][0].transcript;
                 }
             }
-            finalTranscriptRef.current = localFinal;
-            setInterimTranscript(localFinal + currentInterim);
+            setInterimTranscript(currentInterim);
             resetTimer();
         };
 
         recognition.onend = () => {
-            if (mediaRecorderRef.current?.state === 'recording') {
-                mediaRecorderRef.current.stop();
-            }
+            // This is just a safety net, the main logic is in the timer.
         };
 
         recognition.onerror = (event) => {
@@ -164,7 +177,7 @@ export function HybridConversationTool() {
         toast({ title: "음성 인식 시작 오류", variant: "destructive" });
         setSessionState("idle");
     }
-  }, [toast, cleanup, processAudioBlob]);
+  }, [toast, cleanup, processAudioBlob, processFinalTranscript]);
   
    useEffect(() => {
     (window as any)._startListening = startListening;
@@ -262,11 +275,11 @@ export function HybridConversationTool() {
                  {turn.role === 'model' && <div className="p-2 rounded-full bg-primary text-primary-foreground"><Bot className="h-5 w-5" /></div>}
               </div>
             ))}
-             {interimTranscript && (sessionState === 'listening' || sessionState === 'processing') && (
+             {(sessionState === 'listening' || sessionState === 'processing') && (
                 <div className="flex items-start gap-3 justify-start">
                     <div className="p-2 rounded-full bg-muted"><User className="h-5 w-5" /></div>
                     <div className="p-3 rounded-lg max-w-[80%] bg-muted">
-                        <p className="text-sm text-muted-foreground italic">{interimTranscript}</p>
+                        <p className="text-sm text-muted-foreground italic">{finalTranscriptRef.current} {interimTranscript}</p>
                     </div>
                 </div>
             )}
