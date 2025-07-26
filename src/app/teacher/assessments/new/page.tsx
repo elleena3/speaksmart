@@ -11,7 +11,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, CalendarIcon, ChevronsUpDown, Check, Info, Type, ImageIcon, Wand2, Copy, BookOpen, Film } from "lucide-react";
+import { Loader2, CalendarIcon, ChevronsUpDown, Check, Info, Type, ImageIcon, Wand2, Copy, BookOpen, Film, Edit, Users, Search } from "lucide-react";
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -22,7 +22,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { scenarios, type TeacherAssessment, femaleVoices, maleVoices, allVoices, evaluationModels, voiceDescriptions, type AiVoice, monologueTypes } from "@/lib/types";
+import { scenarios, type TeacherAssessment, femaleVoices, maleVoices, allVoices, evaluationModels, voiceDescriptions, type AiVoice, monologueTypes, type UserData } from "@/lib/types";
 import { useAuth, mockStudents } from "@/context/auth-context";
 import { addDoc, collection, getDocs, query, where } from "firebase/firestore";
 import { db, storage } from "@/lib/firebase";
@@ -31,24 +31,64 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { generateImage } from "@/ai/flows/generate-image-flow";
 import Image from 'next/image';
 import { Label } from "@/components/ui/label";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+
 
 const promptExamples = [
   {
     prompt: "공원 벤치에 앉아 책을 읽고 있는 할머니, 따뜻한 색감의 수채화 스타일",
-    image: "https://firebasestorage.googleapis.com/v0/b/speaksmart-evaluator2.appspot.com/o/image%2FGemini_Generated_Image_tegrq6teg.png?alt=media&token=def04b4c-2d30-4194-9e40-871caf273954",
+    image: "https://firebasestorage.googleapis.com/v0/b/speaksmart-evaluator2.firebasestorage.app/o/image%2FGemini_Generated_Image_tegrq6teg.png?alt=media&token=def04b4c-2d30-4194-9e40-871caf273954",
     hint: "grandmother reading park",
   },
   {
     prompt: "로켓을 타고 달로 날아가는 우주비행사, 뒤에는 지구가 보인다, 단순한 만화 스타일",
-    image: "https://firebasestorage.googleapis.com/v0/b/speaksmart-evaluator2.appspot.com/o/image%2FGemini_Generated_Image_unh72munh.png?alt=media&token=8bd0265c-3afe-46e5-80d0-d8d8fbe748b2",
+    image: "https://firebasestorage.googleapis.com/v0/b/speaksmart-evaluator2.firebasestorage.app/o/image%2FGemini_Generated_Image_unh72munh.png?alt=media&token=8bd0265c-3afe-46e5-80d0-d8d8fbe748b2",
     hint: "astronaut rocket moon",
   },
   {
     prompt: "산 정상에서 일출을 보고 있는 등산객의 뒷모습, 장엄한 풍경, 사실적인 사진 스타일",
-    image: "https://firebasestorage.googleapis.com/v0/b/speaksmart-evaluator2.appspot.com/o/image%2FGemini_Generated_Image_96vqrp96v.png?alt=media&token=1e48e934-2bc5-4e29-b199-9f8e96b2c2eb",
+    image: "https://firebasestorage.googleapis.com/v0/b/speaksmart-evaluator2.firebasestorage.app/o/image%2FGemini_Generated_Image_96vqrp96v.png?alt=media&token=1e48e934-2bc5-4e29-b199-9f8e96b2c2eb",
     hint: "hiker sunrise mountain",
   },
 ];
+
+function FilterCombobox({ label, options, value, onSelect }: { label: string, options: string[], value: string, onSelect: (value: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const displayValue = value === 'all' ? `모든 ${label}` : `${value}${label.endsWith('반') ? '반' : '학년'}`;
+  
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" role="combobox" aria-expanded={open} className="w-[120px] justify-between">
+          {displayValue}
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[120px] p-0">
+        <Command>
+          <CommandList>
+            <CommandEmpty>결과 없음.</CommandEmpty>
+            <CommandGroup>
+              {options.map(option => (
+                <CommandItem
+                  key={option}
+                  value={option}
+                  onSelect={(currentValue) => {
+                    onSelect(currentValue === value ? value : currentValue);
+                    setOpen(false);
+                  }}
+                >
+                  <Check className={`mr-2 h-4 w-4 ${value === option ? 'opacity-100' : 'opacity-0'}`} />
+                  {option === 'all' ? `모든 ${label}` : option}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 
 export default function NewAssessmentPage() {
@@ -64,6 +104,11 @@ export default function NewAssessmentPage() {
   const [imagePrompt, setImagePrompt] = useState("");
   const [generatedImageDataUri, setGeneratedImageDataUri] = useState<string | null>(null);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  
+  const [realStudents, setRealStudents] = useState<UserData[]>([]);
+  const [isStudentListLoading, setIsStudentListLoading] = useState(true);
+  const [studentFilter, setStudentFilter] = useState<{ grade: string, class: string }>({ grade: 'all', class: 'all' });
+
 
   const formSchema = useMemo(() => z.object({
     title: z.string().optional(),
@@ -75,7 +120,7 @@ export default function NewAssessmentPage() {
     assessmentType: z.enum(["monologue", "dialogue"]),
     monologueType: z.enum(monologueTypes).optional(),
     targetType: z.enum(["all", "specific"]).default("all"),
-    targetStudentIds: z.union([z.literal('all'), z.array(z.string())]),
+    targetStudentIds: z.union([z.literal('all'), z.array(z.string()).min(1, "한 명 이상의 학생을 선택해야 합니다.")]),
     scenario: z.enum(scenarios).optional(),
     recordingTimeLimit: z.coerce.number().int().min(0).optional(),
     aiVoice: z.enum(allVoices).optional().default('algenib'),
@@ -108,7 +153,7 @@ export default function NewAssessmentPage() {
         ctx.addIssue({ code: z.ZodIssueCode.custom, message: t.teacherAssessmentForm.errors.expectedFormatRequired, path: ['expectedFormat'] });
     }
 
-    if (data.targetType === 'specific' && (data.targetStudentIds === 'all' || data.targetStudentIds.length === 0)) {
+    if (data.targetType === 'specific' && Array.isArray(data.targetStudentIds) && data.targetStudentIds.length === 0) {
         ctx.addIssue({ code: z.ZodIssueCode.custom, message: t.teacherAssessmentForm.errors.studentRequired, path: ['targetStudentIds']});
     }
 
@@ -135,7 +180,7 @@ export default function NewAssessmentPage() {
       useRubric: false,
     },
   });
-
+  
   const assessmentType = form.watch("assessmentType");
   const monologueType = form.watch("monologueType");
   const targetType = form.watch("targetType");
@@ -146,8 +191,45 @@ export default function NewAssessmentPage() {
   useEffect(() => {
     if (!authLoading && !user) {
         router.push('/');
+    } else if (user && !isStudentListLoading) {
+      // Do nothing, student list is loaded
+    } else if (user) {
+        const fetchStudents = async () => {
+            setIsStudentListLoading(true);
+            const q = query(collection(db, "users"), where("role", "==", "student"));
+            const querySnapshot = await getDocs(q);
+            const studentList = querySnapshot.docs.map(doc => doc.data() as UserData);
+            setRealStudents(studentList);
+            setIsStudentListLoading(false);
+        };
+        fetchStudents();
     }
-  }, [user, authLoading, router]);
+  }, [user, authLoading, router, isStudentListLoading]);
+
+  const uniqueGrades = useMemo(() => ['all', ...Array.from(new Set(realStudents.map(s => s.grade || ''))).filter(g => g)], [realStudents]);
+  const uniqueClasses = useMemo(() => ['all', ...Array.from(new Set(realStudents.filter(s => studentFilter.grade === 'all' || s.grade === studentFilter.grade).map(s => s.class || ''))).filter(c => c)], [realStudents, studentFilter.grade]);
+
+  const filteredRealStudents = useMemo(() => {
+    return realStudents.filter(student => {
+      const gradeMatch = studentFilter.grade === 'all' || student.grade === studentFilter.grade;
+      const classMatch = studentFilter.class === 'all' || student.class === studentFilter.class;
+      return gradeMatch && classMatch;
+    });
+  }, [realStudents, studentFilter]);
+
+  const handleSelectAll = (studentsToSelect: UserData[], field: any) => {
+    const currentSelection = new Set(Array.isArray(field.value) ? field.value : []);
+    const allIds = new Set(studentsToSelect.map(s => s.uid));
+    const areAllSelected = studentsToSelect.every(s => currentSelection.has(s.uid));
+
+    if (areAllSelected) {
+        studentsToSelect.forEach(s => currentSelection.delete(s.uid));
+    } else {
+        studentsToSelect.forEach(s => currentSelection.add(s.uid));
+    }
+    field.onChange(Array.from(currentSelection));
+  };
+
 
   useEffect(() => {
     form.trigger();
@@ -281,9 +363,129 @@ export default function NewAssessmentPage() {
       </CardHeader>
       <CardContent>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+             <FormField
+                control={form.control}
+                name="targetType"
+                render={({ field }) => (
+                  <FormItem className="space-y-3">
+                    <FormLabel>{t.teacherAssessmentForm.targetLabel}</FormLabel>
+                    <FormControl>
+                      <RadioGroup
+                        onValueChange={(value) => {
+                            field.onChange(value);
+                            if (value === 'all') {
+                                form.setValue('targetStudentIds', 'all');
+                            } else {
+                                form.setValue('targetStudentIds', []);
+                            }
+                        }}
+                        value={field.value}
+                        className="flex items-center space-x-4"
+                      >
+                        <FormItem className="flex items-center space-x-2 space-y-0">
+                          <FormControl><RadioGroupItem value="all" /></FormControl>
+                          <FormLabel className="font-normal">{t.teacherAssessmentForm.targetAll}</FormLabel>
+                        </FormItem>
+                        <FormItem className="flex items-center space-x-2 space-y-0">
+                          <FormControl><RadioGroupItem value="specific" /></FormControl>
+                          <FormLabel className="font-normal">{t.teacherAssessmentForm.targetSpecific}</FormLabel>
+                        </FormItem>
+                      </RadioGroup>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+            {targetType === 'specific' && (
               <FormField
+                control={form.control}
+                name="targetStudentIds"
+                render={({ field }) => (
+                  <FormItem>
+                    <div className="mb-4">
+                      <FormLabel className="text-base">{t.teacherAssessmentForm.selectStudentsLabel}</FormLabel>
+                      <FormDescription>{t.teacherAssessmentForm.selectStudentsDescription}</FormDescription>
+                    </div>
+                    
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between p-4">
+                            <CardTitle className="text-lg flex items-center gap-2"><Edit className="h-5 w-5"/>목업 계정</CardTitle>
+                             <div className="flex items-center space-x-2">
+                                <Label htmlFor="select-all-mock">전체 선택</Label>
+                                <Checkbox
+                                    id="select-all-mock"
+                                    onCheckedChange={() => handleSelectAll(mockStudents, field)}
+                                    checked={Array.isArray(field.value) && mockStudents.every(s => field.value.includes(s.uid))}
+                                />
+                            </div>
+                        </CardHeader>
+                        <CardContent className="p-4 grid grid-cols-2 md:grid-cols-3 gap-4">
+                           {mockStudents.map((item) => (
+                              <FormItem key={item.uid} className="flex flex-row items-start space-x-3 space-y-0">
+                                <FormControl>
+                                  <Checkbox
+                                    checked={Array.isArray(field.value) && field.value.includes(item.uid)}
+                                    onCheckedChange={(checked) => {
+                                      const currentIds = Array.isArray(field.value) ? field.value : [];
+                                      return checked
+                                        ? field.onChange([...currentIds, item.uid])
+                                        : field.onChange(currentIds.filter((value) => value !== item.uid))
+                                    }}
+                                  />
+                                </FormControl>
+                                <FormLabel className="font-normal">{item.displayName}</FormLabel>
+                              </FormItem>
+                            ))}
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                       <CardHeader className="flex flex-row items-center justify-between p-4">
+                          <CardTitle className="text-lg flex items-center gap-2"><Users className="h-5 w-5"/>가입한 학생</CardTitle>
+                          <div className="flex items-center gap-2">
+                            <FilterCombobox label="학년" options={uniqueGrades} value={studentFilter.grade} onSelect={(value) => setStudentFilter({ grade: value, class: 'all' })} />
+                            <FilterCombobox label="반" options={uniqueClasses} value={studentFilter.class} onSelect={(value) => setStudentFilter({ ...studentFilter, class: value })} />
+                            <div className="flex items-center space-x-2">
+                                <Label htmlFor="select-all-real">전체 선택</Label>
+                                <Checkbox
+                                    id="select-all-real"
+                                    onCheckedChange={() => handleSelectAll(filteredRealStudents, field)}
+                                    checked={Array.isArray(field.value) && filteredRealStudents.length > 0 && filteredRealStudents.every(s => field.value.includes(s.uid))}
+                                />
+                            </div>
+                          </div>
+                       </CardHeader>
+                       <CardContent className="p-4 grid grid-cols-2 md:grid-cols-4 gap-4">
+                           {isStudentListLoading ? <Loader2 className="animate-spin"/> :
+                           filteredRealStudents.length > 0 ? (
+                               filteredRealStudents.map((item) => (
+                                  <FormItem key={item.uid} className="flex flex-row items-start space-x-3 space-y-0">
+                                    <FormControl>
+                                      <Checkbox
+                                        checked={Array.isArray(field.value) && field.value.includes(item.uid)}
+                                        onCheckedChange={(checked) => {
+                                          const currentIds = Array.isArray(field.value) ? field.value : [];
+                                          return checked
+                                            ? field.onChange([...currentIds, item.uid])
+                                            : field.onChange(currentIds.filter((value) => value !== item.uid))
+                                        }}
+                                      />
+                                    </FormControl>
+                                    <FormLabel className="font-normal">{item.displayName}</FormLabel>
+                                  </FormItem>
+                                ))
+                           ) : <p className="text-sm text-muted-foreground col-span-full text-center">해당 조건의 학생이 없습니다.</p>}
+                       </CardContent>
+                    </Card>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+            
+            <FormField
                 control={form.control}
                 name="assessmentType"
                 render={({ field }) => (
@@ -293,23 +495,15 @@ export default function NewAssessmentPage() {
                       <RadioGroup
                         onValueChange={field.onChange}
                         defaultValue={field.value}
-                        className="flex flex-col space-y-1"
+                        className="flex items-center space-x-4"
                       >
-                        <FormItem className="flex items-center space-x-3 space-y-0">
-                          <FormControl>
-                            <RadioGroupItem value="monologue" />
-                          </FormControl>
-                          <FormLabel className="font-normal">
-                            {t.teacherAssessmentForm.typeMonologue}
-                          </FormLabel>
+                        <FormItem className="flex items-center space-x-2 space-y-0">
+                          <FormControl><RadioGroupItem value="monologue" /></FormControl>
+                          <FormLabel className="font-normal">{t.teacherAssessmentForm.typeMonologue}</FormLabel>
                         </FormItem>
-                        <FormItem className="flex items-center space-x-3 space-y-0">
-                          <FormControl>
-                            <RadioGroupItem value="dialogue" />
-                          </FormControl>
-                          <FormLabel className="font-normal">
-                            {t.teacherAssessmentForm.typeDialogue}
-                          </FormLabel>
+                        <FormItem className="flex items-center space-x-2 space-y-0">
+                          <FormControl><RadioGroupItem value="dialogue" /></FormControl>
+                          <FormLabel className="font-normal">{t.teacherAssessmentForm.typeDialogue}</FormLabel>
                         </FormItem>
                       </RadioGroup>
                     </FormControl>
@@ -317,8 +511,8 @@ export default function NewAssessmentPage() {
                   </FormItem>
                 )}
               />
-              
-              {assessmentType === 'monologue' && (
+
+            {assessmentType === 'monologue' && (
                   <FormField
                     control={form.control}
                     name="monologueType"
@@ -326,16 +520,16 @@ export default function NewAssessmentPage() {
                       <FormItem className="space-y-3">
                         <FormLabel>혼자 말하기 유형</FormLabel>
                          <FormControl>
-                           <RadioGroup onValueChange={field.onChange} value={field.value} className="flex flex-col space-y-1">
-                                <FormItem className="flex items-center space-x-3 space-y-0">
+                           <RadioGroup onValueChange={field.onChange} value={field.value} className="flex items-center space-x-4">
+                                <FormItem className="flex items-center space-x-2 space-y-0">
                                     <FormControl><RadioGroupItem value="text"/></FormControl>
                                     <FormLabel className="font-normal flex items-center gap-2"><Type/>주제/텍스트 제시</FormLabel>
                                 </FormItem>
-                                <FormItem className="flex items-center space-x-3 space-y-0">
+                                <FormItem className="flex items-center space-x-2 space-y-0">
                                     <FormControl><RadioGroupItem value="image"/></FormControl>
                                     <FormLabel className="font-normal flex items-center gap-2"><ImageIcon/>그림 묘사하기</FormLabel>
                                 </FormItem>
-                                <FormItem className="flex items-center space-x-3 space-y-0">
+                                <FormItem className="flex items-center space-x-2 space-y-0">
                                     <FormControl><RadioGroupItem value="comic"/></FormControl>
                                     <FormLabel className="font-normal flex items-center gap-2"><Film/>네컷 만화 설명하기</FormLabel>
                                 </FormItem>
@@ -346,7 +540,6 @@ export default function NewAssessmentPage() {
                     )}
                   />
               )}
-            </div>
             
             {(monologueType === 'image' || monologueType === 'comic') && assessmentType === 'monologue' && (
                 <Card>
@@ -375,6 +568,7 @@ export default function NewAssessmentPage() {
                                                 <div className="text-sm p-2 bg-muted rounded-md relative">
                                                     <p className="pr-10">“{example.prompt}”</p>
                                                     <Button
+                                                        type="button"
                                                         variant="ghost"
                                                         size="icon"
                                                         className="absolute top-1 right-1 h-7 w-7"
@@ -424,41 +618,6 @@ export default function NewAssessmentPage() {
             )}
 
 
-            <FormField
-              control={form.control}
-              name="targetType"
-              render={({ field }) => (
-                <FormItem className="space-y-3">
-                  <FormLabel>{t.teacherAssessmentForm.targetLabel}</FormLabel>
-                  <FormControl>
-                    <RadioGroup
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                      className="flex flex-col space-y-1"
-                    >
-                      <FormItem className="flex items-center space-x-3 space-y-0">
-                        <FormControl>
-                          <RadioGroupItem value="all" />
-                        </FormControl>
-                        <FormLabel className="font-normal">
-                          {t.teacherAssessmentForm.targetAll}
-                        </FormLabel>
-                      </FormItem>
-                      <FormItem className="flex items-center space-x-3 space-y-0">
-                        <FormControl>
-                          <RadioGroupItem value="specific" />
-                        </FormControl>
-                        <FormLabel className="font-normal">
-                          {t.teacherAssessmentForm.targetSpecific}
-                        </FormLabel>
-                      </FormItem>
-                    </RadioGroup>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            
             {assessmentType === 'dialogue' && (
               <FormField
                 control={form.control}
@@ -470,6 +629,7 @@ export default function NewAssessmentPage() {
                       <PopoverTrigger asChild>
                         <FormControl>
                           <Button
+                            type="button"
                             variant="outline"
                             role="combobox"
                             className={cn("w-full justify-between", !field.value && "text-muted-foreground")}
@@ -488,8 +648,8 @@ export default function NewAssessmentPage() {
                                 <div className="flex flex-col space-y-1">
                                 {femaleVoices.map((voice) => (
                                     <Button
-                                        key={voice}
                                         type="button"
+                                        key={voice}
                                         variant="ghost"
                                         className="w-full justify-start text-left h-auto"
                                         onClick={() => {
@@ -512,8 +672,8 @@ export default function NewAssessmentPage() {
                                <div className="flex flex-col space-y-1">
                                 {maleVoices.map((voice) => (
                                     <Button
-                                        key={voice}
                                         type="button"
+                                        key={voice}
                                         variant="ghost"
                                         className="w-full justify-start text-left h-auto"
                                         onClick={() => {
@@ -564,62 +724,7 @@ export default function NewAssessmentPage() {
                 </FormItem>
               )}
             />
-
-            {targetType === 'specific' && (
-              <FormField
-                control={form.control}
-                name="targetStudentIds"
-                render={() => (
-                  <FormItem>
-                    <div className="mb-4">
-                      <FormLabel className="text-base">{t.teacherAssessmentForm.selectStudentsLabel}</FormLabel>
-                      <FormDescription>
-                        {t.teacherAssessmentForm.selectStudentsDescription}
-                      </FormDescription>
-                    </div>
-                    {mockStudents.map((item) => (
-                      <React.Fragment key={item.uid}>
-                        <FormField
-                          key={item.uid}
-                          control={form.control}
-                          name="targetStudentIds"
-                          render={({ field }) => {
-                            const studentIds = Array.isArray(field.value) ? field.value : [];
-                            return (
-                              <FormItem
-                                key={item.uid}
-                                className="flex flex-row items-start space-x-3 space-y-0"
-                              >
-                                <FormControl>
-                                  <Checkbox
-                                    checked={studentIds.includes(item.uid)}
-                                    onCheckedChange={(checked) => {
-                                      return checked
-                                        ? field.onChange([...studentIds, item.uid])
-                                        : field.onChange(
-                                            studentIds.filter(
-                                              (value) => value !== item.uid
-                                            )
-                                          )
-                                    }}
-                                  />
-                                </FormControl>
-                                <FormLabel className="font-normal">
-                                  {item.displayName} ({item.email})
-                                </FormLabel>
-                              </FormItem>
-                            )
-                          }}
-                        />
-                      </React.Fragment>
-                    ))}
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
-
-
+            
             {assessmentType === 'dialogue' && (
                <FormField
                   control={form.control}
