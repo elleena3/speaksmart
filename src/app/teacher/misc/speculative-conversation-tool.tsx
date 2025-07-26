@@ -11,8 +11,8 @@ import { converseWithSpeculativeTeacher } from "@/ai/flows/create-speculative-te
 import { cn } from "@/lib/utils";
 
 const mimeType = 'audio/webm;codecs=opus';
-const SPEECH_END_TIMEOUT_MS = 2500; 
-const MIN_SPEECH_DURATION_MS = 500; 
+const SPEECH_END_TIMEOUT_MS = 2500;
+const MIN_SPEECH_DURATION_MS = 500;
 
 type SessionState = "idle" | "initializing" | "speaking" | "listening" | "processing" | "ending" | "finished";
 type TurnWithAnimation = ConversationTurn & { justUpdated?: boolean; id?: number };
@@ -21,7 +21,7 @@ type TurnWithAnimation = ConversationTurn & { justUpdated?: boolean; id?: number
 export function SpeculativeConversationTool() {
   const [sessionState, setSessionState] = useState<SessionState>("idle");
   const [conversation, setConversation] = useState<TurnWithAnimation[]>([]);
-  
+
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
@@ -31,7 +31,10 @@ export function SpeculativeConversationTool() {
   const speechRecognitionRef = useRef<SpeechRecognition | null>(null);
   const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const speechStartTimeRef = useRef<number | null>(null);
-  const currentInterimTurnId = useRef<number | null>(null);
+  const finalTranscriptRef = useRef<string>("");
+  const interimTranscriptRef = useRef<string>("");
+  const interimTurnIdRef = useRef<number | null>(null);
+
 
   const cleanup = useCallback(() => {
     if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
@@ -47,14 +50,16 @@ export function SpeculativeConversationTool() {
     }
     audioChunksRef.current = [];
     speechStartTimeRef.current = null;
+    finalTranscriptRef.current = "";
+    interimTranscriptRef.current = "";
+    interimTurnIdRef.current = null;
   }, []);
 
   const processAudio = useCallback(async (audioBlob: Blob) => {
     setSessionState("processing");
-    
-    // Create initial chunk for speculation
+
     const initialChunkBlob = new Blob(audioChunksRef.current.slice(0, 10), { type: mimeType });
-    
+
     const [initialChunkDataUri, finalAudioDataUri] = await Promise.all([
         new Promise<string>(resolve => {
             if (initialChunkBlob.size === 0) { resolve(""); return; }
@@ -68,7 +73,7 @@ export function SpeculativeConversationTool() {
             reader.onloadend = () => resolve(reader.result as string);
         }),
     ]);
-    
+
     try {
         const { finalStudentTranscript, aiResponseText, aiResponseAudioDataUri } = await converseWithSpeculativeTeacher({
             initialChunkDataUri: initialChunkDataUri || undefined,
@@ -76,10 +81,9 @@ export function SpeculativeConversationTool() {
             conversationHistory: conversation.filter(turn => turn.role !== 'user_interim'),
         });
 
-        // Replace the interim turn with the final, corrected one from the server
         setConversation(prev => {
-            const newHistory = prev.filter(turn => turn.role !== 'user_interim');
-            newHistory.push({ role: 'user', text: finalStudentTranscript || "(음성 인식 안됨)", justUpdated: true });
+            const newHistory = prev.filter(turn => turn.id !== interimTurnIdRef.current);
+            newHistory.push({ role: 'user', text: finalStudentTranscript || "(음성 인식 안됨)", justUpdated: true, id: interimTurnIdRef.current || Date.now() });
             newHistory.push({ role: 'model', text: aiResponseText });
             return newHistory;
         });
@@ -99,7 +103,7 @@ export function SpeculativeConversationTool() {
         setSessionState('speaking');
     }
   }, [conversation, toast]);
-  
+
 
   const startListeningVAD = useCallback(() => {
     setSessionState("listening");
@@ -116,15 +120,14 @@ export function SpeculativeConversationTool() {
         navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
             mediaRecorderRef.current = new MediaRecorder(stream, { mimeType, audioBitsPerSecond: 16000 });
             audioChunksRef.current = [];
-            
+
             mediaRecorderRef.current.ondataavailable = (event) => {
                 if (event.data.size > 0) audioChunksRef.current.push(event.data);
             };
             mediaRecorderRef.current.onstop = () => {
                 const fullAudioBlob = new Blob(audioChunksRef.current, { type: mimeType });
                 const currentSessionState = (window as any)._sessionState;
-                // Only process if we are in a listening state and have enough data
-                if (fullAudioBlob.size > 1000 && currentSessionState === 'listening') { 
+                if (fullAudioBlob.size > 1000 && currentSessionState === 'listening') {
                     processAudio(fullAudioBlob);
                 }
                 stream.getTracks().forEach(track => track.stop());
@@ -136,7 +139,7 @@ export function SpeculativeConversationTool() {
             recognition.continuous = true;
             recognition.interimResults = true;
             recognition.lang = 'en-US';
-            
+
             const stopAll = () => {
                 if (speechRecognitionRef.current) speechRecognitionRef.current.stop();
                 if (mediaRecorderRef.current?.state === 'recording') mediaRecorderRef.current.stop();
@@ -147,33 +150,35 @@ export function SpeculativeConversationTool() {
                 silenceTimerRef.current = setTimeout(() => {
                     if (speechStartTimeRef.current && (Date.now() - speechStartTimeRef.current > MIN_SPEECH_DURATION_MS)) {
                        stopAll();
-                    } else {
-                       // if no speech started, don't stop, just keep listening.
-                       // resetSilenceTimer();
                     }
                 }, SPEECH_END_TIMEOUT_MS);
             };
 
             recognition.onresult = (event) => {
-                let interim = "";
+                interimTranscriptRef.current = "";
                 for (let i = event.resultIndex; i < event.results.length; ++i) {
-                     interim += event.results[i][0].transcript;
+                     if(event.results[i].isFinal) {
+                        finalTranscriptRef.current += event.results[i][0].transcript + ' ';
+                     } else {
+                        interimTranscriptRef.current += event.results[i][0].transcript;
+                     }
                 }
-                
-                if (interim && !speechStartTimeRef.current) {
+                const fullInterimText = (finalTranscriptRef.current + interimTranscriptRef.current).trim();
+
+                if (fullInterimText && !speechStartTimeRef.current) {
                     speechStartTimeRef.current = Date.now();
-                    const newInterimTurn = { role: 'user_interim', text: interim, id: Date.now() };
-                    currentInterimTurnId.current = newInterimTurn.id;
+                    const newInterimTurn = { role: 'user_interim', text: fullInterimText, id: Date.now() };
+                    interimTurnIdRef.current = newInterimTurn.id;
                     setConversation(prev => [...prev, newInterimTurn]);
-                } else if (currentInterimTurnId.current) {
-                    setConversation(prev => prev.map(t => t.id === currentInterimTurnId.current ? {...t, text: interim} : t));
+                } else if (interimTurnIdRef.current) {
+                    setConversation(prev => prev.map(t => t.id === interimTurnIdRef.current ? {...t, text: fullInterimText} : t));
                 }
 
-                if (interim) {
+                if (fullInterimText) {
                     resetSilenceTimer();
                 }
             };
-            
+
             recognition.onend = () => {
                 if (mediaRecorderRef.current?.state === 'recording') {
                      mediaRecorderRef.current.stop();
@@ -188,7 +193,7 @@ export function SpeculativeConversationTool() {
             };
 
             recognition.start();
-            
+
         }).catch(err => {
             toast({ title: "마이크 오류", variant: "destructive" });
             setSessionState("idle");
@@ -198,13 +203,13 @@ export function SpeculativeConversationTool() {
         setSessionState("idle");
     }
   }, [cleanup, processAudio, toast]);
-  
+
   useEffect(() => {
       (window as any)._startListeningVAD = startListeningVAD;
       (window as any)._sessionState = sessionState;
       return () => { delete (window as any)._startListeningVAD; delete (window as any)._sessionState; }
   }, [startListeningVAD, sessionState]);
-  
+
   useEffect(() => {
     return () => cleanup();
   }, [cleanup]);
@@ -234,7 +239,7 @@ export function SpeculativeConversationTool() {
       setSessionState("idle");
     }
   };
-  
+
   const handleStopConversation = () => {
     setSessionState("ending");
     cleanup();
@@ -261,13 +266,13 @@ export function SpeculativeConversationTool() {
         default: return <Button size="lg" onClick={handleStopConversation} variant="destructive" className="w-full" disabled={sessionState==='ending' || sessionState==='initializing' || sessionState==='processing'}><StopCircle className="mr-2"/>대화 종료</Button>
     }
   }
-  
+
    const getStatusIndicator = () => {
       switch(sessionState) {
         case 'speaking': return <div className="flex items-center gap-2 text-sm font-medium"><Volume2 className="h-5 w-5 text-green-500 animate-pulse"/><span>AI 응답 중...</span></div>
         case 'listening': return <div className="flex items-center gap-2 text-sm font-medium"><Mic className="h-5 w-5 text-blue-500 animate-pulse"/><span>듣는 중...</span></div>
         case 'processing': return <div className="flex items-center gap-2 text-sm font-medium"><Loader2 className="h-5 w-5 animate-spin"/><span>처리 중...</span></div>
-        case 'initializing': 
+        case 'initializing':
         case 'ending':
            return <div className="flex items-center gap-2 text-sm font-medium"><Loader2 className="h-5 w-5 animate-spin"/><span>처리 중...</span></div>
         default: return null
@@ -300,16 +305,20 @@ export function SpeculativeConversationTool() {
             {conversation.map((turn, index) => {
                  const isUser = turn.role === 'user' || turn.role === 'user_interim';
                  const isInterim = turn.role === 'user_interim';
-                 
+
                  return (
                     <div key={turn.id || index} className={cn("flex items-start gap-3", isUser ? 'justify-start' : 'justify-end')}>
                         {isUser && <div className="p-2 rounded-full bg-muted"><User className="h-5 w-5" /></div>}
                         <div className={cn(
-                            "p-3 rounded-lg max-w-[80%]", 
+                            "p-3 rounded-lg max-w-[80%]",
                             isUser ? 'bg-muted' : 'bg-primary text-primary-foreground',
                             turn.justUpdated && 'animate-glow-once'
                         )}>
-                        <p className={cn("text-sm", isInterim && "text-muted-foreground italic")}>{turn.text}</p>
+                        <p className={cn(
+                            "text-sm",
+                            isInterim && "text-muted-foreground italic",
+                            turn.justUpdated && "text-blue-600 font-medium"
+                        )}>{turn.text}</p>
                         </div>
                         {turn.role === 'model' && <div className="p-2 rounded-full bg-primary text-primary-foreground"><Bot className="h-5 w-5" /></div>}
                     </div>
