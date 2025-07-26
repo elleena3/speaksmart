@@ -4,7 +4,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useRouter, notFound } from "next/navigation";
-import { type TeacherAssessment, type StudentResult, type ResultSummary, type RubricScores } from "@/lib/types";
+import { type TeacherAssessment, type StudentResult, type ResultSummary, type RubricScores, type UserData } from "@/lib/types";
 import { useAuth, mockStudents } from "@/context/auth-context";
 import { Loader2, User, Sparkles, TrendingUp, DraftingCompass, RefreshCw } from "lucide-react";
 import { db } from "@/lib/firebase";
@@ -260,10 +260,11 @@ function TeacherGrowthView({ results, assessment }: { results: StudentResult[], 
             setGrowthFeedback(feedback);
             
             const resultRef = doc(db, "results", latestResult.id);
+            // Ensure no undefined values are written to Firestore
             await updateDoc(resultRef, {
-                growthFeedback: feedback.growthFeedback,
-                growthTeacherGuidance: feedback.teacherGuidance,
-                growthCurricularRemarks: feedback.growthCurricularRemarks,
+                growthFeedback: feedback.growthFeedback || "",
+                growthTeacherGuidance: feedback.teacherGuidance || "",
+                growthCurricularRemarks: feedback.growthCurricularRemarks || "",
                 growthFeedbackForAttempts: results.length
             });
             toast({ title: "AI 종합 분석 완료", description: "학생의 성장 과정에 대한 종합 분석이 완료되었습니다." });
