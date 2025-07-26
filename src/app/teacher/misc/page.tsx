@@ -1,10 +1,9 @@
 
-
 "use client"
 
-import { useState, useMemo, useRef, useCallback } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Loader2, FileText, Target, Mic, Bot, BookOpen, Sparkles, ScanText, KeyRound, AlertTriangle, MessageCircle, MicVocal, Video, Ear, TestTube2, ChevronsRight } from "lucide-react";
+import { Loader2, FileText, Target, Mic, Bot, BookOpen, Sparkles, ScanText, KeyRound, AlertTriangle, MessageCircle, MicVocal, Video, Ear, TestTube2, ChevronsRight, Wand2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -21,6 +20,7 @@ import { VadConversationTool } from "./vad-conversation-tool";
 import { ParallelConversationTool } from "./parallel-conversation-tool";
 import { HybridConversationTool } from "./hybrid-conversation-tool";
 import { SpeculativeConversationTool } from "./speculative-conversation-tool";
+import { InteractiveTextAnalyzer } from "./interactive-text-analyzer";
 import { useLanguage } from "@/context/language-context";
 
 
@@ -87,6 +87,17 @@ export default function MiscPage() {
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
                  <Card className="lg:col-span-2">
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2"><Wand2 className="h-6 w-6 text-purple-500"/> 상호작용 텍스트 분석기</CardTitle>
+                        <CardDescription>
+                           지문의 단어를 클릭하여 번역, 사전, 해설, AI 리딩 기능을 사용해보세요. AI가 문맥을 파악하여 정확한 정보를 제공합니다.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                       <InteractiveTextAnalyzer />
+                    </CardContent>
+                </Card>
+                <Card className="lg:col-span-2">
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2"><ChevronsRight className="h-6 w-6 text-purple-500"/> AI 원어민 선생님과 대화하기 6 (예측 발화)</CardTitle>
                         <CardDescription>
@@ -437,3 +448,5 @@ function PronunciationAnalyzerTool() {
     </AudioProcessor>
   );
 }
+
+    
