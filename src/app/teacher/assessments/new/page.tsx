@@ -124,7 +124,7 @@ export default function NewAssessmentPage() {
     scenario: z.enum(scenarios).optional(),
     recordingTimeLimit: z.coerce.number().int().min(0).optional(),
     aiVoice: z.enum(allVoices).optional().default('algenib'),
-    evaluationModel: z.enum(evaluationModels).optional().default('gemini-2.5-pro'),
+    evaluationModel: z.enum(evaluationModels).optional().default('gemini-2.5-flash'),
     useRubric: z.boolean().default(false),
   }).superRefine((data, ctx) => {
     const isFreeTalkDialogue = data.assessmentType === 'dialogue' && data.scenario === 'free-talk';
@@ -176,7 +176,7 @@ export default function NewAssessmentPage() {
       scenario: "free-talk",
       recordingTimeLimit: 0,
       aiVoice: 'algenib',
-      evaluationModel: 'gemini-2.5-pro',
+      evaluationModel: 'gemini-2.5-flash',
       useRubric: false,
     },
   });
@@ -198,7 +198,7 @@ export default function NewAssessmentPage() {
             setIsStudentListLoading(true);
             const q = query(collection(db, "users"), where("role", "==", "student"));
             const querySnapshot = await getDocs(q);
-            const studentList = querySnapshot.docs.map(doc => doc.data() as UserData);
+            const studentList = querySnapshot.docs.map(doc => ({ ...doc.data(), docId: doc.id }) as UserData);
             setRealStudents(studentList);
             setIsStudentListLoading(false);
         };
@@ -423,20 +423,29 @@ export default function NewAssessmentPage() {
                         </CardHeader>
                         <CardContent className="p-4 grid grid-cols-2 md:grid-cols-3 gap-4">
                            {mockStudents.map((item) => (
-                              <FormItem key={item.uid} className="flex flex-row items-start space-x-3 space-y-0">
-                                <FormControl>
-                                  <Checkbox
-                                    checked={Array.isArray(field.value) && field.value.includes(item.uid)}
-                                    onCheckedChange={(checked) => {
-                                      const currentIds = Array.isArray(field.value) ? field.value : [];
-                                      return checked
-                                        ? field.onChange([...currentIds, item.uid])
-                                        : field.onChange(currentIds.filter((value) => value !== item.uid))
-                                    }}
-                                  />
-                                </FormControl>
-                                <FormLabel className="font-normal">{item.displayName}</FormLabel>
-                              </FormItem>
+                              <FormField
+                                key={item.uid}
+                                control={form.control}
+                                name="targetStudentIds"
+                                render={({ field }) => (
+                                    <FormItem
+                                    className="flex flex-row items-start space-x-3 space-y-0"
+                                    >
+                                    <FormControl>
+                                        <Checkbox
+                                        checked={Array.isArray(field.value) && field.value.includes(item.uid)}
+                                        onCheckedChange={(checked) => {
+                                            const currentIds = Array.isArray(field.value) ? field.value : [];
+                                            return checked
+                                            ? field.onChange([...currentIds, item.uid])
+                                            : field.onChange(currentIds.filter((value) => value !== item.uid))
+                                        }}
+                                        />
+                                    </FormControl>
+                                    <FormLabel className="font-normal">{item.displayName}</FormLabel>
+                                    </FormItem>
+                                )}
+                              />
                             ))}
                         </CardContent>
                     </Card>
@@ -461,20 +470,27 @@ export default function NewAssessmentPage() {
                            {isStudentListLoading ? <Loader2 className="animate-spin"/> :
                            filteredRealStudents.length > 0 ? (
                                filteredRealStudents.map((item) => (
-                                  <FormItem key={item.uid} className="flex flex-row items-start space-x-3 space-y-0">
-                                    <FormControl>
-                                      <Checkbox
-                                        checked={Array.isArray(field.value) && field.value.includes(item.uid)}
-                                        onCheckedChange={(checked) => {
-                                          const currentIds = Array.isArray(field.value) ? field.value : [];
-                                          return checked
-                                            ? field.onChange([...currentIds, item.uid])
-                                            : field.onChange(currentIds.filter((value) => value !== item.uid))
-                                        }}
-                                      />
-                                    </FormControl>
-                                    <FormLabel className="font-normal">{item.displayName}</FormLabel>
-                                  </FormItem>
+                                <FormField
+                                  key={item.uid}
+                                  control={form.control}
+                                  name="targetStudentIds"
+                                  render={({ field }) => (
+                                    <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                                        <FormControl>
+                                        <Checkbox
+                                            checked={Array.isArray(field.value) && field.value.includes(item.uid)}
+                                            onCheckedChange={(checked) => {
+                                            const currentIds = Array.isArray(field.value) ? field.value : [];
+                                            return checked
+                                                ? field.onChange([...currentIds, item.uid])
+                                                : field.onChange(currentIds.filter((value) => value !== item.uid))
+                                            }}
+                                        />
+                                        </FormControl>
+                                        <FormLabel className="font-normal">{item.displayName}</FormLabel>
+                                    </FormItem>
+                                  )}
+                                />
                                 ))
                            ) : <p className="text-sm text-muted-foreground col-span-full text-center">해당 조건의 학생이 없습니다.</p>}
                        </CardContent>
@@ -483,7 +499,6 @@ export default function NewAssessmentPage() {
                   </FormItem>
                 )}
               />
-            )}
             
             <FormField
                 control={form.control}
