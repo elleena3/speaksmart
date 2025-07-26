@@ -11,8 +11,8 @@ import { converseWithSpeculativeTeacher } from "@/ai/flows/create-speculative-te
 import { cn } from "@/lib/utils";
 
 const mimeType = 'audio/webm;codecs=opus';
-const SPEECH_END_TIMEOUT_MS = 2500;
-const MIN_SPEECH_DURATION_MS = 500;
+const SPEECH_END_TIMEOUT_MS = 3000;
+const MIN_SPEECH_DURATION_MS = 250;
 
 type SessionState = "idle" | "initializing" | "speaking" | "listening" | "processing" | "ending" | "finished";
 type TurnWithAnimation = ConversationTurn & { justUpdated?: boolean; id?: number };
@@ -156,13 +156,15 @@ export function SpeculativeConversationTool() {
 
             recognition.onresult = (event) => {
                 interimTranscriptRef.current = "";
+                let localFinal = finalTranscriptRef.current;
                 for (let i = event.resultIndex; i < event.results.length; ++i) {
                      if(event.results[i].isFinal) {
-                        finalTranscriptRef.current += event.results[i][0].transcript + ' ';
+                        localFinal += event.results[i][0].transcript + ' ';
                      } else {
                         interimTranscriptRef.current += event.results[i][0].transcript;
                      }
                 }
+                finalTranscriptRef.current = localFinal;
                 const fullInterimText = (finalTranscriptRef.current + interimTranscriptRef.current).trim();
 
                 if (fullInterimText && !speechStartTimeRef.current) {
