@@ -1,0 +1,194 @@
+
+"use client";
+
+import { useState, useRef } from "react";
+import { Button } from "@/components/ui/button";
+import { Loader2, FileText, Target, Mic, Sparkles } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
+import { analyzePronunciation, type PronunciationAnalysisResult } from "@/ai/flows/analyze-pronunciation";
+import { Progress } from "@/components/ui/progress";
+import { useLanguage } from "@/context/language-context";
+
+const mimeType = 'audio/webm;codecs=opus';
+type RecordingState = 'idle' | 'recording';
+
+function AudioProcessor({
+  onAnalyze,
+  children,
+  analyzeButtonText,
+  analyzeButtonIcon: AnalyzeIcon = Sparkles,
+}: {
+  onAnalyze: (dataUri: string) => Promise<void>;
+  children: React.ReactNode;
+  analyzeButtonText: string;
+  analyzeButtonIcon?: React.ElementType;
+}) {
+  const [file, setFile] = useState<File | null>(null);
+  const [recordingState, setRecordingState] = useState<RecordingState>('idle');
+  const [isProcessing, setIsProcessing] = useState<boolean>(false);
+
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const { toast } = useToast();
+  const { t } = useLanguage();
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = event.target.files?.[0];
+    if (selectedFile) {
+        if (selectedFile.type.startsWith('audio/webm') || selectedFile.name.endsWith('.webm')) {
+            setFile(selectedFile);
+        } else {
+            toast({
+                title: t.teacherMisc.errors.invalidFileTitle,
+                description: t.teacherMisc.errors.invalidFileDescription,
+                variant: "destructive",
+            });
+            event.target.value = ''; // Reset file input
+        }
+    }
+  };
+
+  const processAudioBlob = (blob: Blob) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(blob);
+    reader.onloadend = async () => {
+      const base64Audio = reader.result as string;
+      await onAnalyze(base64Audio);
+      setIsProcessing(false);
+    };
+    reader.onerror = (error) => {
+      console.error("File reading error:", error);
+      toast({ title: t.teacherMisc.errors.fileReadErrorTitle, description: t.teacherMisc.errors.fileReadErrorDescription, variant: "destructive" });
+      setIsProcessing(false);
+    };
+  };
+
+  const handleAnalyzeClick = async () => {
+    if (!file) {
+      toast({ title: t.teacherMisc.errors.noFileTitle, description: t.teacherMisc.errors.noFileDescription, variant: "destructive" });
+      return;
+    }
+    setIsProcessing(true);
+    processAudioBlob(file);
+  };
+
+  const handleStartRecording = async () => {
+    setFile(null); // Clear any selected file
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorderRef.current = new MediaRecorder(stream, { mimeType });
+      audioChunksRef.current = [];
+
+      mediaRecorderRef.current.ondataavailable = (event) => {
+        if (event.data.size > 0) audioChunksRef.current.push(event.data);
+      };
+
+      mediaRecorderRef.current.onstop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+        setFile(audioBlob as File); // Set the recorded blob as the file to be analyzed
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      mediaRecorderRef.current.start();
+      setRecordingState('recording');
+    } catch (err) {
+      console.error("Microphone access error:", err);
+      toast({ title: t.teacherMisc.errors.micAccessErrorTitle, description: t.teacherMisc.errors.micAccessErrorDescription, variant: "destructive" });
+    }
+  };
+
+  const handleStopRecording = () => {
+    if (mediaRecorderRef.current?.state === 'recording') {
+      mediaRecorderRef.current.stop();
+      setRecordingState('idle');
+    }
+  };
+  
+  return (
+    <CardContent className="space-y-4 pt-6">
+      <div className="grid gap-2">
+        <label htmlFor="file-upload" className="text-sm font-medium">{t.teacherMisc.audioProcessor.label}</label>
+        <div className="flex gap-2">
+            <Input id="file-upload" type="file" accept="audio/webm" onChange={handleFileChange} className="flex-grow" />
+            {recordingState === 'idle' ? (
+                <Button onClick={handleStartRecording} variant="outline" className="shrink-0">
+                    <Mic className="mr-2 h-4 w-4" /> {t.teacherMisc.audioProcessor.recordButton}
+                </Button>
+            ) : (
+                <Button onClick={handleStopRecording} variant="destructive" className="shrink-0">
+                    <Loader2 className="mr-2 h-4 w-4 animate-pulse" /> {t.teacherMisc.audioProcessor.stopButton}
+                </Button>
+            )}
+        </div>
+        {file && <p className="text-sm text-muted-foreground">{t.teacherMisc.audioProcessor.selectedFileText.replace('{fileName}', (file.name || `${t.teacherMisc.audioProcessor.recordedAudio} (${(file.size/1024).toFixed(1)} KB)`))}</p>}
+      </div>
+      <Button onClick={handleAnalyzeClick} disabled={isProcessing || !file} className="w-full">
+        {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <AnalyzeIcon className="mr-2 h-4 w-4" />}
+        {isProcessing ? t.teacherMisc.audioProcessor.processingButton : analyzeButtonText}
+      </Button>
+      <div className="space-y-4">
+        {isProcessing && (
+            <div className="text-center p-4">
+                <Loader2 className="h-6 w-6 animate-spin mx-auto" />
+                <p className="mt-2 text-sm text-muted-foreground">{t.teacherMisc.audioProcessor.processingMessage}</p>
+            </div>
+        )}
+        {children}
+      </div>
+    </CardContent>
+  );
+}
+
+export function PronunciationAnalyzerTool() {
+  const [analysisResults, setAnalysisResults] = useState<PronunciationAnalysisResult[]>([]);
+  const { toast } = useToast();
+  const { t } = useLanguage();
+
+  const handleAnalyze = async (dataUri: string) => {
+    setAnalysisResults([]);
+    toast({ title: t.teacherMisc.pronunciationAnalyzerTool.toastStartTitle, description: t.teacherMisc.pronunciationAnalyzerTool.toastStartDescription });
+    try {
+        const results = await analyzePronunciation(dataUri);
+        setAnalysisResults(results);
+        toast({ title: t.teacherMisc.pronunciationAnalyzerTool.toastCompleteTitle, description: t.teacherMisc.pronunciationAnalyzerTool.toastCompleteDescription });
+    } catch (e) {
+         console.error("Pronunciation analysis error:", e);
+         toast({ title: t.teacherMisc.errors.analysisErrorTitle, description: (e as Error).message || t.teacherMisc.errors.unknownError, variant: "destructive" });
+    }
+  };
+
+  return (
+    <AudioProcessor onAnalyze={handleAnalyze} analyzeButtonText={t.teacherMisc.pronunciationAnalyzerTool.buttonText} analyzeButtonIcon={Target}>
+        {analysisResults.length > 0 && (
+            <div className="grid grid-cols-1 gap-4">
+            <h3 className="text-lg font-semibold border-b pb-2">{t.teacherMisc.pronunciationAnalyzerTool.resultsTitle}</h3>
+            {analysisResults.map((result, index) => (
+                <Card key={index}>
+                <CardHeader>
+                    <CardTitle className="text-base font-mono">{result.model}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="w-full">
+                        <div className="flex justify-between mb-1">
+                            <span className="text-sm font-medium text-primary">{t.studentHistory.pronunciationScore}</span>
+                            <span className="text-sm font-medium text-primary">{result.pronunciationScore}%</span>
+                        </div>
+                        <Progress value={result.pronunciationScore} className="h-2" />
+                    </div>
+                    <Textarea 
+                        readOnly 
+                        value={result.pronunciationFeedback} 
+                        rows={6}
+                        className="text-sm bg-muted/50"
+                    />
+                </CardContent>
+                </Card>
+            ))}
+            </div>
+        )}
+    </AudioProcessor>
+  );
+}

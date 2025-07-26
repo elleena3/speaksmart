@@ -3,7 +3,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Globe, Users, School, Loader2, KeyRound, AlertTriangle } from "lucide-react";
+import { Globe, Users, School, Loader2, KeyRound, AlertTriangle, FlaskConical } from "lucide-react";
 import { Logo } from "@/components/icons";
 import { useLanguage } from "@/context/language-context";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
@@ -55,6 +55,26 @@ export default function Home() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-saebyeol-beige p-4 md:p-8 relative space-y-8">
       <div className="absolute top-4 right-4 flex items-center gap-2">
+         <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="bg-white/70">
+                    <FlaskConical className="mr-2 h-4 w-4" />
+                    <span>실험실</span>
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+                <DropdownMenuLabel>AI 기능 테스트</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => router.push('/lab?tool=handwriting-analyzer')}>AI 자필 분석</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => router.push('/lab?tool=read-aloud')}>Read Aloud 연습</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => router.push('/lab?tool=interactive-text-analyzer')}>상호작용 텍스트 분석</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => router.push('/lab?tool=presentation-analyzer')}>영어 발표 동영상 분석</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => router.push('/lab?tool=transcriber')}>음성-텍스트 변환</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => router.push('/lab?tool=pronunciation-analyzer')}>영어 발음 분석</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => router.push('/lab?tool=speculative-conversation')}>AI 원어민 대화(예측)</DropdownMenuItem>
+            </DropdownMenuContent>
+        </DropdownMenu>
+
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="sm" className="bg-white/70">
