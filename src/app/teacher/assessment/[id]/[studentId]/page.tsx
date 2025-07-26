@@ -251,6 +251,7 @@ function TeacherGrowthView({ results, assessment }: { results: StudentResult[], 
                           pronunciationScore: r.pronunciationScore ?? 0,
                           transcript: r.studentTranscript ?? "",
                           aiFeedback: r.aiFeedback ?? "",
+                          curricularRemarks: r.curricularRemarks ?? "",
                         }));
 
                         const feedback = await generateGrowthFeedback({ attempts: attempts, assessmentTitle: assessment.title, });
@@ -378,7 +379,7 @@ export default function TeacherStudentResultView() {
   const { user, loading: authLoading } = useAuth();
   
   const [assessment, setAssessment] = useState<TeacherAssessment | null>(null);
-  const [student, setStudent] = useState<(typeof mockStudents)[0] | null>(null);
+  const [student, setStudent] = useState<UserData | null>(null);
   const [results, setResults] = useState<StudentResult[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
@@ -444,13 +445,22 @@ export default function TeacherStudentResultView() {
             }
             setAssessment({ id: assessmentSnap.id, ...assessmentSnap.data() } as TeacherAssessment);
     
-            const foundStudent = mockStudents.find(s => s.uid === studentId);
-            if (foundStudent) {
-                setStudent(foundStudent);
+            // Fetch student data from 'users' collection instead of mock data
+            const studentQuery = query(collection(db, "users"), where("uid", "==", studentId));
+            const studentSnapshot = await getDocs(studentQuery);
+
+            if (!studentSnapshot.empty) {
+                const studentData = studentSnapshot.docs[0].data() as UserData;
+                setStudent({ ...studentData, uid: studentId });
             } else {
-                toast({ title: "오류", description: "학생 정보를 찾을 수 없습니다.", variant: "destructive" });
-                notFound();
-                return;
+                 const foundStudent = mockStudents.find(s => s.uid === studentId);
+                 if (foundStudent) {
+                    setStudent(foundStudent);
+                 } else {
+                    toast({ title: "오류", description: "학생 정보를 찾을 수 없습니다.", variant: "destructive" });
+                    notFound();
+                    return;
+                 }
             }
 
             await fetchStudentResults();

@@ -1,4 +1,5 @@
 
+
 import { z } from 'genkit';
 import { scenarios, allVoices, evaluationModels } from '@/lib/types';
 import type { StudentResult } from '@/lib/types';
@@ -117,8 +118,8 @@ export const ResultSummarySchema = z.object({
     pronunciationScore: z.number().int(),
     transcript: z.string(),
     aiFeedback: z.string(),
+    curricularRemarks: z.string(),
     teacherGuidance: z.string().optional(),
-    curricularRemarks: z.string().optional(),
 });
 
 export const GenerateGrowthFeedbackInputSchema = z.object({

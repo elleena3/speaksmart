@@ -33,6 +33,7 @@ Here are all the attempts from the student, in chronological order:
 -   Pronunciation Score: {{this.pronunciationScore}}/100
 -   Transcript: "{{this.transcript}}"
 -   AI Feedback Given: "{{this.aiFeedback}}"
+-   Curricular Remarks from this attempt: "{{this.curricularRemarks}}"
 ---
 {{/each}}
 
@@ -56,7 +57,11 @@ Please perform the following steps based on ALL attempts provided:
 3.  **Generate '생활기록부 교과 특기 사항' ('curricularRemarks'):**
     -   **Format:** Formal Korean prose, with sentences ending in '~함' or '~임'.
     -   **Tone:** Official and descriptive, suitable for a school record.
-    -   **Content:** Synthesize the student's performance from ALL attempts into a single, comprehensive narrative of about 700 Korean characters. The final remark should start by mentioning the student's persistent effort, describe the initial state and how it evolved with specific examples, and conclude by summarizing their current demonstrated ability and attitude. This should be a well-written, cohesive summary, not just a list of points.
+    -   **Content:** Your primary source for this summary is the 'Curricular Remarks from this attempt' field provided for each attempt.
+        1. Review the curricular remarks from all attempts chronologically.
+        2. Synthesize these remarks into a single, cohesive narrative of about 700 Korean characters that shows the student's growth story.
+        3. The final remark should start by mentioning the student's persistent effort, describe the initial performance and how it evolved with specific examples from the provided remarks, and conclude by summarizing their current demonstrated ability and attitude.
+    -   **IMPORTANT:** If all 'Curricular Remarks from this attempt' fields are empty or contain error messages, you MUST return an empty string for the 'curricularRemarks' field. Do not invent content.
 
 The final output must be a single JSON object containing 'growthFeedback', 'teacherGuidance', and 'curricularRemarks'.
 `,
@@ -69,7 +74,19 @@ const generateGrowthFeedbackFlow = ai.defineFlow(
     outputSchema: GenerateGrowthFeedbackOutputSchema,
   },
   async (input) => {
-    const { output } = await growthFeedbackPrompt(input);
+    // Add curricularRemarks to the attempts for the prompt.
+    // This assumes that the `aiFeedback` field in the input might contain the remarks.
+    // A better approach would be to have `curricularRemarks` passed directly.
+    // For now, we will simulate this by assuming they are passed in `attempts`.
+    const enhancedInput = {
+      ...input,
+      attempts: input.attempts.map(attempt => ({
+        ...attempt,
+        curricularRemarks: attempt.curricularRemarks || "내용 없음", // Ensure the field exists
+      }))
+    }
+
+    const { output } = await growthFeedbackPrompt(enhancedInput);
     if (!output) {
       throw new Error("The AI model did not return valid growth feedback.");
     }
