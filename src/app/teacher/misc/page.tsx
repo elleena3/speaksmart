@@ -19,6 +19,7 @@ import { ConcurrentConversationTool } from "./concurrent-conversation-tool";
 import { PresentationAnalyzerTool } from "./presentation-analyzer-tool";
 import { VadConversationTool } from "./vad-conversation-tool";
 import { ParallelConversationTool } from "./parallel-conversation-tool";
+import { HybridConversationTool } from "./hybrid-conversation-tool";
 import { useLanguage } from "@/context/language-context";
 
 
@@ -84,6 +85,18 @@ export default function MiscPage() {
                 <p className="text-muted-foreground">{t.teacherMisc.description}</p>
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+                 <Card className="lg:col-span-2">
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2"><TestTube2 className="h-6 w-6"/> AI 원어민 선생님과 대화하기 5 (하이브리드 VAD)</CardTitle>
+                        <CardDescription>
+                            실시간 텍스트 피드백(UI)과 서버 기반 오디오 처리(백그라운드)를 결합하여 반응성과 정확도를 모두 높인 최종 프로토타입입니다.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                       <HybridConversationTool />
+                    </CardContent>
+                </Card>
+
                 <Card className="lg:col-span-2">
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2"><Video className="h-6 w-6"/> {t.teacherMisc.presentationAnalyzerTool.title}</CardTitle>
