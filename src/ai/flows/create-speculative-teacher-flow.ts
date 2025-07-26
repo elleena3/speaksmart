@@ -38,6 +38,30 @@ export async function converseWithSpeculativeTeacher(
   return converseWithSpeculativeTeacherFlow(input);
 }
 
+// Helper function for retrying API calls on overload
+async function withRetry<T>(fn: () => Promise<T>, retries = 2, delay = 1500): Promise<T> {
+  let lastError: any;
+  for (let i = 0; i <= retries; i++) {
+    try {
+      return await fn();
+    } catch (error: any) {
+      lastError = error;
+      const errorMessage = error.message || '';
+      if (errorMessage.includes('overloaded') || errorMessage.includes('503') || errorMessage.includes('500')) {
+        console.warn(`[withRetry] Attempt ${i + 1} failed due to server error. Retrying in ${delay}ms...`);
+        if (i < retries) {
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      } else {
+        // Not a retryable error, throw immediately
+        throw error;
+      }
+    }
+  }
+  throw lastError;
+}
+
+
 // Helper functions (TTS, WAV conversion)
 async function toWav(pcmData: Buffer): Promise<string> {
     return new Promise((resolve, reject) => {
@@ -52,11 +76,11 @@ async function toWav(pcmData: Buffer): Promise<string> {
 }
 
 async function textToSpeech(text: string): Promise<string> {
-    const ttsResponse = await ai.generate({
+    const ttsResponse = await withRetry(() => ai.generate({
         model: googleAI.model('gemini-2.5-flash-preview-tts'),
         config: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Algenib' } } } },
         prompt: text,
-    });
+    }));
     const audioMedia = ttsResponse.media;
     if (!audioMedia) throw new Error('TTS did not return any audio media.');
     const pcmBuffer = Buffer.from(audioMedia.url.substring(audioMedia.url.indexOf(',') + 1), 'base64');
@@ -114,7 +138,7 @@ const converseWithSpeculativeTeacherFlow = ai.defineFlow(
     
     // Case 1: Initial greeting from AI
     if (input.isInitialGreeting) {
-        const { output } = await conversationalPrompt({ history: [] });
+        const { output } = await withRetry(() => conversationalPrompt({ history: [] }));
         const aiResponseText = output?.aiResponseText || "Hello! I'm Dr. Alex. What's on your mind today?";
         const aiResponseAudioDataUri = await textToSpeech(aiResponseText);
         return { aiResponseText, aiResponseAudioDataUri, finalStudentTranscript: "" };
@@ -127,8 +151,8 @@ const converseWithSpeculativeTeacherFlow = ai.defineFlow(
     // Case 2: Process a conversational turn
     // Step 1: Transcribe initial chunk and final audio in parallel
     const [initialTranscriptionResult, finalTranscriptionResult] = await Promise.all([
-        sttPrompt({ audioDataUri: input.initialChunkDataUri }),
-        sttPrompt({ audioDataUri: input.finalAudioDataUri }),
+        withRetry(() => sttPrompt({ audioDataUri: input.initialChunkDataUri })),
+        withRetry(() => sttPrompt({ audioDataUri: input.finalAudioDataUri })),
     ]);
 
     const initialTranscript = initialTranscriptionResult.text;
@@ -137,10 +161,10 @@ const converseWithSpeculativeTeacherFlow = ai.defineFlow(
     // Step 2: Get a speculative response based on the *initial* transcript
     const historyForPrompt = input.conversationHistory.map(turn => ({...turn, isUser: turn.role === 'user'}));
     
-    const speculativeResponsePromise = conversationalPrompt({
+    const speculativeResponsePromise = withRetry(() => conversationalPrompt({
         history: historyForPrompt,
         studentTranscript: initialTranscript.trim() || finalTranscript.trim() // Fallback to final if initial is empty
-    });
+    }));
 
     // Step 3: Compare transcripts. If they are different, we need a new response.
     // A simple length check is a decent heuristic for this experiment.
@@ -154,10 +178,10 @@ const converseWithSpeculativeTeacherFlow = ai.defineFlow(
         aiResponseText = output?.aiResponseText || "I see. Could you tell me more?";
     } else {
         // Get a new response based on the final, more accurate transcript
-        const { output } = await conversationalPrompt({
+        const { output } = await withRetry(() => conversationalPrompt({
             history: historyForPrompt,
             studentTranscript: finalTranscript
-        });
+        }));
         aiResponseText = output?.aiResponseText || "That's interesting. Please continue.";
     }
 
