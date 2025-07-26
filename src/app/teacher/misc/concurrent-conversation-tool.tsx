@@ -267,7 +267,7 @@ export function ConcurrentConversationTool() {
               <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground pt-12">
                   <BrainCircuit className="h-12 w-12 mb-4 text-primary"/>
                   <p className="font-semibold">'대화 및 녹음 시작'을 누르면 AI와 사용자의 모든 음성이 녹음됩니다.</p>
-                  <p className="text-sm">대화를 마치려면 '녹음 중지'를 누르세요.</p>
+                  <p className="text-sm">대화를 마치려면 '대화 종료'를 누르세요.</p>
               </div>
             )}
             {sessionState === "finished" && recordedBlob && (
