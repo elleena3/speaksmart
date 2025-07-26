@@ -16,7 +16,7 @@ import {
   SidebarFooter
 } from "@/components/ui/sidebar"
 import { Logo } from "@/components/icons"
-import { LogOut, Bell, CheckCircle } from "lucide-react"
+import { LogOut, Bell, CheckCircle, CircleDot } from "lucide-react"
 import { useLanguage } from "@/context/language-context"
 import { translations } from "@/lib/locales"
 import { useAuth } from "@/context/auth-context"
@@ -24,6 +24,7 @@ import { useToast } from "@/hooks/use-toast"
 import { Avatar, AvatarImage, AvatarFallback } from "./ui/avatar"
 import { Button } from "./ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "./ui/dropdown-menu"
+import React, { useState } from "react"
 
 type NavItem = {
   href: string
@@ -37,17 +38,35 @@ type AppLayoutProps = {
   titleKey: keyof typeof translations.ko.titles;
 }
 
+type Notification = {
+  id: number;
+  type: 'submission' | 'feedback';
+  title: string;
+  description: string;
+};
+
+const initialNotifications: Notification[] = [
+    { id: 1, type: 'submission', title: "새로운 제출", description: "일학생님이 '취미와 관심사' 평가를 완료했습니다." },
+    { id: 2, type: 'feedback', title: "피드백 수신", description: "이학생님이 '음식 주문하기' 평가에 대한 피드백을 남겼습니다." },
+];
+
+
 export function AppLayout({ children, navItems, titleKey }: AppLayoutProps) {
   const pathname = usePathname()
   const router = useRouter()
   const { user, logout } = useAuth()
   const { t } = useLanguage()
   const { toast } = useToast()
+  const [notifications, setNotifications] = useState<Notification[]>(initialNotifications);
 
   const handleLogout = async () => {
     await logout();
     router.push('/');
     toast({ title: "로그아웃", description: "성공적으로 로그아웃되었습니다." });
+  }
+
+  const handleNotificationClick = (notificationId: number) => {
+    setNotifications(prev => prev.filter(n => n.id !== notificationId));
   }
 
   return (
@@ -107,35 +126,42 @@ export function AppLayout({ children, navItems, titleKey }: AppLayoutProps) {
                     <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon" className="relative">
                             <Bell className="h-5 w-5" />
-                            <span className="absolute top-1 right-1 flex h-2 w-2">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-                            </span>
+                            {notifications.length > 0 && (
+                                <span className="absolute top-1 right-1 flex h-2 w-2">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                                </span>
+                            )}
                             <span className="sr-only">알림 보기</span>
                         </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-80">
                         <DropdownMenuLabel>알림</DropdownMenuLabel>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem className="flex items-start gap-3">
-                           <CheckCircle className="h-5 w-5 mt-1 text-green-500 flex-shrink-0" />
-                            <div>
-                                <p className="font-semibold">새로운 제출</p>
-                                <p className="text-xs text-muted-foreground">
-                                    일학생님이 '취미와 관심사' 평가를 완료했습니다.
-                                </p>
+                        {notifications.length > 0 ? (
+                           notifications.map((notification, index) => (
+                               <React.Fragment key={notification.id}>
+                                    <DropdownMenuItem className="flex items-start gap-3" onSelect={() => handleNotificationClick(notification.id)}>
+                                        {notification.type === 'submission' ? (
+                                            <CheckCircle className="h-5 w-5 mt-1 text-green-500 flex-shrink-0" />
+                                        ) : (
+                                            <CircleDot className="h-5 w-5 mt-1 text-blue-500 flex-shrink-0" />
+                                        )}
+                                        <div>
+                                            <p className="font-semibold">{notification.title}</p>
+                                            <p className="text-xs text-muted-foreground">
+                                                {notification.description}
+                                            </p>
+                                        </div>
+                                    </DropdownMenuItem>
+                                    {index < notifications.length - 1 && <DropdownMenuSeparator />}
+                               </React.Fragment>
+                           ))
+                        ) : (
+                            <div className="px-2 py-4 text-center text-sm text-muted-foreground">
+                                새로운 알림이 없습니다.
                             </div>
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                         <DropdownMenuItem className="flex items-start gap-3">
-                           <CheckCircle className="h-5 w-5 mt-1 text-green-500 flex-shrink-0" />
-                            <div>
-                                <p className="font-semibold">피드백 수신</p>
-                                <p className="text-xs text-muted-foreground">
-                                    이학생님이 '음식 주문하기' 평가에 대한 피드백을 남겼습니다.
-                                </p>
-                            </div>
-                        </DropdownMenuItem>
+                        )}
                     </DropdownMenuContent>
                 </DropdownMenu>
             )}
