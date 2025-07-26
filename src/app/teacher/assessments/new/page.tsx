@@ -77,7 +77,7 @@ function FilterCombobox({ label, options, value, onSelect }: { label: string, op
 const promptExamples = [
   {
     prompt: "공원 벤치에 앉아 책을 읽고 있는 할머니, 따뜻한 색감의 수채화 스타일",
-    image: "/images/grandmother-reading.jpg",
+    image: "https://placehold.co/400x400.png",
     hint: "grandmother reading park",
   },
   {
@@ -991,5 +991,6 @@ export default function NewAssessmentPage() {
     </Card>
   );
 }
+
 
 
