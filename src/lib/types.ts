@@ -45,7 +45,7 @@ export type UserData = {
     number?: string;
     password?: string; // Storing password in plaintext for simplicity as requested.
     createdAt: number;
-    docId?: string; // Firestore document ID
+    docId: string; // Firestore document ID
 };
 
 

@@ -12,7 +12,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, CalendarIcon, ChevronsUpDown, Check, Info } from "lucide-react";
+import { Loader2, CalendarIcon, ChevronsUpDown, Check, Info, Users, TestTube2 } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -22,12 +22,13 @@ import { useLanguage } from "@/context/language-context";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { scenarios, type TeacherAssessment, femaleVoices, maleVoices, allVoices, evaluationModels, voiceDescriptions, type AiVoice } from "@/lib/types";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { scenarios, type TeacherAssessment, femaleVoices, maleVoices, allVoices, evaluationModels, voiceDescriptions, type AiVoice, type UserData } from "@/lib/types";
 import { useAuth, mockStudents } from "@/context/auth-context";
 import { addDoc, collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Separator } from "@/components/ui/separator";
 
 export default function NewAssessmentPage() {
   const router = useRouter();
@@ -38,6 +39,8 @@ export default function NewAssessmentPage() {
   const [voicePopoverOpen, setVoicePopoverOpen] = useState(false);
   const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
   const [formData, setFormData] = useState<z.infer<typeof formSchema> | null>(null);
+  const [registeredStudents, setRegisteredStudents] = useState<UserData[]>([]);
+  const [isLoadingStudents, setIsLoadingStudents] = useState(true);
 
   const formSchema = useMemo(() => z.object({
     title: z.string().optional(),
@@ -109,6 +112,17 @@ export default function NewAssessmentPage() {
   useEffect(() => {
     if (!authLoading && !user) {
         router.push('/');
+    } else if (user) {
+        const fetchStudents = async () => {
+            if (!db) return;
+            setIsLoadingStudents(true);
+            const q = query(collection(db, "users"), where("role", "==", "student"));
+            const querySnapshot = await getDocs(q);
+            const studentList = querySnapshot.docs.map(doc => ({ ...doc.data(), docId: doc.id }) as UserData);
+            setRegisteredStudents(studentList);
+            setIsLoadingStudents(false);
+        }
+        fetchStudents();
     }
   }, [user, authLoading, router]);
 
@@ -400,7 +414,7 @@ export default function NewAssessmentPage() {
               <FormField
                 control={form.control}
                 name="targetStudentIds"
-                render={() => (
+                render={({ field }) => (
                   <FormItem>
                     <div className="mb-4">
                       <FormLabel className="text-base">{t.teacherAssessmentForm.selectStudentsLabel}</FormLabel>
@@ -408,39 +422,97 @@ export default function NewAssessmentPage() {
                         {t.teacherAssessmentForm.selectStudentsDescription}
                       </FormDescription>
                     </div>
-                    {mockStudents.map((item) => (
-                      <FormField
-                        key={item.uid}
-                        control={form.control}
-                        name="targetStudentIds"
-                        render={({ field }) => {
-                          return (
-                            <FormItem
-                              key={item.uid}
-                              className="flex flex-row items-start space-x-3 space-y-0"
-                            >
-                              <FormControl>
-                                <Checkbox
-                                  checked={field.value?.includes(item.uid)}
-                                  onCheckedChange={(checked) => {
-                                    return checked
-                                      ? field.onChange([...(field.value || []), item.uid])
-                                      : field.onChange(
-                                          field.value?.filter(
-                                            (value) => value !== item.uid
-                                          )
-                                        )
-                                  }}
-                                />
-                              </FormControl>
-                              <FormLabel className="font-normal">
-                                {item.displayName} ({item.email})
-                              </FormLabel>
-                            </FormItem>
-                          )
-                        }}
-                      />
-                    ))}
+                    {isLoadingStudents ? <Loader2 className="animate-spin" /> : (
+                        <div className="space-y-4">
+                            <Card>
+                                <CardHeader className="flex flex-row items-center justify-between p-4">
+                                    <div className="flex items-center gap-2">
+                                        <TestTube2 className="h-5 w-5 text-blue-500"/>
+                                        <CardTitle className="text-base">목업 계정</CardTitle>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                        <Label htmlFor="select-all-mock">전체 선택</Label>
+                                        <Checkbox
+                                            id="select-all-mock"
+                                            onCheckedChange={(checked) => {
+                                                const currentIds = field.value || [];
+                                                const mockIds = mockStudents.map(s => s.uid);
+                                                if (checked) {
+                                                    field.onChange([...new Set([...currentIds, ...mockIds])]);
+                                                } else {
+                                                    field.onChange(currentIds.filter(id => !mockIds.includes(id)));
+                                                }
+                                            }}
+                                            checked={mockStudents.every(s => field.value?.includes(s.uid))}
+                                        />
+                                    </div>
+                                </CardHeader>
+                                <Separator />
+                                <CardContent className="p-4 grid grid-cols-2 md:grid-cols-3 gap-2">
+                                    {mockStudents.map((item) => (
+                                        <FormItem key={item.uid} className="flex flex-row items-center space-x-2 space-y-0">
+                                            <FormControl>
+                                                <Checkbox
+                                                checked={field.value?.includes(item.uid)}
+                                                onCheckedChange={(checked) => {
+                                                    const currentIds = field.value || [];
+                                                    return checked
+                                                    ? field.onChange([...currentIds, item.uid])
+                                                    : field.onChange(currentIds.filter(value => value !== item.uid));
+                                                }}
+                                                />
+                                            </FormControl>
+                                            <FormLabel className="font-normal text-sm">{item.displayName}</FormLabel>
+                                        </FormItem>
+                                    ))}
+                                </CardContent>
+                            </Card>
+                            <Card>
+                                 <CardHeader className="flex flex-row items-center justify-between p-4">
+                                    <div className="flex items-center gap-2">
+                                        <Users className="h-5 w-5 text-green-600"/>
+                                        <CardTitle className="text-base">가입한 학생</CardTitle>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                        <Label htmlFor="select-all-registered">전체 선택</Label>
+                                        <Checkbox
+                                            id="select-all-registered"
+                                            onCheckedChange={(checked) => {
+                                                const currentIds = field.value || [];
+                                                const registeredIds = registeredStudents.map(s => s.uid);
+                                                if (checked) {
+                                                    field.onChange([...new Set([...currentIds, ...registeredIds])]);
+                                                } else {
+                                                    field.onChange(currentIds.filter(id => !registeredIds.includes(id)));
+                                                }
+                                            }}
+                                            checked={registeredStudents.length > 0 && registeredStudents.every(s => field.value?.includes(s.uid))}
+                                            disabled={registeredStudents.length === 0}
+                                        />
+                                    </div>
+                                </CardHeader>
+                                <Separator />
+                                <CardContent className="p-4 grid grid-cols-2 md:grid-cols-3 gap-2">
+                                    {registeredStudents.length > 0 ? registeredStudents.map((item) => (
+                                        <FormItem key={item.uid} className="flex flex-row items-center space-x-2 space-y-0">
+                                            <FormControl>
+                                                <Checkbox
+                                                checked={field.value?.includes(item.uid)}
+                                                onCheckedChange={(checked) => {
+                                                    const currentIds = field.value || [];
+                                                    return checked
+                                                    ? field.onChange([...currentIds, item.uid])
+                                                    : field.onChange(currentIds.filter(value => value !== item.uid));
+                                                }}
+                                                />
+                                            </FormControl>
+                                            <FormLabel className="font-normal text-sm">{item.displayName}</FormLabel>
+                                        </FormItem>
+                                    )) : <p className="text-sm text-muted-foreground col-span-full text-center">가입한 학생이 없습니다.</p>}
+                                </CardContent>
+                            </Card>
+                        </div>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}
