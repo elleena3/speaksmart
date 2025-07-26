@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useRouter } from "next/navigation";
@@ -13,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, CalendarIcon, ChevronsUpDown, Check, Info, Users, TestTube2, Type, Image as ImageIcon, Comics } from "lucide-react";
+import { Loader2, CalendarIcon, ChevronsUpDown, Check, Info, Users, TestTube2, Type, Image as ImageIcon, LayoutGrid } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -351,7 +350,7 @@ export default function NewAssessmentPage() {
                                 </FormItem>
                                 <FormItem className="flex items-center space-x-3 space-y-0">
                                     <FormControl><RadioGroupItem value="comic" /></FormControl>
-                                    <FormLabel className="font-normal flex items-center gap-2"><Comics/>네 컷 만화 설명</FormLabel>
+                                    <FormLabel className="font-normal flex items-center gap-2"><LayoutGrid/>네 컷 만화 설명</FormLabel>
                                 </FormItem>
                            </RadioGroup>
                          </FormControl>
