@@ -8,6 +8,7 @@ import { type UserData } from '@/lib/types';
 // Mock data remains for quick testing via the main page
 const mockTeacher: UserData = {
     uid: 'teacher-mock-uid',
+    docId: 'teacher-mock-uid', // Add docId for consistency
     displayName: '김선생',
     email: 'teacher@example.com',
     photoURL: `https://placehold.co/40x40.png?text=김`,
@@ -17,6 +18,7 @@ const mockTeacher: UserData = {
 
 const mockStudent1: UserData = {
     uid: 'student1-mock-uid',
+    docId: 'student1-mock-uid', // Add docId for consistency
     displayName: '일학생',
     email: 'student1@example.com',
     photoURL: `https://placehold.co/40x40.png?text=일`,
@@ -26,6 +28,7 @@ const mockStudent1: UserData = {
 
 const mockStudent2: UserData = {
     uid: 'student2-mock-uid',
+    docId: 'student2-mock-uid', // Add docId for consistency
     displayName: '이학생',
     email: 'student2@example.com',
     photoURL: `https://placehold.co/40x40.png?text=이`,
@@ -35,6 +38,7 @@ const mockStudent2: UserData = {
 
 const mockStudent3: UserData = {
     uid: 'student3-mock-uid',
+    docId: 'student3-mock-uid', // Add docId for consistency
     displayName: '삼학생',
     email: 'student3@example.com',
     photoURL: `https://placehold.co/40x40.png?text=삼`,
@@ -75,8 +79,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const manualLogin = (userData: UserData) => {
-    setUser(userData);
-    sessionStorage.setItem(USER_SESSION_KEY, JSON.stringify(userData));
+    // Ensure docId is present. If it's a real login, it will be.
+    // If it's a mock login without one, we can default it for settings page to work.
+    const userToSave = { ...userData, docId: userData.docId || userData.uid };
+    setUser(userToSave);
+    sessionStorage.setItem(USER_SESSION_KEY, JSON.stringify(userToSave));
   };
   
   const loginAs = (role: 'teacher' | 'student1' | 'student2' | 'student3') => {
@@ -90,8 +97,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       } else {
           mockUserToLogin = mockStudent3;
       }
-      setUser(mockUserToLogin);
-      sessionStorage.setItem(USER_SESSION_KEY, JSON.stringify(mockUserToLogin));
+      manualLogin(mockUserToLogin);
   };
 
   const logout = () => {

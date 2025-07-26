@@ -80,7 +80,8 @@ export default function LoginPage() {
             
             // Login successful
             const userDoc = querySnapshot.docs[0];
-            const userData = { uid: userDoc.id, ...userDoc.data() } as UserData;
+            // Include the document ID in the user data object
+            const userData = { uid: userDoc.id, docId: userDoc.id, ...userDoc.data() } as UserData;
             
             manualLogin(userData);
 
