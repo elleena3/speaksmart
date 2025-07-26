@@ -62,13 +62,6 @@ export type Assessment = {
   createdAt?: number; 
 };
 
-export type Student = {
-  id: string; // Corresponds to Firebase Auth UID
-  name: string;
-  avatar: string;
-  email: string;
-};
-
 export type TeacherAssessment = {
   id: string; // Firestore document ID
   uid: string; // Teacher's UID

@@ -131,7 +131,7 @@ export type GenerateGrowthFeedbackInput = z.infer<typeof GenerateGrowthFeedbackI
 export const GenerateGrowthFeedbackOutputSchema = z.object({
     growthFeedback: z.string().describe("A comprehensive Markdown-formatted analysis of the student's growth."),
     teacherGuidance: z.string().describe("Actionable advice for the teacher based on the student's entire journey."),
-    curricularRemarks: z.string().describe("A comprehensive school record remark based on the student's entire journey."),
+    growthCurricularRemarks: z.string().describe("A comprehensive school record remark based on the student's entire journey."),
 });
 export type GenerateGrowthFeedbackOutput = z.infer<typeof GenerateGrowthFeedbackOutputSchema>;
 

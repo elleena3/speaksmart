@@ -132,7 +132,7 @@ function AttemptDetailView({ result, assessment, attemptNumber }: { result: Stud
           </Card>
            <Card>
             <CardHeader>
-                <CardTitle>생활기록부 교과 특기 사항</CardTitle>
+                <CardTitle>생활기록부 교과 특기 사항 (개별 시도)</CardTitle>
             </CardHeader>
             <CardContent className="p-4 bg-muted/50 rounded-lg whitespace-pre-wrap font-body text-sm leading-relaxed min-h-[150px]">
                 {curricularRemarks}
@@ -239,7 +239,7 @@ function TeacherGrowthView({ results, assessment }: { results: StudentResult[], 
             setGrowthFeedback({
                 growthFeedback: latestResult.growthFeedback,
                 teacherGuidance: latestResult.growthTeacherGuidance || "",
-                curricularRemarks: latestResult.growthCurricularRemarks || ""
+                growthCurricularRemarks: latestResult.growthCurricularRemarks || ""
             });
             setIsLoadingFeedback(false);
             return;
@@ -263,7 +263,7 @@ function TeacherGrowthView({ results, assessment }: { results: StudentResult[], 
             await updateDoc(resultRef, {
                 growthFeedback: feedback.growthFeedback,
                 growthTeacherGuidance: feedback.teacherGuidance,
-                curricularRemarks: feedback.curricularRemarks,
+                growthCurricularRemarks: feedback.growthCurricularRemarks,
                 growthFeedbackForAttempts: results.length
             });
             toast({ title: "AI 종합 분석 완료", description: "학생의 성장 과정에 대한 종합 분석이 완료되었습니다." });
@@ -273,7 +273,7 @@ function TeacherGrowthView({ results, assessment }: { results: StudentResult[], 
             setGrowthFeedback({ 
                 growthFeedback: "성장 피드백 생성 중 오류 발생",
                 teacherGuidance: "교사 조언 생성 중 오류 발생",
-                curricularRemarks: "생활기록부 교과 특기 사항 생성 중 오류 발생"
+                growthCurricularRemarks: "생활기록부 교과 특기 사항 생성 중 오류 발생"
             });
             toast({ title: "오류", description: "종합 분석 생성 중 오류가 발생했습니다.", variant: "destructive" });
         } finally {
@@ -362,8 +362,8 @@ function TeacherGrowthView({ results, assessment }: { results: StudentResult[], 
                 </CardHeader>
                 <CardContent>
                     <div className="grid md:grid-cols-2 gap-6">
-                        <RemarksCard title="생활기록부 교과 특기 사항" content={growthFeedback?.curricularRemarks} />
-                        <RemarksCard title="교사용 AI 조언" content={growthFeedback?.teacherGuidance} />
+                        <RemarksCard title="생활기록부 교과 특기 사항 (종합)" content={growthFeedback?.growthCurricularRemarks} />
+                        <RemarksCard title="교사용 AI 조언 (종합)" content={growthFeedback?.teacherGuidance} />
                         <Card className="md:col-span-2">
                             <CardHeader><CardTitle>학생에게 제공된 AI 종합 피드백</CardTitle></CardHeader>
                             <CardContent className="p-4 bg-muted/50 rounded-lg font-body text-base leading-relaxed markdown-content">

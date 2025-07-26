@@ -1,4 +1,5 @@
 
+
 'use server';
 /**
  * @fileOverview A flow to generate comparative feedback on a student's growth between two assessment attempts.
@@ -54,16 +55,16 @@ Please perform the following steps based on ALL attempts provided:
     -   **Tone:** Professional and advisory.
     -   **Content:** Summarize the student's overall progress across all attempts. Pinpoint the most significant areas of improvement and persistent weaknesses. Provide clear, actionable advice by suggesting specific activities or teaching strategies. Separate your points into distinct paragraphs for readability.
 
-3.  **Generate '생활기록부 교과 특기 사항' ('curricularRemarks'):**
+3.  **Generate '생활기록부 교과 특기 사항' ('growthCurricularRemarks'):**
     -   **Format:** Formal Korean prose, with sentences ending in '~함' or '~임'.
     -   **Tone:** Official and descriptive, suitable for a school record.
     -   **Content:** Your primary source for this summary is the 'Curricular Remarks from this attempt' field provided for each attempt.
         1. Review the curricular remarks from all attempts chronologically.
         2. Synthesize these remarks into a single, cohesive narrative of about 700 Korean characters that shows the student's growth story.
         3. The final remark should start by mentioning the student's persistent effort, describe the initial performance and how it evolved with specific examples from the provided remarks, and conclude by summarizing their current demonstrated ability and attitude.
-    -   **IMPORTANT:** If all 'Curricular Remarks from this attempt' fields are empty or contain error messages, you MUST return an empty string for the 'curricularRemarks' field. Do not invent content.
+    -   **IMPORTANT:** If all 'Curricular Remarks from this attempt' fields are empty or contain error messages, you MUST return an empty string for the 'growthCurricularRemarks' field. Do not invent content.
 
-The final output must be a single JSON object containing 'growthFeedback', 'teacherGuidance', and 'curricularRemarks'.
+The final output must be a single JSON object containing 'growthFeedback', 'teacherGuidance', and 'growthCurricularRemarks'.
 `,
 });
 
