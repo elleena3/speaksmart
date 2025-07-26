@@ -23,7 +23,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { scenarios, type TeacherAssessment, femaleVoices, maleVoices, allVoices, evaluationModels, voiceDescriptions, type AiVoice, monologueTypes, type UserData } from "@/lib/types";
-import { useAuth, mockStudents } from "@/context/auth-context";
+import { useAuth } from "@/context/auth-context";
 import { addDoc, collection, getDocs, query, where } from "firebase/firestore";
 import { db, storage } from "@/lib/firebase";
 import { ref, uploadString, getDownloadURL } from "firebase/storage";
@@ -37,17 +37,17 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 const promptExamples = [
   {
     prompt: "공원 벤치에 앉아 책을 읽고 있는 할머니, 따뜻한 색감의 수채화 스타일",
-    image: "https://firebasestorage.googleapis.com/v0/b/speaksmart-evaluator2.firebasestorage.app/o/image%2FGemini_Generated_Image_tegrq6teg.png?alt=media&token=def04b4c-2d30-4194-9e40-871caf273954",
+    image: "https://firebasestorage.googleapis.com/v0/b/speaksmart-evaluator2.appspot.com/o/image%2FGemini_Generated_Image_tegrq6teg.png?alt=media&token=def04b4c-2d30-4194-9e40-871caf273954",
     hint: "grandmother reading park",
   },
   {
     prompt: "로켓을 타고 달로 날아가는 우주비행사, 뒤에는 지구가 보인다, 단순한 만화 스타일",
-    image: "https://firebasestorage.googleapis.com/v0/b/speaksmart-evaluator2.firebasestorage.app/o/image%2FGemini_Generated_Image_unh72munh.png?alt=media&token=8bd0265c-3afe-46e5-80d0-d8d8fbe748b2",
+    image: "https://firebasestorage.googleapis.com/v0/b/speaksmart-evaluator2.appspot.com/o/image%2FGemini_Generated_Image_unh72munh.png?alt=media&token=8bd0265c-3afe-46e5-80d0-d8d8fbe748b2",
     hint: "astronaut rocket moon",
   },
   {
     prompt: "산 정상에서 일출을 보고 있는 등산객의 뒷모습, 장엄한 풍경, 사실적인 사진 스타일",
-    image: "https://firebasestorage.googleapis.com/v0/b/speaksmart-evaluator2.firebasestorage.app/o/image%2FGemini_Generated_Image_96vqrp96v.png?alt=media&token=1e48e934-2bc5-4e29-b199-9f8e96b2c2eb",
+    image: "https://firebasestorage.googleapis.com/v0/b/speaksmart-evaluator2.appspot.com/o/image%2FGemini_Generated_Image_96vqrp96v.png?alt=media&token=1e48e934-2bc5-4e29-b199-9f8e96b2c2eb",
     hint: "hiker sunrise mountain",
   },
 ];
@@ -410,47 +410,6 @@ export default function NewAssessmentPage() {
                     </div>
                     
                     <Card>
-                        <CardHeader className="flex flex-row items-center justify-between p-4">
-                            <CardTitle className="text-lg flex items-center gap-2"><Edit className="h-5 w-5"/>목업 계정</CardTitle>
-                             <div className="flex items-center space-x-2">
-                                <Label htmlFor="select-all-mock">전체 선택</Label>
-                                <Checkbox
-                                    id="select-all-mock"
-                                    onCheckedChange={() => handleSelectAll(mockStudents, field)}
-                                    checked={Array.isArray(field.value) && mockStudents.every(s => field.value.includes(s.uid))}
-                                />
-                            </div>
-                        </CardHeader>
-                        <CardContent className="p-4 grid grid-cols-2 md:grid-cols-3 gap-4">
-                           {mockStudents.map((item) => (
-                              <FormField
-                                key={item.uid}
-                                control={form.control}
-                                name="targetStudentIds"
-                                render={({ field }) => (
-                                    <FormItem
-                                    className="flex flex-row items-start space-x-3 space-y-0"
-                                    >
-                                    <FormControl>
-                                        <Checkbox
-                                        checked={Array.isArray(field.value) && field.value.includes(item.uid)}
-                                        onCheckedChange={(checked) => {
-                                            const currentIds = Array.isArray(field.value) ? field.value : [];
-                                            return checked
-                                            ? field.onChange([...currentIds, item.uid])
-                                            : field.onChange(currentIds.filter((value) => value !== item.uid))
-                                        }}
-                                        />
-                                    </FormControl>
-                                    <FormLabel className="font-normal">{item.displayName}</FormLabel>
-                                    </FormItem>
-                                )}
-                              />
-                            ))}
-                        </CardContent>
-                    </Card>
-
-                    <Card>
                        <CardHeader className="flex flex-row items-center justify-between p-4">
                           <CardTitle className="text-lg flex items-center gap-2"><Users className="h-5 w-5"/>가입한 학생</CardTitle>
                           <div className="flex items-center gap-2">
@@ -475,8 +434,10 @@ export default function NewAssessmentPage() {
                                   control={form.control}
                                   name="targetStudentIds"
                                   render={({ field }) => (
-                                    <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                                        <FormControl>
+                                    <FormItem
+                                      className="flex flex-row items-start space-x-3 space-y-0"
+                                    >
+                                    <FormControl>
                                         <Checkbox
                                             checked={Array.isArray(field.value) && field.value.includes(item.uid)}
                                             onCheckedChange={(checked) => {
@@ -499,6 +460,7 @@ export default function NewAssessmentPage() {
                   </FormItem>
                 )}
               />
+            )}
             
             <FormField
                 control={form.control}
