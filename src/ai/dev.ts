@@ -23,6 +23,7 @@ import '@/ai/flows/create-native-teacher-flow';
 import '@/ai/flows/create-concurrent-teacher-flow'; // New flow for concurrent recording tool
 import '@/ai/flows/create-parallel-teacher-flow'; // New flow for parallel processing tool
 import '@/ai/flows/create-hybrid-teacher-flow'; // New flow for hybrid VAD tool
+import '@/ai/flows/create-speculative-teacher-flow'; // New flow for speculative speech model
 
 // New flow for the Misc page's read-aloud tool
 import '@/ai/flows/analyze-read-aloud-flow';

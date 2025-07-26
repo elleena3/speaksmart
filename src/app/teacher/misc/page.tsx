@@ -4,7 +4,7 @@
 
 import { useState, useMemo, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { Loader2, FileText, Target, Mic, Bot, BookOpen, Sparkles, ScanText, KeyRound, AlertTriangle, MessageCircle, MicVocal, Video, Ear, TestTube2 } from "lucide-react";
+import { Loader2, FileText, Target, Mic, Bot, BookOpen, Sparkles, ScanText, KeyRound, AlertTriangle, MessageCircle, MicVocal, Video, Ear, TestTube2, ChevronsRight } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -20,6 +20,7 @@ import { PresentationAnalyzerTool } from "./presentation-analyzer-tool";
 import { VadConversationTool } from "./vad-conversation-tool";
 import { ParallelConversationTool } from "./parallel-conversation-tool";
 import { HybridConversationTool } from "./hybrid-conversation-tool";
+import { SpeculativeConversationTool } from "./speculative-conversation-tool";
 import { useLanguage } from "@/context/language-context";
 
 
@@ -85,6 +86,18 @@ export default function MiscPage() {
                 <p className="text-muted-foreground">{t.teacherMisc.description}</p>
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+                 <Card className="lg:col-span-2">
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2"><ChevronsRight className="h-6 w-6 text-purple-500"/> AI 원어민 선생님과 대화하기 6 (예측 발화)</CardTitle>
+                        <CardDescription>
+                           사용자의 발화 시작 2초만에 음성 조각을 AI에게 보내 답변을 미리 생각하게 만드는 '예측 발화(Speculative Speech)' 모델입니다. 체감 대기 시간을 혁신적으로 줄인 최종 프로토타입입니다.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                       <SpeculativeConversationTool />
+                    </CardContent>
+                </Card>
+                
                  <Card className="lg:col-span-2">
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2"><TestTube2 className="h-6 w-6"/> AI 원어민 선생님과 대화하기 5 (하이브리드 VAD)</CardTitle>
