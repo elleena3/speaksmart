@@ -1,5 +1,4 @@
 
-
 import { type ConversationTurn, type ResultSummarySchema } from "@/lib/types/ai-schemas";
 import { z } from 'zod';
 
@@ -40,11 +39,17 @@ export type MonologueType = (typeof monologueTypes)[number];
 // New UserData type for Firestore
 export type UserData = {
     uid: string;
+    docId?: string; // Firestore document ID
     email: string;
     displayName: string;
     photoURL: string;
     role: 'student' | 'teacher';
+    grade?: string;
+    class?: string;
+    number?: string;
+    password?: string;
     isMock?: boolean; // To identify mock users
+    createdAt: number;
 };
 
 
@@ -89,6 +94,13 @@ export type TeacherAssessment = {
 
 export type { ConversationTurn };
 export type ResultSummary = z.infer<typeof ResultSummarySchema>;
+
+export type HistoricalScore = {
+    attempt: number;
+    contentScore: number;
+    pronunciationScore: number;
+    rubricScores?: RubricScores;
+};
 
 export type ConversationHistory = {
   history: ConversationTurn[];
@@ -136,4 +148,9 @@ export type StudentResult = {
   contentScore: number;
   curricularRemarks: string;
   rubricScores?: RubricScores;
+  historicalScores?: HistoricalScore[];
+  growthFeedback?: string;
+  growthTeacherGuidance?: string;
+  growthCurricularRemarks?: string;
+  growthFeedbackForAttempts?: number;
 }

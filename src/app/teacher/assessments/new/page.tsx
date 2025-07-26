@@ -11,7 +11,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, CalendarIcon, ChevronsUpDown, Check, Info, Type, ImageIcon, Wand2, Copy, BookOpen } from "lucide-react";
+import { Loader2, CalendarIcon, ChevronsUpDown, Check, Info, Type, ImageIcon, Wand2, Copy, BookOpen, Film } from "lucide-react";
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -96,10 +96,14 @@ export default function NewAssessmentPage() {
       }
     }
     
-    if (data.assessmentType === 'monologue' && data.monologueType === 'image' && !generatedImageDataUri) {
+    if ((data.assessmentType === 'monologue' && data.monologueType === 'image') && !generatedImageDataUri) {
         ctx.addIssue({ code: z.ZodIssueCode.custom, message: "이미지를 먼저 생성해주세요.", path: ['monologueType'] });
     }
     
+    if ((data.assessmentType === 'monologue' && data.monologueType === 'comic') && !generatedImageDataUri) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "만화를 먼저 생성해주세요.", path: ['monologueType'] });
+    }
+
     if (data.assessmentType === 'monologue' && data.monologueType === 'text' && !data.expectedFormat && !data.useRubric) {
         ctx.addIssue({ code: z.ZodIssueCode.custom, message: t.teacherAssessmentForm.errors.expectedFormatRequired, path: ['expectedFormat'] });
     }
@@ -174,7 +178,7 @@ export default function NewAssessmentPage() {
     
     try {
         let imageUrl = "";
-        if (values.monologueType === 'image' && generatedImageDataUri) {
+        if ((values.monologueType === 'image' || values.monologueType === 'comic') && generatedImageDataUri) {
             toast({title: "이미지 업로드 중..."});
             const imageRef = ref(storage, `assessment-images/${user.uid}/${Date.now()}.png`);
             const uploadResult = await uploadString(imageRef, generatedImageDataUri, 'data_url');
@@ -329,7 +333,11 @@ export default function NewAssessmentPage() {
                                 </FormItem>
                                 <FormItem className="flex items-center space-x-3 space-y-0">
                                     <FormControl><RadioGroupItem value="image"/></FormControl>
-                                    <FormLabel className="font-normal flex items-center gap-2"><ImageIcon/>Describing a picture(이미지 설명하기)</FormLabel>
+                                    <FormLabel className="font-normal flex items-center gap-2"><ImageIcon/>그림 묘사하기</FormLabel>
+                                </FormItem>
+                                <FormItem className="flex items-center space-x-3 space-y-0">
+                                    <FormControl><RadioGroupItem value="comic"/></FormControl>
+                                    <FormLabel className="font-normal flex items-center gap-2"><Film/>네컷 만화 설명하기</FormLabel>
                                 </FormItem>
                            </RadioGroup>
                          </FormControl>
@@ -340,13 +348,15 @@ export default function NewAssessmentPage() {
               )}
             </div>
             
-            {monologueType === 'image' && assessmentType === 'monologue' && (
+            {(monologueType === 'image' || monologueType === 'comic') && assessmentType === 'monologue' && (
                 <Card>
                     <CardHeader>
                         <div className="flex justify-between items-center">
                             <div>
                                 <CardTitle>AI 이미지 생성</CardTitle>
-                                <CardDescription>평가에 사용할 이미지를 AI에게 그려달라고 요청하세요.</CardDescription>
+                                <CardDescription>
+                                  {monologueType === 'image' ? "평가에 사용할 이미지를 AI에게 그려달라고 요청하세요." : "평가에 사용할 4컷 만화를 AI에게 그려달라고 요청하세요."}
+                                </CardDescription>
                             </div>
                             <Dialog>
                                 <DialogTrigger asChild>
@@ -389,7 +399,7 @@ export default function NewAssessmentPage() {
                                 <Label htmlFor="image-prompt">이미지 생성 프롬프트</Label>
                                 <Textarea 
                                     id="image-prompt"
-                                    placeholder="예: 부엌에서 함께 요리하는 가족, 따뜻하고 아늑한 분위기의 일러스트"
+                                    placeholder={monologueType === 'comic' ? "예: 1. 아이가 넘어진다. 2. 친구가 와서 도와준다. 3. 둘이 함께 웃는다. 4. 같이 아이스크림을 먹는다. --style 4-panel comic" : "예: 부엌에서 함께 요리하는 가족, 따뜻하고 아늑한 분위기의 일러스트"}
                                     value={imagePrompt}
                                     onChange={(e) => setImagePrompt(e.target.value)}
                                     rows={4}

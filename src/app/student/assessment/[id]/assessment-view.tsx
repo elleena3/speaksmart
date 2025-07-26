@@ -4,7 +4,7 @@
 import { useState, useRef, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Mic, StopCircle, Loader2, Timer, Send, RefreshCw, Image as ImageIcon } from "lucide-react"
+import { Mic, StopCircle, Loader2, Timer, Send, RefreshCw, Image as ImageIcon, Film } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { type TeacherAssessment } from "@/lib/types"
 import { useAuth } from "@/context/auth-context"
@@ -343,15 +343,38 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
     }
   }
 
-  const isImageAssessment = assessmentDetails.monologueType === 'image' && assessmentDetails.imageUrl;
+  const isImageAssessment = (assessmentDetails.monologueType === 'image' || assessmentDetails.monologueType === 'comic') && assessmentDetails.imageUrl;
+  
+  const getCardTitle = () => {
+    switch (assessmentDetails.monologueType) {
+      case 'image':
+        return <><ImageIcon className="mr-2"/>제시된 이미지</>;
+      case 'comic':
+        return <><Film className="mr-2"/>제시된 만화</>;
+      default:
+        return '제시 자료';
+    }
+  };
+
+  const getCardDescription = () => {
+    switch (assessmentDetails.monologueType) {
+      case 'image':
+        return "아래 이미지를 보고 영어로 묘사해주세요.";
+      case 'comic':
+        return "아래 네컷 만화를 보고 스토리를 영어로 설명해주세요.";
+      default:
+        return "";
+    }
+  };
+
 
   return (
     <div className="flex flex-col items-center gap-6 p-8 border rounded-lg bg-muted/50 min-h-[350px] justify-center">
       {isImageAssessment && (
         <Card className="w-full mb-4">
             <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg"><ImageIcon/> 제시된 이미지</CardTitle>
-                <CardDescription>아래 이미지를 보고 영어로 묘사해주세요.</CardDescription>
+                <CardTitle className="flex items-center text-lg">{getCardTitle()}</CardTitle>
+                <CardDescription>{getCardDescription()}</CardDescription>
             </CardHeader>
             <CardContent className="flex justify-center items-center">
                 <Image src={assessmentDetails.imageUrl!} alt="Assessment Image" width={400} height={400} className="rounded-md object-contain max-h-[400px]"/>
