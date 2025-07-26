@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
@@ -42,7 +42,7 @@ export function InteractiveTextAnalyzer() {
         const selection = window.getSelection();
         const text = selection?.toString().trim();
         
-        if (text && text.length > 1) {
+        if (text && text.length > 0) {
             const range = selection?.getRangeAt(0);
             if (range) {
                 setSelectionRect(range.getBoundingClientRect());
@@ -77,13 +77,21 @@ export function InteractiveTextAnalyzer() {
     };
     
     const handleReadAloudClick = async () => {
-        if (!currentSelection) return;
+        if (!currentSelection || !textContainerRef.current) return;
 
         setPopoverOpen(false);
         setIsReadingAloud(true);
 
         try {
-            const { audioDataUri } = await readAloudText({ text: currentSelection });
+            // First, get the corrected text from the AI
+            const { correctedText } = await enhanceSelectedText({
+                selectedText: currentSelection,
+                fullSentenceContext: textContainerRef.current.innerText,
+                action: 'translate', // Action doesn't matter here, we just need correctedText
+            });
+
+            // Then, use the corrected text for TTS
+            const { audioDataUri } = await readAloudText({ text: correctedText });
             if (audioPlayerRef.current) {
                 audioPlayerRef.current.src = audioDataUri;
                 audioPlayerRef.current.play();
@@ -127,7 +135,11 @@ export function InteractiveTextAnalyzer() {
                         <CardDescription>아래 지문에서 궁금한 단어, 구, 문장을 드래그하여 AI 분석 기능을 사용해보세요.</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <div ref={textContainerRef} onMouseUp={handleTextSelection} className="p-4 bg-muted/50 rounded-lg text-lg font-serif leading-relaxed h-96 overflow-y-auto select-text">
+                        <div 
+                             ref={textContainerRef} 
+                             onMouseUp={handleTextSelection} 
+                             className="p-4 bg-muted/50 rounded-lg text-lg font-serif leading-relaxed h-96 overflow-y-auto select-text"
+                        >
                             {selectedText}
                         </div>
                         <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
