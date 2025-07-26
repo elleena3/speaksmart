@@ -3,7 +3,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
-import { Mic, StopCircle, Loader2, Bot, User, Play, Volume2, BrainCircuit, Download, RefreshCw } from "lucide-react"
+import { Mic, StopCircle, Loader2, Bot, User, Play, Volume2, BrainCircuit, Download, RefreshCw, CheckCircle2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { type ConversationTurn } from "@/lib/types/ai-schemas";
@@ -11,7 +11,7 @@ import { converseWithConcurrentTeacher, transcribeUserAudio } from "@/ai/flows/c
 
 const mimeType = 'audio/webm;codecs=opus';
 
-type SessionState = "idle" | "initializing" | "user_replying" | "processing" | "speaking" | "finished";
+type SessionState = "idle" | "initializing" | "user_replying" | "processing" | "speaking" | "finishing" | "finished";
 
 export function ConcurrentConversationTool() {
   const [sessionState, setSessionState] = useState<SessionState>("idle");
@@ -200,10 +200,12 @@ export function ConcurrentConversationTool() {
 
   const handleStopConversation = () => {
     if (mainRecorderRef.current?.state === 'recording') {
-        mainRecorderRef.current.stop();
+        setSessionState("finishing");
+        mainRecorderRef.current.stop(); // This will trigger onstop event after a delay
+    } else {
+        cleanupRecorders();
+        cleanupAudioPlayer();
     }
-    cleanupRecorders();
-    cleanupAudioPlayer();
   };
 
 
@@ -218,10 +220,11 @@ export function ConcurrentConversationTool() {
         );
       case "initializing":
       case "processing":
+      case "finishing":
           return (
              <Button size="lg" disabled className="w-full">
                 <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                {sessionState === "initializing" ? "AI 준비 중..." : "AI 생각 중..."}
+                {sessionState === "initializing" ? "AI 준비 중..." : sessionState === 'processing' ? "AI 생각 중..." : "녹음 파일 생성 중..."}
             </Button>
           )
       case "speaking":
@@ -271,18 +274,18 @@ export function ConcurrentConversationTool() {
               </div>
             )}
             {sessionState === "finished" && recordedBlob && (
-                 <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground pt-12">
-                  <Download className="h-12 w-12 mb-4 text-primary"/>
+                 <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground pt-8">
+                  <CheckCircle2 className="h-12 w-12 mb-4 text-green-500"/>
                   <p className="font-semibold">대화 녹음이 완료되었습니다.</p>
                   <p className="text-sm">아래 버튼을 눌러 녹음된 대화 파일을 다운로드하세요.</p>
                   <audio src={URL.createObjectURL(recordedBlob)} controls className="mt-4 w-full max-w-sm"></audio>
               </div>
             )}
-            {["initializing"].includes(sessionState) && (
+            {["initializing", "finishing"].includes(sessionState) && (
                  <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground pt-12">
                      <Loader2 className="h-12 w-12 mb-4 animate-spin"/>
                      <p className="font-semibold">
-                         AI가 응답을 준비 중입니다...
+                         {sessionState === 'initializing' ? 'AI가 응답을 준비 중입니다...' : '대화 녹음 파일을 생성 중입니다...'}
                      </p>
                  </div>
             )}
@@ -321,7 +324,7 @@ export function ConcurrentConversationTool() {
             <div className="flex-grow">
               {getButtonState()}
             </div>
-            {sessionState !== "idle" && sessionState !== 'finished' && (
+            {sessionState !== "idle" && sessionState !== 'finished' && sessionState !== 'finishing' && (
               <Button onClick={handleStopConversation} variant="destructive">
                 대화 종료
               </Button>
