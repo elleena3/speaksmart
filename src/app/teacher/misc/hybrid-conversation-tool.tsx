@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils"
 
 const mimeType = 'audio/webm;codecs=opus';
 const SPEECH_END_TIMEOUT_MS = 2500; 
-const NO_RESPONSE_TIMEOUT_MS = 10000; // 10초 동안 응답이 없을 경우
+const NO_RESPONSE_TIMEOUT_MS = 10000;
 
 type SessionState = "idle" | "initializing" | "speaking" | "listening" | "processing" | "ending" | "finished";
 
@@ -86,8 +86,7 @@ export function HybridConversationTool() {
     if (mediaRecorderRef.current?.state === 'recording') {
         mediaRecorderRef.current.stop();
     } else if (!transcript.trim()) {
-        // If there's no recording and no transcript, just go back to listening
-        setSessionState("speaking"); // This will trigger onEnded -> startListening
+        setSessionState("speaking"); 
     }
   }, [cleanup]);
 
@@ -106,12 +105,11 @@ export function HybridConversationTool() {
     
     cleanup();
 
-    // 10초 안전 타이머 설정
     if (noResponseTimerRef.current) clearTimeout(noResponseTimerRef.current);
     noResponseTimerRef.current = setTimeout(() => {
         if(sessionState === 'listening') {
              toast({title: "응답 없음", description: "AI가 다시 말을 겁니다."});
-             processFinalTranscript("(The user did not respond)");
+             (window as any)._processFinalTranscript("(The user did not respond)");
         }
     }, NO_RESPONSE_TIMEOUT_MS);
 
@@ -123,11 +121,11 @@ export function HybridConversationTool() {
         recognition.lang = 'en-US';
 
         const resetSpeechEndTimer = () => {
-            if (noResponseTimerRef.current) clearTimeout(noResponseTimerRef.current); // 첫 단어가 감지되면 안전 타이머 해제
+            if (noResponseTimerRef.current) clearTimeout(noResponseTimerRef.current);
             if (speechEndTimerRef.current) clearTimeout(speechEndTimerRef.current);
             speechEndTimerRef.current = setTimeout(() => {
                 if (recognitionRef.current) {
-                    processFinalTranscript((finalTranscriptRef.current + " " + interimTranscript).trim());
+                    (window as any)._processFinalTranscript((finalTranscriptRef.current + " " + interimTranscript).trim());
                 }
             }, SPEECH_END_TIMEOUT_MS);
         };
@@ -177,12 +175,11 @@ export function HybridConversationTool() {
              setSessionState("idle");
         });
         
-
     } catch (err) {
         toast({ title: "음성 인식 시작 오류", variant: "destructive" });
         setSessionState("idle");
     }
-  }, [toast, cleanup, processAudioBlob, processFinalTranscript, sessionState]);
+  }, [toast, cleanup, processAudioBlob, sessionState]);
   
    useEffect(() => {
     (window as any)._startListening = startListening;
@@ -246,7 +243,6 @@ export function HybridConversationTool() {
           startListening();
       }
   };
-
 
   return (
     <div className="flex flex-col gap-4">
