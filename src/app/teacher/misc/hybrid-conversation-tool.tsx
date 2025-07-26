@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils"
 
 const mimeType = 'audio/webm;codecs=opus';
 const SPEECH_END_TIMEOUT_MS = 2500; 
+const NO_RESPONSE_TIMEOUT_MS = 10000; // 10초 동안 응답이 없을 경우
 
 type SessionState = "idle" | "initializing" | "speaking" | "listening" | "processing" | "ending" | "finished";
 
@@ -24,6 +25,7 @@ export function HybridConversationTool() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const speechEndTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const noResponseTimerRef = useRef<NodeJS.Timeout | null>(null);
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
   const scrollViewportRef = useRef<HTMLDivElement | null>(null);
   const { toast } = useToast();
@@ -31,6 +33,7 @@ export function HybridConversationTool() {
 
   const cleanup = useCallback(() => {
     if (speechEndTimerRef.current) clearTimeout(speechEndTimerRef.current);
+    if (noResponseTimerRef.current) clearTimeout(noResponseTimerRef.current);
     if (recognitionRef.current) {
         recognitionRef.current.onresult = null;
         recognitionRef.current.onend = null;
@@ -82,14 +85,10 @@ export function HybridConversationTool() {
     cleanup();
     if (mediaRecorderRef.current?.state === 'recording') {
         mediaRecorderRef.current.stop();
+    } else if (!transcript.trim()) {
+        // If there's no recording and no transcript, just go back to listening
+        setSessionState("speaking"); // This will trigger onEnded -> startListening
     }
-    
-    // The onstop event of mediaRecorder will handle the blob processing.
-    // This function's main job now is just to stop the recognition.
-    if (!transcript.trim()) {
-        setSessionState("speaking"); // Or an appropriate state to allow user to try again
-    }
-
   }, [cleanup]);
 
 
@@ -107,6 +106,15 @@ export function HybridConversationTool() {
     
     cleanup();
 
+    // 10초 안전 타이머 설정
+    if (noResponseTimerRef.current) clearTimeout(noResponseTimerRef.current);
+    noResponseTimerRef.current = setTimeout(() => {
+        if(sessionState === 'listening') {
+             toast({title: "응답 없음", description: "AI가 다시 말을 겁니다."});
+             processFinalTranscript("(The user did not respond)");
+        }
+    }, NO_RESPONSE_TIMEOUT_MS);
+
     try {
         const recognition = new SpeechRecognition();
         recognitionRef.current = recognition;
@@ -114,12 +122,12 @@ export function HybridConversationTool() {
         recognition.interimResults = true;
         recognition.lang = 'en-US';
 
-        const resetTimer = () => {
+        const resetSpeechEndTimer = () => {
+            if (noResponseTimerRef.current) clearTimeout(noResponseTimerRef.current); // 첫 단어가 감지되면 안전 타이머 해제
             if (speechEndTimerRef.current) clearTimeout(speechEndTimerRef.current);
             speechEndTimerRef.current = setTimeout(() => {
                 if (recognitionRef.current) {
-                    const finalTranscript = finalTranscriptRef.current + " " + interimTranscript;
-                    processFinalTranscript(finalTranscript.trim());
+                    processFinalTranscript((finalTranscriptRef.current + " " + interimTranscript).trim());
                 }
             }, SPEECH_END_TIMEOUT_MS);
         };
@@ -134,11 +142,9 @@ export function HybridConversationTool() {
                 }
             }
             setInterimTranscript(currentInterim);
-            resetTimer();
-        };
-
-        recognition.onend = () => {
-            // This is just a safety net, the main logic is in the timer.
+            if(finalTranscriptRef.current.trim() || currentInterim.trim()){
+                resetSpeechEndTimer();
+            }
         };
 
         recognition.onerror = (event) => {
@@ -166,7 +172,6 @@ export function HybridConversationTool() {
 
             mediaRecorderRef.current.start();
             recognition.start();
-            resetTimer();
         }).catch(err => {
              toast({ title: "마이크 오류", variant: "destructive" });
              setSessionState("idle");
@@ -177,14 +182,16 @@ export function HybridConversationTool() {
         toast({ title: "음성 인식 시작 오류", variant: "destructive" });
         setSessionState("idle");
     }
-  }, [toast, cleanup, processAudioBlob, processFinalTranscript]);
+  }, [toast, cleanup, processAudioBlob, processFinalTranscript, sessionState]);
   
    useEffect(() => {
     (window as any)._startListening = startListening;
+    (window as any)._processFinalTranscript = processFinalTranscript;
     return () => {
         delete (window as any)._startListening;
+        delete (window as any)._processFinalTranscript;
     }
-  }, [startListening]);
+  }, [startListening, processFinalTranscript]);
 
   useEffect(() => {
     return () => { cleanup(); };
