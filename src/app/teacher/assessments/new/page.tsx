@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, CalendarIcon, ChevronsUpDown, Check, Info, Users, Type, Image as ImageIcon, LayoutGrid, Wand2 } from "lucide-react";
-import { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Calendar } from "@/components/ui/calendar";
@@ -625,27 +625,28 @@ export default function NewAssessmentPage() {
                                 <Separator />
                                 <CardContent className="p-4 grid grid-cols-2 md:grid-cols-3 gap-2 min-h-[100px]">
                                     {filteredRegisteredStudents.length > 0 ? filteredRegisteredStudents.map((item) => (
-                                        <FormField
-                                            key={item.uid}
-                                            control={form.control}
-                                            name="targetStudentIds"
-                                            render={({ field }) => (
-                                                <FormItem className="flex flex-row items-center space-x-2 space-y-0">
-                                                    <FormControl>
-                                                        <Checkbox
-                                                            checked={field.value?.includes(item.uid)}
-                                                            onCheckedChange={(checked) => {
-                                                                const currentIds = field.value || [];
-                                                                return checked
-                                                                ? field.onChange([...currentIds, item.uid])
-                                                                : field.onChange(currentIds.filter(value => value !== item.uid));
-                                                            }}
-                                                        />
-                                                    </FormControl>
-                                                    <FormLabel className="font-normal text-sm">{item.displayName}</FormLabel>
-                                                </FormItem>
-                                            )}
-                                        />
+                                        <React.Fragment key={item.uid}>
+                                            <FormField
+                                                control={form.control}
+                                                name="targetStudentIds"
+                                                render={({ field }) => (
+                                                    <FormItem className="flex flex-row items-center space-x-2 space-y-0">
+                                                        <FormControl>
+                                                            <Checkbox
+                                                                checked={field.value?.includes(item.uid)}
+                                                                onCheckedChange={(checked) => {
+                                                                    const currentIds = field.value || [];
+                                                                    return checked
+                                                                    ? field.onChange([...currentIds, item.uid])
+                                                                    : field.onChange(currentIds.filter(value => value !== item.uid));
+                                                                }}
+                                                            />
+                                                        </FormControl>
+                                                        <FormLabel className="font-normal text-sm">{item.displayName}</FormLabel>
+                                                    </FormItem>
+                                                )}
+                                            />
+                                        </React.Fragment>
                                     )) : <p className="text-sm text-muted-foreground col-span-full text-center py-8">해당 학년/반에 가입한 학생이 없습니다.</p>}
                                 </CardContent>
                             </Card>
