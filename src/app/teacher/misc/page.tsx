@@ -3,7 +3,7 @@
 
 import { useState, useMemo, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { Loader2, FileText, Target, Mic, Bot, BookOpen, Sparkles, ScanText, KeyRound, AlertTriangle, MessageCircle, MicVocal, Video } from "lucide-react";
+import { Loader2, FileText, Target, Mic, Bot, BookOpen, Sparkles, ScanText, KeyRound, AlertTriangle, MessageCircle, MicVocal, Video, Ear } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -16,6 +16,7 @@ import { ReadAloudTool } from "./read-aloud-tool";
 import { HandwritingAnalyzerTool } from "./handwriting-analyzer-tool";
 import { ConcurrentConversationTool } from "./concurrent-conversation-tool";
 import { PresentationAnalyzerTool } from "./presentation-analyzer-tool";
+import { VadConversationTool } from "./vad-conversation-tool";
 import { useLanguage } from "@/context/language-context";
 
 
@@ -91,6 +92,18 @@ export default function MiscPage() {
                     </CardHeader>
                     <CardContent>
                         <PresentationAnalyzerTool />
+                    </CardContent>
+                </Card>
+
+                 <Card className="lg:col-span-2">
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2"><Ear className="h-6 w-6"/> AI 원어민 선생님과 대화하기 3 (VAD)</CardTitle>
+                        <CardDescription>
+                            음성 활동 감지(VAD) 기술을 사용하여, 사용자가 말을 멈추면(약 6초) AI가 자동으로 응답합니다. '대화 시작'과 '대화 종료' 버튼만으로 자연스러운 대화 흐름을 경험해보세요.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                       <VadConversationTool />
                     </CardContent>
                 </Card>
 
@@ -384,5 +397,3 @@ function PronunciationAnalyzerTool() {
     </AudioProcessor>
   );
 }
-
-    
