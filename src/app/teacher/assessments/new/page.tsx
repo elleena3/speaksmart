@@ -98,7 +98,7 @@ export default function NewAssessmentPage() {
     scenario: z.enum(scenarios).optional(),
     recordingTimeLimit: z.coerce.number().int().min(0).optional(),
     aiVoice: z.enum(allVoices).optional().default('algenib'),
-    evaluationModel: z.enum(evaluationModels).optional().default('gemini-2.5-flash'),
+    evaluationModel: z.enum(evaluationModels).optional().default('gemini-2.5-pro'),
     useRubric: z.boolean().default(false),
   }).superRefine((data, ctx) => {
     const isFreeTalk = data.assessmentType === 'dialogue' && data.scenario === 'free-talk';
@@ -141,7 +141,7 @@ export default function NewAssessmentPage() {
       scenario: "free-talk",
       recordingTimeLimit: 0,
       aiVoice: "algenib",
-      evaluationModel: "gemini-2.5-flash",
+      evaluationModel: "gemini-2.5-pro",
       useRubric: false,
     },
   });
@@ -874,7 +874,3 @@ export default function NewAssessmentPage() {
     </Card>
   );
 }
-
-    
-
-    
