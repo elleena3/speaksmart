@@ -4,5 +4,5 @@
 runConfig:
   # Automatically spin up more instances in response to increased traffic.
   maxInstances: 10
-  # Set the location to Seoul for lower latency for Korean users.
-  location: asia-northeast3
+  # Set the location to Taiwan for lower latency for Korean users.
+  location: asia-east1
