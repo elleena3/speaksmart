@@ -1,13 +1,11 @@
 rules_version = '2';
 
-// Warning: This is a completely open rule. 
-// Any user can read, write, and delete any file.
-// This is for development purposes only.
-// You MUST secure these rules before launching your app.
 service firebase.storage {
   match /b/{bucket}/o {
+    // 모든 파일 경로에 대해 적용
     match /{allPaths=**} {
-      allow read, write: if true;
+      // 로그인한 사용자(request.auth != null)만 파일을 읽고 쓸 수 있도록 허용합니다.
+      allow read, write: if request.auth != null;
     }
   }
 }
