@@ -1,3 +1,4 @@
+
 'use server';
 
 /**
@@ -39,10 +40,16 @@ const AnalyzeHandwritingSubmissionOutputSchema = z.object({
 export type AnalyzeHandwritingSubmissionOutput = z.infer<typeof AnalyzeHandwritingSubmissionOutputSchema>;
 
 // Define a separate schema for the prompt's input, excluding the 'model' field.
-const PromptInputSchema = AnalyzeHandwritingSubmissionInputSchema.pick({
-    studentSubmissionUri: true,
-    criteriaText: true,
-    criteriaFileUri: true,
+const PromptInputSchema = z.object({
+    studentSubmissionUri: z.string().describe(
+      "The student's handwritten work as a data URI (image or PDF)."
+    ),
+    criteriaText: z.string().optional().describe(
+      "The evaluation criteria as a text string."
+    ),
+    criteriaFileUri: z.string().optional().describe(
+      "The evaluation criteria as a file data URI (image or PDF)."
+    ),
 });
 
 export async function analyzeHandwritingSubmission(input: AnalyzeHandwritingSubmissionInput): Promise<AnalyzeHandwritingSubmissionOutput> {
