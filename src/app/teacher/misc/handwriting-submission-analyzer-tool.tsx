@@ -12,6 +12,9 @@ import { analyzeHandwritingSubmission, type AnalyzeHandwritingSubmissionOutput }
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { evaluationModels, type EvaluationModel } from '@/lib/types';
+
 
 type AnalysisState = 'idle' | 'analyzing' | 'analyzed' | 'error';
 const validFileTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
@@ -23,6 +26,7 @@ export function HandwritingSubmissionAnalyzerTool() {
     const [criteriaText, setCriteriaText] = useState('');
     const [analysisResult, setAnalysisResult] = useState<AnalyzeHandwritingSubmissionOutput | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [selectedModel, setSelectedModel] = useState<EvaluationModel>('gemini-2.5-flash');
     const { toast } = useToast();
 
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>, fileType: 'student' | 'criteria') => {
@@ -53,10 +57,14 @@ export function HandwritingSubmissionAnalyzerTool() {
             toast({ title: "학생 과제물 없음", description: "분석할 학생의 과제물 파일을 먼저 업로드해주세요.", variant: "destructive" });
             return;
         }
+         if (!criteriaFile && !criteriaText.trim()) {
+            toast({ title: "채점 기준 없음", description: "텍스트 또는 파일 형태의 채점 기준을 하나 이상 입력해주세요.", variant: "destructive" });
+            return;
+        }
         setAnalysisState('analyzing');
         setError(null);
         setAnalysisResult(null);
-        toast({ title: "AI 분석 시작", description: "과제물을 분석하고 있습니다. 내용에 따라 시간이 소요될 수 있습니다." });
+        toast({ title: "AI 분석 시작", description: `[${selectedModel}] 모델을 사용하여 과제물을 분석하고 있습니다.` });
 
         try {
             const studentSubmissionUri = await fileToDataUri(studentFile);
@@ -66,6 +74,7 @@ export function HandwritingSubmissionAnalyzerTool() {
                 studentSubmissionUri,
                 criteriaFileUri,
                 criteriaText: criteriaText || undefined,
+                model: selectedModel,
             });
             
             setAnalysisResult(result);
@@ -94,8 +103,11 @@ export function HandwritingSubmissionAnalyzerTool() {
     };
 
     const isAnalyzeButtonDisabled = useMemo(() => {
-        return !studentFile || analysisState === 'analyzing';
-    }, [studentFile, analysisState]);
+        if (!studentFile) return true;
+        if (!criteriaFile && !criteriaText.trim()) return true;
+        if (analysisState === 'analyzing') return true;
+        return false;
+    }, [studentFile, criteriaFile, criteriaText, analysisState]);
 
     return (
         <div className="space-y-4">
@@ -110,12 +122,12 @@ export function HandwritingSubmissionAnalyzerTool() {
                             <Input id="student-upload" type="file" accept={validFileTypes.join(',')} onChange={(e) => handleFileChange(e, 'student')} />
                         </div>
                          <div className="space-y-2">
-                            <Label htmlFor="criteria-upload">채점 기준 자료 (이미지/PDF, 선택)</Label>
+                            <Label htmlFor="criteria-upload">채점 기준 자료 (이미지/PDF)</Label>
                             <Input id="criteria-upload" type="file" accept={validFileTypes.join(',')} onChange={(e) => handleFileChange(e, 'criteria')} />
                         </div>
                     </div>
                      <div className="space-y-2">
-                        <Label htmlFor="custom-criteria">채점 기준 (텍스트, 선택)</Label>
+                        <Label htmlFor="custom-criteria">채점 기준 (텍스트)</Label>
                         <Textarea 
                             id="custom-criteria"
                             placeholder="파일 대신 텍스트로 채점 기준을 입력할 수 있습니다. 예: 1. 단어의 철자가 정확한가? 2. 문법적으로 올바른 문장을 사용했는가?"
@@ -123,7 +135,20 @@ export function HandwritingSubmissionAnalyzerTool() {
                             onChange={(e) => setCriteriaText(e.target.value)}
                             rows={3}
                         />
+                         <p className="text-xs text-muted-foreground">채점 기준은 파일 또는 텍스트 중 하나 이상을 반드시 입력해야 합니다.</p>
                     </div>
+                     <div>
+                        <Label htmlFor="model-select" className="text-sm font-medium">AI 평가 모델 선택</Label>
+                        <Select onValueChange={(value) => setSelectedModel(value as EvaluationModel)} value={selectedModel}>
+                            <SelectTrigger id="model-select">
+                                <SelectValue placeholder="모델을 선택하세요..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="gemini-2.5-flash">gemini-2.5-flash (빠름)</SelectItem>
+                                <SelectItem value="gemini-2.5-pro">gemini-2.5-pro (고성능)</SelectItem>
+                            </SelectContent>
+                        </Select>
+                     </div>
                     <div className="flex gap-2 pt-2">
                         <Button onClick={handleAnalyze} disabled={isAnalyzeButtonDisabled} className="w-full">
                             {analysisState === 'analyzing' ? <Loader2 className="mr-2 animate-spin" /> : <Sparkles className="mr-2" />}

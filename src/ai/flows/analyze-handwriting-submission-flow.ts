@@ -12,6 +12,7 @@
 import { ai } from '@/ai/genkit';
 import { googleAI } from '@genkit-ai/googleai';
 import { z } from 'zod';
+import { evaluationModels } from '@/lib/types';
 
 const AnalyzeHandwritingSubmissionInputSchema = z.object({
   studentSubmissionUri: z.string().describe(
@@ -23,7 +24,12 @@ const AnalyzeHandwritingSubmissionInputSchema = z.object({
   criteriaFileUri: z.string().optional().describe(
     "The evaluation criteria as a file data URI (image or PDF)."
   ),
+  model: z.enum(evaluationModels).optional().default('gemini-2.5-flash'),
+}).refine(data => data.criteriaText || data.criteriaFileUri, {
+    message: "At least one of criteriaText or criteriaFileUri must be provided.",
+    path: ["criteriaText"], // you can pick any path for the error message
 });
+
 export type AnalyzeHandwritingSubmissionInput = z.infer<typeof AnalyzeHandwritingSubmissionInputSchema>;
 
 const AnalyzeHandwritingSubmissionOutputSchema = z.object({
@@ -40,8 +46,7 @@ export async function analyzeHandwritingSubmission(input: AnalyzeHandwritingSubm
 
 const handwritingSubmissionPrompt = ai.definePrompt({
     name: 'handwritingSubmissionPrompt',
-    model: googleAI.model('gemini-2.5-pro'),
-    input: { schema: AnalyzeHandwritingSubmissionInputSchema },
+    input: { schema: AnalyzeHandwritingSubmissionInputSchema.omit({ model: true }) }, // model is used for selection, not in prompt template
     output: { schema: AnalyzeHandwritingSubmissionOutputSchema },
     prompt: `You are an expert teacher grading a handwritten assignment. Your task is to provide detailed, constructive feedback for both the student and the teacher based on the provided submission and evaluation criteria. All feedback must be in Korean.
 
@@ -57,27 +62,29 @@ const handwritingSubmissionPrompt = ai.definePrompt({
     {{#if criteriaFileUri}}
     -   **File-Based Criteria:** {{media url=criteriaFileUri}}
     {{/if}}
-    {{#unless criteriaText}}{{#unless criteriaFileUri}}
-    -   **Criteria:** No specific criteria provided. Please evaluate based on general legibility, neatness, and completeness.
-    {{/unless}}{{/unless}}
 
 ---
 
 ### Your Tasks
 
-1.  **Analyze the Submission:**
+1.  **Analyze the Submission (Strictly):**
     -   Carefully read and understand the student's handwritten work.
+    -   **IMPORTANT:** When transcribing or evaluating the text, do NOT correct it based on context. Recognize typos, misspellings, and illegible words exactly as they are. Base your initial assessment on this strict, literal interpretation.
     -   Thoroughly review the provided evaluation criteria.
-    -   Compare the student's submission against each criterion. Note strengths, weaknesses, and areas of misunderstanding.
+    -   Compare the student's submission against each criterion based on your strict analysis. Note strengths, weaknesses, and areas of misunderstanding.
 
 2.  **Generate Student Feedback ('studentFeedback'):**
     -   **Format:** Use Markdown for clear formatting (headings, bullet points).
     -   **Tone:** Be encouraging, positive, and constructive.
-    -   **Content:** Start with what the student did well. Then, explain the areas for improvement with specific examples from their work. Provide clear, actionable advice on how they can improve for next time. Avoid overly harsh criticism.
+    -   **Content:**
+        -   Start with what the student did well based on the strict analysis.
+        -   Explain the areas for improvement (e.g., specific spelling mistakes, unclear letters) with concrete examples from their work.
+        -   **Crucially, in a separate section, provide additional feedback considering the likely context.** For example, "비록 'apple'을 'aple'로 썼지만, 전체 문맥을 보니 '사과'를 의미하려 했던 것 같아요. 철자를 다시 한번 확인해보면 더 좋아질 거예요."
+        -   Provide clear, actionable advice on how they can improve for next time.
 
 3.  **Generate Teacher Guidance ('teacherGuidance'):**
     -   **Format:** Plain text, professional tone.
-    -   **Content:** Provide a concise summary of the student's performance. Highlight key strengths and persistent errors. Suggest specific teaching strategies or follow-up activities to help this student. For example, "The student shows a good understanding of X but struggles with Y. Consider a mini-lesson on Z or providing a worksheet focusing on Y."
+    -   **Content:** Provide a concise summary of the student's performance. Highlight key strengths and persistent errors (distinguishing between simple mistakes and potential misunderstandings). Suggest specific teaching strategies or follow-up activities to help this student.
 
 ---
 
@@ -91,8 +98,12 @@ const analyzeHandwritingSubmissionFlow = ai.defineFlow(
     inputSchema: AnalyzeHandwritingSubmissionInputSchema,
     outputSchema: AnalyzeHandwritingSubmissionOutputSchema,
   },
-  async (input) => {
-    const { output } = await handwritingSubmissionPrompt(input);
+  async ({ model, ...input }) => {
+    
+    const analysisModel = googleAI.model(model || 'gemini-2.5-flash');
+
+    const { output } = await handwritingSubmissionPrompt(input, { model: analysisModel });
+
     if (!output) {
       throw new Error("The AI model did not return a valid analysis for the submission.");
     }
