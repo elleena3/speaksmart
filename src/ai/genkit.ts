@@ -1,6 +1,8 @@
 import {genkit} from 'genkit';
 import {googleAI} from '@genkit-ai/googleai';
+import {firebase} from '@genkit-ai/firebase';
 import {config} from 'dotenv';
+import { firebaseConfig } from '@/lib/firebase';
 
 config();
 
@@ -26,6 +28,15 @@ export const ai = genkit({
   plugins: [
     googleAI({
       apiKey: GOOGLE_API_KEY,
+    }),
+    firebase({
+        firebaseConfig: firebaseConfig,
+        auth: {
+            // When deployed to Cloud Functions, Genkit will automatically use the
+            // service account of the function.
+            // For local development, you need to authorize the Genkit CLI with
+            // a user account that has access to the project.
+        },
     }),
   ],
 });
