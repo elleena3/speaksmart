@@ -359,7 +359,7 @@ export function FreeTalkView({ assessment }: { assessment: TeacherAssessment }) 
                 <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground pt-12">
                     <Loader2 className="h-12 w-12 mb-4 animate-spin"/>
                     <p className="font-semibold">
-                      {sessionState === 'initializing' ? `AI 대화 파트너 '${assessment.aiVoice || 'achernar'}'를 연결하는 중입니다...` : '대화 내용을 저장하고 분석 페이지로 이동합니다...'}
+                      {sessionState === 'initializing' ? `AI 대화 파트너 '${assessment.aiVoice || 'algenib'}'를 연결하는 중입니다...` : '대화 내용을 저장하고 분석 페이지로 이동합니다...'}
                     </p>
                     <p className="text-sm">잠시만 기다려주세요.</p>
                 </div>

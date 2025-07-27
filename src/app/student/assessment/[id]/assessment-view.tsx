@@ -66,7 +66,7 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
             URL.revokeObjectURL(audioUrl);
         }
     };
-  }, [audioBlob, audioUrl]);
+  }, [audioBlob]);
 
   const cleanupRecorder = useCallback(() => {
     if (audioStreamRef.current) {
