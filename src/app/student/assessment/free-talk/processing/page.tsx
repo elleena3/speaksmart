@@ -198,12 +198,14 @@ export default function DialogueProcessingPage() {
                 }
             });
 
-            // Upload recording
+            // Step 1: Upload recording
             const storageRef = ref(storage, `recordings/${user.uid}_dialogue_${newResultDocRef.id}.webm`);
             const uploadSnapshot = await uploadString(storageRef, studentRecordingDataUri, 'data_url');
             const downloadURL = await getDownloadURL(uploadSnapshot.ref);
-            await updateDoc(newResultDocRef, { studentRecordingUrl: downloadURL });
-            console.log(`[Dialogue Processing] Audio uploaded to ${downloadURL}`);
+            
+            // Step 2: Update status to 'analyze' after upload
+            await updateDoc(newResultDocRef, { studentRecordingUrl: downloadURL, status: "분석 중: analyze" });
+            console.log(`[Dialogue Processing] Audio uploaded to ${downloadURL}. Status updated to 'analyze'.`);
 
             // Prepare transcripts
             const fullConversationTranscript = conversationHistory
@@ -214,7 +216,7 @@ export default function DialogueProcessingPage() {
                 .map(turn => turn.text)
                 .join(' ');
             
-            // Call the main analysis flow, passing teacherUid explicitly
+            // Step 3: Call the main analysis flow
             await generateDialogueAnalysis({
                 resultId: newResultDocRef.id,
                 teacherUid: assessment.uid,
