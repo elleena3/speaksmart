@@ -39,26 +39,26 @@ let storage: FirebaseStorage;
 let analytics: Analytics | undefined;
 
 // 클라이언트 사이드에서만 Firebase 초기화를 수행합니다.
-if (typeof window !== 'undefined' && !getApps().length) {
-    try {
-        app = initializeApp(firebaseConfig);
+if (typeof window !== 'undefined') {
+    if (!getApps().length) {
+        try {
+            app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
+            db = getFirestore(app);
+            storage = getStorage(app);
+            isSupported().then((supported) => {
+                if (supported) {
+                    analytics = getAnalytics(app);
+                }
+            });
+        } catch(e) {
+            console.error("Firebase initialization error:", e);
+        }
+    } else {
+        app = getApp();
         auth = getAuth(app);
         db = getFirestore(app);
         storage = getStorage(app);
-        isSupported().then((supported) => {
-            if (supported) {
-                analytics = getAnalytics(app);
-            }
-        });
-    } catch(e) {
-        console.error("Firebase initialization error:", e);
-    }
-} else {
-    app = getApp();
-    auth = getAuth(app);
-    db = getFirestore(app);
-    storage = getStorage(app);
-     if (typeof window !== 'undefined') {
         isSupported().then((supported) => {
             if (supported) {
                 analytics = getAnalytics(app);
