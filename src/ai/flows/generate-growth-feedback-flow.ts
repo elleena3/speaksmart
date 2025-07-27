@@ -82,11 +82,12 @@ const generateGrowthFeedbackFlow = ai.defineFlow(
     // Sanitize and filter attempts to ensure only valid remarks are processed.
     const sanitizedAttempts = input.attempts.map(attempt => {
         let remarks = (attempt.curricularRemarks || "").trim();
-        const isRemarkValid = remarks && !remarks.includes('오류') && !remarks.includes('실패') && !remarks.includes('없음');
+        // Check for invalid content, not just emptiness
+        const isRemarkInvalid = !remarks || remarks.includes('오류') || remarks.includes('실패') || remarks.includes('없음') || remarks.includes('불가능');
         return {
           ...attempt,
           // Set to null if invalid so Handlebars can check for its absence
-          curricularRemarks: isRemarkValid ? remarks : null,
+          curricularRemarks: isRemarkInvalid ? null : remarks,
         };
       });
 
