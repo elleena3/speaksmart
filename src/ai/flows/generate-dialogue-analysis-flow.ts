@@ -1,4 +1,5 @@
 
+
 'use server';
 
 /**
@@ -231,6 +232,25 @@ IMPORTANT INSTRUCTION: Your output MUST be ONLY the HTML code, starting with <!D
 Now, generate the HTML code.
 `,
     }),
+    teacherGuidance: ai.definePrompt({
+      name: `dialogueTeacherGuidancePrompt_${modelName.replace(/[-.]/g, '_')}`,
+      model: googleAI.model(modelName),
+      input: { schema: z.object({ studentFeedbackHtml: z.string() }) },
+      prompt: `You are an expert English education consultant. Your task is to provide actionable advice to a teacher based on an AI-generated feedback report for a student.
+
+The following is an HTML report containing a detailed rubric-based analysis of a student's English speaking performance. Read it carefully.
+
+### Student Feedback Report (HTML):
+{{{studentFeedbackHtml}}}
+
+### Your Task:
+Based on the provided HTML report, write concise and actionable guidance for the teacher in Korean. Your advice should:
+1.  Summarize the student's key strengths and weaknesses across all categories.
+2.  Suggest specific activities, teaching strategies, or areas of focus to help the student improve.
+3.  Be professional, encouraging, and easy for a teacher to understand and implement.
+
+Please provide only the teacher guidance text.`,
+    }),
 });
 
 // The Main Orchestration Flow for Dialogue
@@ -286,13 +306,15 @@ const generateDialogueAnalysisFlow = ai.defineFlow(
 
         const contentScore = Math.round(((rubricScores.fluency + rubricScores.grammar + rubricScores.vocabulary + (rubricScores.interaction || 0)) / 4) * 20);
         const pronunciationScore = rubricScores.pronunciation * 20;
+        
+        const guidanceResult = await withRetry(() => prompts.teacherGuidance({ studentFeedbackHtml: rubricText }));
 
         return {
             studentTranscript: input.fullConversationTranscript,
             contentScore: contentScore,
             pronunciationScore: pronunciationScore,
             aiFeedback: rubricText,
-            teacherGuidance: "루브릭 기반 평가를 사용했습니다. 학생의 강점과 약점을 항목별로 확인하고, 개선점에 제시된 활동을 지도해주세요.",
+            teacherGuidance: guidanceResult.text,
             curricularRemarks: `'${input.assessmentTitle}' 대화형 평가에서 루브릭 기반으로 종합 ${contentScore}점, 발음 ${pronunciationScore}점을 받는 등 준수한 성취를 보임. 특히 상호작용(${rubricScores.interaction! * 20}점) 능력이 돋보임.`,
             pronunciationFeedback: `루브릭 기반 발음 점수는 ${pronunciationScore}점입니다. 상세 내용은 종합 분석 리포트를 참고하세요.`,
             rubricScores,
