@@ -21,7 +21,7 @@ import {
 } from '@/lib/types/ai-schemas';
 import { evaluationModels, type RubricScores, type StudentResult } from '@/lib/types';
 import { doc, updateDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase-client';
+import { db } from '@/lib/firebase';
 
 // This parsing logic is now centralized here.
 const parseScore = (text: string, category: string): number => {
@@ -63,23 +63,21 @@ export async function generateDialogueAnalysis(
   const resultDocRef = doc(db, "results", input.resultId);
 
   try {
-      // The processing page handles the initial 'upload' and 'analyze' statuses.
-      // This flow starts from 'analyze' and updates to 'report' and '채점 완료'.
       console.log(`[Dialogue Flow] Starting analysis for result ID: ${input.resultId}`);
+      await updateDoc(resultDocRef, { status: "분석 중: analyze", assessmentType: "dialogue" });
       
       const analysisResult = await generateDialogueAnalysisFlow(input);
 
-      await updateDoc(resultDocRef, { status: "분석 중: report" });
       console.log(`[Dialogue Flow] Analysis complete. Updating document with final report for ${input.resultId}`);
+      await updateDoc(resultDocRef, { status: "분석 중: report" });
       
       const finalResultData: Partial<StudentResult> = {
           ...analysisResult,
           status: "채점 완료",
           teacherUid: input.teacherUid,
+          // Ensure the URL is persisted upon success as well
           studentRecordingUrl: input.studentRecordingUrl,
           assessmentType: "dialogue",
-          // Persist the transcripts used for analysis
-          studentTranscript: analysisResult.studentTranscript,
       };
       
       await updateDoc(resultDocRef, finalResultData);
@@ -87,12 +85,14 @@ export async function generateDialogueAnalysis(
 
   } catch (e: any) {
       console.error(`[Dialogue Flow] An error occurred during dialogue analysis for ${input.resultId}:`, e);
+      // On error, still try to save the recording URL for retry purposes.
       await updateDoc(resultDocRef, {
           status: "오류",
           aiFeedback: (e as Error).message || "알 수 없는 오류가 발생했습니다.",
-          studentRecordingUrl: input.studentRecordingUrl, 
+          studentRecordingUrl: input.studentRecordingUrl, // Save URL even on failure
           assessmentType: "dialogue",
       });
+      // Re-throw to let the caller know something went wrong.
       throw e;
   }
 }
@@ -151,91 +151,62 @@ const createPrompt = (modelName: z.infer<typeof evaluationModels[number]>) => ({
       name: `dialogueRubricAnalysisPrompt_${modelName.replace(/[-.]/g, '_')}`,
       model: googleAI.model(modelName),
       input: { schema: z.object({ fullConversationTranscript: z.string() }) },
-      prompt: `당신은 AI 영어 회화 능력 분석 전문가입니다. 주어진 대화 스크립트를 바탕으로, 아래의 5가지 평가 항목에 대해 학생의 영어 회화 능력을 분석하고, 각 항목에 대한 점수(1-5점)와 구체적인 피드백을 한국어로 제공해주세요.
+      prompt: `You are an HTML generation machine. Based on the user's speech and the provided rubric, generate a single, complete HTML file for a web-based report.
 
-### 분석 대상 대화
+IMPORTANT: Your output MUST be ONLY the HTML code, starting with <!DOCTYPE html> and ending with </html>. Do NOT include any additional text, explanations, or markdown code blocks (like \`\`\`html) before or after the HTML content.
+
+### User's Speech Content:
 {{{fullConversationTranscript}}}
 
-### 평가 기준 루브릭 (Evaluation Rubric)
-아래의 평가 기준을 반드시 준수하여 각 항목을 평가하고, 점수에 대한 근거를 "잘한 점"과 "개선점"으로 나누어 구체적인 예시와 함께 서술해주세요.
+### HTML Generation Requirements:
+1.  **Structure:** Create a standard HTML5 document.
+2.  **Content:** The page must contain a main title "📊 AI 영어회화 상세 분석". It should have 5 category cards for:
+    - 🗣️ 유창성 (Fluency)
+    - 🎤 발음 및 억양 (Pronunciation & Intonation)
+    - ✍️ 문법 (Grammar)
+    - 📚 어휘 (Vocabulary)
+    - 🤝 내용 이해 및 상호작용 (Comprehension & Interaction)
+3.  **Card Details:** Each card must display a score out of 5 (e.g., "📈 점수: 4 / 5점") and two sub-sections: "👍 잘한 점" and "💡 개선점", each with bulleted lists.
+4.  **Styling:** All CSS must be inside a <style> tag in the <head>. The layout should be responsive (flexbox for desktop, stacked on mobile below 768px). Use the specified color scheme: light gray page background, white cards, green for good points, and orange for improvement points.
 
-[평가 항목: 🗣️ 유창성 (Fluency)]
-- 5점 (최상): 원어민과 가까운 속도와 리듬으로 매우 자연스럽게 말함.
-- 4점 (상): 큰 막힘 없이 안정적인 속도로 말함.
-- 3점 (중): 비교적 이해 가능한 속도로 말하지만, 머뭇거림이 눈에 띔.
-- 2점 (하): 매우 느리고 자주 끊어지며 말함.
-- 1점 (최하): 단어 단위로 말함.
+### Evaluation Rubric (Use this to determine scores and feedback for each category):
 
-[평가 항목: 🎤 발음 및 억양 (Pronunciation & Intonation)]
-- 5점 (최상): 발음이 매우 명확하고 자연스러운 억양을 사용함.
-- 4점 (상): 대부분의 발음이 정확하여 쉽게 이해할 수 있음.
-- 3점 (중): 일부 단어의 발음이 부정확하여 가끔 재확인이 필요함.
-- 2점 (하): 부정확한 발음이 많아 이해하기 위해 노력이 필요함.
-- 1점 (최하): 발음을 거의 이해할 수 없음.
+[평가 항목: 유창성 (Fluency)]
+5점 (최상): 원어민과 가까운 속도와 리듬으로 매우 자연스럽게 말함.
+4점 (상): 큰 막힘 없이 안정적인 속도로 말함.
+3점 (중): 비교적 이해 가능한 속도로 말하지만, 머뭇거림이 눈에 띔.
+2점 (하): 매우 느리고 자주 끊어지며 말함.
+1점 (최하): 단어 단위로 말함.
 
-[평가 항목: ✍️ 문법 (Grammar)]
-- 5점 (최상): 복잡한 문장 구조를 포함하여 다양한 문법을 거의 실수 없이 사용함.
-- 4점 (상): 일상적인 문장 구조를 대부분 정확하게 사용함.
-- 3점 (중): 기본적인 문장 구조는 사용하나, 반복적인 실수가 나타남.
-- 2점 (하): 기본적인 문장 구성에도 오류가 많음.
-- 1점 (최하): 문장을 거의 구성하지 못함.
+[평가 항목: 발음 및 억양 (Pronunciation & Intonation)]
+5점 (최상): 발음이 매우 명확하고 자연스러운 억양을 사용함.
+4점 (상): 대부분의 발음이 정확하여 쉽게 이해할 수 있음.
+3점 (중): 일부 단어의 발음이 부정확하여 가끔 재확인이 필요함.
+2점 (하): 부정확한 발음이 많아 이해하기 위해 노력이 필요함.
+1점 (최하): 발음을 거의 이해할 수 없음.
 
-[평가 항목: 📚 어휘 (Vocabulary)]
-- 5점 (최상): 주제에 맞게 폭넓고 수준 높은 어휘를 정확하게 사용함.
-- 4점 (상): 주제에 대해 논의하기에 충분한 어휘를 구사함.
-- 3점 (중): 기본적인 어휘는 구사하나, 어휘의 폭이 좁아 반복적인 단어를 사용함.
-- 2점 (하): 매우 제한적인 어휘만 알고 있음.
-- 1점 (최하): 극소수의 기본 단어만 알고 있음.
+[평가 항목: 문법 (Grammar)]
+5점 (최상): 복잡한 문장 구조를 포함하여 다양한 문법을 거의 실수 없이 사용함.
+4점 (상): 일상적인 문법 구조를 대부분 정확하게 사용함.
+3점 (중): 기본적인 문장 구조는 사용하나, 반복적인 실수가 나타남.
+2점 (하): 기본적인 문장 구성에도 오류가 많음.
+1점 (최하): 문장을 거의 구성하지 못함.
 
-[평가 항목: 🤝 내용 이해 및 상호작용 (Comprehension & Interaction)]
-- 5점 (최상): 상대방의 말을 완벽하게 이해하고 대화의 흐름을 주도함.
-- 4점 (상): 대부분의 말을 어려움 없이 이해하고 적절히 반응함.
-- 3점 (중): 간단한 문장은 이해하나, 길거나 빠른 문장은 이해에 어려움을 겪음.
-- 2점 (하): 아주 간단한 질문만 이해하고, 대화에 거의 참여하지 못함.
-- 1점 (최하): 상대방의 말을 거의 이해하지 못함.
+[평가 항목: 어휘 (Vocabulary)]
+5점 (최상): 주제에 맞게 폭넓고 수준 높은 어휘를 정확하게 사용함.
+4점 (상): 주제에 대해 논의하기에 충분한 어휘를 구사함.
+3점 (중): 기본적인 어휘는 구사하나, 어휘의 폭이 좁아 반복적인 단어를 사용함.
+2점 (하): 매우 제한적인 어휘만 알고 있음.
+1점 (최하): 극소수의 기본 단어만 알고 있음.
 
-### 출력 형식 (Output Format)
-반드시 아래의 마크다운 형식을 지켜서, 각 항목에 대한 점수와 피드백을 작성해주세요.
+[평가 항목: 내용 이해 및 상호작용 (Comprehension & Interaction)]
+5점 (최상): 상대방의 말을 완벽하게 이해하고 대화의 흐름을 주도함.
+4점 (상): 대부분의 말을 어려움 없이 이해하고 적절히 반응함.
+3점 (중): 간단한 문장은 이해하나, 길거나 빠른 문장은 이해에 어려움을 겪음.
+2점 (하): 아주 간단한 질문만 이해하고, 대화에 거의 참여하지 못함.
+1점 (최하): 상대방의 말을 거의 이해하지 못함.
 
-\`\`\`markdown
-# 📊 AI 영어회화 상세 분석
-
-## 🗣️ 유창성 (Fluency)
-- **📈 점수: [1-5점] / 5점**
-- **👍 잘한 점**
-  - (여기에 구체적인 긍정적 피드백 작성)
-- **💡 개선점**
-  - (여기에 구체적인 개선점 작성)
-
-## 🎤 발음 및 억양 (Pronunciation & Intonation)
-- **📈 점수: [1-5점] / 5점**
-- **👍 잘한 점**
-  - (피드백 작성)
-- **💡 개선점**
-  - (피드백 작성)
-
-## ✍️ 문법 (Grammar)
-- **📈 점수: [1-5점] / 5점**
-- **👍 잘한 점**
-  - (피드백 작성)
-- **💡 개선점**
-  - (피드백 작성)
-
-## 📚 어휘 (Vocabulary)
-- **📈 점수: [1-5점] / 5점**
-- **👍 잘한 점**
-  - (피드백 작성)
-- **💡 개선점**
-  - (피드백 작성)
-
-## 🤝 내용 이해 및 상호작용 (Comprehension & Interaction)
-- **📈 점수: [1-5점] / 5점**
-- **👍 잘한 점**
-  - (피드백 작성)
-- **💡 개선점**
-  - (피드백 작성)
-\`\`\`
-`,
+Now, generate the HTML code.`,
     }),
 });
 
@@ -260,6 +231,7 @@ const generateDialogueAnalysisFlow = ai.defineFlow(
     const model = input.evaluationModel || 'gemini-2.5-flash';
     const prompts = createPrompt(model);
     
+    // In this flow, transcription is already done. We receive the transcript and audio URL.
     if (!input.studentTranscript || !input.fullConversationTranscript) {
         return {
             studentTranscript: input.fullConversationTranscript || '전체 대화 기록이 없습니다.',
@@ -277,10 +249,8 @@ const generateDialogueAnalysisFlow = ai.defineFlow(
         const rubricResult = await withRetry(() => prompts.rubric({ fullConversationTranscript: input.fullConversationTranscript }));
         let rubricText = rubricResult.text;
          // Clean up the text just in case the model still wraps it
-        if (rubricText.startsWith("```markdown")) {
-            rubricText = rubricText.substring(10, rubricText.length - 3).trim();
-        } else if (rubricText.startsWith("```")) {
-            rubricText = rubricText.substring(3, rubricText.length - 3).trim();
+        if (rubricText.startsWith("```html")) {
+            rubricText = rubricText.substring(7, rubricText.length - 3).trim();
         }
         
         const rubricScores: RubricScores = {
