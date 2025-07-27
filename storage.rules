@@ -1,15 +1,18 @@
 
 rules_version = '2';
 
-// See: https://firebase.google.com/docs/storage/security
+// Firebase Storage 보안 규칙
+// 문서: https://firebase.google.com/docs/storage/security
 service firebase.storage {
   match /b/{bucket}/o {
-    // A more permissive rule for initial development and testing.
-    // This allows any user to read and write to Storage.
-    // For production, you should restrict access based on authentication.
-    // e.g., `allow read, write: if request.auth != null;`
+    // 이 규칙은 인증된 사용자가 파일을 읽고 쓸 수 있도록 허용합니다.
+    // 프로덕션 환경에서는 아래 규칙을 더 강화하여,
+    // 사용자가 자신의 데이터에만 접근할 수 있도록 수정해야 합니다.
+    // 예: match /users/{userId}/{allPaths=**} {
+    //   allow read, write: if request.auth != null && request.auth.uid == userId;
+    // }
     match /{allPaths=**} {
-      allow read, write: if true;
+      allow read, write: if request.auth != null;
     }
   }
 }
