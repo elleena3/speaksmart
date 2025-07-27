@@ -13,7 +13,7 @@ import Link from "next/link"
 import { type TeacherAssessment, type UserData } from "@/lib/types"
 import { OverviewChart } from "./overview-chart"
 import { useLanguage } from "@/context/language-context"
-import { useAuth } from '@/context/auth-context';
+import { useAuth, mockStudents } from '@/context/auth-context';
 import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
@@ -92,7 +92,7 @@ export default function TeacherDashboard() {
     }
     if (Array.isArray(targetStudentIds)) {
       if (targetStudentIds.length === 1) {
-        const student = allStudents.find(s => s.docId === targetStudentIds[0]);
+        const student = [...mockStudents, ...allStudents].find(s => s.uid === targetStudentIds[0] || s.docId === targetStudentIds[0]);
         return student ? student.displayName || '개별' : '개별';
       }
       if (targetStudentIds.length > 1) {
@@ -108,7 +108,7 @@ export default function TeacherDashboard() {
     let totalStudents = 0;
 
     if (!targetStudentIds || targetStudentIds === 'all') {
-      totalStudents = allStudents.length;
+      totalStudents = mockStudents.length + allStudents.length;
     } else if (Array.isArray(targetStudentIds)) {
       totalStudents = targetStudentIds.length;
     }

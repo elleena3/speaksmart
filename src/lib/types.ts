@@ -32,7 +32,7 @@ export const voiceDescriptions: Record<AiVoice, string> = {
 export const evaluationModels = ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.5-flash-lite-preview-06-17", "gemini-2.0-flash"] as const;
 export type EvaluationModel = (typeof evaluationModels)[number];
 
-export const imageGenerationModels = ["gemini-2.0-flash-preview-image-generation", "gemini-2.5-pro"] as const;
+export const imageGenerationModels = ["gemini-2.0-flash-preview-image-generation"] as const;
 export type ImageGenerationModel = (typeof imageGenerationModels)[number];
 
 

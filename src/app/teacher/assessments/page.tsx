@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { PlusCircle, MoreHorizontal, Copy, Users, Loader2, Trash2, DraftingCompass } from 'lucide-react';
 import Link from 'next/link';
-import { type TeacherAssessment } from "@/lib/types";
+import { type TeacherAssessment, type UserData } from "@/lib/types";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -27,6 +27,7 @@ export default function AssessmentsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
+  const [allStudents, setAllStudents] = useState<UserData[]>([]);
   const { toast } = useToast();
   const { t } = useLanguage();
 
@@ -35,13 +36,17 @@ export default function AssessmentsPage() {
     setIsLoading(true);
     try {
         const assessmentsQuery = query(collection(db, "assessments"), where("uid", "==", user.uid));
-        
         const allResultsQuery = query(collection(db, 'results'), where('teacherUid', '==', user.uid));
+        const allStudentsQuery = query(collection(db, "users"), where("role", "==", "student"));
 
-        const [assessmentsSnapshot, allResultsSnapshot] = await Promise.all([
+        const [assessmentsSnapshot, allResultsSnapshot, studentsSnapshot] = await Promise.all([
             getDocs(assessmentsQuery),
-            getDocs(allResultsQuery)
+            getDocs(allResultsQuery),
+            getDocs(allStudentsQuery),
         ]);
+
+        const studentList = studentsSnapshot.docs.map(doc => ({ ...doc.data(), docId: doc.id }) as UserData);
+        setAllStudents(studentList);
 
         const submissionCounts = new Map<string, Set<string>>();
         allResultsSnapshot.forEach(resultDoc => {
@@ -58,7 +63,6 @@ export default function AssessmentsPage() {
             return assessment;
         });
 
-        // Sort assessments by createdAt in descending order (client-side)
         assessmentsData.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 
         setAssessments(assessmentsData);
@@ -91,7 +95,6 @@ export default function AssessmentsPage() {
       
       await addDoc(collection(db, "assessments"), {
         ...copyData,
-        // The title is now copied exactly as it is.
         title: `${copyData.title}`, 
         createdAt: Date.now(),
         dateCreated: new Date().toISOString().split('T')[0],
@@ -113,10 +116,7 @@ export default function AssessmentsPage() {
   const handleCopy = (assessmentId: string) => {
     const assessmentToCopy = assessments.find(a => a.id === assessmentId);
     if (!assessmentToCopy) return;
-
-    const isTitleDuplicate = assessments.some(a => a.title === assessmentToCopy.title && a.id !== assessmentId);
     
-    // Always trigger the confirmation dialog for copying
     document.getElementById(`copy-dialog-trigger-${assessmentId}`)?.click();
   };
 
@@ -125,23 +125,18 @@ export default function AssessmentsPage() {
     const batch = writeBatch(db);
     const resultsCollection = collection(db, 'results');
 
-    // For each assessment, find and delete its results
     for (const id of assessmentIds) {
-        // Delete the assessment itself
         const assessmentRef = doc(db, "assessments", id);
         batch.delete(assessmentRef);
 
-        // Query for related results
         const resultsQuery = query(resultsCollection, where('assessmentId', '==', id));
         const resultsSnapshot = await getDocs(resultsQuery);
 
-        // Add each result to the batch delete
         resultsSnapshot.forEach(resultDoc => {
             batch.delete(resultDoc.ref);
         });
     }
 
-    // Commit the batch
     await batch.commit();
   }
 
@@ -205,7 +200,7 @@ export default function AssessmentsPage() {
     }
     if (Array.isArray(targetStudentIds)) {
       if (targetStudentIds.length === 1) {
-        const student = mockStudents.find(s => s.uid === targetStudentIds[0]);
+        const student = [...mockStudents, ...allStudents].find(s => s.uid === targetStudentIds[0] || s.docId === targetStudentIds[0]);
         return student ? student.displayName || '개별' : '개별';
       }
       if (targetStudentIds.length > 1) {
@@ -221,7 +216,7 @@ export default function AssessmentsPage() {
     let totalStudents = 0;
 
     if (!targetStudentIds || targetStudentIds === 'all') {
-      totalStudents = mockStudents.length;
+      totalStudents = mockStudents.length + allStudents.length;
     } else if (Array.isArray(targetStudentIds)) {
       totalStudents = targetStudentIds.length;
     }
@@ -372,7 +367,7 @@ export default function AssessmentsPage() {
                                   <Link href={`/teacher/assessments/${assessment.id}/edit`}>{t.teacherAssessments.menuEdit}</Link>
                                 </DropdownMenuItem>
                                 
-                                <AlertDialogTrigger asChild>
+                                <AlertDialogTrigger asChild id={`copy-dialog-trigger-${assessment.id}`}>
                                   <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
                                     <Copy className="mr-2 h-4 w-4" />
                                     {t.teacherAssessments.menuCopy}
@@ -403,7 +398,6 @@ export default function AssessmentsPage() {
                               </DropdownMenuContent>
                             </DropdownMenu>
 
-                            {/* This Dialog is specifically for the copy action */}
                             <AlertDialogContent>
                                 <AlertDialogHeader>
                                     <AlertDialogTitle>평가를 복사하시겠습니까?</AlertDialogTitle>
