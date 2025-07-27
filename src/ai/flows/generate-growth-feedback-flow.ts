@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * @fileOverview A flow to generate comparative feedback on a student's growth between two assessment attempts.
@@ -20,7 +19,7 @@ export async function generateGrowthFeedback(
 const growthFeedbackPrompt = ai.definePrompt({
   name: 'growthFeedbackPrompt',
   model: googleAI.model('gemini-2.5-flash'),
-  input: { schema: GenerateGrowthFeedbackInputSchema },
+  input: { schema: GenerateGrowthFeedbackInputSchema.extend({ allAttemptsHaveErrors: z.boolean() }) },
   output: { schema: GenerateGrowthFeedbackOutputSchema },
   prompt: `You are an expert AI English teacher. Your task is to provide a comprehensive growth analysis for a student by comparing all of their attempts of the same speaking assessment. Your entire response must be in Korean and formatted in Markdown.
 
@@ -58,7 +57,7 @@ Please perform the following steps based on ALL attempts provided:
     -   **Format:** Formal Korean prose, with sentences ending in '~함' or '~임'.
     -   **Tone:** Official and descriptive, suitable for a school record.
     -   **Content:** 
-        {{#if (every attempts (lookup (regexp "오류|실패|없음") "test" this.curricularRemarks))}}
+        {{#if allAttemptsHaveErrors}}
         개별 시도에 대한 생활기록부 의견이 유효하지 않아 종합 의견을 생성할 수 없습니다. 개별 시도 결과를 먼저 확인해주세요.
         {{else}}
         Your primary source for this summary is the 'Curricular Remarks from this attempt' field provided for each attempt.
@@ -92,9 +91,17 @@ const generateGrowthFeedbackFlow = ai.defineFlow(
         };
     });
 
+    const allAttemptsHaveErrors = sanitizedAttempts.every(attempt => 
+        !attempt.curricularRemarks || 
+        attempt.curricularRemarks.includes('오류') ||
+        attempt.curricularRemarks.includes('실패') ||
+        attempt.curricularRemarks.includes('없음')
+    );
+    
     const { output } = await growthFeedbackPrompt({
         ...input,
         attempts: sanitizedAttempts,
+        allAttemptsHaveErrors: allAttemptsHaveErrors,
     });
     
     if (!output) {
