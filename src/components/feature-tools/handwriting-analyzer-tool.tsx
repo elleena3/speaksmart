@@ -11,6 +11,10 @@ import { Loader2, Upload, Sparkles, RefreshCw } from 'lucide-react';
 import { analyzeHandwriting, type AnalyzeHandwritingOutput } from '@/ai/flows/analyze-handwriting-flow';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { evaluationModels, type EvaluationModel } from '@/lib/types';
+import { Label } from '../ui/label';
+
 
 type AnalysisState = 'idle' | 'analyzing' | 'analyzed' | 'error';
 
@@ -20,6 +24,7 @@ export function HandwritingAnalyzerTool() {
     const [imageDataUri, setImageDataUri] = useState<string | null>(null);
     const [analysisResult, setAnalysisResult] = useState<AnalyzeHandwritingOutput | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [selectedModel, setSelectedModel] = useState<EvaluationModel>('gemini-2.5-flash');
     const { toast } = useToast();
 
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -51,10 +56,10 @@ export function HandwritingAnalyzerTool() {
         setAnalysisState('analyzing');
         setError(null);
         setAnalysisResult(null);
-        toast({ title: "AI 분석 시작", description: "자필 내용을 분석하고 있습니다. 잠시만 기다려주세요." });
+        toast({ title: "AI 분석 시작", description: `[${selectedModel}] 모델을 사용하여 자필 내용을 분석하고 있습니다.` });
 
         try {
-            const result = await analyzeHandwriting({ imageDataUri });
+            const result = await analyzeHandwriting({ imageDataUri, model: selectedModel });
             setAnalysisResult(result);
             setAnalysisState('analyzed');
             toast({ title: "분석 완료", description: "AI 자필 분석이 완료되었습니다." });
@@ -77,9 +82,23 @@ export function HandwritingAnalyzerTool() {
     return (
         <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                    <label className="text-sm font-medium">자필 이미지 업로드</label>
-                    <Input type="file" accept="image/*" onChange={handleFileChange} />
+                <div className="space-y-4">
+                    <div>
+                        <Label htmlFor="image-upload" className="text-sm font-medium">자필 이미지 업로드</Label>
+                        <Input id="image-upload" type="file" accept="image/*" onChange={handleFileChange} />
+                    </div>
+                     <div>
+                        <Label htmlFor="model-select" className="text-sm font-medium">AI 평가 모델 선택</Label>
+                        <Select onValueChange={(value) => setSelectedModel(value as EvaluationModel)} value={selectedModel}>
+                            <SelectTrigger id="model-select">
+                                <SelectValue placeholder="모델을 선택하세요..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="gemini-2.5-flash">gemini-2.5-flash (빠름)</SelectItem>
+                                <SelectItem value="gemini-2.5-pro">gemini-2.5-pro (고성능)</SelectItem>
+                            </SelectContent>
+                        </Select>
+                     </div>
                     <Button onClick={handleAnalyze} disabled={!imageDataUri || analysisState === 'analyzing'} className="w-full mt-2">
                         {analysisState === 'analyzing' ? <Loader2 className="mr-2 animate-spin" /> : <Sparkles className="mr-2" />}
                         {analysisState === 'analyzing' ? "분석 중..." : "자필 분석하기"}

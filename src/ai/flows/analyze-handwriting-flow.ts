@@ -1,4 +1,3 @@
-
 'use server';
 
 /**
@@ -13,11 +12,14 @@
 import { ai } from '@/ai/genkit';
 import { googleAI } from '@genkit-ai/googleai';
 import { z } from 'zod';
+import { evaluationModels } from '@/lib/types';
+
 
 const AnalyzeHandwritingInputSchema = z.object({
   imageDataUri: z.string().describe(
     "An image file of the user's handwriting, as a data URI."
   ),
+  model: z.enum(evaluationModels).optional().default('gemini-2.5-flash'),
 });
 export type AnalyzeHandwritingInput = z.infer<typeof AnalyzeHandwritingInputSchema>;
 
@@ -42,7 +44,6 @@ export async function analyzeHandwriting(input: AnalyzeHandwritingInput): Promis
 
 const handwritingAnalysisPrompt = ai.definePrompt({
     name: 'handwritingAnalysisPrompt',
-    model: googleAI.model('gemini-2.5-flash'),
     input: { schema: AnalyzeHandwritingInputSchema },
     output: { schema: AnalyzeHandwritingOutputSchema },
     prompt: `You are an expert handwriting analyst and teacher, specializing in providing feedback for English language learners. Your task is to evaluate a student's handwriting from an image. Provide all feedback in Korean.
@@ -68,8 +69,14 @@ const analyzeHandwritingFlow = ai.defineFlow(
     inputSchema: AnalyzeHandwritingInputSchema,
     outputSchema: AnalyzeHandwritingOutputSchema,
   },
-  async (input) => {
-    const { output } = await handwritingAnalysisPrompt(input);
+  async ({ imageDataUri, model }) => {
+    const analysisModel = googleAI.model(model || 'gemini-2.5-flash');
+
+    const { output } = await handwritingAnalysisPrompt(
+      { imageDataUri, model },
+      { model: analysisModel }
+    );
+    
     if (!output) {
       throw new Error("The AI model did not return a valid handwriting analysis.");
     }
