@@ -171,7 +171,8 @@ export default function AssessmentSubmissionsPage() {
         
         if (studentToRemove) {
             setCompletedStudents(prev => prev.filter(s => s.result?.id !== resultId));
-            setPendingStudents(prev => [...prev, { ...studentToRemove, result: undefined }].sort((a,b) => (a.displayName).localeCompare(b.displayName)));
+            const { result, ...studentData } = studentToRemove;
+            setPendingStudents(prev => [...prev, studentData].sort((a,b) => (a.displayName).localeCompare(b.displayName)));
         }
       } catch (error) {
          console.error("Error deleting result:", error);
