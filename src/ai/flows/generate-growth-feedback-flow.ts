@@ -33,7 +33,7 @@ Here are all the attempts from the student, in chronological order:
 -   Pronunciation Score: {{this.pronunciationScore}}/100
 -   Transcript: "{{this.transcript}}"
 -   AI Feedback Given: "{{this.aiFeedback}}"
--   Curricular Remarks from this attempt: "{{this.curricularRemarks}}"
+-   {{#if this.curricularRemarks}}Curricular Remarks from this attempt: "{{this.curricularRemarks}}"{{/if}}
 ---
 {{/each}}
 
@@ -58,11 +58,14 @@ Please perform the following steps based on ALL attempts provided:
     -   **Format:** Formal Korean prose, with sentences ending in '~함' or '~임'.
     -   **Tone:** Official and descriptive, suitable for a school record.
     -   **Content:** 
+        {{#if (all (map attempts (get 'curricularRemarks')))}}
         Your primary source for this summary is the 'Curricular Remarks from this attempt' field provided for each attempt.
-        1. Review the curricular remarks from all valid attempts chronologically. Ignore any attempts where the remarks contain error messages.
+        1. Review the curricular remarks from all valid attempts chronologically.
         2. Synthesize these valid remarks into a single, cohesive narrative of about 700 Korean characters that shows the student's growth story.
         3. The final remark should start by mentioning the student's persistent effort, describe the initial performance and how it evolved with specific examples from the provided remarks, and conclude by summarizing their current demonstrated ability and attitude.
-    -   **IMPORTANT:** If you are not provided with any valid 'curricularRemarks' data for any of the attempts, you MUST return an explanatory message in Korean stating that a comprehensive review cannot be generated due to a lack of valid individual remarks.
+        {{else}}
+        You MUST return the exact following message in the 'growthCurricularRemarks' field: "종합 의견을 생성하기 위한 개별 시도의 교과 특기 사항 기록이 부족하거나 유효하지 않습니다."
+        {{/if}}
 
 The final output must be a single JSON object containing 'growthFeedback', 'teacherGuidance', and 'growthCurricularRemarks'.
 `,
@@ -76,44 +79,38 @@ const generateGrowthFeedbackFlow = ai.defineFlow(
   },
   async (input) => {
     
-    // Sanitize and filter the attempts before sending them to the AI.
-    const validAttempts = input.attempts
-      .map(attempt => {
-        // Sanitize remarks by removing potential stray single quotes from bad data saves
+    // 1. Sanitize and filter attempts to ensure only valid remarks are processed.
+    const sanitizedAttempts = input.attempts.map(attempt => {
         let remarks = (attempt.curricularRemarks || "").trim();
+        // Remove potential stray single quotes from bad data saves
         if (remarks.startsWith("'") && remarks.endsWith("'")) {
             remarks = remarks.substring(1, remarks.length - 1);
         }
-
-        // Check if the remark is valid (not empty and not an error message)
+        
+        // Consider a remark invalid if it's empty or an error message
         const isRemarkValid = remarks && !remarks.includes('오류') && !remarks.includes('실패') && !remarks.includes('없음');
         
         return {
           ...attempt,
-          // If the remark is invalid, replace it with a clear indicator for the AI.
-          // This allows other parts of the prompt (like teacher guidance) to still see the attempt existed.
-          curricularRemarks: isRemarkValid ? remarks : "[유효한 개별 의견 없음]",
+          // If remark is not valid, set it to null so Handlebars can check for its absence
+          curricularRemarks: isRemarkValid ? remarks : null,
         };
       });
 
     const { output } = await growthFeedbackPrompt({
         ...input,
-        attempts: validAttempts,
+        attempts: sanitizedAttempts,
     });
     
-    if (!output) {
-      throw new Error("The AI model did not return valid growth feedback.");
-    }
-    
-    // Final check on the generated output
-    const finalCurricularRemarks = (output.growthCurricularRemarks || "").includes('[유효한 개별 의견 없음]') 
-        ? "오류가 발생했거나 생성된 내용이 없습니다." 
-        : output.growthCurricularRemarks;
-    
-    return {
-        growthFeedback: output.growthFeedback || "성장 피드백 생성에 실패했습니다.",
-        teacherGuidance: output.teacherGuidance || "교사 조언 생성에 실패했습니다.",
-        growthCurricularRemarks: finalCurricularRemarks || "오류가 발생했거나 생성된 내용이 없습니다."
+    const defaultErrorMsg = "오류가 발생했거나 생성된 내용이 없습니다.";
+
+    // Provide default values for all fields if they are null, undefined, or empty.
+    const finalOutput: GenerateGrowthFeedbackOutput = {
+        growthFeedback: output?.growthFeedback || defaultErrorMsg,
+        teacherGuidance: output?.teacherGuidance || defaultErrorMsg,
+        curricularRemarks: output?.growthCurricularRemarks || defaultErrorMsg,
     };
+    
+    return finalOutput;
   }
 );
