@@ -2,7 +2,9 @@
 # https://firebase.google.com/docs/app-hosting/configure
 
 runConfig:
-  # Automatically spin up more instances in response to increased traffic.
-  maxInstances: 10
-  # Set the location to Taiwan for lower latency for Korean users.
-  location: asia-east1
+  # Increase this value if you'd like to automatically spin up
+  # more instances in response to increased traffic.
+  maxInstances: 1
+secretEnv:
+  - secret: GOOGLE_API_KEY
+    env: GOOGLE_API_KEY
