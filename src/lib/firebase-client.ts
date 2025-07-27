@@ -8,28 +8,18 @@ import { getAnalytics, type Analytics, isSupported } from "firebase/analytics";
 
 // This file is for CLIENT-SIDE use only.
 
-// ====================================================================
-// Firebase 설정 안내
-//
-// 아래 값들은 .env.local 파일에서 자동으로 불러옵니다.
-// 이 값들은 Firebase 콘솔의 프로젝트 설정에서 확인할 수 있습니다.
-// ====================================================================
-export const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyAieUKTGnuh0f9zWJYjgYM77j4mEshxWCg",
+  authDomain: "speaksmart-evaluator2.firebaseapp.com",
+  projectId: "speaksmart-evaluator2",
+  storageBucket: "speaksmart-evaluator2.appspot.com",
+  messagingSenderId: "60227542963",
+  appId: "1:60227542963:web:f5d6c51046eb572a9c35c6",
+  measurementId: "G-M20FDF494Y"
 };
 
-// 모든 필수 환경 변수가 설정되었는지 확인합니다.
-if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
-  console.warn(
-    "Firebase 설정이 .env 파일에 올바르게 구성되지 않았습니다. NEXT_PUBLIC_FIREBASE_ 접두사가 붙은 환경 변수들을 확인해주세요."
-  );
-}
 
 // Firebase 앱 초기화
 let app: FirebaseApp;
@@ -67,5 +57,4 @@ if (typeof window !== 'undefined') {
     }
 }
 
-
-export { app, db, auth, storage, analytics };
+export { app, auth, db, storage, analytics };
