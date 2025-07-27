@@ -15,7 +15,7 @@ if (!GOOGLE_API_KEY) {
 export const ai = genkit({
   plugins: [
     googleAI({
-      apiKey: GOOGLE_API_KEY,
+      apiKey: firebaseConfig.apiKey,
     }),
     firebase({
         firebaseConfig: firebaseConfig, 
