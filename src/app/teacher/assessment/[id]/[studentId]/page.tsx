@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
@@ -265,7 +266,7 @@ function TeacherGrowthView({ results, assessment }: { results: StudentResult[], 
             await updateDoc(resultRef, {
                 growthFeedback: feedback.growthFeedback,
                 growthTeacherGuidance: feedback.teacherGuidance,
-                growthCurricularRemarks: feedback.growthCurricularRemarks,
+                growthCurricularRemarks: feedback.curricularRemarks,
                 growthFeedbackForAttempts: results.length
             });
             toast({ title: "AI 종합 분석 완료", description: "학생의 성장 과정에 대한 종합 분석이 완료되었습니다."});
@@ -289,7 +290,6 @@ function TeacherGrowthView({ results, assessment }: { results: StudentResult[], 
         toast({ title: "생활기록부(종합) 재생성 중...", description: "AI가 모든 시도를 다시 분석하여 종합 의견을 작성합니다." });
         
         try {
-            // 1. Prepare clean data for the AI flow
             const validAttempts: ResultSummary[] = results.map((r, index) => ({
                 attemptNumber: index + 1,
                 contentScore: r.contentScore ?? 0,
@@ -299,19 +299,16 @@ function TeacherGrowthView({ results, assessment }: { results: StudentResult[], 
                 curricularRemarks: r.curricularRemarks ?? ""
             }));
 
-            // 2. Call the new, dedicated flow
             const { growthCurricularRemarks } = await regenerateCurricularRemarks({
                 attempts: validAttempts,
                 assessmentTitle: assessment.title,
             });
 
-            // 3. Update the local state
             setGrowthFeedback(prev => ({
                 ...(prev || { growthFeedback: "", teacherGuidance: "" }),
                 curricularRemarks: growthCurricularRemarks
             }));
             
-            // 4. Update only the curricular remarks in Firestore
             const resultRef = doc(db, "results", latestResult.id);
             await updateDoc(resultRef, {
                 growthCurricularRemarks: growthCurricularRemarks,
@@ -412,7 +409,11 @@ function TeacherGrowthView({ results, assessment }: { results: StudentResult[], 
                 </CardHeader>
                 <CardContent>
                     <div className="grid md:grid-cols-2 gap-6">
-                        <RemarksCard title="생활기록부 교과 특기 사항 (종합)" content={growthFeedback?.curricularRemarks} onRegenerate={handleRegenerateRemarks} />
+                        <RemarksCard 
+                            title="생활기록부 교과 특기 사항 (종합)" 
+                            content={growthFeedback?.curricularRemarks} 
+                            onRegenerate={results.length > 1 ? handleRegenerateRemarks : undefined}
+                        />
                         <RemarksCard title="교사용 AI 조언 (종합)" content={growthFeedback?.teacherGuidance} />
                         <Card className="md:col-span-2">
                             <CardHeader><CardTitle>학생에게 제공된 AI 종합 피드백</CardTitle></CardHeader>
