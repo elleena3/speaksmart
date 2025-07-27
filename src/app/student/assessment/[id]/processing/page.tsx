@@ -9,7 +9,7 @@ import { useAuth } from "@/context/auth-context";
 import { Loader2, AlertTriangle, CheckCircle2, UploadCloud, AudioLines, FileScan, Sparkles } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { db } from "@/lib/firebase-client";
+import { db } from "@/lib/firebase";
 import { collection, query, where, onSnapshot, doc, updateDoc, getDocs, addDoc, runTransaction } from "firebase/firestore";
 import { generateMonologueAnalysisFlow } from "@/ai/flows/generate-monologue-analysis-flow";
 import { useToast } from '@/hooks/use-toast';

@@ -1,7 +1,8 @@
 
+
 "use client"
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { type StudentResult, type TeacherAssessment, type ResultSummary, type RubricScores } from "@/lib/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -123,7 +124,6 @@ export function GrowthView({ results: initialResults, assessment, defaultTab }: 
                           pronunciationScore: r.pronunciationScore ?? 0,
                           transcript: r.studentTranscript ?? "",
                           aiFeedback: r.aiFeedback ?? "",
-                          curricularRemarks: r.curricularRemarks ?? ""
                         }));
 
                         const feedback = await generateGrowthFeedback({
@@ -134,9 +134,9 @@ export function GrowthView({ results: initialResults, assessment, defaultTab }: 
                         
                         const resultRef = doc(db, "results", latestResult.id);
                         await updateDoc(resultRef, {
-                            growthFeedback: feedback.growthFeedback || "",
-                            growthTeacherGuidance: feedback.teacherGuidance || "",
-                            growthCurricularRemarks: feedback.curricularRemarks || "",
+                            growthFeedback: feedback.growthFeedback,
+                            growthTeacherGuidance: feedback.teacherGuidance,
+                            curricularRemarks: feedback.curricularRemarks,
                             growthFeedbackForAttempts: sortedResults.length
                         });
                         toast({ title: "AI 종합 분석 완료", description: "학생의 성장 과정에 대한 종합 분석이 완료되었습니다."});

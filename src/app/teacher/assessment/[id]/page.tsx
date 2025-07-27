@@ -15,7 +15,7 @@ import { type TeacherAssessment, type StudentResult, type UserData } from "@/lib
 import { useAuth, mockStudents } from "@/context/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import { collection, query, where, getDocs, doc, getDoc, deleteDoc } from 'firebase/firestore';
-import { db } from "@/lib/firebase-client";
+import { db } from "@/lib/firebase";
 import { format } from "date-fns";
 import { retryAnalysis } from "@/ai/flows/retry-analysis-flow";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";

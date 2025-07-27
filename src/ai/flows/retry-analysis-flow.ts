@@ -10,7 +10,7 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
-import { db, storage } from '@/lib/firebase-client';
+import { db, storage } from '@/lib/firebase';
 import { generateMonologueAnalysisFlow } from './generate-monologue-analysis-flow';
 import { generateDialogueAnalysis } from './generate-dialogue-analysis-flow';
 import { type TeacherAssessment, type StudentResult } from '@/lib/types';

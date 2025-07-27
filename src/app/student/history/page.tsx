@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useCallback } from 'react';
@@ -13,7 +14,7 @@ import { useAuth } from '@/context/auth-context';
 import { Loader2, ChevronDown, TrendingUp, DraftingCompass } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
-import { db } from "@/lib/firebase-client";
+import { db } from "@/lib/firebase";
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';

@@ -19,7 +19,7 @@ import {
 } from '@/lib/types/ai-schemas';
 import { evaluationModels, type RubricScores, type StudentResult } from '@/lib/types';
 import { ref, uploadString, getDownloadURL } from "firebase/storage";
-import { db, storage } from "@/lib/firebase-client";
+import { db, storage } from "@/lib/firebase";
 import { doc, updateDoc } from 'firebase/firestore';
 
 
@@ -50,7 +50,7 @@ const parseScore = (text: string, category: string): number => {
 // Helper function for retrying API calls on overload
 async function withRetry<T>(fn: () => Promise<T>, retries = 2, delay = 1500): Promise<T> {
   let lastError: any;
-  for (let i = 0; i <= retries; i++) {
+  for (let i = 0; i < retries; i++) {
     try {
       return await fn();
     } catch (error: any) {
