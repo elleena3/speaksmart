@@ -25,6 +25,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "./ui/avatar"
 import { Button } from "./ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "./ui/dropdown-menu"
 import React, { useState } from "react"
+import { Badge } from "./ui/badge"
 
 type NavItem = {
   href: string
@@ -120,7 +121,19 @@ export function AppLayout({ children, navItems, titleKey }: AppLayoutProps) {
             </div>
             <h2 className="text-xl font-semibold font-headline">{t.titles[titleKey]}</h2>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-4">
+             {user && (
+                <div className="flex items-center gap-2">
+                    <Avatar className="h-7 w-7">
+                        <AvatarImage src={user.photoURL || undefined} alt={user.displayName || "User"}/>
+                        <AvatarFallback>{user.displayName?.charAt(0) || "U"}</AvatarFallback>
+                    </Avatar>
+                    <span className="text-sm font-semibold text-muted-foreground hidden sm:inline-block">
+                      {user.displayName}
+                    </span>
+                    {user.isMock && <Badge variant="outline">테스트 계정</Badge>}
+                </div>
+            )}
             {user?.role === 'teacher' && (
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
