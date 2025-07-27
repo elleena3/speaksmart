@@ -12,7 +12,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Loader2, User, ArrowRight, CheckCircle, XCircle, RefreshCcw, Trash2 } from "lucide-react"
 import { type TeacherAssessment, type StudentResult, type UserData } from "@/lib/types";
-import { useAuth } from "@/context/auth-context";
+import { useAuth, mockStudents } from "@/context/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import { collection, query, where, getDocs, doc, getDoc, deleteDoc } from 'firebase/firestore';
 import { db } from "@/lib/firebase";
@@ -23,6 +23,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 
 type EnrichedStudent = {
     uid: string;
+    docId?: string;
     displayName: string;
     email: string;
     photoURL: string;
@@ -74,31 +75,43 @@ export default function AssessmentSubmissionsPage() {
         resultsSnapshot.forEach(doc => {
             const result = { id: doc.id, ...doc.data() } as StudentResult;
             
-            // Handle multiple attempts: only keep the latest one for the summary view
             const existingResult = resultsMap.get(result.studentId);
             if (!existingResult || (result.createdAt || 0) > (existingResult.createdAt || 0)) {
                 resultsMap.set(result.studentId, result);
             }
         });
         
-        let targetStudents: UserData[];
+        let targetStudents: UserData[] = [];
         if (assessmentData.targetStudentIds === 'all') {
             const allStudentsQuery = query(collection(db, "users"), where("role", "==", "student"));
             const studentsSnapshot = await getDocs(allStudentsQuery);
-            targetStudents = studentsSnapshot.docs.map(d => ({...d.data(), docId: d.id, uid: d.id} as UserData));
+            const realStudents = studentsSnapshot.docs.map(d => ({...d.data(), docId: d.id, uid: d.id} as UserData));
+            targetStudents = [...mockStudents, ...realStudents];
         } else {
-            const studentPromises = assessmentData.targetStudentIds.map(id => getDoc(doc(db, "users", id)));
-            const studentDocs = await Promise.all(studentPromises);
-            targetStudents = studentDocs
-                .filter(doc => doc.exists())
-                .map(doc => ({...doc.data(), docId: doc.id, uid: doc.id} as UserData));
+            const studentIds = assessmentData.targetStudentIds;
+            const realStudentIds = studentIds.filter(id => !id.includes('mock'));
+            const mockStudentIds = studentIds.filter(id => id.includes('mock'));
+            
+            let fetchedRealStudents: UserData[] = [];
+            if (realStudentIds.length > 0) {
+                 const studentPromises = realStudentIds.map(id => getDoc(doc(db, "users", id)));
+                 const studentDocs = await Promise.all(studentPromises);
+                 fetchedRealStudents = studentDocs
+                    .filter(doc => doc.exists())
+                    .map(doc => ({...doc.data(), docId: doc.id, uid: doc.id} as UserData));
+            }
+           
+            const fetchedMockStudents = mockStudents.filter(mock => mockStudentIds.includes(mock.uid));
+            
+            targetStudents = [...fetchedMockStudents, ...fetchedRealStudents];
         }
         
         const completed: EnrichedStudent[] = [];
         const pending: EnrichedStudent[] = [];
 
         for (const student of targetStudents) {
-            const result = resultsMap.get(student.docId!);
+            const studentKey = student.docId || student.uid;
+            const result = resultsMap.get(studentKey);
             if (result) {
                 completed.push({ ...student, result });
             } else {
@@ -107,6 +120,7 @@ export default function AssessmentSubmissionsPage() {
         }
         
         completed.sort((a, b) => (b.result?.createdAt || 0) - (a.result?.createdAt || 0));
+        pending.sort((a,b) => (a.displayName).localeCompare(b.displayName));
 
         setCompletedStudents(completed);
         setPendingStudents(pending);
@@ -137,7 +151,6 @@ export default function AssessmentSubmissionsPage() {
         const response = await retryAnalysis({ resultId });
         if (response.success) {
             toast({ title: "성공", description: "분석 재시도를 시작했습니다. 잠시 후 결과가 업데이트됩니다." });
-            // Optionally, you can implement a poller or rely on a snapshot listener to update the UI
             setTimeout(fetchSubmissions, 5000); // Refresh after 5s
         } else {
             throw new Error(response.message);
