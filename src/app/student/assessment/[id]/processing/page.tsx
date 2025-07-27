@@ -3,13 +3,13 @@
 
 import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useState, useRef } from "react";
-import { type StudentResult, type TeacherAssessment, type HistoricalScore } from "@/lib/types";
+import { type StudentResult, type TeacherAssessment } from "@/lib/types";
 import { useAuth } from "@/context/auth-context";
 import { Loader2, AlertTriangle, CheckCircle2, UploadCloud, AudioLines, FileScan, Sparkles } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { db } from "@/lib/firebase";
-import { collection, query, where, onSnapshot, doc, updateDoc, getDocs, addDoc, orderBy, runTransaction } from "firebase/firestore";
+import { collection, query, where, onSnapshot, doc, updateDoc, getDocs, addDoc, runTransaction } from "firebase/firestore";
 import { generateMonologueAnalysisFlow } from "@/ai/flows/generate-monologue-analysis-flow";
 import { useToast } from '@/hooks/use-toast';
 
