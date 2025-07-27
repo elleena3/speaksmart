@@ -57,11 +57,16 @@ Please perform the following steps based on ALL attempts provided:
 3.  **Generate '생활기록부 교과 특기 사항' ('growthCurricularRemarks'):**
     -   **Format:** Formal Korean prose, with sentences ending in '~함' or '~임'.
     -   **Tone:** Official and descriptive, suitable for a school record.
-    -   **Content:** Your primary source for this summary is the 'Curricular Remarks from this attempt' field provided for each attempt.
-        1. Review the curricular remarks from all attempts chronologically.
-        2. Synthesize these remarks into a single, cohesive narrative of about 700 Korean characters that shows the student's growth story.
+    -   **Content:** 
+        {{#if (every attempts (lookup (regexp "오류|실패|없음") "test" this.curricularRemarks))}}
+        개별 시도에 대한 생활기록부 의견이 유효하지 않아 종합 의견을 생성할 수 없습니다. 개별 시도 결과를 먼저 확인해주세요.
+        {{else}}
+        Your primary source for this summary is the 'Curricular Remarks from this attempt' field provided for each attempt.
+        1. Review the curricular remarks from all valid attempts chronologically. Ignore any attempts where the remarks contain error messages.
+        2. Synthesize these valid remarks into a single, cohesive narrative of about 700 Korean characters that shows the student's growth story.
         3. The final remark should start by mentioning the student's persistent effort, describe the initial performance and how it evolved with specific examples from the provided remarks, and conclude by summarizing their current demonstrated ability and attitude.
-    -   **IMPORTANT:** If all 'Curricular Remarks from this attempt' fields are empty or contain error messages, you MUST return an empty string for the 'growthCurricularRemarks' field. Do not invent content.
+        {{/if}}
+    -   **IMPORTANT:** If all 'Curricular Remarks from this attempt' fields are empty or contain error messages, you MUST return an explanatory message in Korean. Do not invent content.
 
 The final output must be a single JSON object containing 'growthFeedback', 'teacherGuidance', and 'growthCurricularRemarks'.
 `,
