@@ -5,7 +5,8 @@
       "http://localhost:3000",
       "http://localhost:9002",
       "https://speaksmart-evaluator.web.app",
-      "https://speaksmart-evaluator.firebaseapp.com"
+      "https://speaksmart-evaluator.firebaseapp.com",
+      "https://storage.googleapis.com"
     ],
     "method": [
       "GET",
