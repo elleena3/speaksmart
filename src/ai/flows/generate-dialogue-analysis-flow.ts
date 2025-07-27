@@ -20,11 +20,10 @@ import {
 } from '@/lib/types/ai-schemas';
 import { evaluationModels, type RubricScores, type StudentResult } from '@/lib/types';
 import { doc, updateDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase-client';
+import { db } from '@/lib/firebase';
 
 // This parsing logic is now centralized here.
 const parseScore = (text: string, category: string): number => {
-    // A more flexible regex that doesn't rely on emojis or exact spacing
     const regex = new RegExp(`${category}[\\s\\S]*?점수[^\\d]*(\\d)`);
     const match = text.match(regex);
     return match ? parseInt(match[1], 10) : 0;
@@ -147,10 +146,10 @@ const createPrompt = (modelName: z.infer<typeof evaluationModels[number]>) => ({
         `,
     }),
     rubric: ai.definePrompt({
-      name: `dialogueRubricAnalysisPrompt_${modelName.replace(/[-.]/g, '_')}`,
-      model: googleAI.model(modelName),
-      input: { schema: z.object({ fullConversationTranscript: z.string() }) },
-      prompt: `You are an HTML generation machine. Your ONLY task is to create a complete, single HTML file for a web-based report based on the user's speech and the provided rubric.
+        name: `dialogueRubricAnalysisPrompt_${modelName.replace(/[-.]/g, '_')}`,
+        model: googleAI.model(modelName),
+        input: { schema: z.object({ fullConversationTranscript: z.string() }) },
+        prompt: `You are an HTML generation machine. Your ONLY task is to create a complete, single HTML file for a web-based report based on the user's speech and the provided rubric.
 
 IMPORTANT INSTRUCTION: Your output MUST be ONLY the HTML code, starting with <!DOCTYPE html> and ending with </html>. Do NOT include any other text, explanations, or markdown code blocks (like \`\`\`html) before or after the HTML content.
 
@@ -167,10 +166,10 @@ IMPORTANT INSTRUCTION: Your output MUST be ONLY the HTML code, starting with <!D
     -   ✍️ 문법 (Grammar)
     -   📚 어휘 (Vocabulary)
     -   🤝 내용 이해 및 상호작용 (Comprehension & Interaction)
--   **Card Header:** Inside each card, use an <h2> for the category title and a <span> with class "score-display" for the score (e.g., "📈 점수: 4 / 5점").
--   **Card Details:** Inside each card, below the header, create a <div class=\"detail-flex-container\">. Inside this container, create two boxes:
-    -   <div class=\"detail-box good-points\"> for "👍 잘한 점".
-    -   <div class=\"detail-box improvement-points\"> for "💡 개선점".
+-   **Card Header:** Inside each card, use an <h2> for the category title and a <span> with class="score-display" for the score (e.g., "📈 점수: 4 / 5점").
+-   **Card Details:** Inside each card, below the header, create a <div class="detail-flex-container">. Inside this container, create two boxes:
+    -   <div class="detail-box good-points"> for "👍 잘한 점".
+    -   <div class="detail-box improvement-points"> for "💡 개선점".
 -   **Box Content:** Each "detail-box" must have an <h3> for its title and a <ul> with <li> elements for the detailed feedback points.
 
 #### 2. Design & Style (MUST be inside a <style> tag in the <head>):
