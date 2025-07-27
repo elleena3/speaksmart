@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useRouter, useParams } from 'next/navigation';
@@ -207,7 +208,9 @@ export default function ProcessingPage() {
                 studentRecordingDataUri: studentRecordingDataUri,
                 activityPrompt: assessmentDetails.prompt,
                 expectedFormat: assessmentDetails.expectedFormat || "",
+                studentId: user.uid, // Pass studentId to the flow
                 studentName: user.displayName || "Student",
+                assessmentId: assessmentDetails.id,
                 assessmentTitle: assessmentDetails.title,
                 evaluationModel: assessmentDetails.evaluationModel,
                 useRubric: assessmentDetails.useRubric || false,

@@ -30,7 +30,9 @@ const MonologueProcessingInputSchema = z.object({
   ),
   activityPrompt: z.string().describe('The prompt or instructions for the speaking activity.'),
   expectedFormat: z.string().describe('The expected format or key points of the response for grading.'),
-  studentName: z.string().describe('The name of the student.'),
+  studentId: z.string().describe('The unique ID of the student.'), // Changed from studentName
+  studentName: z.string().describe('The display name of the student.'),
+  assessmentId: z.string().describe('The ID of the assessment.'),
   assessmentTitle: z.string().describe('The title of the assessment.'),
   evaluationModel: z.enum(evaluationModels).optional(),
   useRubric: z.boolean().optional().describe('Whether to use the standardized rubric for evaluation.'),
@@ -177,7 +179,7 @@ Flexbox를 사용하여 "잘한 점"과 "개선점" 박스를 가로로 배치�
 
 전체 페이지 배경은 연한 회색 (#f4f7f9), 콘텐츠 카드는 흰색 (#ffffff)으로 지정합니다.
 
-"잘한 점" 박스: 긍정적 느낌을 주는 연한 녹색 계열(background-color: #e8f5e9, border-left: 5px solid #4caf50)로 스타일링합니다.
+"잘한 점" 박스: 긍정적 느낌을 주는 연한 녹색 계열(background-color: #e8f5e9, border-left: 5px solid #4caf50)으로 스타일링합니다.
 
 "개선점" 박스: 주목도를 높이는 연한 주황색 계열(background-color: #fff3e0, border-left: 5px solid #ff9800)으로 스타일링합니다.
 
@@ -248,11 +250,11 @@ export const generateMonologueAnalysisFlow = ai.defineFlow(
     let downloadURL = ""; // To store the URL for retry purposes
 
     try {
-      // Step 1: Upload File to Storage first (can happen in parallel with first AI call)
+      // Step 1: Upload File to Storage first
       await updateDoc(resultDocRef, { status: "분석 중: upload", assessmentType: "monologue" });
       console.log("[Flow] Step 1: Uploading audio file to Storage.");
-      const studentUid = input.studentName; 
-      const uploadPath = `recordings/${studentUid}_${input.assessmentTitle}_${Date.now()}.webm`;
+      // Use studentId for the path to be compliant with security rules and uniqueness
+      const uploadPath = `recordings/${input.studentId}/${input.assessmentId}_${Date.now()}.webm`;
       const storageRef = ref(storage, uploadPath);
       const uploadTask = uploadString(storageRef, input.studentRecordingDataUri, 'data_url');
       
