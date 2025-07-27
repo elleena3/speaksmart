@@ -1,11 +1,10 @@
 
-
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useRouter, notFound } from "next/navigation";
 import { type TeacherAssessment, type StudentResult, type ResultSummary, type RubricScores, type UserData } from "@/lib/types";
-import { useAuth } from "@/context/auth-context";
+import { useAuth, mockStudents } from "@/context/auth-context";
 import { Loader2, User, Sparkles, TrendingUp, DraftingCompass, RefreshCcw } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
@@ -396,7 +395,7 @@ export default function TeacherStudentResultView() {
   const { toast } = useToast();
 
   const assessmentId = Array.isArray(params.id) ? params.id[0] : params.id;
-  const studentDocId = Array.isArray(params.studentId) ? params.studentId[0] : params.studentId;
+  const studentId = Array.isArray(params.studentId) ? params.studentId[0] : params.studentId;
 
   const fetchStudentResults = useCallback(async (studentUid: string) => {
     if (!assessmentId) return;
@@ -416,7 +415,7 @@ export default function TeacherStudentResultView() {
 
       const studentResults = querySnapshot.docs
         .map(doc => ({ id: doc.id, ...doc.data() } as StudentResult))
-        .sort((a,b) => (a.createdAt || 0) - (b.createdAt || 0)); // Sort client-side
+        .sort((a,b) => (a.createdAt || 0) - (b.createdAt || 0));
       
       setResults(studentResults);
 
@@ -448,12 +447,20 @@ export default function TeacherStudentResultView() {
             }
             setAssessment({ id: assessmentSnap.id, ...assessmentSnap.data() } as TeacherAssessment);
     
-            const studentRef = doc(db, "users", studentDocId);
-            const studentSnap = await getDoc(studentRef);
-            if (studentSnap.exists()) {
-                const studentData = { ...studentSnap.data(), uid: studentSnap.id, docId: studentSnap.id } as UserData;
+            let studentData: UserData | null = null;
+            if (studentId.includes('mock')) {
+                studentData = mockStudents.find(s => s.uid === studentId) || null;
+            } else {
+                const studentRef = doc(db, "users", studentId);
+                const studentSnap = await getDoc(studentRef);
+                if (studentSnap.exists()) {
+                    studentData = { ...studentSnap.data(), uid: studentSnap.id, docId: studentSnap.id } as UserData;
+                }
+            }
+
+            if (studentData) {
                 setStudent(studentData);
-                await fetchStudentResults(studentData.uid); // Pass the correct UID here
+                await fetchStudentResults(studentData.uid);
             } else {
                 toast({ title: "오류", description: "학생 정보를 찾을 수 없습니다.", variant: "destructive" });
                 notFound();
@@ -470,7 +477,7 @@ export default function TeacherStudentResultView() {
     };
 
     fetchInitialData();
-  }, [studentDocId, assessmentId, user, toast, router, authLoading, fetchStudentResults]);
+  }, [studentId, assessmentId, user, toast, router, authLoading, fetchStudentResults]);
   
 
   if (isLoading || authLoading || !assessment || !student) {
