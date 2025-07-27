@@ -75,22 +75,32 @@ const generateGrowthFeedbackFlow = ai.defineFlow(
     outputSchema: GenerateGrowthFeedbackOutputSchema,
   },
   async (input) => {
-    // Add curricularRemarks to the attempts for the prompt.
-    // This assumes that the `aiFeedback` field in the input might contain the remarks.
-    // A better approach would be to have `curricularRemarks` passed directly.
-    // For now, we will simulate this by assuming they are passed in `attempts`.
-    const enhancedInput = {
-      ...input,
-      attempts: input.attempts.map(attempt => ({
-        ...attempt,
-        curricularRemarks: attempt.curricularRemarks || "내용 없음", // Ensure the field exists
-      }))
-    }
+    
+    // Trim single quotes from the beginning and end of curricularRemarks to fix JSON parsing issues.
+    const sanitizedAttempts = input.attempts.map(attempt => {
+        let remarks = attempt.curricularRemarks || "";
+        if (remarks.startsWith("'") && remarks.endsWith("'")) {
+            remarks = remarks.substring(1, remarks.length - 1);
+        }
+        return {
+            ...attempt,
+            curricularRemarks: remarks,
+        };
+    });
 
-    const { output } = await growthFeedbackPrompt(enhancedInput);
+    const { output } = await growthFeedbackPrompt({
+        ...input,
+        attempts: sanitizedAttempts,
+    });
+    
     if (!output) {
       throw new Error("The AI model did not return valid growth feedback.");
     }
-    return output;
+    
+    return {
+        growthFeedback: output.growthFeedback || "성장 피드백 생성에 실패했습니다.",
+        teacherGuidance: output.teacherGuidance || "교사 조언 생성에 실패했습니다.",
+        growthCurricularRemarks: output.growthCurricularRemarks || "" // Return empty string if undefined/null
+    };
   }
 );
