@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils"
 import { Label } from "@/components/ui/label"
 import { Slider } from "@/components/ui/slider"
 
-const SPEECH_END_TIMEOUT_MS = 4000; 
+const SPEECH_END_TIMEOUT_MS_DEFAULT = 4000; 
 
 type SessionState = "idle" | "initializing" | "speaking" | "listening" | "processing" | "ending" | "finished";
 
@@ -20,6 +20,7 @@ export function VadConversationTool() {
   const [sessionState, setSessionState] = useState<SessionState>("idle");
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
   const [interimTranscript, setInterimTranscript] = useState<string>("");
+  const [speechEndTimeout, setSpeechEndTimeout] = useState(SPEECH_END_TIMEOUT_MS_DEFAULT);
   
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const speechEndTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -72,11 +73,8 @@ export function VadConversationTool() {
             if (speechEndTimerRef.current) clearTimeout(speechEndTimerRef.current);
             speechEndTimerRef.current = setTimeout(() => {
                 const finalTranscript = finalTranscriptRef.current.trim();
-                // This is where processFinalTranscript will be called
-                // We'll define it below so it can be used here.
-                // The linter might complain, but it will work at runtime.
                 (window as any)._processFinalTranscript(finalTranscript);
-            }, SPEECH_END_TIMEOUT_MS);
+            }, speechEndTimeout);
         };
 
         recognition.onresult = (event) => {
@@ -114,7 +112,7 @@ export function VadConversationTool() {
         toast({ title: "마이크 오류", description: "마이크에 접근할 수 없습니다.", variant: "destructive" });
         setSessionState("idle");
     }
-  }, [toast, cleanup]);
+  }, [toast, cleanup, speechEndTimeout]);
 
   const processFinalTranscript = useCallback(async (transcript: string) => {
     cleanup();
@@ -155,7 +153,6 @@ export function VadConversationTool() {
   }, [conversation, cleanup, toast, startListening, sessionState]);
   
   useEffect(() => {
-    // Expose processFinalTranscript globally to be called from the timer in startListening
     (window as any)._processFinalTranscript = processFinalTranscript;
     return () => {
         delete (window as any)._processFinalTranscript;
@@ -252,7 +249,7 @@ export function VadConversationTool() {
               <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground pt-12">
                   <BrainCircuit className="h-12 w-12 mb-4 text-primary"/>
                   <p className="font-semibold">'대화 시작'을 누르면 자동으로 대화가 진행됩니다.</p>
-                  <p className="text-sm">의미있는 발화가 4초간 없으면 자동으로 AI에게 턴이 넘어갑니다.</p>
+                  <p className="text-sm">침묵이 감지되면 자동으로 AI에게 턴이 넘어갑니다.</p>
               </div>
             )}
              {sessionState === "finished" && (
@@ -292,15 +289,17 @@ export function VadConversationTool() {
       
       <div className="flex flex-col gap-4">
         <div className="space-y-2">
-            <Label htmlFor="sensitivity">마이크 민감도 (조용한 환경 🤫 &lt;-&gt; 🗣️ 시끄러운 환경)</Label>
+            <Label htmlFor="sensitivity">침묵 감지 시간 (ms): {speechEndTimeout}</Label>
             <Slider
                 id="sensitivity"
-                min={0.005}
-                max={0.05}
-                step={0.001}
-                defaultValue={[0.01]}
+                min={1000}
+                max={5000}
+                step={500}
+                defaultValue={[speechEndTimeout]}
+                onValueChange={(value) => setSpeechEndTimeout(value[0])}
                 disabled={sessionState !== 'idle' && sessionState !== 'finished'}
             />
+            <p className="text-xs text-muted-foreground">말을 마친 후, 여기서 설정된 시간만큼 침묵이 이어지면 AI에게 턴이 넘어갑니다.</p>
         </div>
         {getButtonState()}
         {sessionState !== 'idle' && sessionState !== 'finished' && (
