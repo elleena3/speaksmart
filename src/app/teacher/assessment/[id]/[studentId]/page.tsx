@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
@@ -252,7 +253,7 @@ function TeacherGrowthView({ results, assessment }: { results: StudentResult[], 
                 pronunciationScore: r.pronunciationScore ?? 0,
                 transcript: r.studentTranscript ?? "",
                 aiFeedback: r.aiFeedback ?? "",
-                curricularRemarks: r.curricularRemarks ?? "", // 필수 필드 추가
+                curricularRemarks: r.curricularRemarks ?? "", 
             }));
 
             const feedback = await generateGrowthFeedback({ attempts, assessmentTitle: assessment.title });
@@ -263,7 +264,7 @@ function TeacherGrowthView({ results, assessment }: { results: StudentResult[], 
                 growthFeedback: feedback.growthFeedback || "",
                 teacherGuidance: feedback.teacherGuidance || "",
                 growthCurricularRemarks: feedback.curricularRemarks || "",
-                growthFeedbackForAttempts: results.length // 상태 저장 필드 추가
+                growthFeedbackForAttempts: results.length
             });
             toast({ title: "AI 종합 분석 완료", description: "학생의 성장 과정에 대한 종합 분석이 완료되었습니다." });
 
@@ -545,5 +546,3 @@ export default function TeacherStudentResultView() {
     </div>
   );
 }
-
-    
