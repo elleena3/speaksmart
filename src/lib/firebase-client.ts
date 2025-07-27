@@ -1,4 +1,3 @@
-
 // src/lib/firebase-client.ts
 import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
 import { getAuth, type Auth } from "firebase/auth";
@@ -9,12 +8,11 @@ import { getAnalytics, type Analytics, isSupported } from "firebase/analytics";
 // This file is for CLIENT-SIDE use only.
 
 // Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
   apiKey: "AIzaSyAieUKTGnuh0f9zWJYjgYM77j4mEshxWCg",
   authDomain: "speaksmart-evaluator2.firebaseapp.com",
   projectId: "speaksmart-evaluator2",
-  storageBucket: "speaksmart-evaluator2.appspot.com",
+  storageBucket: "speaksmart-evaluator2.firebasestorage.app",
   messagingSenderId: "60227542963",
   appId: "1:60227542963:web:f5d6c51046eb572a9c35c6",
   measurementId: "G-M20FDF494Y"
