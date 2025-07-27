@@ -354,7 +354,7 @@ function TeacherGrowthView({ results, assessment }: { results: StudentResult[], 
                     <div className="flex justify-between items-center">
                         <CardTitle className="flex items-center gap-2"><Sparkles />AI 종합 성장 피드백</CardTitle>
                         <Button variant="secondary" size="sm" onClick={() => fetchGrowthFeedback(true)} disabled={isLoadingFeedback}>
-                           {isLoadingFeedback ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <RefreshCw className="mr-2 h-4 w-4" />}
+                           {isLoadingFeedback ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <RefreshCcw className="mr-2 h-4 w-4" />}
                             종합 분석 재생성
                         </Button>
                     </div>
@@ -546,3 +546,4 @@ export default function TeacherStudentResultView() {
     </div>
   );
 }
+

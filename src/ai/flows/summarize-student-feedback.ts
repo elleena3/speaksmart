@@ -1,4 +1,4 @@
-// 'use server';
+'use server';
 
 /**
  * @fileOverview Summarizes student feedback on assessment activities for teachers.
@@ -7,8 +7,6 @@
  * - SummarizeStudentFeedbackInput - The input type for the summarizeStudentFeedback function.
  * - SummarizeStudentFeedbackOutput - The return type for the summarizeStudentFeedback function.
  */
-
-'use server';
 
 import {ai} from '@/ai/genkit';
 import { googleAI } from '@genkit-ai/googleai';

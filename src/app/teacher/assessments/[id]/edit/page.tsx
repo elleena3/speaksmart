@@ -12,7 +12,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, CalendarIcon, ChevronsUpDown, Check, Info, Edit, Users } from "lucide-react";
+import { Loader2, CalendarIcon, ChevronsUpDown, Check, Info, Edit, Users, Search } from "lucide-react";
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";

@@ -1,4 +1,5 @@
 
+
 "use client"
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -13,7 +14,7 @@ import { useEffect, useState } from 'react';
 import { Loader2, Info } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { doc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from '@/lib/firebase-client';
+import { db } from '@/lib/firebase';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export default function SettingsPage() {

@@ -1,5 +1,6 @@
 
-"use client"
+
+"use client";
 
 import { useState } from "react"
 import Link from "next/link"
@@ -10,7 +11,7 @@ import { useToast } from "@/hooks/use-toast"
 import { Send, ThumbsUp, ThumbsDown, MessageSquareQuote, Loader2, FileText, Target, Repeat, Bot, User, DraftingCompass } from "lucide-react"
 import { type StudentResult, type TeacherAssessment, type RubricScores } from "@/lib/types"
 import { Progress } from "@/components/ui/progress"
-import { db } from "@/lib/firebase-client";
+import { db } from "@/lib/firebase";
 import { doc, updateDoc } from "firebase/firestore"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"

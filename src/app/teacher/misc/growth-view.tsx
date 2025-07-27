@@ -1,6 +1,6 @@
 
 
-"use client"
+"use client";
 
 import { useState, useEffect, useMemo } from "react";
 import { type StudentResult, type TeacherAssessment, type ResultSummary, type RubricScores } from "@/lib/types";
@@ -16,7 +16,7 @@ import { Repeat } from "lucide-react";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from "remark-gfm";
 import { doc, updateDoc, writeBatch } from "firebase/firestore";
-import { db } from "@/lib/firebase-client";
+import { db } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
 
 type GrowthViewProps = {
@@ -324,3 +324,4 @@ export function GrowthView({ results: initialResults, assessment, defaultTab }: 
         </Tabs>
     );
 }
+

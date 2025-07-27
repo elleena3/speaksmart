@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { FreeTalkFeedbackView } from "./free-talk-feedback-view";
@@ -8,7 +9,7 @@ import { useEffect, useState } from "react";
 import { type StudentResult, type TeacherAssessment } from "@/lib/types";
 import { useAuth } from "@/context/auth-context";
 import { Loader2 } from "lucide-react";
-import { db } from "@/lib/firebase-client";
+import { db } from "@/lib/firebase";
 import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { useToast } from '@/hooks/use-toast';

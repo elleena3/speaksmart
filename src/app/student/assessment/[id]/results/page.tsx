@@ -8,7 +8,7 @@ import { useEffect, useState } from "react";
 import { type StudentResult, type TeacherAssessment } from "@/lib/types";
 import { useAuth } from "@/context/auth-context";
 import { Loader2 } from "lucide-react";
-import { db } from "@/lib/firebase-client";
+import { db } from "@/lib/firebase";
 import { collection, query, where, getDocs, doc, getDoc, orderBy } from "firebase/firestore";
 import { useToast } from '@/hooks/use-toast';
 
