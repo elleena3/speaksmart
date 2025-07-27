@@ -6,6 +6,8 @@
       "http://localhost:9002",
       "https://speaksmart-evaluator2.web.app",
       "https://speaksmart-evaluator2.firebaseapp.com",
+      "https://*.web.app",
+      "https://*.firebaseapp.com",
       "https://storage.googleapis.com"
     ],
     "method": [
