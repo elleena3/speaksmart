@@ -55,11 +55,11 @@ export function PresentationAnalyzerTool() {
         const file = event.target.files?.[0];
         if (!file) return;
 
-        const validVideoTypes = ['video/mp4', 'video/webm'];
+        const validVideoTypes = ['video/mp4', 'video/webm', 'video/quicktime'];
         const validPresentationTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.presentationml.presentation'];
         
         if (fileType === 'video' && !validVideoTypes.includes(file.type)) {
-            toast({ title: "지원하지 않는 동영상 형식", description: "MP4 또는 WebM 형식의 동영상 파일을 선택해주세요.", variant: "destructive" });
+            toast({ title: "지원하지 않는 동영상 형식", description: "MP4, WebM, MOV 형식의 동영상 파일을 선택해주세요.", variant: "destructive" });
             event.target.value = '';
             return;
         }
@@ -144,8 +144,8 @@ export function PresentationAnalyzerTool() {
                             <Label htmlFor="video-upload" className="flex items-center gap-1">
                                 <VideoIcon className="h-4 w-4"/> 동영상 파일 <span className="text-red-500">*</span>
                             </Label>
-                            <Input id="video-upload" type="file" accept="video/mp4,video/webm" onChange={(e) => handleFileChange(e, 'video')} />
-                            <p className="text-xs text-muted-foreground">MP4, WebM 형식, 1080p 이하</p>
+                            <Input id="video-upload" type="file" accept="video/mp4,video/webm,video/quicktime" onChange={(e) => handleFileChange(e, 'video')} />
+                            <p className="text-xs text-muted-foreground">MP4, WebM, MOV 형식, 1080p 이하</p>
                         </div>
                          <div className="space-y-2">
                             <Label htmlFor="presentation-upload">발표 자료 (선택)</Label>

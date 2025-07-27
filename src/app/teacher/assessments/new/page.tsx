@@ -21,7 +21,7 @@ import { useLanguage } from "@/context/language-context";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { scenarios, type TeacherAssessment, femaleVoices, maleVoices, allVoices, evaluationModels, voiceDescriptions, type AiVoice, monologueTypes, type UserData, imageGenerationModels } from "@/lib/types";
 import { useAuth, mockStudents } from "@/context/auth-context";
 import { addDoc, collection, getDocs, query, where } from "firebase/firestore";
@@ -586,27 +586,19 @@ export default function NewAssessmentPage() {
                                 <DialogContent className="max-w-4xl">
                                     <DialogHeader>
                                         <DialogTitle>이미지 생성 프롬프트 예시</DialogTitle>
+                                        <DialogDescription>예시 이미지를 클릭하면 프롬프트가 자동으로 복사됩니다.</DialogDescription>
                                     </DialogHeader>
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 py-4">
                                         {promptExamples.map((example, index) => (
-                                            <div key={index} className="space-y-2">
-                                                <div className="border rounded-lg overflow-hidden">
+                                            <div key={index} className="space-y-2 group cursor-pointer" onClick={() => {
+                                                setImagePrompt(example.prompt);
+                                                toast({ title: "프롬프트 복사됨", description: "이미지 생성 프롬프트가 입력창에 붙여넣기 되었습니다." });
+                                            }}>
+                                                <div className="border rounded-lg overflow-hidden group-hover:ring-2 group-hover:ring-primary transition-all">
                                                     <Image src={example.image} alt={example.prompt} width={400} height={400} className="object-cover" data-ai-hint={example.hint}/>
                                                 </div>
                                                 <div className="text-sm p-2 bg-muted rounded-md relative">
                                                     <p className="pr-10">“{example.prompt}”</p>
-                                                    <Button
-                                                        type="button"
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="absolute top-1 right-1 h-7 w-7"
-                                                        onClick={() => {
-                                                            navigator.clipboard.writeText(example.prompt);
-                                                            toast({ title: "프롬프트 복사됨" });
-                                                        }}
-                                                    >
-                                                        <Copy className="h-4 w-4"/>
-                                                    </Button>
                                                 </div>
                                             </div>
                                         ))}
@@ -896,6 +888,9 @@ export default function NewAssessmentPage() {
                       <DialogContent className="max-w-4xl h-[90vh]">
                         <DialogHeader>
                           <DialogTitle>영어 회화 능력 평가 루브릭</DialogTitle>
+                          <DialogDescription>
+                            AI 평가에 사용되는 표준화된 영어 회화 능력 평가 기준표입니다.
+                          </DialogDescription>
                         </DialogHeader>
                         <iframe src="/rubric.html" className="w-full h-full border-0" title="영어 회화 능력 평가 루브릭"></iframe>
                       </DialogContent>
