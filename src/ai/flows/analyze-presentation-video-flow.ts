@@ -95,6 +95,9 @@ In addition to the core framework, pay special attention to the following criter
 "{{{customCriteria}}}"
 {{/if}}
 
+### IMPORTANT ANALYSIS INSTRUCTION:
+If the video appears to be a casual conversation, a non-standard activity, or does not fit a formal presentation structure, you MUST **prioritize the teacher's custom criteria** as the main evaluation framework. In this case, adapt your analysis of Content, Language, and Delivery to reflect the custom criteria. If no custom criteria are provided for such a video, evaluate based on general conversational abilities.
+
 ### Your Task:
 1.  **Analyze and Score Each Category:** Carefully review all provided materials. For each of the three main categories (Content, Language Competence, Delivery), provide a score from 0 to 100.
 2.  **Write Detailed Feedback for Each Category:** For each category, write specific, constructive feedback in Korean. Justify the score you gave by providing concrete examples (what the student did well, what they did wrong) from the video and/or presentation materials.

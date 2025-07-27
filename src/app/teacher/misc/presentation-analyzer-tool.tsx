@@ -13,6 +13,7 @@ import { analyzePresentationVideo, type AnalyzePresentationVideoOutput } from '@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
 
 type AnalysisState = 'idle' | 'analyzing' | 'analyzed' | 'error';
 
@@ -195,7 +196,15 @@ export function PresentationAnalyzerTool() {
             )}
 
             {analysisState === 'analyzed' && analysisResult && (
-                <Card>
+                <Card 
+                    data-state="open" 
+                    className={cn(
+                        "data-[state=open]:animate-in data-[state=closed]:animate-out",
+                        "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+                        "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
+                        "data-[state=open]:slide-in-from-bottom-2"
+                    )}
+                >
                     <CardHeader>
                         <CardTitle>AI 발표 분석 종합 결과</CardTitle>
                         <CardDescription>가중치가 적용된 최종 점수는 다음과 같습니다: 내용(40%), 언어(40%), 태도(20%)</CardDescription>
