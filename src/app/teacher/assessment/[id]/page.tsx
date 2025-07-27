@@ -167,11 +167,11 @@ export default function AssessmentSubmissionsPage() {
       try {
         await deleteDoc(doc(db, "results", resultId));
         toast({ title: "삭제 완료", description: "오류 기록이 삭제되었습니다. 학생은 다시 응시할 수 있습니다." });
-        // Instead of refetching, just remove the item from the local state for instant UI update
+        // The deletion was successful, now update the local state.
         const studentToRemove = completedStudents.find(s => s.result?.id === resultId);
         if (studentToRemove) {
             setCompletedStudents(prev => prev.filter(s => s.result?.id !== resultId));
-            setPendingStudents(prev => [...prev, studentToRemove].sort((a,b) => (a.displayName).localeCompare(b.displayName)));
+            setPendingStudents(prev => [...prev, { ...studentToRemove, result: undefined }].sort((a,b) => (a.displayName).localeCompare(b.displayName)));
         }
       } catch (error) {
          console.error("Error deleting result:", error);
