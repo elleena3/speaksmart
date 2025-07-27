@@ -396,15 +396,13 @@ export default function TeacherStudentResultView() {
   const { toast } = useToast();
 
   const assessmentId = Array.isArray(params.id) ? params.id[0] : params.id;
-  const studentId = Array.isArray(params.studentId) ? params.studentId[0] : params.studentId;
+  const studentDocId = Array.isArray(params.studentId) ? params.studentId[0] : params.studentId;
 
-  const fetchStudentResults = useCallback(async () => {
-    if (!assessmentId || !studentId) return;
-    setIsLoading(true);
+  const fetchStudentResults = useCallback(async (studentUid: string) => {
+    if (!assessmentId) return;
     
     if (!db) {
       toast({ title: "오류", description: "Firebase가 설정되지 않았습니다.", variant: "destructive" });
-      setIsLoading(false);
       return;
     }
     
@@ -412,14 +410,10 @@ export default function TeacherStudentResultView() {
       const resultsQuery = query(
         collection(db, "results"),
         where("assessmentId", "==", assessmentId),
-        where("studentId", "==", studentId)
+        where("studentId", "==", studentUid)
       );
       const querySnapshot = await getDocs(resultsQuery);
-      if (querySnapshot.empty) {
-        toast({ title: "결과 없음", description: "해당 학생의 평가 결과가 없습니다.", variant: "destructive" });
-        router.push(`/teacher/assessment/${assessmentId}`);
-        return;
-      }
+
       const studentResults = querySnapshot.docs
         .map(doc => ({ id: doc.id, ...doc.data() } as StudentResult))
         .sort((a,b) => (a.createdAt || 0) - (b.createdAt || 0)); // Sort client-side
@@ -429,10 +423,8 @@ export default function TeacherStudentResultView() {
     } catch (error) {
       console.error("Error fetching student results:", error);
       toast({ title: "오류", description: "학생 결과를 불러오는 중 오류가 발생했습니다.", variant: "destructive" });
-    } finally {
-        setIsLoading(false);
     }
-  }, [assessmentId, studentId, router, toast]);
+  }, [assessmentId, toast]);
 
   useEffect(() => {
     if (authLoading || !user) return;
@@ -456,18 +448,17 @@ export default function TeacherStudentResultView() {
             }
             setAssessment({ id: assessmentSnap.id, ...assessmentSnap.data() } as TeacherAssessment);
     
-            const studentDocId = studentId;
             const studentRef = doc(db, "users", studentDocId);
             const studentSnap = await getDoc(studentRef);
             if (studentSnap.exists()) {
-                setStudent({ ...studentSnap.data(), uid: studentSnap.id, docId: studentSnap.id } as UserData);
+                const studentData = { ...studentSnap.data(), uid: studentSnap.id, docId: studentSnap.id } as UserData;
+                setStudent(studentData);
+                await fetchStudentResults(studentData.uid); // Pass the correct UID here
             } else {
-            toast({ title: "오류", description: "학생 정보를 찾을 수 없습니다.", variant: "destructive" });
-            notFound();
-            return;
+                toast({ title: "오류", description: "학생 정보를 찾을 수 없습니다.", variant: "destructive" });
+                notFound();
+                return;
             }
-
-            await fetchStudentResults();
 
         } catch (error) {
              console.error("Error fetching initial data:", error);
@@ -479,7 +470,7 @@ export default function TeacherStudentResultView() {
     };
 
     fetchInitialData();
-  }, [studentId, assessmentId, user, toast, router, authLoading, fetchStudentResults]);
+  }, [studentDocId, assessmentId, user, toast, router, authLoading, fetchStudentResults]);
   
 
   if (isLoading || authLoading || !assessment || !student) {
@@ -546,4 +537,3 @@ export default function TeacherStudentResultView() {
     </div>
   );
 }
-
