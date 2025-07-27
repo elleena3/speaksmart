@@ -15,7 +15,7 @@ import { OverviewChart } from "./overview-chart"
 import { useLanguage } from "@/context/language-context"
 import { useAuth, mockStudents } from '@/context/auth-context';
 import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { db } from '@/lib/firebase-client';
 
 export default function TeacherDashboard() {
   const { t } = useLanguage();
@@ -44,7 +44,7 @@ export default function TeacherDashboard() {
         
         const [assessmentsSnapshot, resultsSnapshot, studentsSnapshot] = await Promise.all([
             getDocs(assessmentsQuery),
-            getDocs(resultsQuery),
+            getDocs(resultsSnapshot),
             getDocs(allStudentsQuery),
         ]);
         

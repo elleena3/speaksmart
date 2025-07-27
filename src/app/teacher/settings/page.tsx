@@ -13,7 +13,7 @@ import { useEffect, useState } from 'react';
 import { Loader2, Info } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { doc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { db } from '@/lib/firebase-client';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export default function SettingsPage() {

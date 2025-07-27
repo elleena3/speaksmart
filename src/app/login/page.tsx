@@ -27,7 +27,7 @@ import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/auth-context";
 import { Loader2 } from "lucide-react";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firebase-client";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { type UserData } from "@/lib/types";
 

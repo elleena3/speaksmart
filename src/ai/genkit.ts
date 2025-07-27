@@ -4,7 +4,7 @@
 import {genkit} from 'genkit';
 import {googleAI} from '@genkit-ai/googleai';
 import * as firebase from '@genkit-ai/firebase';
-import { firebaseConfig } from '@/lib/firebase'; 
+import { firebaseConfig } from '@/lib/firebase-client'; 
 
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
 
