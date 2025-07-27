@@ -1,4 +1,3 @@
-
 import { config } from 'dotenv';
 config();
 
@@ -36,6 +35,7 @@ import '@/ai/flows/analyze-handwriting-flow';
 
 // New flow for growth analysis
 import '@/ai/flows/generate-growth-feedback-flow';
+import '@/ai/flows/regenerate-curricular-remarks-flow'; // New flow for regenerating remarks
 
 // New flow for retrying analysis
 import '@/ai/flows/retry-analysis-flow';
@@ -45,5 +45,3 @@ import '@/ai/flows/analyze-presentation-video-flow';
 
 // This flow is being removed due to errors.
 // import '@/ai/flows/regenerate-html-feedback-flow';
-
-    

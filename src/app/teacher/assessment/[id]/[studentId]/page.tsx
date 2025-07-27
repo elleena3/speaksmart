@@ -17,6 +17,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
 import { generateGrowthFeedback, type GenerateGrowthFeedbackOutput } from "@/ai/flows/generate-growth-feedback-flow";
+import { regenerateCurricularRemarks } from "@/ai/flows/regenerate-curricular-remarks-flow";
 import { Button } from "@/components/ui/button";
 
 
@@ -232,10 +233,9 @@ function TeacherGrowthView({ results, assessment }: { results: StudentResult[], 
         return data;
     }, [latestResult.historicalScores, results, rubricSubjects]);
 
-    const fetchGrowthFeedback = useCallback(async (forceRefetch = false) => {
+    const fetchGrowthFeedback = useCallback(async () => {
         setIsLoadingFeedback(true);
-        // Use cached data if not forcing a refetch and data is available for the current number of attempts.
-        if (!forceRefetch && latestResult.growthFeedback && latestResult.growthFeedbackForAttempts === results.length) {
+        if (latestResult.growthFeedback && latestResult.growthFeedbackForAttempts === results.length) {
             setGrowthFeedback({
                 growthFeedback: latestResult.growthFeedback,
                 teacherGuidance: latestResult.growthTeacherGuidance || "",
@@ -245,46 +245,30 @@ function TeacherGrowthView({ results, assessment }: { results: StudentResult[], 
             return;
         }
 
-        if (forceRefetch) {
-            toast({ title: "AI 종합 분석 재생성 중...", description: "학생의 모든 시도를 다시 분석하고 있습니다." });
-        }
-
         try {
-            // Prepare data for the AI flow by filtering for valid remarks.
-            const validAttempts: ResultSummary[] = results
-                .map((r, index) => {
-                    // Sanitize remarks to handle potential data inconsistencies
-                    let remarks = (r.curricularRemarks || "").trim();
-                    if (remarks.startsWith("'") && remarks.endsWith("'")) {
-                        remarks = remarks.substring(1, remarks.length - 1);
-                    }
-                    return {
-                        attemptNumber: index + 1,
-                        contentScore: r.contentScore ?? 0,
-                        pronunciationScore: r.pronunciationScore ?? 0,
-                        transcript: r.studentTranscript ?? "",
-                        aiFeedback: r.aiFeedback ?? "",
-                        curricularRemarks: remarks,
-                    };
-                });
+            const attempts: ResultSummary[] = results.map((r, index) => ({
+                attemptNumber: index + 1,
+                contentScore: r.contentScore ?? 0,
+                pronunciationScore: r.pronunciationScore ?? 0,
+                transcript: r.studentTranscript ?? "",
+                aiFeedback: r.aiFeedback ?? "",
+                curricularRemarks: r.curricularRemarks ?? ""
+            }));
 
             const feedback = await generateGrowthFeedback({
-                attempts: validAttempts,
+                attempts: attempts,
                 assessmentTitle: assessment.title,
             });
-            
             setGrowthFeedback(feedback);
             
-            // Update the latest result document in Firestore with the new feedback.
             const resultRef = doc(db, "results", latestResult.id);
             await updateDoc(resultRef, {
                 growthFeedback: feedback.growthFeedback,
                 growthTeacherGuidance: feedback.teacherGuidance,
-                growthCurricularRemarks: feedback.curricularRemarks,
-                growthFeedbackForAttempts: results.length // Stamp the number of attempts this feedback is for.
+                growthCurricularRemarks: feedback.growthCurricularRemarks,
+                growthFeedbackForAttempts: results.length
             });
-
-            toast({ title: "AI 종합 분석 완료", description: "학생의 성장 과정에 대한 종합 분석이 완료되었습니다." });
+            toast({ title: "AI 종합 분석 완료", description: "학생의 성장 과정에 대한 종합 분석이 완료되었습니다."});
 
         } catch (error) {
             console.error("Error generating growth feedback:", error);
@@ -300,6 +284,48 @@ function TeacherGrowthView({ results, assessment }: { results: StudentResult[], 
         }
     }, [results, assessment.title, toast, latestResult]);
 
+    const handleRegenerateRemarks = useCallback(async () => {
+        setIsLoadingFeedback(true);
+        toast({ title: "생활기록부(종합) 재생성 중...", description: "AI가 모든 시도를 다시 분석하여 종합 의견을 작성합니다." });
+        
+        try {
+            // 1. Prepare clean data for the AI flow
+            const validAttempts: ResultSummary[] = results.map((r, index) => ({
+                attemptNumber: index + 1,
+                contentScore: r.contentScore ?? 0,
+                pronunciationScore: r.pronunciationScore ?? 0,
+                transcript: r.studentTranscript ?? "",
+                aiFeedback: r.aiFeedback ?? "",
+                curricularRemarks: r.curricularRemarks ?? ""
+            }));
+
+            // 2. Call the new, dedicated flow
+            const { growthCurricularRemarks } = await regenerateCurricularRemarks({
+                attempts: validAttempts,
+                assessmentTitle: assessment.title,
+            });
+
+            // 3. Update the local state
+            setGrowthFeedback(prev => ({
+                ...(prev || { growthFeedback: "", teacherGuidance: "" }),
+                curricularRemarks: growthCurricularRemarks
+            }));
+            
+            // 4. Update only the curricular remarks in Firestore
+            const resultRef = doc(db, "results", latestResult.id);
+            await updateDoc(resultRef, {
+                growthCurricularRemarks: growthCurricularRemarks,
+            });
+            
+            toast({ title: "생활기록부(종합) 재생성 완료!", description: "새로운 종합 의견이 생성되었습니다." });
+
+        } catch (error) {
+            console.error("Error regenerating curricular remarks:", error);
+            toast({ title: "재생성 실패", description: (error as Error).message, variant: "destructive" });
+        } finally {
+            setIsLoadingFeedback(false);
+        }
+    }, [results, assessment.title, toast, latestResult.id]);
 
      useEffect(() => {
         if (results.length > 1) {
@@ -309,9 +335,17 @@ function TeacherGrowthView({ results, assessment }: { results: StudentResult[], 
         }
     }, [results.length, fetchGrowthFeedback]);
 
-    const RemarksCard = ({ title, content }: { title: string, content?: string }) => (
+    const RemarksCard = ({ title, content, onRegenerate }: { title: string, content?: string, onRegenerate?: () => void }) => (
       <Card>
-        <CardHeader><CardTitle>{title}</CardTitle></CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>{title}</CardTitle>
+            {onRegenerate && (
+                <Button variant="secondary" size="sm" onClick={onRegenerate} disabled={isLoadingFeedback}>
+                    {isLoadingFeedback ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <RefreshCcw className="mr-2 h-4 w-4" />}
+                    재생성
+                </Button>
+            )}
+        </CardHeader>
         <CardContent className="p-4 bg-muted/50 rounded-lg whitespace-pre-wrap font-body text-sm leading-relaxed min-h-[150px]">
           {isLoadingFeedback ? (
             <div className="flex items-center gap-2 text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin"/> 생성 중...</div>
@@ -373,16 +407,12 @@ function TeacherGrowthView({ results, assessment }: { results: StudentResult[], 
                 <CardHeader>
                     <div className="flex justify-between items-center">
                         <CardTitle className="flex items-center gap-2"><Sparkles />AI 종합 성장 피드백</CardTitle>
-                        <Button variant="secondary" size="sm" onClick={() => fetchGrowthFeedback(true)} disabled={isLoadingFeedback}>
-                           {isLoadingFeedback ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <RefreshCcw className="mr-2 h-4 w-4" />}
-                            종합 분석 재생성
-                        </Button>
                     </div>
                     <CardDescription>모든 시도를 종합하여 AI가 분석한 학생의 성장 과정입니다.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <div className="grid md:grid-cols-2 gap-6">
-                        <RemarksCard title="생활기록부 교과 특기 사항 (종합)" content={growthFeedback?.curricularRemarks} />
+                        <RemarksCard title="생활기록부 교과 특기 사항 (종합)" content={growthFeedback?.curricularRemarks} onRegenerate={handleRegenerateRemarks} />
                         <RemarksCard title="교사용 AI 조언 (종합)" content={growthFeedback?.teacherGuidance} />
                         <Card className="md:col-span-2">
                             <CardHeader><CardTitle>학생에게 제공된 AI 종합 피드백</CardTitle></CardHeader>
