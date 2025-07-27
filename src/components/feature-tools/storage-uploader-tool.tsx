@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from 'react';
@@ -8,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, UploadCloud, CheckCircle, LinkIcon } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
-import { storage } from '@/lib/firebase-client';
+import { storage } from '@/lib/firebase';
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { useAuth } from '@/context/auth-context';
 
