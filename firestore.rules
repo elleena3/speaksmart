@@ -1,39 +1,33 @@
-
 rules_version = '2';
 
-// Firestore Database Rules
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Allow read/write access to the 'users' collection for authenticated users
-    match /users/{userId} {
+    match /{document=**} {
+      // Allow read and write access for all authenticated users.
+      // In a production app, you should restrict this further.
       allow read, write: if request.auth != null;
-    }
-
-    // Allow read access to assessments for authenticated users
-    // Only the creator can write/update/delete
-    match /assessments/{assessmentId} {
-      allow read: if request.auth != null;
-      allow create, update, delete: if request.auth.uid == resource.data.uid;
-    }
-    
-    // Allow authenticated users to create their own results
-    // Allow the creator of the assessment (teacher) to read all results for their assessment
-    match /results/{resultId} {
-      allow read: if request.auth.uid == resource.data.studentId || request.auth.uid == resource.data.teacherUid;
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.studentId;
-      allow update: if request.auth.uid == request.resource.data.teacherUid || request.auth.uid == resource.data.studentId;
-      allow delete: if request.auth.uid == resource.data.teacherUid;
     }
   }
 }
 
-// Firebase Storage Rules
 service firebase.storage {
   match /b/{bucket}/o {
-    // Allow authenticated users to read and write to the recordings folder
-    match /recordings/{allPaths=**} {
-        allow read, write: if request.auth != null;
+    // Public read access for all files
+    match /{allPaths=**} {
+      allow read: if true;
+    }
+
+    // Allow uploads for logged-in users to specific paths
+    match /recordings/{userId}/{allPaths=**} {
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    match /assessment-images/{userId}/{allPaths=**} {
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Allow anyone to upload to the "uploads" folder for testing
+    match /uploads/{allPaths=**} {
+      allow write: if true;
     }
   }
 }
