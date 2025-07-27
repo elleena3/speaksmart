@@ -234,6 +234,7 @@ function TeacherGrowthView({ results, assessment }: { results: StudentResult[], 
 
     const fetchGrowthFeedback = useCallback(async (forceRefetch = false) => {
         setIsLoadingFeedback(true);
+        // Use cached data if not forcing a refetch and data is available for the current number of attempts.
         if (!forceRefetch && latestResult.growthFeedback && latestResult.growthFeedbackForAttempts === results.length) {
             setGrowthFeedback({
                 growthFeedback: latestResult.growthFeedback,
@@ -244,41 +245,61 @@ function TeacherGrowthView({ results, assessment }: { results: StudentResult[], 
             return;
         }
 
-        try {
-            toast({ title: "AI 종합 분석 중...", description: "학생의 모든 시도를 종합하여 분석하고 있습니다." });
-            const attempts: ResultSummary[] = results.map((r, index) => ({
-                attemptNumber: index + 1,
-                contentScore: r.contentScore ?? 0,
-                pronunciationScore: r.pronunciationScore ?? 0,
-                transcript: r.studentTranscript ?? "",
-                aiFeedback: r.aiFeedback ?? "",
-                curricularRemarks: r.curricularRemarks ?? "", 
-            }));
+        if (forceRefetch) {
+            toast({ title: "AI 종합 분석 재생성 중...", description: "학생의 모든 시도를 다시 분석하고 있습니다." });
+        }
 
-            const feedback = await generateGrowthFeedback({ attempts, assessmentTitle: assessment.title });
+        try {
+            // Prepare data for the AI flow by filtering for valid remarks.
+            const validAttempts: ResultSummary[] = results
+                .map((r, index) => {
+                    // Sanitize remarks to handle potential data inconsistencies
+                    let remarks = (r.curricularRemarks || "").trim();
+                    if (remarks.startsWith("'") && remarks.endsWith("'")) {
+                        remarks = remarks.substring(1, remarks.length - 1);
+                    }
+                    return {
+                        attemptNumber: index + 1,
+                        contentScore: r.contentScore ?? 0,
+                        pronunciationScore: r.pronunciationScore ?? 0,
+                        transcript: r.studentTranscript ?? "",
+                        aiFeedback: r.aiFeedback ?? "",
+                        curricularRemarks: remarks,
+                    };
+                });
+
+            const feedback = await generateGrowthFeedback({
+                attempts: validAttempts,
+                assessmentTitle: assessment.title,
+            });
+            
             setGrowthFeedback(feedback);
             
+            // Update the latest result document in Firestore with the new feedback.
             const resultRef = doc(db, "results", latestResult.id);
             await updateDoc(resultRef, {
-                growthFeedback: feedback.growthFeedback || "",
-                teacherGuidance: feedback.teacherGuidance || "",
-                growthCurricularRemarks: feedback.curricularRemarks || "",
-                growthFeedbackForAttempts: results.length
+                growthFeedback: feedback.growthFeedback,
+                growthTeacherGuidance: feedback.teacherGuidance,
+                growthCurricularRemarks: feedback.curricularRemarks,
+                growthFeedbackForAttempts: results.length // Stamp the number of attempts this feedback is for.
             });
+
             toast({ title: "AI 종합 분석 완료", description: "학생의 성장 과정에 대한 종합 분석이 완료되었습니다." });
 
         } catch (error) {
             console.error("Error generating growth feedback:", error);
+            const errorMessage = "종합 분석 생성 중 오류가 발생했습니다.";
             setGrowthFeedback({ 
-                growthFeedback: "성장 피드백 생성 중 오류 발생",
-                teacherGuidance: "교사 조언 생성 중 오류 발생",
-                curricularRemarks: "생활기록부 교과 특기 사항 생성 중 오류 발생"
+                growthFeedback: errorMessage,
+                teacherGuidance: errorMessage,
+                curricularRemarks: errorMessage,
             });
-            toast({ title: "오류", description: "종합 분석 생성 중 오류가 발생했습니다.", variant: "destructive" });
+            toast({ title: "오류", description: errorMessage, variant: "destructive" });
         } finally {
             setIsLoadingFeedback(false);
         }
     }, [results, assessment.title, toast, latestResult]);
+
 
      useEffect(() => {
         if (results.length > 1) {
