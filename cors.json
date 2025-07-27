@@ -4,8 +4,8 @@
     "origin": [
       "http://localhost:3000",
       "http://localhost:9002",
-      "https://speaksmart-evaluator.web.app",
-      "https://speaksmart-evaluator.firebaseapp.com",
+      "https://speaksmart-evaluator2.web.app",
+      "https://speaksmart-evaluator2.firebaseapp.com",
       "https://storage.googleapis.com"
     ],
     "method": [
