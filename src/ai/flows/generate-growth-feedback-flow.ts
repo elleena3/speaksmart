@@ -20,7 +20,7 @@ export async function generateGrowthFeedback(
 const growthFeedbackPrompt = ai.definePrompt({
   name: 'growthFeedbackPrompt',
   model: googleAI.model('gemini-2.5-flash'),
-  input: { schema: GenerateGrowthFeedbackInputSchema },
+  input: { schema: GenerateGrowthFeedbackInputSchema.extend({ hasValidCurricularRemarks: z.boolean() }) },
   output: { schema: GenerateGrowthFeedbackOutputSchema },
   prompt: `You are an expert AI English teacher. Your task is to provide a comprehensive growth analysis for a student by comparing all of their attempts of the same speaking assessment. Your entire response must be in Korean and formatted in Markdown.
 
@@ -58,7 +58,7 @@ Please perform the following steps based on ALL attempts provided:
     -   **Format:** Formal Korean prose, with sentences ending in '~함' or '~임'.
     -   **Tone:** Official and descriptive, suitable for a school record.
     -   **Content:** 
-        {{#if (all (map attempts (get 'curricularRemarks')))}}
+        {{#if hasValidCurricularRemarks}}
         Your primary source for this summary is the 'Curricular Remarks from this attempt' field provided for each attempt.
         1. Review the curricular remarks from all valid attempts chronologically.
         2. Synthesize these valid remarks into a single, cohesive narrative of about 700 Korean characters that shows the student's growth story.
@@ -79,27 +79,24 @@ const generateGrowthFeedbackFlow = ai.defineFlow(
   },
   async (input) => {
     
-    // 1. Sanitize and filter attempts to ensure only valid remarks are processed.
+    // Sanitize and filter attempts to ensure only valid remarks are processed.
     const sanitizedAttempts = input.attempts.map(attempt => {
         let remarks = (attempt.curricularRemarks || "").trim();
-        // Remove potential stray single quotes from bad data saves
-        if (remarks.startsWith("'") && remarks.endsWith("'")) {
-            remarks = remarks.substring(1, remarks.length - 1);
-        }
-        
-        // Consider a remark invalid if it's empty or an error message
         const isRemarkValid = remarks && !remarks.includes('오류') && !remarks.includes('실패') && !remarks.includes('없음');
-        
         return {
           ...attempt,
-          // If remark is not valid, set it to null so Handlebars can check for its absence
+          // Set to null if invalid so Handlebars can check for its absence
           curricularRemarks: isRemarkValid ? remarks : null,
         };
       });
 
+    // Determine if there are any valid remarks to pass to the prompt.
+    const hasValidCurricularRemarks = sanitizedAttempts.some(attempt => !!attempt.curricularRemarks);
+
     const { output } = await growthFeedbackPrompt({
         ...input,
         attempts: sanitizedAttempts,
+        hasValidCurricularRemarks: hasValidCurricularRemarks,
     });
     
     const defaultErrorMsg = "오류가 발생했거나 생성된 내용이 없습니다.";
