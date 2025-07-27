@@ -6,7 +6,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { collection, getDocs, query, where, doc, updateDoc, deleteDoc, writeBatch } from 'firebase/firestore';
 import { db } from '@/lib/firebase-client';
 import { useAuth } from '@/context/auth-context';
-import { type UserData } from '@/lib/types';
+import { type UserData } from "@/lib/types";
 import { Loader2, ChevronsUpDown, Check, Edit, KeyRound, Search, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';

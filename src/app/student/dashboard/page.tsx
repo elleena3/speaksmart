@@ -14,7 +14,7 @@ import { useToast } from "@/hooks/use-toast"
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { collection, query, where, getDocs, orderBy, doc, getDoc, collectionGroup } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firebase-client";
 import { cn } from "@/lib/utils"
 
 

@@ -7,7 +7,7 @@ import { useParams, useRouter, notFound } from "next/navigation";
 import { type TeacherAssessment, type StudentResult, type ResultSummary, type RubricScores, type UserData } from "@/lib/types";
 import { useAuth, mockStudents } from "@/context/auth-context";
 import { Loader2, User, Sparkles, TrendingUp, DraftingCompass, RefreshCw } from "lucide-react";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firebase-client";
 import { doc, getDoc, collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
 import { useToast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -263,7 +263,7 @@ function TeacherGrowthView({ results, assessment }: { results: StudentResult[], 
             // Ensure no undefined values are written to Firestore
             await updateDoc(resultRef, {
                 growthFeedback: feedback.growthFeedback || "",
-                growthTeacherGuidance: feedback.teacherGuidance || "",
+                teacherGuidance: feedback.teacherGuidance || "",
                 growthCurricularRemarks: feedback.growthCurricularRemarks || "",
                 growthFeedbackForAttempts: results.length
             });

@@ -44,7 +44,7 @@ export default function TeacherDashboard() {
         
         const [assessmentsSnapshot, resultsSnapshot, studentsSnapshot] = await Promise.all([
             getDocs(assessmentsQuery),
-            getDocs(resultsSnapshot),
+            getDocs(resultsQuery),
             getDocs(allStudentsQuery),
         ]);
         
