@@ -10,7 +10,7 @@ import { ConcurrentConversationTool } from "@/app/teacher/misc/concurrent-conver
 import { VadConversationTool } from "@/app/teacher/misc/vad-conversation-tool";
 import { ParallelConversationTool } from "@/app/teacher/misc/parallel-conversation-tool";
 import { HybridConversationTool } from "@/app/teacher/misc/hybrid-conversation-tool";
-import { ReadAloudTool } from "@/components/feature-tools/read-aloud-tool";
+import { ReadAloudTool } from "@/app/teacher/misc/read-aloud-tool";
 import { HandwritingAnalyzerTool } from "@/components/feature-tools/handwriting-analyzer-tool";
 import { PresentationAnalyzerTool } from "./presentation-analyzer-tool";
 import { InteractiveTextAnalyzer } from "@/components/feature-tools/interactive-text-analyzer";

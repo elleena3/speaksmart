@@ -1,4 +1,3 @@
-
 // src/lib/firebase-client.ts
 import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
 import { getAuth, type Auth } from "firebase/auth";
@@ -55,10 +54,14 @@ if (typeof window !== 'undefined') {
 }
 
 // Ensure exports are available for server-side rendering even if initialization is skipped
-if (!app!) {
+// @ts-ignore
+if (!app) {
     app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+    // @ts-ignore
     auth = getAuth(app);
+    // @ts-ignore
     db = getFirestore(app);
+    // @ts-ignore
     storage = getStorage(app);
 }
 
