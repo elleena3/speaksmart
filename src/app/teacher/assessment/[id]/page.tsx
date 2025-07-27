@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
@@ -174,6 +173,58 @@ export default function AssessmentSubmissionsPage() {
       }
   }
 
+  const renderActionButtons = (student: EnrichedStudent) => {
+    const { result } = student;
+    if (!result) return null;
+
+    const isRetrying = retryingIds.includes(result.id);
+
+    if (result.status === "채점 완료") {
+        return (
+            <Link href={`/teacher/assessment/${assessmentId}/${student.uid}`}>
+                <Button variant="outline" size="sm">
+                    결과 보기 <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+            </Link>
+        );
+    }
+    
+    if (result.status === "오류") {
+        if (result.studentRecordingUrl) {
+             return (
+                <Button variant="outline" size="sm" onClick={() => handleRetry(result.id)} disabled={isRetrying}>
+                   {isRetrying ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <RefreshCcw className="mr-2 h-4 w-4" />}
+                   분석 재시도
+                </Button>
+           );
+        }
+    }
+
+    // For "오류" without recording URL, or any other status like "채점 중"
+    return (
+        <AlertDialog>
+            <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="sm">
+                    <Trash2 className="mr-2 h-4 w-4"/> 삭제
+                </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>기록을 삭제하시겠습니까?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        현재 상태: <Badge variant="secondary">{result.status}</Badge><br/>
+                        이 기록을 삭제하면 학생이 이 평가에 다시 응시할 수 있게 됩니다. 이 작업은 되돌릴 수 없습니다.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel>취소</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => handleDeleteResult(result.id)} className="bg-destructive hover:bg-destructive/90">삭제</AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+    );
+  };
+
 
   if (isLoading || authLoading) {
     return (
@@ -213,65 +264,29 @@ export default function AssessmentSubmissionsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {completedStudents.map(({result, ...student}) => {
-                    const isRetrying = result ? retryingIds.includes(result.id) : false;
-                    return (
-                        <TableRow key={student.uid}>
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            <Avatar className="h-9 w-9">
-                              <AvatarImage src={student.photoURL} alt={student.displayName} data-ai-hint="person portrait" />
-                              <AvatarFallback>{student.displayName.charAt(0)}</AvatarFallback>
-                            </Avatar>
-                            <span className="font-medium">{student.displayName}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={result?.status === "채점 완료" ? "default" : result?.status === "오류" ? "destructive" : "secondary"}>
-                            {result?.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{result?.contentScore ? `${result.contentScore}%` : "N/A"}</TableCell>
-                        <TableCell>{result?.createdAt ? format(new Date(result.createdAt), 'yyyy-MM-dd') : 'N/A'}</TableCell>
-                        <TableCell className="text-right">
-                           {result?.status === "채점 완료" && (
-                               <Link href={`/teacher/assessment/${assessmentId}/${student.uid}`}>
-                                <Button variant="outline" size="sm">
-                                   결과 보기 <ArrowRight className="ml-2 h-4 w-4" />
-                                </Button>
-                              </Link>
-                           )}
-                           {result?.status === "오류" && result.studentRecordingUrl && (
-                                <Button variant="outline" size="sm" onClick={() => handleRetry(result!.id)} disabled={isRetrying}>
-                                   {isRetrying ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <RefreshCcw className="mr-2 h-4 w-4" />}
-                                   분석 재시도
-                                </Button>
-                           )}
-                           {result?.status === "오류" && !result.studentRecordingUrl && (
-                                <AlertDialog>
-                                    <AlertDialogTrigger asChild>
-                                        <Button variant="destructive" size="sm">
-                                            <Trash2 className="mr-2 h-4 w-4"/> 삭제
-                                        </Button>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                        <AlertDialogHeader>
-                                            <AlertDialogTitle>오류 기록을 삭제하시겠습니까?</AlertDialogTitle>
-                                            <AlertDialogDescription>
-                                                녹음 파일이 존재하지 않아 재평가가 불가능합니다. 이 오류 기록을 삭제하면 학생이 다시 평가에 응시할 수 있습니다.
-                                            </AlertDialogDescription>
-                                        </AlertDialogHeader>
-                                        <AlertDialogFooter>
-                                            <AlertDialogCancel>취소</AlertDialogCancel>
-                                            <AlertDialogAction onClick={() => handleDeleteResult(result.id)} className="bg-destructive hover:bg-destructive/90">삭제</AlertDialogAction>
-                                        </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                </AlertDialog>
-                           )}
-                        </TableCell>
-                      </TableRow>
-                    )
-                })}
+                {completedStudents.map((student) => (
+                    <TableRow key={student.uid}>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-9 w-9">
+                          <AvatarImage src={student.photoURL} alt={student.displayName} data-ai-hint="person portrait" />
+                          <AvatarFallback>{student.displayName.charAt(0)}</AvatarFallback>
+                        </Avatar>
+                        <span className="font-medium">{student.displayName}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={student.result?.status === "채점 완료" ? "default" : student.result?.status === "오류" ? "destructive" : "secondary"}>
+                        {student.result?.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{student.result?.contentScore ? `${student.result.contentScore}%` : "N/A"}</TableCell>
+                    <TableCell>{student.result?.createdAt ? format(new Date(student.result.createdAt), 'yyyy-MM-dd') : 'N/A'}</TableCell>
+                    <TableCell className="text-right">
+                       {renderActionButtons(student)}
+                    </TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           ) : (
