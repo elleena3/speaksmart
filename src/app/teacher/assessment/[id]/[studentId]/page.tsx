@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
@@ -354,6 +353,9 @@ function TeacherGrowthView({ results, assessment }: { results: StudentResult[], 
         </CardContent>
       </Card>
     );
+    
+    // Display database value first, then fallback to local state.
+    const finalCurricularRemarks = latestResult.growthCurricularRemarks || growthFeedback?.curricularRemarks;
 
     return (
         <div className="space-y-6">
@@ -411,7 +413,7 @@ function TeacherGrowthView({ results, assessment }: { results: StudentResult[], 
                     <div className="grid md:grid-cols-2 gap-6">
                         <RemarksCard 
                             title="생활기록부 교과 특기 사항 (종합)" 
-                            content={growthFeedback?.curricularRemarks} 
+                            content={finalCurricularRemarks} 
                             onRegenerate={results.length > 1 ? handleRegenerateRemarks : undefined}
                         />
                         <RemarksCard title="교사용 AI 조언 (종합)" content={growthFeedback?.teacherGuidance} />
