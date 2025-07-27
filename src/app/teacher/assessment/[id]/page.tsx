@@ -21,12 +21,7 @@ import { retryAnalysis } from "@/ai/flows/retry-analysis-flow";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 
-type EnrichedStudent = {
-    uid: string;
-    docId?: string;
-    displayName: string;
-    email: string;
-    photoURL: string;
+type EnrichedStudent = UserData & {
     result?: StudentResult;
 };
 
@@ -271,7 +266,7 @@ export default function AssessmentSubmissionsPage() {
               </TableHeader>
               <TableBody>
                 {completedStudents.map((student) => (
-                    <TableRow key={student.uid}>
+                    <TableRow key={student.docId || student.uid}>
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <Avatar className="h-9 w-9">
@@ -321,7 +316,7 @@ export default function AssessmentSubmissionsPage() {
               </TableHeader>
               <TableBody>
                 {pendingStudents.map((student) => (
-                  <TableRow key={student.uid}>
+                  <TableRow key={student.docId || student.uid}>
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <Avatar className="h-9 w-9">
