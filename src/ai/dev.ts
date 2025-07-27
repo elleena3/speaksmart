@@ -32,10 +32,10 @@ import '@/ai/flows/extract-text-from-file.ts'; // New flow for file upload text 
 
 // New flow for the Misc page's handwriting analysis tool
 import '@/ai/flows/analyze-handwriting-flow';
+import '@/ai/flows/analyze-handwriting-submission-flow'; // New flow for Handwriting Analyzer Tool 2
 
 // New flow for growth analysis
 import '@/ai/flows/generate-growth-feedback-flow';
-import '@/ai/flows/regenerate-curricular-remarks-flow'; // New flow for regenerating remarks
 
 // New flow for retrying analysis
 import '@/ai/flows/retry-analysis-flow';

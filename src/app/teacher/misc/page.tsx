@@ -12,6 +12,7 @@ import { ParallelConversationTool } from "@/app/teacher/misc/parallel-conversati
 import { HybridConversationTool } from "@/app/teacher/misc/hybrid-conversation-tool";
 import { ReadAloudTool } from "@/app/teacher/misc/read-aloud-tool";
 import { HandwritingAnalyzerTool } from "@/components/feature-tools/handwriting-analyzer-tool";
+import { HandwritingSubmissionAnalyzerTool } from "./handwriting-submission-analyzer-tool";
 import { PresentationAnalyzerTool } from "./presentation-analyzer-tool";
 import { InteractiveTextAnalyzer } from "@/components/feature-tools/interactive-text-analyzer";
 import { SpeculativeConversationTool } from "@/components/feature-tools/speculative-conversation-tool";
@@ -74,6 +75,15 @@ export default function MiscPage() {
                     </CardHeader>
                     <CardContent>
                         <HandwritingAnalyzerTool />
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader>
+                        <CardTitle>AI 자필 분석 도구 2</CardTitle>
+                        <CardDescription>학생의 손글씨 과제(이미지/PDF)를 채점 기준(텍스트/파일)에 따라 분석하고 피드백을 생성합니다.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <HandwritingSubmissionAnalyzerTool />
                     </CardContent>
                 </Card>
                  <Card>
