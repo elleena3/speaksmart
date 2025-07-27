@@ -38,6 +38,12 @@ const AnalyzeHandwritingSubmissionOutputSchema = z.object({
 });
 export type AnalyzeHandwritingSubmissionOutput = z.infer<typeof AnalyzeHandwritingSubmissionOutputSchema>;
 
+// Define a separate schema for the prompt's input, excluding the 'model' field.
+const PromptInputSchema = AnalyzeHandwritingSubmissionInputSchema.pick({
+    studentSubmissionUri: true,
+    criteriaText: true,
+    criteriaFileUri: true,
+});
 
 export async function analyzeHandwritingSubmission(input: AnalyzeHandwritingSubmissionInput): Promise<AnalyzeHandwritingSubmissionOutput> {
   const result = await analyzeHandwritingSubmissionFlow(input);
@@ -46,7 +52,7 @@ export async function analyzeHandwritingSubmission(input: AnalyzeHandwritingSubm
 
 const handwritingSubmissionPrompt = ai.definePrompt({
     name: 'handwritingSubmissionPrompt',
-    input: { schema: AnalyzeHandwritingSubmissionInputSchema.omit({ model: true }) }, // model is used for selection, not in prompt template
+    input: { schema: PromptInputSchema }, // Use the schema without the model field
     output: { schema: AnalyzeHandwritingSubmissionOutputSchema },
     prompt: `You are an expert teacher grading a handwritten assignment. Your task is to provide detailed, constructive feedback for both the student and the teacher based on the provided submission and evaluation criteria. All feedback must be in Korean.
 
