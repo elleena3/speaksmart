@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import Link from "next/link"
-import { type TeacherAssessment, type StudentResult } from "@/lib/types"
+import { type TeacherAssessment, type StudentResult, type UserData } from "@/lib/types"
 import { CheckCircle2, MessageCircle, Mic, Loader2, AlertCircle, TrendingUp, DraftingCompass } from "lucide-react"
 import { useLanguage } from "@/context/language-context"
 import { useAuth } from "@/context/auth-context"
@@ -155,7 +155,7 @@ export default function StudentDashboard() {
         const assessmentsRef = collection(db, "assessments");
 
         // 1. Fetch assessments assigned to the specific student OR to all students
-        const qAssigned = query(assessmentsRef, where("targetStudentIds", "array-contains", user.uid));
+        const qAssigned = query(assessmentsRef, where("targetStudentIds", "array-contains", user.docId));
         const qAll = query(assessmentsRef, where("targetStudentIds", "==", "all"));
         
         const [assignedSnapshot, allSnapshot] = await Promise.all([getDocs(qAssigned), getDocs(qAll)]);
@@ -175,7 +175,7 @@ export default function StudentDashboard() {
         processSnapshot(allSnapshot);
 
         // 2. Fetch all results for this student to determine their status for each assessment
-        const resultsQuery = query(collection(db, "results"), where("studentId", "==", user.uid));
+        const resultsQuery = query(collection(db, "results"), where("studentId", "==", user.docId));
         const resultsSnapshot = await getDocs(resultsQuery);
 
         const resultsByAssessment = new Map<string, StudentResult[]>();

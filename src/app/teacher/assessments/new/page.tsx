@@ -151,8 +151,14 @@ export default function NewAssessmentPage() {
         ctx.addIssue({ code: z.ZodIssueCode.custom, message: "만화를 먼저 생성해주세요.", path: ['monologueType'] });
     }
 
-    if (data.assessmentType === 'monologue' && data.monologueType === 'text' && !data.expectedFormat && !data.useRubric) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, message: t.teacherAssessmentForm.errors.expectedFormatRequired, path: ['expectedFormat'] });
+    if (data.assessmentType === 'monologue' && data.monologueType === 'text' && !data.useRubric) {
+        if (!data.expectedFormat) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "루브릭을 사용하지 않는 경우, AI 평가를 위한 채점 기준을 필수로 입력해야 합니다.",
+            path: ['expectedFormat'],
+          });
+        }
     }
 
     if (data.targetType === 'specific' && Array.isArray(data.targetStudentIds) && data.targetStudentIds.length === 0) {
@@ -169,8 +175,8 @@ export default function NewAssessmentPage() {
     defaultValues: {
       title: "",
       topic: "",
-      prompt: "",
-      expectedFormat: "",
+      prompt: "예시) 제시된 주제와 텍스트를 읽고 자신의 생각과 근거를 정리할 2분의 준비 시간을 드립니다. 준비가 끝나면, 5분 이내로 자신의 주장을 논리적으로 발표해 주세요. 명확한 입장과 함께 최소 두 가지 이상의 구체적인 이유나 예시를 들어 설명하고, 서론-본론-결론의 구조를 갖추어 말하는 것이 좋습니다.",
+      expectedFormat: "예시) • 논리적 구조 및 일관성: 서론-본론-결론 구조의 명확성 및 주장의 일관된 유지 여부.\n• 주장에 대한 근거 제시: 제시한 주장을 뒷받침하는 이유나 예시의 구체성 및 설득력.\n• 어휘의 다양성 및 정확성: 주제와 관련된 어휘(예: automation, displacement, adaptable, creativity)의 적절하고 다채로운 사용.\n• 문장 구조의 복잡성: 단문과 복문을 혼합 사용하여 복잡한 아이디어를 표현하는 능력.\n• 담화 표지어 활용: 'First of all', 'However', 'In conclusion' 등 논리적 흐름을 보여주는 연결어의 효과적인 사용.",
       assessmentType: "monologue",
       monologueType: "text",
       targetType: "all",
@@ -439,7 +445,7 @@ export default function NewAssessmentPage() {
                                 </div>
                             </CardHeader>
                              <CardContent className="p-4 grid grid-cols-2 md:grid-cols-4 gap-4">
-                                {mockStudents.map(item => (
+                                {mockStudents.map((item) => (
                                     <FormItem key={item.uid} className="flex flex-row items-start space-x-3 space-y-0">
                                         <FormControl>
                                             <Checkbox

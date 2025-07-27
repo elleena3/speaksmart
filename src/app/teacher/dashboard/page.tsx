@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useEffect, useState, useCallback } from 'react';
@@ -9,10 +10,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { ArrowRight, Users, Loader2 } from "lucide-react"
 import Link from "next/link"
-import { type TeacherAssessment } from "@/lib/types"
+import { type TeacherAssessment, type UserData } from "@/lib/types"
 import { OverviewChart } from "./overview-chart"
 import { useLanguage } from "@/context/language-context"
-import { useAuth, mockStudents } from '@/context/auth-context';
+import { useAuth } from '@/context/auth-context';
 import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
@@ -22,8 +23,9 @@ export default function TeacherDashboard() {
   const router = useRouter();
   const [assessments, setAssessments] = useState<TeacherAssessment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [allStudents, setAllStudents] = useState<UserData[]>([]);
 
-  const fetchAssessments = useCallback(async () => {
+  const fetchDashboardData = useCallback(async () => {
     if (!user) return;
     setIsLoading(true);
 
@@ -31,7 +33,6 @@ export default function TeacherDashboard() {
         const assessmentsQuery = query(
             collection(db, "assessments"), 
             where("uid", "==", user.uid)
-            // Removed orderBy and limit to fetch all and sort client-side
         );
         
         const resultsQuery = query(
@@ -39,29 +40,33 @@ export default function TeacherDashboard() {
             where("teacherUid", "==", user.uid)
         );
 
-        const [assessmentsSnapshot, resultsSnapshot] = await Promise.all([
+        const allStudentsQuery = query(collection(db, "users"), where("role", "==", "student"));
+        
+        const [assessmentsSnapshot, resultsSnapshot, studentsSnapshot] = await Promise.all([
             getDocs(assessmentsQuery),
             getDocs(resultsQuery),
+            getDocs(allStudentsQuery),
         ]);
         
-        const assessmentsData = assessmentsSnapshot.docs.map(doc => {
-            const assessmentData = { id: doc.id, ...doc.data() } as TeacherAssessment;
-            
-            const relevantResults = resultsSnapshot.docs
-                .map(rDoc => rDoc.data())
-                .filter(r => r.assessmentId === assessmentData.id);
+        const studentList = studentsSnapshot.docs.map(doc => ({ ...doc.data(), docId: doc.id }) as UserData);
+        setAllStudents(studentList);
+        
+        const resultsByAssessment = new Map<string, Set<string>>();
+        resultsSnapshot.forEach(resultDoc => {
+            const result = resultDoc.data();
+            if (!resultsByAssessment.has(result.assessmentId)) {
+                resultsByAssessment.set(result.assessmentId, new Set());
+            }
+            resultsByAssessment.get(result.assessmentId)!.add(result.studentId);
+        });
 
-            const uniqueStudentIds = new Set(relevantResults.map(r => r.studentId));
-            
-            assessmentData.submissionCount = uniqueStudentIds.size;
-            
-            return assessmentData;
+        const assessmentsData = assessmentsSnapshot.docs.map(doc => {
+            const assessment = { id: doc.id, ...doc.data() } as TeacherAssessment;
+            assessment.submissionCount = resultsByAssessment.get(assessment.id)?.size || 0;
+            return assessment;
         });
         
-        // Sort client-side to handle missing createdAt fields
         assessmentsData.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-
-        // Limit to the 5 most recent assessments after sorting
         setAssessments(assessmentsData.slice(0, 5));
 
     } catch (error) {
@@ -77,9 +82,9 @@ export default function TeacherDashboard() {
         router.push('/');
         return;
     }
-    fetchAssessments();
+    fetchDashboardData();
 
-  }, [user, authLoading, router, fetchAssessments]);
+  }, [user, authLoading, router, fetchDashboardData]);
   
   const getTargetAudienceText = (targetStudentIds?: string[] | 'all'): string => {
     if (!targetStudentIds || targetStudentIds === 'all') {
@@ -87,7 +92,7 @@ export default function TeacherDashboard() {
     }
     if (Array.isArray(targetStudentIds)) {
       if (targetStudentIds.length === 1) {
-        const student = mockStudents.find(s => s.uid === targetStudentIds[0]);
+        const student = allStudents.find(s => s.docId === targetStudentIds[0]);
         return student ? student.displayName || '개별' : '개별';
       }
       if (targetStudentIds.length > 1) {
@@ -103,7 +108,7 @@ export default function TeacherDashboard() {
     let totalStudents = 0;
 
     if (!targetStudentIds || targetStudentIds === 'all') {
-      totalStudents = mockStudents.length;
+      totalStudents = allStudents.length;
     } else if (Array.isArray(targetStudentIds)) {
       totalStudents = targetStudentIds.length;
     }

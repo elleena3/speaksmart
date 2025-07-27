@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
@@ -10,8 +11,8 @@ import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Loader2, User, ArrowRight, CheckCircle, XCircle, RefreshCcw, Trash2 } from "lucide-react"
-import { type TeacherAssessment, type StudentResult } from "@/lib/types";
-import { useAuth, mockStudents } from "@/context/auth-context";
+import { type TeacherAssessment, type StudentResult, type UserData } from "@/lib/types";
+import { useAuth } from "@/context/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import { collection, query, where, getDocs, doc, getDoc, deleteDoc } from 'firebase/firestore';
 import { db } from "@/lib/firebase";
@@ -79,16 +80,25 @@ export default function AssessmentSubmissionsPage() {
                 resultsMap.set(result.studentId, result);
             }
         });
-
-        const targetStudents = assessmentData.targetStudentIds === 'all'
-            ? mockStudents
-            : mockStudents.filter(student => assessmentData.targetStudentIds.includes(student.uid));
+        
+        let targetStudents: UserData[];
+        if (assessmentData.targetStudentIds === 'all') {
+            const allStudentsQuery = query(collection(db, "users"), where("role", "==", "student"));
+            const studentsSnapshot = await getDocs(allStudentsQuery);
+            targetStudents = studentsSnapshot.docs.map(d => ({...d.data(), docId: d.id, uid: d.id} as UserData));
+        } else {
+            const studentPromises = assessmentData.targetStudentIds.map(id => getDoc(doc(db, "users", id)));
+            const studentDocs = await Promise.all(studentPromises);
+            targetStudents = studentDocs
+                .filter(doc => doc.exists())
+                .map(doc => ({...doc.data(), docId: doc.id, uid: doc.id} as UserData));
+        }
         
         const completed: EnrichedStudent[] = [];
         const pending: EnrichedStudent[] = [];
 
         for (const student of targetStudents) {
-            const result = resultsMap.get(student.uid);
+            const result = resultsMap.get(student.docId!);
             if (result) {
                 completed.push({ ...student, result });
             } else {

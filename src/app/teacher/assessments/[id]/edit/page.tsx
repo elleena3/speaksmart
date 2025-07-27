@@ -24,7 +24,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { scenarios, type TeacherAssessment, femaleVoices, maleVoices, allVoices, evaluationModels, voiceDescriptions, type AiVoice } from "@/lib/types";
-import { useAuth, mockStudents } from "@/context/auth-context";
+import { useAuth } from "@/context/auth-context";
 import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
@@ -434,40 +434,7 @@ export default function EditAssessmentPage() {
                         {t.teacherAssessmentForm.selectStudentsDescription}
                       </FormDescription>
                     </div>
-                    {mockStudents.map((item) => (
-                      <FormField
-                        key={item.uid}
-                        control={form.control}
-                        name="targetStudentIds"
-                        render={({ field }) => {
-                          const studentIds = Array.isArray(field.value) ? field.value : [];
-                          return (
-                            <FormItem
-                              key={item.uid}
-                              className="flex flex-row items-start space-x-3 space-y-0"
-                            >
-                              <FormControl>
-                                <Checkbox
-                                  checked={studentIds.includes(item.uid)}
-                                  onCheckedChange={(checked) => {
-                                    return checked
-                                      ? field.onChange([...studentIds, item.uid])
-                                      : field.onChange(
-                                          studentIds.filter(
-                                            (value) => value !== item.uid
-                                          )
-                                        )
-                                  }}
-                                />
-                              </FormControl>
-                              <FormLabel className="font-normal">
-                                {item.displayName} ({item.email})
-                              </FormLabel>
-                            </FormItem>
-                          )
-                        }}
-                      />
-                    ))}
+                    {/* Real student data will be fetched here in a real app */}
                     <FormMessage />
                   </FormItem>
                 )}
