@@ -1,3 +1,4 @@
+
 'use server';
 
 /**
@@ -153,44 +154,45 @@ const createPrompt = (modelName: z.infer<typeof evaluationModels[number]>) => ({
 
 IMPORTANT INSTRUCTION: Your output MUST be ONLY the HTML code, starting with <!DOCTYPE html> and ending with </html>. Do NOT include any other text, explanations, or markdown code blocks (like \`\`\`html) before or after the HTML content.
 
-### User's Speech Content:
+[사용자 발화 내용]
 {{{fullConversationTranscript}}}
 
 ### HTML Generation Requirements:
 
 #### 1. Content Structure:
--   **Main Title:** Use an `<h1>` tag for "📊 AI 영어회화 상세 분석".
--   **Category Cards:** Create a `<div>` with class "category-card" for each of the 5 analysis categories: 
+-   **Main Title:** Use an <h1> tag for "📊 AI 영어회화 상세 분석".
+-   **Category Cards:** Create a <div class="category-card"> for each of the 5 analysis categories:
     -   🗣️ 유창성 (Fluency)
     -   🎤 발음 및 억양 (Pronunciation & Intonation)
     -   ✍️ 문법 (Grammar)
     -   📚 어휘 (Vocabulary)
     -   🤝 내용 이해 및 상호작용 (Comprehension & Interaction)
--   **Card Header:** Inside each card, use an `<h2>` for the category title and a `<span>` with class "score-display" for the score (e.g., "📈 점수: 4 / 5점").
--   **Card Details:** Inside each card, below the header, create a `<div class="detail-flex-container">`. Inside this container, create two boxes:
-    -   `<div class="detail-box good-points">` for "👍 잘한 점".
-    -   `<div class="detail-box improvement-points">` for "💡 개선점".
--   **Box Content:** Each "detail-box" must have an `<h3>` for its title and a `<ul>` with `<li>` elements for the detailed feedback points.
+-   **Card Header:** Inside each card, use an <h2> for the category title and a <span> with class "score-display" for the score (e.g., "📈 점수: 4 / 5점").
+-   **Card Details:** Inside each card, below the header, create a <div class=\"detail-flex-container\">. Inside this container, create two boxes:
+    -   <div class=\"detail-box good-points\"> for "👍 잘한 점".
+    -   <div class=\"detail-box improvement-points\"> for "💡 개선점".
+-   **Box Content:** Each "detail-box" must have an <h3> for its title and a <ul> with <li> elements for the detailed feedback points.
 
-#### 2. Design & Style (MUST be inside a `<style>` tag in the `<head>`):
+#### 2. Design & Style (MUST be inside a <style> tag in the <head>):
 -   **Layout:**
-    -   Use Flexbox to arrange "잘한 점" and "개선점" boxes side-by-side (`.detail-flex-container { display: flex; }`).
-    -   Center the main content on the page with `max-width: 900px` and `margin: auto;`.
+    -   Use Flexbox to arrange "잘한 점" and "개선점" boxes side-by-side (\`.detail-flex-container { display: flex; }\`).
+    -   Center the main content on the page with \`max-width: 900px\` and \`margin: auto;\`.
 -   **Responsiveness (MANDATORY):**
-    -   Use a media query (`@media (max-width: 768px)`) to stack the "잘한 점" and "개선점" boxes vertically (`flex-direction: column;`).
+    -   Use a media query (\`@media (max-width: 768px)\`) to stack the "잘한 점" and "개선점" boxes vertically (\`flex-direction: column;\`).
 -   **Colors & Effects:**
-    -   Page background: `#f4f7f9`.
-    -   Card background: `#ffffff`.
-    -   "잘한 점" box: `background-color: #e8f5e9;`, `border-left: 5px solid #4caf50;`.
-    -   "개선점" box: `background-color: #fff3e0;`, `border-left: 5px solid #ff9800;`.
-    -   Add a `box-shadow` and `transform: translateY(-5px);` effect on `.category-card:hover`.
+    -   Page background: \`#f4f7f9\`.
+    -   Card background: \`#ffffff\`.
+    -   "잘한 점" box: \`background-color: #e8f5e9;\`, \`border-left: 5px solid #4caf50;\`.
+    -   "개선점" box: \`background-color: #fff3e0;\`, \`border-left: 5px solid #ff9800;\`.
+    -   Add a \`box-shadow\` and \`transform: translateY(-5px);\` effect on \`.category-card:hover\`.
 -   **Font:**
-    -   Set `font-family` to a standard sans-serif stack like `-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;`.
+    -   Set \`font-family\` to a standard sans-serif stack like \`-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;\`.
 -   **Technical Requirement:**
-    -   Do NOT use any external CSS libraries. All styles must be inline in the `<style>` tag.
+    -   Do NOT use any external CSS libraries. All styles must be inline in the \`<style>\` tag.
     -   Include comments in the CSS to explain style blocks.
 
-### Evaluation Rubric (Use this to determine scores and feedback for each category):
+### 평가 기준 루브릭 (Evaluation Rubric)
+아래의 평가 기준을 반드시 준수하여 각 항목을 평가하시오. 각 항목은 고유한 평가 기준을 가지며, 점수별 설명에 따라 정확하게 평가해야 합니다.
 
 [평가 항목: 유창성 (Fluency)]
 5점 (최상): 원어민과 가까운 속도와 리듬으로 매우 자연스럽게 말함.
