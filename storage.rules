@@ -1,11 +1,15 @@
+
 rules_version = '2';
 
+// See: https://firebase.google.com/docs/storage/security
 service firebase.storage {
   match /b/{bucket}/o {
-    // 모든 파일 경로에 대해 적용
+    // A more permissive rule for initial development and testing.
+    // This allows any user to read and write to Storage.
+    // For production, you should restrict access based on authentication.
+    // e.g., `allow read, write: if request.auth != null;`
     match /{allPaths=**} {
-      // 로그인한 사용자(request.auth != null)만 파일을 읽고 쓸 수 있도록 허용합니다.
-      allow read, write: if request.auth != null;
+      allow read, write: if true;
     }
   }
 }
