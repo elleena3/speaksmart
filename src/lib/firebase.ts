@@ -17,13 +17,13 @@ import { getStorage, type FirebaseStorage } from "firebase/storage";
 // 참고: 이 방식은 환경 변수(.env) 설정 문제를 해결하기 위한 가장 확실한 방법입니다.
 // ====================================================================
 export const firebaseConfig = {
-  apiKey: "AIzaSyAieUKTGnuh0f9zWJYjgYM77j4mEshxWCg",
-  authDomain: "speaksmart-evaluator2.firebaseapp.com",
-  projectId: "speaksmart-evaluator2",
-  storageBucket: "speaksmart-evaluator2.appspot.com",
-  messagingSenderId: "60227542963",
-  appId: "1:60227542963:web:f5d6c51046eb572a9c35c6",
-  measurementId: "G-M20FDF494Y",
+  apiKey: "여기에_붙여넣기",
+  authDomain: "여기에_붙여넣기",
+  projectId: "여기에_붙여넣기",
+  storageBucket: "여기에_붙여넣기",
+  messagingSenderId: "여기에_붙여넣기",
+  appId: "여기에_붙여넣기",
+  measurementId: "여기에_붙여넣기"
 };
 
 let app: FirebaseApp;
@@ -31,13 +31,21 @@ let auth: Auth;
 let db: Firestore;
 let storage: FirebaseStorage;
 
-try {
-    app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-    auth = getAuth(app);
-    db = getFirestore(app);
-    storage = getStorage(app);
-} catch (e) {
-    console.error("Firebase initialization error. Check your firebaseConfig in src/lib/firebase.ts", e);
+// 모든 필수 환경 변수가 설정되었는지 확인합니다.
+if (!firebaseConfig.apiKey || !firebaseConfig.projectId || firebaseConfig.apiKey === "여기에_붙여넣기") {
+  console.error(
+    "Firebase 설정이 src/lib/firebase.ts 파일에 올바르게 구성되지 않았습니다. Firebase 콘솔에서 값을 복사하여 붙여넣어주세요."
+  );
+} else {
+    try {
+        app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+        auth = getAuth(app);
+        db = getFirestore(app);
+        storage = getStorage(app);
+    } catch (e) {
+        console.error("Firebase initialization error:", e);
+    }
 }
+
 
 export { app, db, auth, storage };
