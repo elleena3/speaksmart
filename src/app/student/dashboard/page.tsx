@@ -69,7 +69,7 @@ function AssessmentCard({ assessment, t }: { assessment: CombinedAssessment, t: 
   
   const getButtonText = () => {
       if (displayStatus === "오류") return "다시 시도";
-      if (displayStatus === "채점 중") return "채점 현황 보기"; // This would link to the processing page if we had one
+      if (displayStatus === "채점 중") return "채점 현황 보기";
       if (displayStatus === "채점 완료") {
           return hasMultipleAttempts ? "종합 결과 보기" : t.studentDashboard.viewResults;
       }
@@ -78,16 +78,17 @@ function AssessmentCard({ assessment, t }: { assessment: CombinedAssessment, t: 
 
   const getLink = () => {
     const attemptQuery = hasMultipleAttempts ? `?attempt=${assessment.completedAttemptsCount}` : '';
-    const resultsPath = assessment.assessmentType === 'dialogue'
-      ? `/student/assessment/free-talk/results?id=${assessment.id}${attemptQuery}`
-      : `/student/assessment/${assessment.id}/results${attemptQuery}`;
-      
-    if (displayStatus === '채점 완료') return resultsPath;
     
-    // For grading, error, or to-do, link to start page
+    // For Dialogue
     if (assessment.assessmentType === 'dialogue') {
+      if (displayStatus === '채점 완료') return `/student/assessment/free-talk/results?id=${assessment.id}${attemptQuery}`;
+      if (displayStatus === '채점 중' && assessment.resultId) return `/student/assessment/free-talk/processing?id=${assessment.id}&resultId=${assessment.resultId}`;
       return `/student/assessment/free-talk?id=${assessment.id}`;
     }
+
+    // For Monologue
+    if (displayStatus === '채점 완료') return `/student/assessment/${assessment.id}/results${attemptQuery}`;
+    if (displayStatus === '채점 중' && assessment.resultId) return `/student/assessment/${assessment.id}/processing`;
     return `/student/assessment/${assessment.id}`;
   }
 
