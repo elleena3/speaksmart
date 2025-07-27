@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
@@ -181,7 +182,7 @@ export default function AssessmentSubmissionsPage() {
 
     if (result.status === "채점 완료") {
         return (
-            <Link href={`/teacher/assessment/${assessmentId}/${student.uid}`}>
+            <Link href={`/teacher/assessment/${assessmentId}/${student.docId || student.uid}`}>
                 <Button variant="outline" size="sm">
                     결과 보기 <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>

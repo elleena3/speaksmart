@@ -457,17 +457,16 @@ export default function TeacherStudentResultView() {
             }
             setAssessment({ id: assessmentSnap.id, ...assessmentSnap.data() } as TeacherAssessment);
     
-            // Fetch student data from 'users' collection instead of mock data
-            const studentQuery = query(collection(db, "users"), where("uid", "==", studentId));
-            const studentSnapshot = await getDocs(studentQuery);
+            const studentDocId = studentId;
+            const foundMockStudent = mockStudents.find(s => s.uid === studentDocId);
 
-            if (!studentSnapshot.empty) {
-                const studentData = studentSnapshot.docs[0].data() as UserData;
-                setStudent({ ...studentData, uid: studentId });
+            if (foundMockStudent) {
+                 setStudent(foundMockStudent);
             } else {
-                 const foundStudent = mockStudents.find(s => s.uid === studentId);
-                 if (foundStudent) {
-                    setStudent(foundStudent);
+                 const studentRef = doc(db, "users", studentDocId);
+                 const studentSnap = await getDoc(studentRef);
+                 if (studentSnap.exists()) {
+                     setStudent({ ...studentSnap.data(), uid: studentSnap.id, docId: studentSnap.id } as UserData);
                  } else {
                     toast({ title: "오류", description: "학생 정보를 찾을 수 없습니다.", variant: "destructive" });
                     notFound();
