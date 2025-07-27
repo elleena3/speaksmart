@@ -15,7 +15,7 @@ import { OverviewChart } from "./overview-chart"
 import { useLanguage } from "@/context/language-context"
 import { useAuth, mockStudents } from '@/context/auth-context';
 import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
-import { db } from '@/lib/firebase-client';
+import { db } from '@/lib/firebase';
 
 export default function TeacherDashboard() {
   const { t } = useLanguage();

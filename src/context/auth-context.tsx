@@ -114,6 +114,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     logout,
   }), [user, loading]);
 
+  if (typeof window === 'undefined') {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
   return (
     <AuthContext.Provider value={value}>
       {loading ? (

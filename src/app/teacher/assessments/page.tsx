@@ -18,7 +18,7 @@ import { format } from "date-fns";
 import { useLanguage } from '@/context/language-context';
 import { useAuth, mockStudents } from '@/context/auth-context';
 import { useRouter } from 'next/navigation';
-import { db } from "@/lib/firebase-client";
+import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, doc, deleteDoc, addDoc, writeBatch, orderBy } from 'firebase/firestore';
 
 export default function AssessmentsPage() {
