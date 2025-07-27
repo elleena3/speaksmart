@@ -3,13 +3,10 @@ import {googleAI} from '@genkit-ai/googleai';
 import {firebase} from '@genkit-ai/firebase';
 import { firebaseConfig } from '@/lib/firebase'; // Import from the single source of truth
 
-// Hardcoded Google AI API Key to prevent build issues.
-const GOOGLE_API_KEY = "AIzaSyAieUKTGnuh0f9zWJYjgYM77j4mEshxWCg";
-
 export const ai = genkit({
   plugins: [
     googleAI({
-      apiKey: GOOGLE_API_KEY,
+      apiKey: process.env.GOOGLE_API_KEY,
     }),
     firebase({
         firebaseConfig: firebaseConfig, // Use the same config object
