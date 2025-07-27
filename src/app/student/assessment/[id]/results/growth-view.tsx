@@ -1,5 +1,4 @@
 
-
 "use client"
 
 import { useState, useEffect, useMemo } from "react";
@@ -16,7 +15,7 @@ import { Repeat } from "lucide-react";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from "remark-gfm";
 import { doc, updateDoc, writeBatch } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firebase-client";
 import { useToast } from "@/hooks/use-toast";
 
 
@@ -127,6 +126,7 @@ export function GrowthView({ results: initialResults, assessment, defaultTab }: 
                           pronunciationScore: r.pronunciationScore ?? 0,
                           transcript: r.studentTranscript ?? "",
                           aiFeedback: r.aiFeedback ?? "",
+                          curricularRemarks: r.curricularRemarks ?? "" // 필수 필드 추가
                         }));
 
                         const feedback = await generateGrowthFeedback({
@@ -139,8 +139,8 @@ export function GrowthView({ results: initialResults, assessment, defaultTab }: 
                         await updateDoc(resultRef, {
                             growthFeedback: feedback.growthFeedback,
                             growthTeacherGuidance: feedback.teacherGuidance,
-                            curricularRemarks: feedback.curricularRemarks,
-                            growthFeedbackForAttempts: sortedResults.length
+                            growthCurricularRemarks: feedback.curricularRemarks,
+                            growthFeedbackForAttempts: sortedResults.length // 상태 저장 필드 추가
                         });
                         toast({ title: "AI 종합 분석 완료", description: "학생의 성장 과정에 대한 종합 분석이 완료되었습니다."});
 
@@ -327,3 +327,5 @@ export function GrowthView({ results: initialResults, assessment, defaultTab }: 
         </Tabs>
     );
 }
+
+    

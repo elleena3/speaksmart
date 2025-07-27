@@ -1,11 +1,10 @@
 
-
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useRouter, notFound } from "next/navigation";
 import { type TeacherAssessment, type StudentResult, type ResultSummary, type RubricScores, type UserData } from "@/lib/types";
-import { useAuth, mockStudents } from "@/context/auth-context";
+import { useAuth } from "@/context/auth-context";
 import { Loader2, User, Sparkles, TrendingUp, DraftingCompass, RefreshCw } from "lucide-react";
 import { db } from "@/lib/firebase-client";
 import { doc, getDoc, collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
@@ -239,7 +238,7 @@ function TeacherGrowthView({ results, assessment }: { results: StudentResult[], 
             setGrowthFeedback({
                 growthFeedback: latestResult.growthFeedback,
                 teacherGuidance: latestResult.growthTeacherGuidance || "",
-                growthCurricularRemarks: latestResult.growthCurricularRemarks || ""
+                curricularRemarks: latestResult.growthCurricularRemarks || ""
             });
             setIsLoadingFeedback(false);
             return;
@@ -253,19 +252,18 @@ function TeacherGrowthView({ results, assessment }: { results: StudentResult[], 
                 pronunciationScore: r.pronunciationScore ?? 0,
                 transcript: r.studentTranscript ?? "",
                 aiFeedback: r.aiFeedback ?? "",
-                curricularRemarks: r.curricularRemarks ?? "",
+                curricularRemarks: r.curricularRemarks ?? "", // 필수 필드 추가
             }));
 
             const feedback = await generateGrowthFeedback({ attempts, assessmentTitle: assessment.title });
             setGrowthFeedback(feedback);
             
             const resultRef = doc(db, "results", latestResult.id);
-            // Ensure no undefined values are written to Firestore
             await updateDoc(resultRef, {
                 growthFeedback: feedback.growthFeedback || "",
                 teacherGuidance: feedback.teacherGuidance || "",
-                growthCurricularRemarks: feedback.growthCurricularRemarks || "",
-                growthFeedbackForAttempts: results.length
+                growthCurricularRemarks: feedback.curricularRemarks || "",
+                growthFeedbackForAttempts: results.length // 상태 저장 필드 추가
             });
             toast({ title: "AI 종합 분석 완료", description: "학생의 성장 과정에 대한 종합 분석이 완료되었습니다." });
 
@@ -274,7 +272,7 @@ function TeacherGrowthView({ results, assessment }: { results: StudentResult[], 
             setGrowthFeedback({ 
                 growthFeedback: "성장 피드백 생성 중 오류 발생",
                 teacherGuidance: "교사 조언 생성 중 오류 발생",
-                growthCurricularRemarks: "생활기록부 교과 특기 사항 생성 중 오류 발생"
+                curricularRemarks: "생활기록부 교과 특기 사항 생성 중 오류 발생"
             });
             toast({ title: "오류", description: "종합 분석 생성 중 오류가 발생했습니다.", variant: "destructive" });
         } finally {
@@ -363,7 +361,7 @@ function TeacherGrowthView({ results, assessment }: { results: StudentResult[], 
                 </CardHeader>
                 <CardContent>
                     <div className="grid md:grid-cols-2 gap-6">
-                        <RemarksCard title="생활기록부 교과 특기 사항 (종합)" content={growthFeedback?.growthCurricularRemarks} />
+                        <RemarksCard title="생활기록부 교과 특기 사항 (종합)" content={growthFeedback?.curricularRemarks} />
                         <RemarksCard title="교사용 AI 조언 (종합)" content={growthFeedback?.teacherGuidance} />
                         <Card className="md:col-span-2">
                             <CardHeader><CardTitle>학생에게 제공된 AI 종합 피드백</CardTitle></CardHeader>
@@ -458,20 +456,14 @@ export default function TeacherStudentResultView() {
             setAssessment({ id: assessmentSnap.id, ...assessmentSnap.data() } as TeacherAssessment);
     
             const studentDocId = studentId;
-            const foundMockStudent = mockStudents.find(s => s.uid === studentDocId);
-
-            if (foundMockStudent) {
-                 setStudent(foundMockStudent);
+            const studentRef = doc(db, "users", studentDocId);
+            const studentSnap = await getDoc(studentRef);
+            if (studentSnap.exists()) {
+                setStudent({ ...studentSnap.data(), uid: studentSnap.id, docId: studentSnap.id } as UserData);
             } else {
-                 const studentRef = doc(db, "users", studentDocId);
-                 const studentSnap = await getDoc(studentRef);
-                 if (studentSnap.exists()) {
-                     setStudent({ ...studentSnap.data(), uid: studentSnap.id, docId: studentSnap.id } as UserData);
-                 } else {
-                    toast({ title: "오류", description: "학생 정보를 찾을 수 없습니다.", variant: "destructive" });
-                    notFound();
-                    return;
-                 }
+            toast({ title: "오류", description: "학생 정보를 찾을 수 없습니다.", variant: "destructive" });
+            notFound();
+            return;
             }
 
             await fetchStudentResults();
@@ -553,3 +545,5 @@ export default function TeacherStudentResultView() {
     </div>
   );
 }
+
+    
