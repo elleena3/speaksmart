@@ -17,9 +17,10 @@ import { ParallelConversationTool } from "@/app/teacher/misc/parallel-conversati
 import { HybridConversationTool } from "@/app/teacher/misc/hybrid-conversation-tool";
 import { ReadAloudTool } from "@/components/feature-tools/read-aloud-tool";
 import { HandwritingAnalyzerTool } from "@/components/feature-tools/handwriting-analyzer-tool";
-import { PresentationAnalyzerTool } from "@/components/feature-tools/presentation-analyzer-tool";
+import { PresentationAnalyzerTool } from "./presentation-analyzer-tool";
 import { InteractiveTextAnalyzer } from "@/components/feature-tools/interactive-text-analyzer";
 import { SpeculativeConversationTool } from "@/components/feature-tools/speculative-conversation-tool";
+import { StorageUploaderTool } from "@/components/feature-tools/storage-uploader-tool";
 
 
 export default function MiscPage() {
@@ -83,6 +84,13 @@ export default function MiscPage() {
                 <p className="text-muted-foreground">{t.teacherMisc.description}</p>
             </div>
             <div className="grid grid-cols-1 gap-6">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Storage 파일 업로더</CardTitle>
+                        <CardDescription>파일을 선택하여 Firebase Storage에 직접 업로드하는 기능입니다.</CardDescription>
+                    </CardHeader>
+                    <StorageUploaderTool />
+                </Card>
                 <Card>
                     <CardHeader>
                         <CardTitle>{t.teacherMisc.transcriberTool.title}</CardTitle>
