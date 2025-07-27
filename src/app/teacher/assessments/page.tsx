@@ -1,12 +1,13 @@
 
-"use client"
+
+"use client";
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { PlusCircle, MoreHorizontal, Copy, Users, Loader2, Trash2, DraftingCompass } from 'lucide-react';
 import Link from 'next/link';
-import { type TeacherAssessment, type UserData } from "@/lib/types";
+import { type TeacherAssessment, type UserData } from "@/lib/types"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -103,8 +104,8 @@ export default function AssessmentsPage() {
       });
 
       toast({
-        title: t.teacherAssessments.copyToast.title,
-        description: t.teacherAssessments.copyToast.description.replace('{title}', assessmentToCopy.title),
+        title: "평가 복사됨",
+        description: `'${assessmentToCopy.title}' 평가의 복사본이 생성되었습니다.`,
       });
       fetchAssessments();
     } catch (error) {
@@ -114,9 +115,6 @@ export default function AssessmentsPage() {
   };
 
   const handleCopy = (assessmentId: string) => {
-    const assessmentToCopy = assessments.find(a => a.id === assessmentId);
-    if (!assessmentToCopy) return;
-    
     document.getElementById(`copy-dialog-trigger-${assessmentId}`)?.click();
   };
 
@@ -142,11 +140,12 @@ export default function AssessmentsPage() {
 
 
   const handleDelete = async (assessmentId: string) => {
+    const assessmentToDelete = assessments.find(a => a.id === assessmentId);
     try {
         await deleteAssessmentAndResults([assessmentId]);
         toast({
-            title: t.teacherAssessments.deleteToast.title,
-            description: t.teacherAssessments.deleteToast.description,
+            title: "평가 삭제됨",
+            description: `'${assessmentToDelete?.title}' 평가 및 관련 데이터가 삭제되었습니다.`,
         });
         fetchAssessments(); 
     } catch (error) {
@@ -160,7 +159,7 @@ export default function AssessmentsPage() {
     try {
       await deleteAssessmentAndResults(selectedRowIds);
       toast({
-          title: "삭제 완료",
+          title: "선택 항목 삭제 완료",
           description: `${selectedRowIds.length}개의 평가가 성공적으로 삭제되었습니다.`,
       });
       fetchAssessments();

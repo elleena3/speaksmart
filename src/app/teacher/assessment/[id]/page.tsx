@@ -70,9 +70,11 @@ export default function AssessmentSubmissionsPage() {
         resultsSnapshot.forEach(doc => {
             const result = { id: doc.id, ...doc.data() } as StudentResult;
             
-            const existingResult = resultsMap.get(result.studentId);
+            const studentKey = result.studentId;
+            const existingResult = resultsMap.get(studentKey);
+            // Always store the newest result for each student
             if (!existingResult || (result.createdAt || 0) > (existingResult.createdAt || 0)) {
-                resultsMap.set(result.studentId, result);
+                resultsMap.set(studentKey, result);
             }
         });
         
@@ -159,11 +161,14 @@ export default function AssessmentSubmissionsPage() {
   }
 
   const handleDeleteResult = async (resultId: string) => {
+      const studentToRemove = completedStudents.find(s => s.result?.id === resultId);
       try {
         await deleteDoc(doc(db, "results", resultId));
-        toast({ title: "삭제 완료", description: "오류 기록이 삭제되었습니다. 학생은 다시 응시할 수 있습니다." });
-        // The deletion was successful, now update the local state.
-        const studentToRemove = completedStudents.find(s => s.result?.id === resultId);
+        toast({ 
+            title: "삭제 완료", 
+            description: `'${studentToRemove?.displayName}' 학생의 결과가 데이터베이스에서 영구적으로 삭제되었습니다.`
+        });
+        
         if (studentToRemove) {
             setCompletedStudents(prev => prev.filter(s => s.result?.id !== resultId));
             setPendingStudents(prev => [...prev, { ...studentToRemove, result: undefined }].sort((a,b) => (a.displayName).localeCompare(b.displayName)));
@@ -179,10 +184,11 @@ export default function AssessmentSubmissionsPage() {
     if (!result) return null;
 
     const isRetrying = retryingIds.includes(result.id);
+    const studentId = student.docId || student.uid;
 
     if (result.status === "채점 완료") {
         return (
-            <Link href={`/teacher/assessment/${assessmentId}/${student.docId || student.uid}`}>
+            <Link href={`/teacher/assessment/${assessmentId}/${studentId}`}>
                 <Button variant="outline" size="sm">
                     결과 보기 <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
