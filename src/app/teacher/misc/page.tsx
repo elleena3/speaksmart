@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useLanguage } from "@/context/language-context";
@@ -14,6 +13,7 @@ import { ReadAloudTool } from "@/app/teacher/misc/read-aloud-tool";
 import { HandwritingAnalyzerTool } from "@/components/feature-tools/handwriting-analyzer-tool";
 import { HandwritingSubmissionAnalyzerTool } from "./handwriting-submission-analyzer-tool";
 import { PresentationAnalyzerTool } from "./presentation-analyzer-tool";
+import { VideoAnalyzerTool } from "./video-analyzer-tool";
 import { InteractiveTextAnalyzer } from "@/components/feature-tools/interactive-text-analyzer";
 import { SpeculativeConversationTool } from "@/components/feature-tools/speculative-conversation-tool";
 import { StorageUploaderTool } from "@/components/feature-tools/storage-uploader-tool";
@@ -93,6 +93,15 @@ export default function MiscPage() {
                     </CardHeader>
                     <CardContent>
                         <PresentationAnalyzerTool />
+                    </CardContent>
+                </Card>
+                 <Card>
+                    <CardHeader>
+                        <CardTitle>범용 동영상 분석 도구</CardTitle>
+                        <CardDescription>동영상을 업로드하고 텍스트로 질문하여 분석 결과를 얻습니다.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <VideoAnalyzerTool />
                     </CardContent>
                 </Card>
                 <Card>
