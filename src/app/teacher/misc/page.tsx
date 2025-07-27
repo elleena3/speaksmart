@@ -82,7 +82,7 @@ export default function MiscPage() {
                 <h2 className="text-2xl font-bold tracking-tight">{t.teacherMisc.title}</h2>
                 <p className="text-muted-foreground">{t.teacherMisc.description}</p>
             </div>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 gap-6">
                 <Card>
                     <CardHeader>
                         <CardTitle>{t.teacherMisc.transcriberTool.title}</CardTitle>
