@@ -1,3 +1,4 @@
+
 // src/lib/firebase-client.ts
 import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
 import { getAuth, type Auth } from "firebase/auth";
@@ -7,12 +8,11 @@ import { getAnalytics, type Analytics, isSupported } from "firebase/analytics";
 
 // This file is for CLIENT-SIDE use only.
 
-// Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyAieUKTGnuh0f9zWJYjgYM77j4mEshxWCg",
   authDomain: "speaksmart-evaluator2.firebaseapp.com",
   projectId: "speaksmart-evaluator2",
-  storageBucket: "speaksmart-evaluator2.firebasestorage.app",
+  storageBucket: "speaksmart-evaluator2.appspot.com",
   messagingSenderId: "60227542963",
   appId: "1:60227542963:web:f5d6c51046eb572a9c35c6",
   measurementId: "G-M20FDF494Y"
@@ -26,7 +26,6 @@ let db: Firestore;
 let storage: FirebaseStorage;
 let analytics: Analytics | undefined;
 
-// 클라이언트 사이드에서만 Firebase 초기화를 수행합니다.
 if (typeof window !== 'undefined') {
     if (!getApps().length) {
         try {
@@ -53,6 +52,14 @@ if (typeof window !== 'undefined') {
             }
         });
     }
+}
+
+// Ensure exports are available for server-side rendering even if initialization is skipped
+if (!app!) {
+    app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+    auth = getAuth(app);
+    db = getFirestore(app);
+    storage = getStorage(app);
 }
 
 export { app, auth, db, storage, analytics };
