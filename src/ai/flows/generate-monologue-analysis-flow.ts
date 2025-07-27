@@ -30,9 +30,7 @@ const MonologueProcessingInputSchema = z.object({
   ),
   activityPrompt: z.string().describe('The prompt or instructions for the speaking activity.'),
   expectedFormat: z.string().describe('The expected format or key points of the response for grading.'),
-  studentId: z.string().describe('The unique ID of the student.'), // Changed from studentName
-  studentName: z.string().describe('The display name of the student.'),
-  assessmentId: z.string().describe('The ID of the assessment.'),
+  studentName: z.string().describe('The name of the student.'),
   assessmentTitle: z.string().describe('The title of the assessment.'),
   evaluationModel: z.enum(evaluationModels).optional(),
   useRubric: z.boolean().optional().describe('Whether to use the standardized rubric for evaluation.'),
@@ -253,8 +251,8 @@ export const generateMonologueAnalysisFlow = ai.defineFlow(
       // Step 1: Upload File to Storage first
       await updateDoc(resultDocRef, { status: "분석 중: upload", assessmentType: "monologue" });
       console.log("[Flow] Step 1: Uploading audio file to Storage.");
-      // Use studentId for the path to be compliant with security rules and uniqueness
-      const uploadPath = `recordings/${input.studentId}/${input.assessmentId}_${Date.now()}.webm`;
+      // Use studentName for the path as per user's existing structure.
+      const uploadPath = `recordings/${input.studentName}_${input.assessmentTitle}_${Date.now()}.webm`;
       const storageRef = ref(storage, uploadPath);
       const uploadTask = uploadString(storageRef, input.studentRecordingDataUri, 'data_url');
       
