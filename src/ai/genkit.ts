@@ -3,7 +3,7 @@
 
 import {genkit} from 'genkit';
 import {googleAI} from '@genkit-ai/googleai';
-import {firebase} from '@genkit-ai/firebase';
+import * as firebase from '@genkit-ai/firebase';
 import { firebaseConfig } from '@/lib/firebase'; 
 
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
@@ -19,7 +19,7 @@ export const ai = genkit({
     googleAI({
       apiKey: GOOGLE_API_KEY,
     }),
-    firebase({
+    firebase.firebase({
         firebaseConfig: firebaseConfig, 
         auth: {
             // When deployed to Cloud Functions, Genkit will automatically use the
