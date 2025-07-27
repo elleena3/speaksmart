@@ -107,7 +107,6 @@ export default function AssessmentResultsPage() {
 
     if (results.length > 1) {
       const attemptNumber = searchParams.get('attempt');
-      // The GrowthView component still exists but will use the old logic for now
       return <GrowthView results={results} assessment={assessment} defaultTab={`attempt-${attemptNumber || results.length}`} />;
     }
   }
