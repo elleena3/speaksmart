@@ -1,5 +1,3 @@
-
-
 'use server';
 
 /**
@@ -21,7 +19,7 @@ import {
 } from '@/lib/types/ai-schemas';
 import { evaluationModels, type RubricScores, type StudentResult } from '@/lib/types';
 import { doc, updateDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { db } from '@/lib/firebase-client';
 
 // This parsing logic is now centralized here.
 const parseScore = (text: string, category: string): number => {
@@ -151,23 +149,46 @@ const createPrompt = (modelName: z.infer<typeof evaluationModels[number]>) => ({
       name: `dialogueRubricAnalysisPrompt_${modelName.replace(/[-.]/g, '_')}`,
       model: googleAI.model(modelName),
       input: { schema: z.object({ fullConversationTranscript: z.string() }) },
-      prompt: `You are an HTML generation machine. Based on the user's speech and the provided rubric, generate a single, complete HTML file for a web-based report.
+      prompt: `You are an HTML generation machine. Your ONLY task is to create a complete, single HTML file for a web-based report based on the user's speech and the provided rubric.
 
-IMPORTANT: Your output MUST be ONLY the HTML code, starting with <!DOCTYPE html> and ending with </html>. Do NOT include any additional text, explanations, or markdown code blocks (like \`\`\`html) before or after the HTML content.
+IMPORTANT INSTRUCTION: Your output MUST be ONLY the HTML code, starting with <!DOCTYPE html> and ending with </html>. Do NOT include any other text, explanations, or markdown code blocks (like \`\`\`html) before or after the HTML content.
 
 ### User's Speech Content:
 {{{fullConversationTranscript}}}
 
 ### HTML Generation Requirements:
-1.  **Structure:** Create a standard HTML5 document.
-2.  **Content:** The page must contain a main title "📊 AI 영어회화 상세 분석". It should have 5 category cards for:
-    - 🗣️ 유창성 (Fluency)
-    - 🎤 발음 및 억양 (Pronunciation & Intonation)
-    - ✍️ 문법 (Grammar)
-    - 📚 어휘 (Vocabulary)
-    - 🤝 내용 이해 및 상호작용 (Comprehension & Interaction)
-3.  **Card Details:** Each card must display a score out of 5 (e.g., "📈 점수: 4 / 5점") and two sub-sections: "👍 잘한 점" and "💡 개선점", each with bulleted lists.
-4.  **Styling:** All CSS must be inside a <style> tag in the <head>. The layout should be responsive (flexbox for desktop, stacked on mobile below 768px). Use the specified color scheme: light gray page background, white cards, green for good points, and orange for improvement points.
+
+#### 1. Content Structure:
+-   **Main Title:** Use an `<h1>` tag for "📊 AI 영어회화 상세 분석".
+-   **Category Cards:** Create a `<div>` with class "category-card" for each of the 5 analysis categories: 
+    -   🗣️ 유창성 (Fluency)
+    -   🎤 발음 및 억양 (Pronunciation & Intonation)
+    -   ✍️ 문법 (Grammar)
+    -   📚 어휘 (Vocabulary)
+    -   🤝 내용 이해 및 상호작용 (Comprehension & Interaction)
+-   **Card Header:** Inside each card, use an `<h2>` for the category title and a `<span>` with class "score-display" for the score (e.g., "📈 점수: 4 / 5점").
+-   **Card Details:** Inside each card, below the header, create a `<div class="detail-flex-container">`. Inside this container, create two boxes:
+    -   `<div class="detail-box good-points">` for "👍 잘한 점".
+    -   `<div class="detail-box improvement-points">` for "💡 개선점".
+-   **Box Content:** Each "detail-box" must have an `<h3>` for its title and a `<ul>` with `<li>` elements for the detailed feedback points.
+
+#### 2. Design & Style (MUST be inside a `<style>` tag in the `<head>`):
+-   **Layout:**
+    -   Use Flexbox to arrange "잘한 점" and "개선점" boxes side-by-side (`.detail-flex-container { display: flex; }`).
+    -   Center the main content on the page with `max-width: 900px` and `margin: auto;`.
+-   **Responsiveness (MANDATORY):**
+    -   Use a media query (`@media (max-width: 768px)`) to stack the "잘한 점" and "개선점" boxes vertically (`flex-direction: column;`).
+-   **Colors & Effects:**
+    -   Page background: `#f4f7f9`.
+    -   Card background: `#ffffff`.
+    -   "잘한 점" box: `background-color: #e8f5e9;`, `border-left: 5px solid #4caf50;`.
+    -   "개선점" box: `background-color: #fff3e0;`, `border-left: 5px solid #ff9800;`.
+    -   Add a `box-shadow` and `transform: translateY(-5px);` effect on `.category-card:hover`.
+-   **Font:**
+    -   Set `font-family` to a standard sans-serif stack like `-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;`.
+-   **Technical Requirement:**
+    -   Do NOT use any external CSS libraries. All styles must be inline in the `<style>` tag.
+    -   Include comments in the CSS to explain style blocks.
 
 ### Evaluation Rubric (Use this to determine scores and feedback for each category):
 
@@ -206,7 +227,8 @@ IMPORTANT: Your output MUST be ONLY the HTML code, starting with <!DOCTYPE html>
 2점 (하): 아주 간단한 질문만 이해하고, 대화에 거의 참여하지 못함.
 1점 (최하): 상대방의 말을 거의 이해하지 못함.
 
-Now, generate the HTML code.`,
+Now, generate the HTML code.
+`,
     }),
 });
 
