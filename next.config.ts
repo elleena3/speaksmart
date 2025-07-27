@@ -1,4 +1,3 @@
-
 import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
@@ -17,19 +16,11 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'firebasestorage.googleapis.com',
+      }
     ],
-  },
-  webpack: (config, { isServer }) => {
-    // 'async_hooks' is a Node.js-specific module. This tells webpack to ignore it
-    // when building for the browser environment.
-    if (!isServer) {
-      config.resolve.fallback = {
-        ...config.resolve.fallback,
-        async_hooks: false,
-      };
-    }
-
-    return config;
   },
 };
 

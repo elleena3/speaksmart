@@ -37,17 +37,17 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 const promptExamples = [
   {
     prompt: "공원 벤치에 앉아 책을 읽고 있는 할머니, 따뜻한 색감의 수채화 스타일",
-    image: "https://placehold.co/400x400.png",
+    image: "https://firebasestorage.googleapis.com/v0/b/speaksmart-evaluator2.firebasestorage.app/o/image%2FGemini_Generated_Image_tegrq6teg.png?alt=media&token=def04b4c-2d30-4194-9e40-871caf273954",
     hint: "grandmother reading park",
   },
   {
     prompt: "로켓을 타고 달로 날아가는 우주비행사, 뒤에는 지구가 보인다, 단순한 만화 스타일",
-    image: "https://placehold.co/400x400.png",
+    image: "https://firebasestorage.googleapis.com/v0/b/speaksmart-evaluator2.firebasestorage.app/o/image%2FGemini_Generated_Image_unh72munh.png?alt=media&token=8bd0265c-3afe-46e5-80d0-d8d8fbe748b2",
     hint: "astronaut rocket moon",
   },
   {
     prompt: "산 정상에서 일출을 보고 있는 등산객의 뒷모습, 장엄한 풍경, 사실적인 사진 스타일",
-    image: "https://placehold.co/400x400.png",
+    image: "https://firebasestorage.googleapis.com/v0/b/speaksmart-evaluator2.firebasestorage.app/o/image%2FGemini_Generated_Image_96vqrp96v.png?alt=media&token=1e48e934-2bc5-4e29-b199-9f8e96b2c2eb",
     hint: "hiker sunrise mountain",
   },
 ];
