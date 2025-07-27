@@ -12,8 +12,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, CalendarIcon, ChevronsUpDown, Check, Info } from "lucide-react";
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { Loader2, CalendarIcon, ChevronsUpDown, Check, Info, Edit, Users } from "lucide-react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
@@ -23,10 +23,52 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { scenarios, type TeacherAssessment, femaleVoices, maleVoices, allVoices, evaluationModels, voiceDescriptions, type AiVoice } from "@/lib/types";
-import { useAuth } from "@/context/auth-context";
-import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { scenarios, type TeacherAssessment, femaleVoices, maleVoices, allVoices, evaluationModels, voiceDescriptions, type AiVoice, type UserData } from "@/lib/types";
+import { useAuth, mockStudents } from "@/context/auth-context";
+import { doc, getDoc, updateDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { Label } from "@/components/ui/label";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+
+
+function FilterCombobox({ label, options, value, onSelect }: { label: string, options: string[], value: string, onSelect: (value: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const displayValue = value === 'all' ? `모든 ${label}` : `${value}${label.endsWith('반') ? '반' : '학년'}`;
+  
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" role="combobox" aria-expanded={open} className="w-[120px] justify-between">
+          {displayValue}
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[120px] p-0">
+        <Command>
+          <CommandList>
+            <CommandEmpty>결과 없음.</CommandEmpty>
+            <CommandGroup>
+              {options.map(option => (
+                <CommandItem
+                  key={option}
+                  value={option}
+                  onSelect={(currentValue) => {
+                    onSelect(currentValue === value ? value : currentValue);
+                    setOpen(false);
+                  }}
+                >
+                  <Check className={`mr-2 h-4 w-4 ${value === option ? 'opacity-100' : 'opacity-0'}`} />
+                  {option === 'all' ? `모든 ${label}` : option}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 
 export default function EditAssessmentPage() {
   const router = useRouter();
@@ -37,6 +79,10 @@ export default function EditAssessmentPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [voicePopoverOpen, setVoicePopoverOpen] = useState(false);
+  
+  const [realStudents, setRealStudents] = useState<UserData[]>([]);
+  const [isStudentListLoading, setIsStudentListLoading] = useState(true);
+  const [studentFilter, setStudentFilter] = useState<{ grade: string, class: string }>({ grade: 'all', class: 'all' });
 
   const assessmentId = Array.isArray(params.id) ? params.id[0] : params.id;
   
@@ -107,11 +153,11 @@ export default function EditAssessmentPage() {
   const isFreeTalkDialogue = assessmentType === 'dialogue' && scenario === 'free-talk';
   const useRubric = form.watch("useRubric");
 
-  const fetchAssessment = useCallback(async () => {
+  const fetchAssessmentAndStudents = useCallback(async () => {
     if (!user || !assessmentId) return;
 
     if (!db) {
-      toast({ title: "오류", description: "Firebase가 설정되지 않아 평가를 불러올 수 없습니다.", variant: "destructive" });
+      toast({ title: "오류", description: "Firebase가 설정되지 않아 데이터를 불러올 수 없습니다.", variant: "destructive" });
       setIsLoading(false);
       return;
     }
@@ -127,6 +173,7 @@ export default function EditAssessmentPage() {
               startDate: data.startDate ? new Date(data.startDate) : undefined,
               endDate: data.endDate ? new Date(data.endDate) : undefined,
               targetType: Array.isArray(data.targetStudentIds) ? 'specific' : 'all',
+              targetStudentIds: data.targetStudentIds,
               aiVoice: data.aiVoice || 'algenib',
               evaluationModel: data.evaluationModel || 'gemini-2.5-pro',
               useRubric: data.useRubric || false,
@@ -134,7 +181,17 @@ export default function EditAssessmentPage() {
         } else {
             toast({ title: "오류", description: "평가를 찾을 수 없거나 수정할 권한이 없습니다.", variant: "destructive" });
             router.push("/teacher/assessments");
+            return;
         }
+
+        // Fetch students
+        setIsStudentListLoading(true);
+        const q = query(collection(db, "users"), where("role", "==", "student"));
+        const querySnapshot = await getDocs(q);
+        const studentList = querySnapshot.docs.map(doc => ({ ...doc.data(), docId: doc.id }) as UserData);
+        setRealStudents(studentList);
+        setIsStudentListLoading(false);
+
     } catch (error) {
         toast({ title: "오류", description: "평가 정보를 불러오는 데 실패했습니다.", variant: "destructive" });
         console.error("Error fetching assessment:", error);
@@ -148,14 +205,52 @@ export default function EditAssessmentPage() {
       if (!user) {
         router.push('/');
       } else {
-        fetchAssessment();
+        fetchAssessmentAndStudents();
       }
     }
-  }, [user, authLoading, router, fetchAssessment]);
+  }, [user, authLoading, router, fetchAssessmentAndStudents]);
 
   useEffect(() => {
     form.trigger();
   }, [language, form]);
+
+  const uniqueGrades = useMemo(() => ['all', ...Array.from(new Set(realStudents.map(s => s.grade || ''))).filter(g => g)], [realStudents]);
+  const uniqueClasses = useMemo(() => ['all', ...Array.from(new Set(realStudents.filter(s => studentFilter.grade === 'all' || s.grade === studentFilter.grade).map(s => s.class || ''))).filter(c => c)], [realStudents, studentFilter.grade]);
+
+  const filteredRealStudents = useMemo(() => {
+    return realStudents.filter(student => {
+      const gradeMatch = studentFilter.grade === 'all' || student.grade === studentFilter.grade;
+      const classMatch = studentFilter.class === 'all' || student.class === studentFilter.class;
+      return gradeMatch && classMatch;
+    });
+  }, [realStudents, studentFilter]);
+
+   const handleSelectAll = (studentsToSelect: UserData[], field: any) => {
+    const currentSelection = new Set(Array.isArray(field.value) ? field.value : []);
+    const allIds = new Set(studentsToSelect.map(s => s.docId!));
+    const areAllSelected = studentsToSelect.every(s => currentSelection.has(s.docId!));
+
+    if (areAllSelected) {
+        studentsToSelect.forEach(s => currentSelection.delete(s.docId!));
+    } else {
+        studentsToSelect.forEach(s => currentSelection.add(s.docId!));
+    }
+    field.onChange(Array.from(currentSelection));
+  };
+  
+  const handleSelectAllMock = (field: any) => {
+     const currentSelection = new Set(Array.isArray(field.value) ? field.value : []);
+     const allMockIds = new Set(mockStudents.map(s => s.uid));
+     const areAllSelected = mockStudents.every(s => currentSelection.has(s.uid));
+     
+     if(areAllSelected) {
+         mockStudents.forEach(s => currentSelection.delete(s.uid));
+     } else {
+         mockStudents.forEach(s => currentSelection.add(s.uid));
+     }
+     field.onChange(Array.from(currentSelection));
+  }
+
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     if (!user || !assessmentId || !db) return;
@@ -236,8 +331,139 @@ export default function EditAssessmentPage() {
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <FormField
+                control={form.control}
+                name="targetType"
+                render={({ field }) => (
+                  <FormItem className="space-y-3">
+                    <FormLabel>{t.teacherAssessmentForm.targetLabel}</FormLabel>
+                    <FormControl>
+                      <RadioGroup
+                        onValueChange={(value) => {
+                            field.onChange(value);
+                            if (value === 'all') {
+                                form.setValue('targetStudentIds', 'all');
+                            } else {
+                                const currentSelection = form.getValues('targetStudentIds');
+                                if (currentSelection === 'all') {
+                                    form.setValue('targetStudentIds', []);
+                                }
+                            }
+                        }}
+                        value={field.value}
+                        className="flex items-center space-x-4"
+                      >
+                        <FormItem className="flex items-center space-x-2 space-y-0">
+                          <FormControl><RadioGroupItem value="all" /></FormControl>
+                          <FormLabel className="font-normal">{t.teacherAssessmentForm.targetAll}</FormLabel>
+                        </FormItem>
+                        <FormItem className="flex items-center space-x-2 space-y-0">
+                          <FormControl><RadioGroupItem value="specific" /></FormControl>
+                          <FormLabel className="font-normal">{t.teacherAssessmentForm.targetSpecific}</FormLabel>
+                        </FormItem>
+                      </RadioGroup>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+            {targetType === 'specific' && (
               <FormField
+                control={form.control}
+                name="targetStudentIds"
+                render={({ field }) => (
+                  <FormItem>
+                    <div className="mb-4">
+                      <FormLabel className="text-base">{t.teacherAssessmentForm.selectStudentsLabel}</FormLabel>
+                      <FormDescription>{t.teacherAssessmentForm.selectStudentsDescription}</FormDescription>
+                    </div>
+                     <div className="space-y-4">
+                        <Card>
+                            <CardHeader className="flex flex-row items-center justify-between p-4">
+                                <CardTitle className="text-lg flex items-center gap-2"><Edit className="h-5 w-5"/>목업 계정</CardTitle>
+                                <div className="flex items-center space-x-2">
+                                    <Label htmlFor="select-all-mock">전체 선택</Label>
+                                    <Checkbox
+                                        id="select-all-mock"
+                                        onCheckedChange={() => handleSelectAllMock(field)}
+                                        checked={Array.isArray(field.value) && mockStudents.every(s => field.value.includes(s.uid))}
+                                    />
+                                </div>
+                            </CardHeader>
+                             <CardContent className="p-4 grid grid-cols-2 md:grid-cols-4 gap-4">
+                                {mockStudents.map((item) => (
+                                    <FormItem key={item.uid} className="flex flex-row items-start space-x-3 space-y-0">
+                                        <FormControl>
+                                            <Checkbox
+                                                checked={Array.isArray(field.value) && field.value.includes(item.uid)}
+                                                onCheckedChange={(checked) => {
+                                                    const currentSelection = new Set(Array.isArray(field.value) ? field.value : []);
+                                                    if(checked) {
+                                                        currentSelection.add(item.uid);
+                                                    } else {
+                                                        currentSelection.delete(item.uid);
+                                                    }
+                                                    field.onChange(Array.from(currentSelection));
+                                                }}
+                                            />
+                                        </FormControl>
+                                        <FormLabel className="font-normal">{item.displayName}</FormLabel>
+                                    </FormItem>
+                                ))}
+                            </CardContent>
+                        </Card>
+                        <Card>
+                           <CardHeader className="flex flex-row items-center justify-between p-4">
+                              <CardTitle className="text-lg flex items-center gap-2"><Users className="h-5 w-5"/>가입한 학생</CardTitle>
+                              <div className="flex items-center gap-2">
+                                <FilterCombobox label="학년" options={uniqueGrades} value={studentFilter.grade} onSelect={(value) => setStudentFilter({ grade: value, class: 'all' })} />
+                                <FilterCombobox label="반" options={uniqueClasses} value={studentFilter.class} onSelect={(value) => setStudentFilter({ ...studentFilter, class: value })} />
+                                <div className="flex items-center space-x-2">
+                                    <Label htmlFor="select-all-real">전체 선택</Label>
+                                    <Checkbox
+                                        id="select-all-real"
+                                        onCheckedChange={() => handleSelectAll(filteredRealStudents, field)}
+                                        checked={Array.isArray(field.value) && filteredRealStudents.length > 0 && filteredRealStudents.every(s => field.value.includes(s.docId!))}
+                                    />
+                                </div>
+                              </div>
+                           </CardHeader>
+                           <CardContent className="p-4 grid grid-cols-2 md:grid-cols-4 gap-4">
+                               {isStudentListLoading ? <Loader2 className="animate-spin"/> :
+                               filteredRealStudents.length > 0 ? (
+                                   filteredRealStudents.map((item) => (
+                                    <FormItem key={item.docId}>
+                                        <div className="flex flex-row items-start space-x-3 space-y-0">
+                                            <FormControl>
+                                                <Checkbox
+                                                    checked={Array.isArray(field.value) && field.value.includes(item.docId!)}
+                                                    onCheckedChange={(checked) => {
+                                                        const currentSelection = new Set(Array.isArray(field.value) ? field.value : []);
+                                                        if (checked) {
+                                                            currentSelection.add(item.docId!);
+                                                        } else {
+                                                            currentSelection.delete(item.docId!);
+                                                        }
+                                                        field.onChange(Array.from(currentSelection));
+                                                    }}
+                                                />
+                                            </FormControl>
+                                            <FormLabel className="font-normal">{item.displayName}</FormLabel>
+                                        </div>
+                                    </FormItem>
+                                    ))
+                               ) : <p className="text-sm text-muted-foreground col-span-full text-center">해당 조건의 학생이 없습니다.</p>}
+                           </CardContent>
+                        </Card>
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
+            <FormField
                 control={form.control}
                 name="assessmentType"
                 render={({ field }) => (
@@ -272,49 +498,6 @@ export default function EditAssessmentPage() {
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="targetType"
-                render={({ field }) => (
-                  <FormItem className="space-y-3">
-                    <FormLabel>{t.teacherAssessmentForm.targetLabel}</FormLabel>
-                    <FormControl>
-                      <RadioGroup
-                        onValueChange={(value) => {
-                            field.onChange(value);
-                            if (value === 'all') {
-                                form.setValue('targetStudentIds', 'all');
-                            } else {
-                                form.setValue('targetStudentIds', []);
-                            }
-                        }}
-                        value={field.value}
-                        className="flex flex-col space-y-1"
-                      >
-                        <FormItem className="flex items-center space-x-3 space-y-0">
-                          <FormControl>
-                            <RadioGroupItem value="all" />
-                          </FormControl>
-                          <FormLabel className="font-normal">
-                            {t.teacherAssessmentForm.targetAll}
-                          </FormLabel>
-                        </FormItem>
-                        <FormItem className="flex items-center space-x-3 space-y-0">
-                          <FormControl>
-                            <RadioGroupItem value="specific" />
-                          </FormControl>
-                          <FormLabel className="font-normal">
-                            {t.teacherAssessmentForm.targetSpecific}
-                          </FormLabel>
-                        </FormItem>
-                      </RadioGroup>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-            
             {assessmentType === 'dialogue' && (
               <FormField
                 control={form.control}
@@ -421,26 +604,6 @@ export default function EditAssessmentPage() {
                 </FormItem>
               )}
             />
-
-            {targetType === 'specific' && (
-              <FormField
-                control={form.control}
-                name="targetStudentIds"
-                render={() => (
-                  <FormItem>
-                    <div className="mb-4">
-                      <FormLabel className="text-base">{t.teacherAssessmentForm.selectStudentsLabel}</FormLabel>
-                      <FormDescription>
-                        {t.teacherAssessmentForm.selectStudentsDescription}
-                      </FormDescription>
-                    </div>
-                    {/* Real student data will be fetched here in a real app */}
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
-
 
             {assessmentType === 'dialogue' && (
                <FormField
