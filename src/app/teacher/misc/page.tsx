@@ -1,13 +1,8 @@
 
 "use client"
 
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { KeyRound, AlertTriangle } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { useLanguage } from "@/context/language-context";
-
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { TranscriberTool } from "@/components/feature-tools/transcriber-tool";
 import { PronunciationAnalyzerTool } from "@/components/feature-tools/pronunciation-analyzer-tool";
 import { RealtimeConversationTool } from "@/app/teacher/misc/realtime-conversation-tool";
@@ -25,57 +20,6 @@ import { StorageUploaderTool } from "@/components/feature-tools/storage-uploader
 
 export default function MiscPage() {
     const { t } = useLanguage();
-    const [isAuthenticated, setIsAuthenticated] = useState(false);
-    const [password, setPassword] = useState('');
-    const [error, setError] = useState('');
-
-    const handleLogin = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (password === '2918') {
-            setIsAuthenticated(true);
-            setError('');
-        } else {
-            setError(t.teacherMisc.incorrectPasswordError);
-            setPassword('');
-        }
-    };
-
-    if (!isAuthenticated) {
-        return (
-            <div className="flex items-center justify-center min-h-[50vh]">
-                <Card className="w-full max-w-sm">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                           <KeyRound className="h-6 w-6"/> {t.teacherMisc.accessTitle}
-                        </CardTitle>
-                        <CardDescription>
-                            {t.teacherMisc.accessDescription}
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <form onSubmit={handleLogin} className="space-y-4">
-                            <Input
-                                type="password"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                placeholder={t.teacherMisc.passwordPlaceholder}
-                                autoFocus
-                            />
-                            {error && (
-                                <div className="flex items-center text-sm font-medium text-destructive">
-                                    <AlertTriangle className="h-4 w-4 mr-2" />
-                                    {error}
-                                </div>
-                            )}
-                            <Button type="submit" className="w-full">
-                                {t.teacherMisc.confirmButton}
-                            </Button>
-                        </form>
-                    </CardContent>
-                </Card>
-            </div>
-        );
-    }
 
     return (
         <div className="space-y-6">
