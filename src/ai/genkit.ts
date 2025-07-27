@@ -1,4 +1,6 @@
 
+'use server';
+
 import {genkit} from 'genkit';
 import {googleAI} from '@genkit-ai/googleai';
 import {firebase} from '@genkit-ai/firebase';
@@ -15,7 +17,7 @@ if (!GOOGLE_API_KEY) {
 export const ai = genkit({
   plugins: [
     googleAI({
-      apiKey: firebaseConfig.apiKey,
+      apiKey: GOOGLE_API_KEY,
     }),
     firebase({
         firebaseConfig: firebaseConfig, 
