@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo } from 'react';
@@ -44,16 +45,8 @@ export function VideoAnalyzerTool() {
     };
 
     const handleAnalyze = async () => {
-        if (!videoFile) {
-            toast({ title: "동영상 파일 없음", description: "분석할 동영상 파일을 먼저 업로드해주세요.", variant: "destructive" });
-            return;
-        }
-        if (!prompt.trim()) {
-            toast({ title: "요구사항 없음", description: "AI에게 요청할 내용을 입력해주세요.", variant: "destructive" });
-            return;
-        }
-        if (!user) {
-            toast({ title: "로그인 필요", description: "파일을 업로드하려면 로그인이 필요합니다.", variant: "destructive" });
+        if (!videoFile || !prompt.trim() || !user) {
+            toast({ title: "정보 부족", description: "동영상 파일과 분석 요구사항을 모두 입력하고 로그인했는지 확인해주세요.", variant: "destructive" });
             return;
         }
 
@@ -79,15 +72,15 @@ export function VideoAnalyzerTool() {
             },
             async () => {
                 try {
-                    const bucket = uploadTask.snapshot.ref.bucket;
-                    const gcsUri = `gs://${bucket}/${filePath}`;
-                    
                     setAnalysisState('analyzing');
                     toast({ title: "업로드 완료, 분석 시작", description: "AI가 동영상을 분석하고 있습니다." });
 
+                    const bucket = uploadTask.snapshot.ref.bucket;
+                    const gcsUri = `gs://${bucket}/${filePath}`;
+                    
                     const result = await analyzeVideo({
                         gcsUri,
-                        mimeType: videoFile.type, // Pass the correct MIME type
+                        mimeType: videoFile.type,
                         prompt
                     });
                     
