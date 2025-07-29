@@ -54,15 +54,25 @@ const summarizeYoutubeVideoFlow = ai.defineFlow(
     outputSchema: SummarizeYoutubeVideoOutputSchema,
   },
   async ({ youtubeUrl }) => {
+    let transcript_parts;
     try {
         console.log(`Fetching transcript for: ${youtubeUrl}`);
         // Fetch the transcript
-        const transcript_parts = await YoutubeTranscript.fetchTranscript(youtubeUrl);
-        
-        if (!transcript_parts || transcript_parts.length === 0) {
-            throw new Error("자막을 찾을 수 없거나, 해당 영상은 자막을 지원하지 않습니다.");
-        }
+        transcript_parts = await YoutubeTranscript.fetchTranscript(youtubeUrl);
+    } catch (error: any) {
+         // Catch errors from the library itself (e.g., video not found, subtitles disabled)
+         console.error("An error occurred during transcript fetch:", error);
+         if (error.message.includes('subtitles are disabled') || error.message.includes('No transcripts are available')) {
+             throw new Error("해당 영상의 자막이 비활성화되어 있거나, 지원하지 않아 요약할 수 없습니다.");
+         }
+         throw new Error("자막을 가져오는 중 오류가 발생했습니다: " + error.message);
+    }
 
+    if (!transcript_parts || transcript_parts.length === 0) {
+        throw new Error("자막을 찾을 수 없거나, 해당 영상은 자막을 지원하지 않습니다.");
+    }
+    
+    try {
         // Concatenate the transcript parts into a single string
         const transcript = transcript_parts.map(part => part.text).join(' ');
 
@@ -77,15 +87,7 @@ const summarizeYoutubeVideoFlow = ai.defineFlow(
         return output;
 
     } catch (error: any) {
-        console.error("An error occurred in summarizeYoutubeVideoFlow:", error);
-        
-        if (error.message.includes('subtitles are disabled')) {
-            throw new Error("해당 영상의 자막이 비활성화되어 있어 요약할 수 없습니다.");
-        }
-        if (error.message.includes('No transcripts are available')) {
-            throw new Error("이 영상에는 사용 가능한 자막이 없습니다.");
-        }
-
+        console.error("An error occurred in summarizeYoutubeVideoFlow during AI processing:", error);
         throw new Error(error.message || "유튜브 영상 요약 중 알 수 없는 오류가 발생했습니다.");
     }
   }
