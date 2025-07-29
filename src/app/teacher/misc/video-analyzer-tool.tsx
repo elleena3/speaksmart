@@ -74,12 +74,11 @@ export function VideoAnalyzerTool() {
                 try {
                     setAnalysisState('analyzing');
                     toast({ title: "업로드 완료, AI 분석 시작", description: "AI가 동영상을 분석하고 있습니다. 시간이 소요될 수 있습니다." });
-
-                    const bucket = uploadTask.snapshot.ref.bucket;
-                    const gcsUri = `gs://${bucket}/${filePath}`;
                     
+                    const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
+
                     const result = await analyzeVideo({
-                        gcsUri,
+                        gcsUri: downloadUrl, // Pass the public HTTPS URL
                         mimeType: videoFile.type,
                         prompt
                     });
