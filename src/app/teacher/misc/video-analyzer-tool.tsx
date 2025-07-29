@@ -110,15 +110,15 @@ export function VideoAnalyzerTool() {
       async () => {
         try {
           setAnalysisState("analyzing");
-          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-
+          
           toast({
             title: "업로드 완료, AI 분석 시작",
             description: "AI가 동영상을 분석하고 있습니다. 시간이 소요될 수 있습니다.",
           });
 
+          // Pass the file path and mimeType to the flow instead of the URL
           const result = await analyzeVideo({
-            gcsUri: downloadURL,
+            filePath: filePath, // The path in the bucket
             mimeType: videoFile.type,
             prompt,
           });
