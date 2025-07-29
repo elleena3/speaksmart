@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useMemo } from 'react';
@@ -87,7 +86,7 @@ export function VideoAnalyzerTool() {
                     toast({ title: "업로드 완료, 분석 시작", description: "AI가 동영상을 분석하고 있습니다." });
 
                     const result = await analyzeVideo({
-                        videoUri: gcsUri,
+                        gcsUri,
                         prompt
                     });
                     

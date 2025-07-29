@@ -11,9 +11,9 @@ import { ai } from '@/ai/genkit';
 import { googleAI } from '@genkit-ai/googleai';
 import { z } from 'zod';
 
-// The input now expects a direct GCS URI to the file, not a data URI or HTTPS URL.
+// The input now expects a direct GCS URI to the file, not a data URI.
 const AnalyzeVideoInputSchema = z.object({
-  videoUri: z.string().regex(/^gs:\/\//, "A direct Google Cloud Storage URI is required (gs://...).").describe(
+  gcsUri: z.string().regex(/^gs:\/\//, "A direct Google Cloud Storage URI is required (gs://...).").describe(
     "A direct Google Cloud Storage URI to a video file. (e.g., gs://bucket-name/path/to/video.mp4)"
   ),
   prompt: z.string().describe(
@@ -35,7 +35,7 @@ export async function analyzeVideo(input: AnalyzeVideoInput): Promise<AnalyzeVid
 
 const videoAnalysisPrompt = ai.definePrompt({
     name: 'videoAnalysisPrompt',
-    model: googleAI.model('gemini-2.5-pro'),
+    model: googleAI.model('gemini-1.0-pro-vision-001'), // Corrected to use a vision-capable model
     input: { schema: AnalyzeVideoInputSchema },
     output: { schema: AnalyzeVideoOutputSchema },
     prompt: `You are an expert video analyst. Analyze the provided video file based on the user's specific request. Provide a detailed, text-based response that directly addresses the user's prompt.
@@ -44,7 +44,7 @@ const videoAnalysisPrompt = ai.definePrompt({
 "{{{prompt}}}"
 
 ### Video for Analysis:
-{{media url=videoUri}}
+{{media url=gcsUri}}
 
 Please provide your analysis now.
 `,
