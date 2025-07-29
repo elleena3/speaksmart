@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * @fileOverview A flow to summarize a YouTube video.
@@ -55,14 +54,13 @@ const summarizeYoutubeVideoFlow = ai.defineFlow(
     outputSchema: SummarizeYoutubeVideoOutputSchema,
   },
   async ({ youtubeUrl }) => {
-    let transcript_parts;
     try {
         console.log(`Fetching transcript for: ${youtubeUrl}`);
-        // Attempt to fetch the transcript
-        transcript_parts = await YoutubeTranscript.fetchTranscript(youtubeUrl);
+        // Attempt to fetch the transcript. This can throw an error or return an empty array.
+        const transcript_parts = await YoutubeTranscript.fetchTranscript(youtubeUrl);
         
+        // This case handles videos that have a transcript track but it's empty.
         if (!transcript_parts || transcript_parts.length === 0) {
-            // This case handles videos with no subtitles available at all.
              return {
                 summary: "### 요약 실패\n\n이 영상은 자막을 지원하지 않거나, 자막이 비어 있어 내용을 요약할 수 없습니다. 다른 영상을 시도해주세요."
             };
@@ -82,7 +80,8 @@ const summarizeYoutubeVideoFlow = ai.defineFlow(
     } catch (error: any) {
         console.error("An error occurred in summarizeYoutubeVideoFlow:", error);
 
-        // This block now specifically catches errors from the library, like when subtitles are disabled.
+        // This block now specifically catches errors from the library, 
+        // like when subtitles are disabled, or the video is unavailable.
         if (error.message.includes('subtitles are disabled') || error.message.includes('No transcripts are available')) {
              return {
                 summary: "### 요약 실패\n\n이 영상은 자막 기능이 비활성화되어 있어 내용을 요약할 수 없습니다. 다른 영상을 시도해주세요."
