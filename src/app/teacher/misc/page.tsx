@@ -17,6 +17,7 @@ import { VideoAnalyzerTool } from "./video-analyzer-tool";
 import { InteractiveTextAnalyzer } from "@/components/feature-tools/interactive-text-analyzer";
 import { SpeculativeConversationTool } from "@/components/feature-tools/speculative-conversation-tool";
 import { StorageUploaderTool } from "@/components/feature-tools/storage-uploader-tool";
+import { YoutubeSummarizerTool } from "./youtube-summarizer-tool";
 
 
 export default function MiscPage() {
@@ -29,6 +30,13 @@ export default function MiscPage() {
                 <p className="text-muted-foreground">{t.teacherMisc.description}</p>
             </div>
             <div className="grid grid-cols-1 gap-6">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>유튜브 요약 도구</CardTitle>
+                        <CardDescription>유튜브 동영상 링크를 입력하면 AI가 내용을 요약하고 핵심 포인트를 정리합니다.</CardDescription>
+                    </CardHeader>
+                    <YoutubeSummarizerTool />
+                </Card>
                 <Card>
                     <CardHeader>
                         <CardTitle>Storage 파일 업로더</CardTitle>
