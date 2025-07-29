@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * @fileOverview A generic flow to analyze a video based on a user's text prompt.
@@ -12,7 +11,7 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
-import { GoogleGenerativeAI, Part } from '@google/generative-ai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 
 // The input now expects a direct GCS URI.
@@ -52,19 +51,23 @@ const analyzeVideoFlow = ai.defineFlow(
       // Note: The model name was corrected to gemini-1.5-pro as per the error log.
       const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
 
-      const contents: Part[] = [
-        {
-          fileData: {
-            mimeType: input.mimeType,
-            fileUri: input.gcsUri,
+      const result = await model.generateContent({
+        contents: [
+          {
+            role: "user",
+            parts: [
+              {
+                fileData: {
+                  mimeType: input.mimeType,
+                  fileUri: input.gcsUri,
+                },
+              },
+              { text: input.prompt },
+            ],
           },
-        },
-        { text: input.prompt },
-      ];
+        ],
+      });
 
-      console.log("Generating content with gemini-1.5-pro...");
-      const result = await model.generateContent({ contents });
-      
       const analysisText = result.response.text();
 
       if (!analysisText) {
