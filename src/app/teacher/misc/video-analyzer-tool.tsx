@@ -66,14 +66,14 @@ export function VideoAnalyzerTool() {
             },
             (error) => {
                 console.error("Upload failed:", error);
-                toast({ title: "업로드 실패", description: "파일을 업로드하는 중 오류가 발생했습니다.", variant: "destructive" });
+                toast({ title: "업로드 실패", description: "파일을 Firebase Storage에 업로드하는 중 오류가 발생했습니다.", variant: "destructive" });
                 setAnalysisState('error');
                 setError("파일 업로드 실패.");
             },
             async () => {
                 try {
                     setAnalysisState('analyzing');
-                    toast({ title: "업로드 완료, 분석 시작", description: "AI가 동영상을 분석하고 있습니다." });
+                    toast({ title: "업로드 완료, AI 분석 시작", description: "AI가 동영상을 분석하고 있습니다. 시간이 소요될 수 있습니다." });
 
                     const bucket = uploadTask.snapshot.ref.bucket;
                     const gcsUri = `gs://${bucket}/${filePath}`;
