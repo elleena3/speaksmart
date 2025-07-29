@@ -34,7 +34,7 @@ export async function analyzeVideo(input: AnalyzeVideoInput): Promise<AnalyzeVid
 const videoAnalysisPrompt = ai.definePrompt({
     name: 'videoAnalysisPrompt',
     model: googleAI.model('gemini-2.5-pro'),
-    input: { schema: AnalyzeVideoInputSchema },
+    input: { schema: AnalyzeVideoInputSchema.extend({ contentType: z.string() }) },
     output: { schema: AnalyzeVideoOutputSchema },
     prompt: `You are an expert video analyst. Analyze the provided video file based on the user's specific request. Provide a detailed, text-based response that directly addresses the user's prompt.
 
@@ -42,7 +42,7 @@ const videoAnalysisPrompt = ai.definePrompt({
 "{{{prompt}}}"
 
 ### Video for Analysis:
-{{media url=videoDataUri}}
+{{media url=videoDataUri contentType=contentType}}
 
 Please provide your analysis now.
 `,
@@ -55,7 +55,14 @@ const analyzeVideoFlow = ai.defineFlow(
     outputSchema: AnalyzeVideoOutputSchema,
   },
   async (input) => {
-    const { output } = await videoAnalysisPrompt(input);
+    // Extract contentType from the data URI
+    const match = input.videoDataUri.match(/^data:(.*?);base64,/);
+    if (!match || !match[1]) {
+        throw new Error('Could not determine content type from data URI.');
+    }
+    const contentType = match[1];
+
+    const { output } = await videoAnalysisPrompt({ ...input, contentType });
     if (!output) {
       throw new Error("The AI model did not return a valid video analysis.");
     }
