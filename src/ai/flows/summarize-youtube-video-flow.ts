@@ -57,9 +57,16 @@ const summarizeYoutubeVideoFlow = ai.defineFlow(
   async ({ youtubeUrl }) => {
     let transcriptParts;
     try {
-        console.log(`Fetching transcript for: ${youtubeUrl}`);
-        // Attempt to fetch the transcript.
-        transcriptParts = await YoutubeTranscript.fetchTranscript(youtubeUrl);
+        const videoId = new URL(youtubeUrl).searchParams.get('v');
+        if (!videoId) {
+            return {
+                summary: "### 요약 실패\n\n유효하지 않은 유튜브 URL입니다. 주소에 'v=' 파라미터가 포함되어 있는지 확인해주세요."
+            };
+        }
+        
+        console.log(`Fetching transcript for video ID: ${videoId}`);
+        transcriptParts = await YoutubeTranscript.fetchTranscript(videoId);
+
     } catch (error: any) {
         console.error("Could not fetch transcript:", error.message);
         // If an error occurs (e.g., subtitles disabled), return a user-friendly message.
