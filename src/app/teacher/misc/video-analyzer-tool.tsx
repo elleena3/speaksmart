@@ -38,11 +38,7 @@ export function VideoAnalyzerTool() {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.readAsDataURL(file);
-            reader.onload = () => {
-                // The result includes the full data URI with the correct MIME type
-                // e.g., "data:video/mp4;base64,..."
-                resolve(reader.result as string);
-            };
+            reader.onload = () => resolve(reader.result as string);
             reader.onerror = error => reject(error);
         });
     };
@@ -64,7 +60,11 @@ export function VideoAnalyzerTool() {
 
         try {
             const videoDataUri = await fileToDataUri(videoFile);
-            const result = await analyzeVideo({ videoDataUri, prompt });
+            const result = await analyzeVideo({ 
+                videoDataUri, 
+                fileName: videoFile.name, // Pass the file name
+                prompt 
+            });
             setAnalysisResult(result);
             setAnalysisState('analyzed');
             toast({ title: "분석 완료", description: "AI 동영상 분석이 완료되었습니다." });
