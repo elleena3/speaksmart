@@ -11,13 +11,12 @@
  */
 
 import { ai } from '@/ai/genkit';
-import { googleAI,getGoogleAIClient } from '@genkit-ai/googleai';
 import { z } from 'zod';
-import { Part, FunctionDeclarationSchemaType } from '@google/generative-ai';
+import { GoogleGenerativeAI, Part } from '@google/generative-ai';
 
 // The input now expects a direct GCS URI and the file's mime type.
 const AnalyzeVideoInputSchema = z.object({
-  gcsUri: z.string().regex(/^gs:\/\//, "A direct Google Cloud Storage URI is required (gs://...).").describe(
+  gcsUri: z.string().regex(/^gs:\/\/.*/, "A direct Google Cloud Storage URI is required (gs://...).").describe(
     "A direct Google Cloud Storage URI to a video file. (e.g., gs://bucket-name/path/to/video.mp4)"
   ),
   mimeType: z.string().describe("The MIME type of the video file (e.g., 'video/mp4')."),
@@ -48,12 +47,15 @@ const analyzeVideoFlow = ai.defineFlow(
     try {
       console.log("Starting video analysis flow with GCS URI:", input.gcsUri);
       
-      const genaiClient = getGoogleAIClient();
+      const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || '');
+      const generativeModel = genAI.getGenerativeModel({ model: "gemini-1.5-pro-latest" });
+
 
       // Step 1: Upload the file to the Gemini API Files service
       console.log("Uploading file to Gemini Files service...");
-      const uploadResult = await genaiClient.uploadFile(input.gcsUri, {
-        mimeType: input.mimeType,
+      const uploadResult = await genAI.uploadFile({
+          path: input.gcsUri,
+          mimeType: input.mimeType,
       });
 
       console.log("File uploaded successfully. URI:", uploadResult.file.uri);
@@ -69,14 +71,13 @@ const analyzeVideoFlow = ai.defineFlow(
         { text: input.prompt },
       ];
 
-      console.log("Generating content with gemini-2.5-pro...");
-      const result = await genaiClient.generateContent({
-        model: 'gemini-2.5-pro',
+      console.log("Generating content with gemini-1.5-pro...");
+      const result = await generativeModel.generateContent({
         contents,
       });
       
       const response = result.response;
-      const analysisText = response.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+      const analysisText = response.text();
 
       if (!analysisText) {
           throw new Error("AI model did not return a valid text analysis from the video.");
