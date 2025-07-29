@@ -14,7 +14,8 @@ import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 import { GoogleGenerativeAI, Part } from '@google/generative-ai';
 
-// The input now expects a direct GCS URI and the file's mime type.
+
+// The input now expects a direct GCS URI.
 const AnalyzeVideoInputSchema = z.object({
   gcsUri: z.string().regex(/^gs:\/\/.*/, "A direct Google Cloud Storage URI is required (gs://...).").describe(
     "A direct Google Cloud Storage URI to a video file. (e.g., gs://bucket-name/path/to/video.mp4)"
@@ -47,13 +48,11 @@ const analyzeVideoFlow = ai.defineFlow(
     try {
       console.log("Starting video analysis flow with GCS URI:", input.gcsUri);
       
-      const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || '');
-      const generativeModel = genAI.getGenerativeModel({ model: "gemini-1.5-pro-latest" });
-
-
-      // Step 1: Upload the file to the Gemini API Files service
+      const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+      
+      // Step 1: Upload the file to the Gemini API Files service using the correct function name
       console.log("Uploading file to Gemini Files service...");
-      const uploadResult = await genAI.uploadFile({
+      const uploadResult = await genAI.files.upload({
           path: input.gcsUri,
           mimeType: input.mimeType,
       });
@@ -71,7 +70,8 @@ const analyzeVideoFlow = ai.defineFlow(
         { text: input.prompt },
       ];
 
-      console.log("Generating content with gemini-1.5-pro...");
+      console.log("Generating content with gemini-2.5-pro...");
+      const generativeModel = genAI.getGenerativeModel({ model: "gemini-1.5-pro-latest" });
       const result = await generativeModel.generateContent({
         contents,
       });
