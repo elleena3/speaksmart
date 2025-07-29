@@ -35,7 +35,7 @@ export async function analyzeVideo(input: AnalyzeVideoInput): Promise<AnalyzeVid
 
 const videoAnalysisPrompt = ai.definePrompt({
     name: 'videoAnalysisPrompt',
-    model: googleAI.model('gemini-1.0-pro-vision-001'), // Corrected to use a vision-capable model
+    model: googleAI.model('gemini-2.5-pro'), 
     input: { schema: AnalyzeVideoInputSchema },
     output: { schema: AnalyzeVideoOutputSchema },
     prompt: `You are an expert video analyst. Analyze the provided video file based on the user's specific request. Provide a detailed, text-based response that directly addresses the user's prompt.
@@ -57,8 +57,8 @@ const analyzeVideoFlow = ai.defineFlow(
     outputSchema: AnalyzeVideoOutputSchema,
   },
   async (input) => {
-    // The GCS URI is now passed directly, and the {{media}} helper handles it.
     // The data URI and content type logic is no longer needed here.
+    // The {{media}} helper in the prompt will handle the direct GCS URI.
     const { output } = await videoAnalysisPrompt(input);
     
     if (!output) {

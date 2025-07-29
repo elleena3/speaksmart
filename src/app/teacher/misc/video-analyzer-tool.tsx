@@ -31,9 +31,9 @@ export function VideoAnalyzerTool() {
         const file = event.target.files?.[0];
         if (!file) return;
 
-        const validVideoTypes = ['video/mp4', 'video/webm', 'video/quicktime', 'video/mov', 'video/avi', 'video/x-flv'];
+        const validVideoTypes = ['video/mp4', 'video/webm', 'video/quicktime', 'video/mov', 'video/avi', 'video/x-flv', 'video/mkv', 'video/wmv', 'video/3gpp'];
         if (!validVideoTypes.includes(file.type)) {
-            toast({ title: "지원하지 않는 동영상 형식", description: "MP4, WebM, MOV 등의 동영상 파일을 선택해주세요.", variant: "destructive" });
+            toast({ title: "지원하지 않는 동영상 형식", description: "지원되는 동영상 파일을 선택해주세요.", variant: "destructive" });
             event.target.value = '';
             return;
         }
