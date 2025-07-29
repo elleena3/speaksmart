@@ -7,11 +7,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Sparkles, RefreshCw, AlertTriangle, FileUp, VideoIcon } from 'lucide-react';
+import { Loader2, Sparkles, RefreshCw, AlertTriangle, FileUp, VideoIcon, Link as LinkIcon } from 'lucide-react';
 import { analyzeVideo, type AnalyzeVideoOutput } from '@/ai/flows/analyze-video-flow';
 import { Label } from '@/components/ui/label';
+import { useAuth } from '@/context/auth-context';
+import { storage } from '@/lib/firebase';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { Progress } from '@/components/ui/progress';
 
-type AnalysisState = 'idle' | 'analyzing' | 'analyzed' | 'error';
+
+type AnalysisState = 'idle' | 'uploading' | 'analyzing' | 'analyzed' | 'error';
 
 export function VideoAnalyzerTool() {
     const [analysisState, setAnalysisState] = useState<AnalysisState>('idle');
@@ -19,6 +24,8 @@ export function VideoAnalyzerTool() {
     const [prompt, setPrompt] = useState('');
     const [analysisResult, setAnalysisResult] = useState<AnalyzeVideoOutput | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [uploadProgress, setUploadProgress] = useState(0);
+    const { user } = useAuth();
     const { toast } = useToast();
 
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -32,15 +39,9 @@ export function VideoAnalyzerTool() {
             return;
         }
         setVideoFile(file);
-    };
-
-    const fileToDataUri = (file: File): Promise<string> => {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.readAsDataURL(file);
-            reader.onload = () => resolve(reader.result as string);
-            reader.onerror = error => reject(error);
-        });
+        setAnalysisState('idle');
+        setAnalysisResult(null);
+        setError(null);
     };
 
     const handleAnalyze = async () => {
@@ -52,28 +53,53 @@ export function VideoAnalyzerTool() {
             toast({ title: "요구사항 없음", description: "AI에게 요청할 내용을 입력해주세요.", variant: "destructive" });
             return;
         }
-
-        setAnalysisState('analyzing');
-        setError(null);
-        setAnalysisResult(null);
-        toast({ title: "AI 분석 시작", description: "동영상을 분석하고 있습니다. 동영상 길이에 따라 몇 분 정도 소요될 수 있습니다." });
-
-        try {
-            const videoDataUri = await fileToDataUri(videoFile);
-            const result = await analyzeVideo({ 
-                videoDataUri, 
-                fileName: videoFile.name, // Pass the file name
-                prompt 
-            });
-            setAnalysisResult(result);
-            setAnalysisState('analyzed');
-            toast({ title: "분석 완료", description: "AI 동영상 분석이 완료되었습니다." });
-        } catch (e: any) {
-            console.error("Video analysis failed:", e);
-            setError(e.message || "알 수 없는 오류가 발생했습니다.");
-            setAnalysisState('error');
-            toast({ title: "분석 실패", description: `AI 분석 중 오류가 발생했습니다: ${e.message}`, variant: "destructive" });
+        if (!user) {
+            toast({ title: "로그인 필요", description: "파일을 업로드하려면 로그인이 필요합니다.", variant: "destructive" });
+            return;
         }
+
+        setUploadProgress(0);
+        setAnalysisResult(null);
+        setError(null);
+        setAnalysisState('uploading');
+
+        const storageRef = ref(storage, `misc-uploads/${user.uid}/${Date.now()}_${videoFile.name}`);
+        const uploadTask = uploadBytesResumable(storageRef, videoFile);
+
+        uploadTask.on('state_changed',
+            (snapshot) => {
+                const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                setUploadProgress(progress);
+            },
+            (error) => {
+                console.error("Upload failed:", error);
+                toast({ title: "업로드 실패", description: "파일을 업로드하는 중 오류가 발생했습니다.", variant: "destructive" });
+                setAnalysisState('error');
+                setError("파일 업로드 실패.");
+            },
+            async () => {
+                try {
+                    const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+                    setAnalysisState('analyzing');
+                    toast({ title: "업로드 완료, 분석 시작", description: "AI가 동영상을 분석하고 있습니다." });
+
+                    const result = await analyzeVideo({
+                        videoUri: downloadURL,
+                        prompt
+                    });
+                    
+                    setAnalysisResult(result);
+                    setAnalysisState('analyzed');
+                    toast({ title: "분석 완료", description: "AI 동영상 분석이 완료되었습니다." });
+
+                } catch (e: any) {
+                    console.error("Video analysis failed:", e);
+                    setError(e.message || "알 수 없는 오류가 발생했습니다.");
+                    setAnalysisState('error');
+                    toast({ title: "분석 실패", description: `AI 분석 중 오류가 발생했습니다: ${e.message}`, variant: "destructive" });
+                }
+            }
+        );
     };
     
     const handleReset = () => {
@@ -82,13 +108,20 @@ export function VideoAnalyzerTool() {
         setPrompt('');
         setAnalysisResult(null);
         setError(null);
+        setUploadProgress(0);
         const videoInput = document.getElementById('video-analyzer-upload') as HTMLInputElement;
         if(videoInput) videoInput.value = '';
     };
 
     const isAnalyzeButtonDisabled = useMemo(() => {
-        return !videoFile || !prompt.trim() || analysisState === 'analyzing';
+        return !videoFile || !prompt.trim() || analysisState === 'analyzing' || analysisState === 'uploading';
     }, [videoFile, prompt, analysisState]);
+
+    const getButtonText = () => {
+        if(analysisState === 'uploading') return '업로드 중...';
+        if(analysisState === 'analyzing') return '분석 중...';
+        return '동영상 분석하기';
+    }
 
     return (
         <div className="space-y-4">
@@ -115,10 +148,13 @@ export function VideoAnalyzerTool() {
                         />
                          <p className="text-xs text-muted-foreground">AI에게 동영상에 대해 무엇을 분석할지 구체적으로 요청합니다.</p>
                     </div>
+                    { (analysisState === 'uploading' || analysisState === 'analyzing') && (
+                       <Progress value={uploadProgress} />
+                    )}
                     <div className="flex gap-2 pt-2">
                         <Button onClick={handleAnalyze} disabled={isAnalyzeButtonDisabled} className="w-full">
-                            {analysisState === 'analyzing' ? <Loader2 className="mr-2 animate-spin" /> : <Sparkles className="mr-2" />}
-                            {analysisState === 'analyzing' ? "분석 중..." : "동영상 분석하기"}
+                            {analysisState === 'uploading' || analysisState === 'analyzing' ? <Loader2 className="mr-2 animate-spin" /> : <Sparkles className="mr-2" />}
+                            {getButtonText()}
                         </Button>
                         <Button onClick={handleReset} variant="outline" className="w-full">
                             <RefreshCw className="mr-2" /> 새로 시작
@@ -127,7 +163,7 @@ export function VideoAnalyzerTool() {
                 </CardContent>
             </Card>
 
-            {analysisState === 'analyzing' && (
+            {analysisState === 'analyzing' && !analysisResult && (
                 <div className="text-center p-8">
                     <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
                     <p className="mt-4 text-muted-foreground">AI가 동영상을 분석하고 있습니다. 시간이 다소 걸릴 수 있습니다...</p>

@@ -3,7 +3,7 @@
 /**
  * @fileOverview A generic flow to analyze a video based on a user's text prompt.
  * 
- * - analyzeVideo - A function that takes a video and a prompt, returning a text analysis.
+ * - analyzeVideo - A function that takes a video URI from Firebase Storage and a prompt, returning a text analysis.
  * - AnalyzeVideoInput - The input type for the flow.
  * - AnalyzeVideoOutput - The output type for the flow.
  */
@@ -12,12 +12,10 @@ import { ai } from '@/ai/genkit';
 import { googleAI } from '@genkit-ai/googleai';
 import { z } from 'zod';
 
+// The input now expects a direct URI to the file in a bucket, not a data URI.
 const AnalyzeVideoInputSchema = z.object({
-  videoDataUri: z.string().describe(
-    "A video file to be analyzed, as a data URI."
-  ),
-  fileName: z.string().describe(
-    "The original file name of the video, including its extension."
+  videoUri: z.string().url().describe(
+    "A direct URL to a video file, likely from Firebase Storage."
   ),
   prompt: z.string().describe(
     "The user's specific request or question about the video."
@@ -35,16 +33,10 @@ export async function analyzeVideo(input: AnalyzeVideoInput): Promise<AnalyzeVid
   return result;
 }
 
-const PromptInputSchema = z.object({
-    videoDataUri: z.string(),
-    prompt: z.string(),
-    contentType: z.string(), // Explicitly define contentType for the prompt
-});
-
 const videoAnalysisPrompt = ai.definePrompt({
     name: 'videoAnalysisPrompt',
     model: googleAI.model('gemini-2.5-pro'),
-    input: { schema: PromptInputSchema },
+    input: { schema: AnalyzeVideoInputSchema },
     output: { schema: AnalyzeVideoOutputSchema },
     prompt: `You are an expert video analyst. Analyze the provided video file based on the user's specific request. Provide a detailed, text-based response that directly addresses the user's prompt.
 
@@ -52,27 +44,11 @@ const videoAnalysisPrompt = ai.definePrompt({
 "{{{prompt}}}"
 
 ### Video for Analysis:
-{{media url=videoDataUri contentType=contentType}}
+{{media url=videoUri}}
 
 Please provide your analysis now.
 `,
 });
-
-const getContentTypeFromFileName = (fileName: string): string => {
-    const extension = fileName.split('.').pop()?.toLowerCase();
-    switch (extension) {
-        case 'mp4':
-            return 'video/mp4';
-        case 'mov':
-            return 'video/quicktime';
-        case 'webm':
-            return 'video/webm';
-        // Add other video types as needed
-        default:
-            throw new Error(`지원하지 않는 동영상 파일 확장자입니다: .${extension}`);
-    }
-}
-
 
 const analyzeVideoFlow = ai.defineFlow(
   {
@@ -81,14 +57,9 @@ const analyzeVideoFlow = ai.defineFlow(
     outputSchema: AnalyzeVideoOutputSchema,
   },
   async (input) => {
-    
-    const contentType = getContentTypeFromFileName(input.fileName);
-
-    const { output } = await videoAnalysisPrompt({
-      videoDataUri: input.videoDataUri,
-      prompt: input.prompt,
-      contentType: contentType,
-    });
+    // The data URI and content type logic is no longer needed here.
+    // The {{media}} helper in the prompt will handle the direct URL.
+    const { output } = await videoAnalysisPrompt(input);
     
     if (!output) {
       throw new Error("The AI model did not return a valid video analysis.");
