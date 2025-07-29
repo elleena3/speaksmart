@@ -12,10 +12,10 @@ import { ai } from '@/ai/genkit';
 import { googleAI } from '@genkit-ai/googleai';
 import { z } from 'zod';
 
-// The input now expects a direct URI to the file in a bucket, not a data URI.
+// The input now expects a direct GCS URI to the file, not a data URI or HTTPS URL.
 const AnalyzeVideoInputSchema = z.object({
-  videoUri: z.string().url().describe(
-    "A direct URL to a video file, likely from Firebase Storage."
+  videoUri: z.string().startsWith("gs://").describe(
+    "A direct Google Cloud Storage URI to a video file. (e.g., gs://bucket-name/path/to/video.mp4)"
   ),
   prompt: z.string().describe(
     "The user's specific request or question about the video."
@@ -36,7 +36,7 @@ export async function analyzeVideo(input: AnalyzeVideoInput): Promise<AnalyzeVid
 const videoAnalysisPrompt = ai.definePrompt({
     name: 'videoAnalysisPrompt',
     model: googleAI.model('gemini-2.5-pro'),
-    input: { schema: AnalyzeVideoInputSchema },
+    input: { schema: AnalyzeVideoInputSchema }, // Use the updated schema
     output: { schema: AnalyzeVideoOutputSchema },
     prompt: `You are an expert video analyst. Analyze the provided video file based on the user's specific request. Provide a detailed, text-based response that directly addresses the user's prompt.
 
@@ -57,8 +57,8 @@ const analyzeVideoFlow = ai.defineFlow(
     outputSchema: AnalyzeVideoOutputSchema,
   },
   async (input) => {
-    // The data URI and content type logic is no longer needed here.
-    // The {{media}} helper in the prompt will handle the direct URL.
+    // The GCS URI is now passed directly, and the {{media}} helper handles it.
+    // No need to extract contentType or modify the URI.
     const { output } = await videoAnalysisPrompt(input);
     
     if (!output) {

@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Sparkles, RefreshCw, AlertTriangle, FileUp, VideoIcon, Link as LinkIcon } from 'lucide-react';
+import { Loader2, Sparkles, RefreshCw, AlertTriangle, FileUp, VideoIcon } from 'lucide-react';
 import { analyzeVideo, type AnalyzeVideoOutput } from '@/ai/flows/analyze-video-flow';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/context/auth-context';
@@ -32,9 +32,9 @@ export function VideoAnalyzerTool() {
         const file = event.target.files?.[0];
         if (!file) return;
 
-        const validVideoTypes = ['video/mp4', 'video/webm', 'video/quicktime', 'video/mov'];
+        const validVideoTypes = ['video/mp4', 'video/webm', 'video/quicktime', 'video/mov', 'video/avi', 'video/x-flv'];
         if (!validVideoTypes.includes(file.type)) {
-            toast({ title: "지원하지 않는 동영상 형식", description: "MP4, WebM, MOV 형식의 동영상 파일을 선택해주세요.", variant: "destructive" });
+            toast({ title: "지원하지 않는 동영상 형식", description: "MP4, WebM, MOV 등의 동영상 파일을 선택해주세요.", variant: "destructive" });
             event.target.value = '';
             return;
         }
@@ -63,7 +63,8 @@ export function VideoAnalyzerTool() {
         setError(null);
         setAnalysisState('uploading');
 
-        const storageRef = ref(storage, `misc-uploads/${user.uid}/${Date.now()}_${videoFile.name}`);
+        const filePath = `misc-uploads/${user.uid}/${Date.now()}_${videoFile.name}`;
+        const storageRef = ref(storage, filePath);
         const uploadTask = uploadBytesResumable(storageRef, videoFile);
 
         uploadTask.on('state_changed',
@@ -79,12 +80,14 @@ export function VideoAnalyzerTool() {
             },
             async () => {
                 try {
-                    const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+                    const bucket = uploadTask.snapshot.ref.bucket;
+                    const gcsUri = `gs://${bucket}/${filePath}`;
+                    
                     setAnalysisState('analyzing');
                     toast({ title: "업로드 완료, 분석 시작", description: "AI가 동영상을 분석하고 있습니다." });
 
                     const result = await analyzeVideo({
-                        videoUri: downloadURL,
+                        videoUri: gcsUri,
                         prompt
                     });
                     
@@ -118,7 +121,7 @@ export function VideoAnalyzerTool() {
     }, [videoFile, prompt, analysisState]);
 
     const getButtonText = () => {
-        if(analysisState === 'uploading') return '업로드 중...';
+        if(analysisState === 'uploading') return `업로드 중... (${uploadProgress.toFixed(0)}%)`;
         if(analysisState === 'analyzing') return '분석 중...';
         return '동영상 분석하기';
     }
@@ -134,8 +137,8 @@ export function VideoAnalyzerTool() {
                         <Label htmlFor="video-analyzer-upload" className="flex items-center gap-1">
                             <VideoIcon className="h-4 w-4"/> 동영상 파일 <span className="text-red-500">*</span>
                         </Label>
-                        <Input id="video-analyzer-upload" type="file" accept="video/mp4,video/webm,video/quicktime,video/mov" onChange={handleFileChange} />
-                        <p className="text-xs text-muted-foreground">MP4, WebM, MOV 형식, 1080p 이하</p>
+                        <Input id="video-analyzer-upload" type="file" accept="video/*" onChange={handleFileChange} />
+                        <p className="text-xs text-muted-foreground">대부분의 동영상 형식을 지원합니다. (예: MP4, MOV, WebM 등)</p>
                     </div>
                      <div className="space-y-2">
                         <Label htmlFor="analysis-prompt">분석 요구사항 <span className="text-red-500">*</span></Label>
