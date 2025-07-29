@@ -52,7 +52,7 @@ const analyzeVideoFlow = ai.defineFlow(
 
       // 3. Call the model with the file part and prompt
       const result = await ai.generate({
-        model: 'gemini-2.5-pro',
+        model: 'gemini-1.5-pro-preview-0514',
         prompt: [
             { text: prompt },
             { media: videoFilePart }
