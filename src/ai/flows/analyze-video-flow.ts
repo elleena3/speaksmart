@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview A generic flow to analyze a video based on a user's text prompt.
@@ -48,9 +49,9 @@ const analyzeVideoFlow = ai.defineFlow(
       console.log("Starting video analysis flow with GCS URI:", input.gcsUri);
       
       const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+      // Note: The model name was corrected to gemini-1.5-pro as per the error log.
       const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
 
-      // 업로드 스킵: GCS URI 바로 사용
       const contents: Part[] = [
         {
           fileData: {
