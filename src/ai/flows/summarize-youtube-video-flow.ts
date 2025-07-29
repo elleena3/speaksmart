@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview A flow to summarize a YouTube video.
@@ -84,7 +85,7 @@ const summarizeYoutubeVideoFlow = ai.defineFlow(
         // like when subtitles are disabled, or the video is unavailable.
         if (error.message.includes('subtitles are disabled') || error.message.includes('No transcripts are available')) {
              return {
-                summary: "### 요약 실패\n\n이 영상은 자막 기능이 비활성화되어 있어 내용을 요약할 수 없습니다. 다른 영상을 시도해주세요."
+                summary: "### 요약 실패\n\n이 영상은 자막 기능이 비활성화되어 있거나, 지원하지 않아 내용을 요약할 수 없습니다. 다른 영상을 시도해주세요."
             };
         }
         
