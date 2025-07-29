@@ -51,9 +51,10 @@ const analyzeVideoFlow = ai.defineFlow(
       const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
       
       console.log("Uploading file to Gemini Files service...");
+      // Corrected: Use genAI.files.upload instead of genAI.uploadFile
       const uploadResult = await genAI.files.upload({
-          path: input.gcsUri,
-          mimeType: input.mimeType,
+        path: input.gcsUri,
+        mimeType: input.mimeType,
       });
 
       console.log("File uploaded successfully. URI:", uploadResult.file.uri);
@@ -68,8 +69,9 @@ const analyzeVideoFlow = ai.defineFlow(
         { text: input.prompt },
       ];
 
-      console.log("Generating content with gemini-1.5-pro-latest...");
-      const generativeModel = genAI.getGenerativeModel({ model: "gemini-1.5-pro-latest" });
+      console.log("Generating content with gemini-2.5-pro...");
+      // Corrected: use getGenerativeModel from the new genAI instance
+      const generativeModel = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
       const result = await generativeModel.generateContent({
         contents,
       });
