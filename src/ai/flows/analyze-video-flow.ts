@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * @fileOverview A generic flow to analyze a video based on a user's text prompt.
@@ -14,7 +13,7 @@ import { z } from 'zod';
 
 // The input now expects a direct GCS URI to the file, not a data URI or HTTPS URL.
 const AnalyzeVideoInputSchema = z.object({
-  videoUri: z.string().startsWith("gs://").describe(
+  videoUri: z.string().regex(/^gs:\/\//, "A direct Google Cloud Storage URI is required (gs://...).").describe(
     "A direct Google Cloud Storage URI to a video file. (e.g., gs://bucket-name/path/to/video.mp4)"
   ),
   prompt: z.string().describe(
@@ -28,6 +27,7 @@ const AnalyzeVideoOutputSchema = z.object({
 });
 export type AnalyzeVideoOutput = z.infer<typeof AnalyzeVideoOutputSchema>;
 
+
 export async function analyzeVideo(input: AnalyzeVideoInput): Promise<AnalyzeVideoOutput> {
   const result = await analyzeVideoFlow(input);
   return result;
@@ -36,7 +36,7 @@ export async function analyzeVideo(input: AnalyzeVideoInput): Promise<AnalyzeVid
 const videoAnalysisPrompt = ai.definePrompt({
     name: 'videoAnalysisPrompt',
     model: googleAI.model('gemini-2.5-pro'),
-    input: { schema: AnalyzeVideoInputSchema }, // Use the updated schema
+    input: { schema: AnalyzeVideoInputSchema },
     output: { schema: AnalyzeVideoOutputSchema },
     prompt: `You are an expert video analyst. Analyze the provided video file based on the user's specific request. Provide a detailed, text-based response that directly addresses the user's prompt.
 
@@ -58,7 +58,7 @@ const analyzeVideoFlow = ai.defineFlow(
   },
   async (input) => {
     // The GCS URI is now passed directly, and the {{media}} helper handles it.
-    // No need to extract contentType or modify the URI.
+    // The data URI and content type logic is no longer needed here.
     const { output } = await videoAnalysisPrompt(input);
     
     if (!output) {
