@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo } from "react";
@@ -24,7 +25,7 @@ import { analyzeVideo, type AnalyzeVideoOutput } from "@/ai/flows/analyze-video-
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/context/auth-context";
 import { storage } from "@/lib/firebase";
-import { ref, uploadBytesResumable } from "firebase/storage";
+import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { Progress } from "@/components/ui/progress";
 
 type AnalysisState = "idle" | "uploading" | "analyzing" | "analyzed" | "error";
@@ -109,14 +110,15 @@ export function VideoAnalyzerTool() {
       async () => {
         try {
           setAnalysisState("analyzing");
+          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+
           toast({
             title: "업로드 완료, AI 분석 시작",
             description: "AI가 동영상을 분석하고 있습니다. 시간이 소요될 수 있습니다.",
           });
 
-          /* ✔︎ 업로드한 GCS 객체 경로를 그대로 전달 */
           const result = await analyzeVideo({
-            filePath,
+            gcsUri: downloadURL,
             mimeType: videoFile.type,
             prompt,
           });

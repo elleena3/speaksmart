@@ -1,4 +1,5 @@
-"use client"
+
+"use client";
 
 import { useLanguage } from "@/context/language-context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";

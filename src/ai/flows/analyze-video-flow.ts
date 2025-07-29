@@ -1,61 +1,73 @@
-// src/ai/flows/analyze-video-flow.ts
+
 'use server';
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { getDownloadURL, ref } from 'firebase/storage';
+import { storage } from '@/lib/firebase';
+import * as https from 'https';
 
-/* ---------- 1. 입·출력 스키마 ---------- */
-const Input = z.object({
-  /** Firestore에 저장된 객체 경로 예: misc-uploads/uid/1700_video.webm */
-  filePath : z.string(),
-  /** video/mp4, video/webm 등 */
-  mimeType : z.string(),
-  /** “영상 속 인물의 감정 변화를 시간순으로 설명해줘” */
-  prompt   : z.string(),
+const AnalyzeVideoInputSchema = z.object({
+  gcsUri: z.string().describe("Publicly accessible HTTPS URL to the video file."),
+  mimeType: z.string().describe("The MIME type of the video file (e.g., video/mp4)."),
+  prompt: z.string().describe("The prompt describing what to analyze in the video."),
 });
-type AnalyzeVideoInput = z.infer<typeof Input>;
+export type AnalyzeVideoInput = z.infer<typeof AnalyzeVideoInputSchema>;
 
-const Output = z.object({ analysis: z.string() });
-type AnalyzeVideoOutput = z.infer<typeof Output>;
+const AnalyzeVideoOutputSchema = z.object({
+  analysis: z.string(),
+});
+export type AnalyzeVideoOutput = z.infer<typeof AnalyzeVideoOutputSchema>;
 
-/* ---------- 2. 퍼블릭 함수 ---------- */
 export async function analyzeVideo(
   input: AnalyzeVideoInput,
 ): Promise<AnalyzeVideoOutput> {
   return analyzeVideoFlow(input);
 }
 
-/* ---------- 3. Genkit Flow 본체 ---------- */
+
 const analyzeVideoFlow = ai.defineFlow(
-  { name: 'analyzeVideoFlow', inputSchema: Input, outputSchema: Output },
-  async ({ filePath, mimeType, prompt }) => {
-    /* 3‑1) 버킷 이름 확인 */
-    const bucket = process.env.GCS_BUCKET_NAME;              // 예: speaksmart-evaluator2.appspot.com
-    if (!bucket) throw new Error('GCS_BUCKET_NAME env 가 비어 있습니다.');
-
-    /* 3‑2) 객체 경로 인코딩 & URI 생성 */
-    const encodedPath = encodeURI(filePath.replace(/^\/+/, '')); // 선행 슬래시 제거 후 encodeURI
-    const fileUri     = `gs://${bucket}/${encodedPath}`;
-
-    console.log('Gemini 요청 URI →', fileUri);
-
-    /* 3‑3) 모델 호출 */
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
-
-    const res = await model.generateContent({
-      contents: [{
-        role : 'user',
-        parts: [
-          { fileData: { fileUri, mimeType } },  // ✅ CamelCase 필드
-          { text: prompt },
-        ],
-      }],
-    });
-
-    const analysis = res.response.text?.();
-    if (!analysis) throw new Error('분석 결과가 비어 있습니다.');
-    return { analysis };
+  {
+    name: 'analyzeVideoFlow',
+    inputSchema: AnalyzeVideoInputSchema,
+    outputSchema: AnalyzeVideoOutputSchema,
   },
+  async (input) => {
+    try {
+      console.log("Starting video analysis flow with HTTPS URL:", input.gcsUri);
+
+      const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+
+      const result = await model.generateContent({
+        contents: [
+          {
+            role: "user",
+            parts: [
+              {
+                file_data: {
+                  mime_type: input.mimeType,
+                  file_uri: input.gcsUri,
+                },
+              },
+              { text: input.prompt },
+            ],
+          },
+        ],
+      });
+
+      const analysisText = result.response.text();
+      if (!analysisText) {
+        throw new Error("AI model did not return a valid text analysis from the video.");
+      }
+
+      console.log("Analysis successful.");
+      return { analysis: analysisText };
+
+    } catch (error: any) {
+      console.error("An error occurred during the video analysis flow:", error);
+      throw new Error(error.message || "An unknown error occurred during video analysis.");
+    }
+  }
 );
