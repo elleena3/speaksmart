@@ -50,7 +50,6 @@ const analyzeVideoFlow = ai.defineFlow(
       
       const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
       
-      // Step 1: Upload the file to the Gemini API Files service using the correct function name
       console.log("Uploading file to Gemini Files service...");
       const uploadResult = await genAI.files.upload({
           path: input.gcsUri,
@@ -58,8 +57,7 @@ const analyzeVideoFlow = ai.defineFlow(
       });
 
       console.log("File uploaded successfully. URI:", uploadResult.file.uri);
-
-      // Step 2: Generate content using the uploaded file's URI
+      
       const contents: Part[] = [
         {
           fileData: {
@@ -70,7 +68,7 @@ const analyzeVideoFlow = ai.defineFlow(
         { text: input.prompt },
       ];
 
-      console.log("Generating content with gemini-2.5-pro...");
+      console.log("Generating content with gemini-1.5-pro-latest...");
       const generativeModel = genAI.getGenerativeModel({ model: "gemini-1.5-pro-latest" });
       const result = await generativeModel.generateContent({
         contents,
@@ -89,7 +87,6 @@ const analyzeVideoFlow = ai.defineFlow(
     } catch (error: any) {
         console.error("An error occurred during the video analysis flow:", error);
         
-        // Check for specific error messages to provide clearer feedback
         if (error.message && error.message.includes('media file is not available')) {
             throw new Error('The video file could not be accessed by the AI. Please check file permissions in Google Cloud Storage.');
         }
