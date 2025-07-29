@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo } from 'react';
@@ -37,7 +38,11 @@ export function VideoAnalyzerTool() {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.readAsDataURL(file);
-            reader.onload = () => resolve(reader.result as string);
+            reader.onload = () => {
+                // The result includes the full data URI with the correct MIME type
+                // e.g., "data:video/mp4;base64,..."
+                resolve(reader.result as string);
+            };
             reader.onerror = error => reject(error);
         });
     };

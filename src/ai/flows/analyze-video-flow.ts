@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview A generic flow to analyze a video based on a user's text prompt.
@@ -13,7 +14,7 @@ import { z } from 'zod';
 
 const AnalyzeVideoInputSchema = z.object({
   videoDataUri: z.string().describe(
-    "A video file to be analyzed, as a data URI."
+    "A video file to be analyzed, as a data URI that includes a MIME type."
   ),
   prompt: z.string().describe(
     "The user's specific request or question about the video."
@@ -34,7 +35,7 @@ export async function analyzeVideo(input: AnalyzeVideoInput): Promise<AnalyzeVid
 const videoAnalysisPrompt = ai.definePrompt({
     name: 'videoAnalysisPrompt',
     model: googleAI.model('gemini-2.5-pro'),
-    input: { schema: AnalyzeVideoInputSchema.extend({ contentType: z.string() }) },
+    input: { schema: AnalyzeVideoInputSchema },
     output: { schema: AnalyzeVideoOutputSchema },
     prompt: `You are an expert video analyst. Analyze the provided video file based on the user's specific request. Provide a detailed, text-based response that directly addresses the user's prompt.
 
@@ -42,7 +43,7 @@ const videoAnalysisPrompt = ai.definePrompt({
 "{{{prompt}}}"
 
 ### Video for Analysis:
-{{media url=videoDataUri contentType=contentType}}
+{{media url=videoDataUri}}
 
 Please provide your analysis now.
 `,
@@ -55,14 +56,9 @@ const analyzeVideoFlow = ai.defineFlow(
     outputSchema: AnalyzeVideoOutputSchema,
   },
   async (input) => {
-    // Extract contentType from the data URI
-    const match = input.videoDataUri.match(/^data:(.*?);base64,/);
-    if (!match || !match[1]) {
-        throw new Error('Could not determine content type from data URI.');
-    }
-    const contentType = match[1];
-
-    const { output } = await videoAnalysisPrompt({ ...input, contentType });
+    // The data URI from the client now correctly includes the content type.
+    // The {{media}} helper in the prompt will handle it automatically.
+    const { output } = await videoAnalysisPrompt(input);
     if (!output) {
       throw new Error("The AI model did not return a valid video analysis.");
     }
