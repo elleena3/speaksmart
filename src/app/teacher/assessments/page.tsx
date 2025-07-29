@@ -232,11 +232,18 @@ export default function AssessmentsPage() {
           <h2 className="text-2xl font-bold tracking-tight">{t.teacherAssessments.title}</h2>
           <p className="text-muted-foreground">{t.teacherAssessments.description}</p>
         </div>
-        <Link href="/teacher/assessments/new" passHref>
-          <Button>
-            <PlusCircle className="mr-2 h-4 w-4" /> {t.teacherAssessments.newAssessmentButton}
-          </Button>
-        </Link>
+        <div className="flex gap-2">
+            <Link href="/teacher/rubrics" passHref>
+                <Button variant="outline">
+                    <DraftingCompass className="mr-2 h-4 w-4" /> 루브릭 평가 관리
+                </Button>
+            </Link>
+            <Link href="/teacher/assessments/new" passHref>
+              <Button>
+                <PlusCircle className="mr-2 h-4 w-4" /> {t.teacherAssessments.newAssessmentButton}
+              </Button>
+            </Link>
+        </div>
       </div>
       <Card>
         <CardContent className="p-0">
