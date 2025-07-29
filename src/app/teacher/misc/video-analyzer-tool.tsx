@@ -87,6 +87,7 @@ export function VideoAnalyzerTool() {
 
                     const result = await analyzeVideo({
                         gcsUri,
+                        mimeType: videoFile.type, // Pass the correct MIME type
                         prompt
                     });
                     

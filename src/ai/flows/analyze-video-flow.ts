@@ -2,7 +2,7 @@
 /**
  * @fileOverview A generic flow to analyze a video based on a user's text prompt.
  * 
- * - analyzeVideo - A function that takes a video URI from Firebase Storage and a prompt, returning a text analysis.
+ * - analyzeVideo - A function that takes a video GCS URI and a prompt, returning a text analysis.
  * - AnalyzeVideoInput - The input type for the flow.
  * - AnalyzeVideoOutput - The output type for the flow.
  */
@@ -11,11 +11,12 @@ import { ai } from '@/ai/genkit';
 import { googleAI } from '@genkit-ai/googleai';
 import { z } from 'zod';
 
-// The input now expects a direct GCS URI to the file, not a data URI.
+// The input now expects a direct GCS URI and the file's mime type.
 const AnalyzeVideoInputSchema = z.object({
   gcsUri: z.string().regex(/^gs:\/\//, "A direct Google Cloud Storage URI is required (gs://...).").describe(
     "A direct Google Cloud Storage URI to a video file. (e.g., gs://bucket-name/path/to/video.mp4)"
   ),
+  mimeType: z.string().describe("The MIME type of the video file (e.g., 'video/mp4')."),
   prompt: z.string().describe(
     "The user's specific request or question about the video."
   ),
@@ -44,7 +45,7 @@ const videoAnalysisPrompt = ai.definePrompt({
 "{{{prompt}}}"
 
 ### Video for Analysis:
-{{media url=gcsUri}}
+{{media url=gcsUri contentType=mimeType}}
 
 Please provide your analysis now.
 `,
@@ -57,8 +58,7 @@ const analyzeVideoFlow = ai.defineFlow(
     outputSchema: AnalyzeVideoOutputSchema,
   },
   async (input) => {
-    // The data URI and content type logic is no longer needed here.
-    // The {{media}} helper in the prompt will handle the direct GCS URI.
+    // The prompt now correctly uses gcsUri and mimeType from the input.
     const { output } = await videoAnalysisPrompt(input);
     
     if (!output) {
