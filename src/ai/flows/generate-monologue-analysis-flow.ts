@@ -75,7 +75,7 @@ const createPrompt = (modelName: z.infer<typeof evaluationModels[number]>) => ({
         name: `transcribeAudioPrompt_${modelName.replace(/[-.]/g, '_')}`,
         model: googleAI.model(modelName),
         input: { schema: z.object({ studentRecordingUrl: z.string() }) },
-        prompt: `Transcribe this English audio.
+        prompt: `Transcribe this English audio. If the audio is silent or contains no discernible speech, return a note that it was not recognized. Do not correct any grammatical errors or mispronunciations. Transcribe exactly what is heard.
     Audio: {{media url=studentRecordingUrl}}
     `,
     }),
@@ -293,8 +293,8 @@ export const generateMonologueAnalysisFlow = ai.defineFlow(
 
           finalResult = {
               studentTranscript,
-              contentScore,
-              pronunciationScore,
+              contentScore: contentScore,
+              pronunciationScore: pronunciationScore,
               aiFeedback: rubricText,
               teacherGuidance: guidanceResult.text,
               curricularRemarks: `'${input.assessmentTitle}' 평가에서 루브릭 기반으로 유창성(${rubricScores.fluency}점), 문법(${rubricScores.grammar}점), 어휘(${rubricScores.vocabulary}점) 영역에서 종합 ${contentScore}점, 발음 영역에서 ${pronunciationScore}점을 받는 등 준수한 성취를 보임.`,
