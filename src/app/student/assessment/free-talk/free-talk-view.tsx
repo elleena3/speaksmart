@@ -408,12 +408,12 @@ export function FreeTalkView({ assessment }: { assessment: TeacherAssessment }) 
             {getFooterButtonState()}
         </div>
         {sessionState !== 'idle' && sessionState !== 'initializing' && sessionState !== 'submitting' && sessionState !== 'countdown' && (
-            <p className="text-xs text-center text-muted-foreground">
+            <p className="text-sm text-center text-muted-foreground">
                 AI의 응답이 끝나면 <strong className="text-foreground">[응답하기]</strong> 버튼을 누르고 말씀하세요. 발언이 끝나면 <strong className="text-foreground">[말하기 중지]</strong> 버튼을 누릅니다.
             </p>
         )}
         {sessionState === 'countdown' && (
-             <p className="text-xs text-center text-muted-foreground">
+             <p className="text-sm text-center text-muted-foreground">
                 카운트다운 후 바로 말씀하세요!
             </p>
         )}
