@@ -20,6 +20,7 @@ import { StorageUploaderTool } from "@/components/feature-tools/storage-uploader
 import { YoutubeSummarizerTool } from "./youtube-summarizer-tool";
 import { PdfStorageAnalyzerTool } from "./pdf-storage-analyzer-tool";
 import { PdfMultiAnalyzerTool } from "./pdf-multi-analyzer-tool";
+import { PdfSequentialAnalyzerTool } from "./pdf-sequential-analyzer-tool";
 
 
 export default function MiscPage() {
@@ -32,10 +33,17 @@ export default function MiscPage() {
                 <p className="text-muted-foreground">{t.teacherMisc.description}</p>
             </div>
             <div className="grid grid-cols-1 gap-6">
+                 <Card>
+                    <CardHeader>
+                        <CardTitle>PDF 분석 도구 3 (순차 분석)</CardTitle>
+                        <CardDescription>여러 개의 PDF 파일을 업로드하면, 분석이 완료되는 순서대로 결과를 즉시 화면에 표시합니다. 사용자 경험의 차이를 비교해보세요.</CardDescription>
+                    </CardHeader>
+                    <PdfSequentialAnalyzerTool />
+                </Card>
                 <Card>
                     <CardHeader>
-                        <CardTitle>PDF 분석 도구 2 (다중 파일)</CardTitle>
-                        <CardDescription>여러 개의 PDF 파일을 한 번에 업로드하여, 각 파일에 대한 AI 분석을 개별적으로 요청하고 결과를 확인합니다.</CardDescription>
+                        <CardTitle>PDF 분석 도구 2 (일괄 분석)</CardTitle>
+                        <CardDescription>여러 개의 PDF 파일을 한 번에 업로드하여, 모든 분석이 끝난 후 결과를 한꺼번에 확인합니다.</CardDescription>
                     </CardHeader>
                     <PdfMultiAnalyzerTool />
                 </Card>
