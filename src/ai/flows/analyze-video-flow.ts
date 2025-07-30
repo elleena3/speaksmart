@@ -54,12 +54,11 @@ const analyzeVideoFlow = ai.defineFlow(
   },
   async ({ filePath, mimeType, prompt }) => {
     
-    // Use the storage bucket name directly from the environment variables.
-    // This ensures the correct format (e.g., 'project-id.appspot.com') is used.
-    const bucketName = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
+    // Use the admin SDK to get the default bucket name, which is in the correct format (e.g., 'project-id.appspot.com').
+    const bucketName = adminStorage.bucket().name;
 
     if (!bucketName) {
-        throw new Error("Firebase Storage bucket name (NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET) is not configured in the .env file.");
+        throw new Error("Could not determine Firebase Storage bucket name via Admin SDK.");
     }
     
     // Construct the correct gs:// URI using the bucket name and the file path.
