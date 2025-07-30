@@ -1,5 +1,4 @@
 
-
 "use client"
 
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -118,7 +117,6 @@ function AssessmentCard({ assessment, t }: { assessment: CombinedAssessment, t: 
                         루브릭 평가
                       </Badge>
                     )}
-                     <span className="text-xs text-muted-foreground">{assessment.displayDate}</span>
                 </div>
             </div>
             <Badge variant={displayBadgeVariant} className="whitespace-nowrap ml-2">
@@ -128,7 +126,8 @@ function AssessmentCard({ assessment, t }: { assessment: CombinedAssessment, t: 
         <CardDescription className="pt-2">{assessment.topic}</CardDescription>
       </CardHeader>
       <CardContent className="flex-grow" />
-      <CardFooter>
+      <CardFooter className="flex-col items-stretch gap-2">
+        <p className="text-xs text-center text-muted-foreground">{assessment.displayDate}</p>
         <Link href={getLink()} passHref className="w-full">
           <Button className="w-full" variant={isCompleted ? 'secondary' : 'default'}>
             {getIcon()}
