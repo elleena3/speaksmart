@@ -1,8 +1,10 @@
+
 'use server';
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 import { adminStorage } from '@/lib/firebase-admin';
+import { googleAI } from '@genkit-ai/googleai';
 
 const AnalyzePdfFromStorageInputSchema = z.object({
   filePath: z.string().describe("The path to the PDF file in Firebase Storage."),
@@ -39,20 +41,16 @@ const analyzePdfFromStorageFlow = ai.defineFlow(
       
       console.log(`[PDF Flow] File downloaded successfully. Size: ${buffer.length} bytes.`);
 
-      // 2. Create a Part object for the Generative AI model
-      const pdfFilePart = {
-        inlineData: {
-          data: buffer.toString("base64"),
-          mimeType: 'application/pdf',
-        },
-      };
+      // 2. Convert the buffer to a Base64 Data URI string.
+      // This is a more robust way to pass file data to the model.
+      const pdfDataUri = `data:application/pdf;base64,${buffer.toString("base64")}`;
 
-      // 3. Call the model with the file part and prompt
+      // 3. Call the model with the Data URI.
       const result = await ai.generate({
-        model: 'gemini-2.5-pro',
+        model: googleAI.model('gemini-2.5-pro'),
         prompt: [
             { text: prompt },
-            { media: pdfFilePart }
+            { media: { url: pdfDataUri } } // Pass as a media part with a URL
         ],
       });
       
