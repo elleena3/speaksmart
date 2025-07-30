@@ -22,7 +22,7 @@ export function FreeTalkView({ assessment }: { assessment: TeacherAssessment }) 
   const [sessionState, setSessionState] = useState<SessionState>("idle");
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
   const [interimTranscript, setInterimTranscript] = useState<string | null>(null);
-  const [countdown, setCountdown] = useState<number>(3);
+  const [countdown, setCountdown] = useState<number>(2);
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioStreamRef = useRef<MediaStream | null>(null);
@@ -170,7 +170,7 @@ export function FreeTalkView({ assessment }: { assessment: TeacherAssessment }) 
     
     setInterimTranscript(null);
     setSessionState("countdown");
-    setCountdown(3);
+    setCountdown(2);
 
     const recordingStarted = await startActualRecording();
     if (!recordingStarted) {
@@ -187,7 +187,7 @@ export function FreeTalkView({ assessment }: { assessment: TeacherAssessment }) 
             }
             return prev - 1;
         });
-    }, 1000);
+    }, 700);
   };
 
   const handleStopRecording = () => {
@@ -408,12 +408,12 @@ export function FreeTalkView({ assessment }: { assessment: TeacherAssessment }) 
             {getFooterButtonState()}
         </div>
         {sessionState !== 'idle' && sessionState !== 'initializing' && sessionState !== 'submitting' && sessionState !== 'countdown' && (
-            <p className="text-sm text-center text-muted-foreground">
+            <p className="text-base text-center text-muted-foreground">
                 AI의 응답이 끝나면 <strong className="text-foreground">[응답하기]</strong> 버튼을 누르고 말씀하세요. 발언이 끝나면 <strong className="text-foreground">[말하기 중지]</strong> 버튼을 누릅니다.
             </p>
         )}
         {sessionState === 'countdown' && (
-             <p className="text-sm text-center text-muted-foreground">
+             <p className="text-base text-center text-muted-foreground">
                 카운트다운 후 바로 말씀하세요!
             </p>
         )}

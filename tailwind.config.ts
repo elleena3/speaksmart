@@ -94,7 +94,7 @@ export default {
           },
         },
          'ping-short': {
-          '0%': {
+          '0%, 100%': {
             transform: 'scale(1)',
             opacity: '1',
           },
@@ -102,16 +102,24 @@ export default {
             transform: 'scale(1.5)',
             opacity: '0.3',
           },
+        },
+        'glow-once': {
+          '0%': {
+            boxShadow: '0 0 0 0 hsl(var(--primary) / 0.4)',
+          },
+          '50%': {
+            boxShadow: '0 0 10px 3px hsl(var(--primary) / 0.4)',
+          },
           '100%': {
-            transform: 'scale(1)',
-            opacity: '1',
+            boxShadow: '0 0 0 0 hsl(var(--primary) / 0)',
           },
         },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
-        'ping-short': 'ping-short 1s cubic-bezier(0, 0, 0.2, 1) infinite',
+        'ping-short': 'ping-short 0.7s cubic-bezier(0, 0, 0.2, 1) infinite',
+        'glow-once': 'glow-once 1s ease-out',
       },
     },
   },
