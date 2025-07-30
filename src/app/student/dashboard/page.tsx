@@ -81,7 +81,14 @@ function AssessmentCard({ assessment, t }: { assessment: CombinedAssessment, t: 
     
     // For Dialogue
     if (assessment.assessmentType === 'dialogue') {
-      if (displayStatus === '채점 완료') return `/student/assessment/free-talk/results?id=${assessment.id}${attemptQuery}`;
+      if (displayStatus === '채점 완료') {
+        const params = new URLSearchParams();
+        params.set('id', assessment.id);
+        if (hasMultipleAttempts) {
+          params.set('attempt', assessment.completedAttemptsCount.toString());
+        }
+        return `/student/assessment/free-talk/results?${params.toString()}`;
+      }
       if (displayStatus === '채점 중' && assessment.resultId) return `/student/assessment/free-talk/processing?id=${assessment.id}&resultId=${assessment.resultId}`;
       return `/student/assessment/free-talk?id=${assessment.id}`;
     }
