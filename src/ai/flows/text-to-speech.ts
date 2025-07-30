@@ -175,7 +175,8 @@ const converseWithStudentFlow = ai.defineFlow(
     let studentTranscript = "";
     let aiResponseText = "";
     
-    const model = evaluationModel || 'gemini-2.5-flash';
+    // Use the faster model for real-time conversation.
+    const model = 'gemini-2.5-flash-lite-preview-06-17';
     const conversationalPrompt = createConversationalPrompt(model);
 
     if (studentRecordingDataUri) {
