@@ -1,4 +1,3 @@
-
 'use server';
 
 import { ai } from '@/ai/genkit';
@@ -23,6 +22,31 @@ export async function analyzePdfFromStorage(
   return analyzePdfFromStorageFlow(input);
 }
 
+// Helper function for retrying API calls on overload or transient server errors
+async function withRetry<T>(fn: () => Promise<T>, retries = 2, delay = 1500): Promise<T> {
+  let lastError: any;
+  for (let i = 0; i <= retries; i++) {
+    try {
+      return await fn();
+    } catch (error: any) {
+      lastError = error;
+      const errorMessage = error.message || '';
+      // Check for common transient error codes
+      if (errorMessage.includes('503') || errorMessage.includes('500') || errorMessage.includes('overloaded')) {
+        console.warn(`[withRetry] Attempt ${i + 1} failed due to server error. Retrying in ${delay}ms...`);
+        if (i < retries) {
+          await new Promise(resolve => setTimeout(resolve, delay * (i + 1))); // Increase delay for subsequent retries
+        }
+      } else {
+        // Not a retryable error, throw immediately
+        throw error;
+      }
+    }
+  }
+  console.error("All retry attempts failed.", lastError);
+  throw new Error(`AI 모델이 일시적인 과부하 상태입니다. 모든 재시도에 실패했습니다: ${lastError.message}`);
+}
+
 
 const analyzePdfFromStorageFlow = ai.defineFlow(
   {
@@ -41,18 +65,18 @@ const analyzePdfFromStorageFlow = ai.defineFlow(
       
       console.log(`[PDF Flow] File downloaded successfully. Size: ${buffer.length} bytes.`);
 
-      // 2. Convert the buffer to a Base64 Data URI string.
-      // This is a more robust way to pass file data to the model.
       const pdfDataUri = `data:application/pdf;base64,${buffer.toString("base64")}`;
 
-      // 3. Call the model with the Data URI.
-      const result = await ai.generate({
-        model: googleAI.model('gemini-2.5-pro'),
-        prompt: [
-            { text: prompt },
-            { media: { url: pdfDataUri } } // Pass as a media part with a URL
-        ],
-      });
+      // 2. Call the model with the Data URI, now wrapped in our retry logic.
+      const result = await withRetry(() => 
+        ai.generate({
+          model: googleAI.model('gemini-2.5-pro'),
+          prompt: [
+              { text: prompt },
+              { media: { url: pdfDataUri } }
+          ],
+        })
+      );
       
       const analysisText = result.text;
       if (!analysisText) {
