@@ -9,7 +9,7 @@ import { type StudentResult, type TeacherAssessment } from "@/lib/types";
 import { useAuth } from "@/context/auth-context";
 import { Loader2 } from "lucide-react";
 import { db } from "@/lib/firebase";
-import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, getDoc, orderBy } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { useToast } from '@/hooks/use-toast';
 
