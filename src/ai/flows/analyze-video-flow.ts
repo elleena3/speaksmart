@@ -62,7 +62,7 @@ const analyzeVideoFlow = ai.defineFlow(
     const gcsUri = `gs://${bucketName}/${filePath}`;
 
     // Get the specific model instance from the googleAI() plugin
-    const model = googleAI.model('gemini-2.5-pro');
+    const model = googleAI.model('gemini-1.5-pro');
 
     const content = [
       { text: prompt },
@@ -74,8 +74,8 @@ const analyzeVideoFlow = ai.defineFlow(
       },
     ];
     
-    // Call generateContent on the model object, not the ai object
-    const response = await model.generateContent(content);
+    // Call invoke on the model object, not generateContent
+    const response = await model.invoke(content);
     const analysisText = response.text();
 
     if (!analysisText) {
