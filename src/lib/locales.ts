@@ -1,5 +1,4 @@
 
-
 export const translations = {
   ko: {
     language: {
@@ -27,6 +26,7 @@ export const translations = {
       profile: "프로필",
       assessments: "평가 관리",
       students: "학생 관리",
+      rubrics: "루브릭 관리",
       settings: "설정",
       misc: "기타",
       logout: "로그아웃",
@@ -333,6 +333,7 @@ export const translations = {
       profile: "Profile",
       assessments: "Assessments",
       students: "Students",
+      rubrics: "Rubrics",
       settings: "Settings",
       misc: "Misc",
       logout: "Logout",
