@@ -76,6 +76,7 @@ export async function generateDialogueAnalysis(
           // Ensure the URL is persisted upon success as well
           studentRecordingUrl: input.studentRecordingUrl,
           assessmentType: "dialogue",
+          curricularRemarks: analysisResult.curricularRemarks || '',
       };
       
       await updateDoc(resultDocRef, finalResultData);

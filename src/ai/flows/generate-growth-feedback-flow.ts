@@ -52,7 +52,7 @@ Please perform the following steps based on ALL attempts provided:
 2.  **Generate Teacher Guidance ('teacherGuidance'):**
     -   **Format:** Plain text with clear paragraphs. Do NOT write one long block of text.
     -   **Tone:** Professional and advisory.
-    -   **Content:** Summarize the student's overall progress across all attempts. Pinpoint the most significant areas of improvement and persistent weaknesses. Provide clear, actionable advice by suggesting specific activities or teaching strategies. Separate your points into distinct paragraphs for readability.
+    -   **Content:** Summarize the student's overall progress across all attempts. Pinpoint the most significant areas of improvement and persistent weaknesses. Provide clear, actionable advice by suggesting specific teaching strategies or follow-up activities. Separate your points into distinct paragraphs for readability.
 
 3.  **Generate '생활기록부 교과 특기 사항' (MUST be named 'growthCurricularRemarks'):**
     -   **Format:** Formal Korean prose, with sentences ending in '~함' or '~임'.
@@ -106,10 +106,10 @@ const generateGrowthFeedbackFlow = ai.defineFlow(
     const finalOutput: GenerateGrowthFeedbackOutput = {
         growthFeedback: rawOutput?.growthFeedback || defaultErrorMsg,
         teacherGuidance: rawOutput?.teacherGuidance || defaultErrorMsg,
-        // If the model mistakenly uses 'curricularRemarks', correct it to 'growthCurricularRemarks'.
         growthCurricularRemarks: rawOutput?.growthCurricularRemarks || rawOutput?.curricularRemarks || defaultErrorMsg,
     };
     
     return finalOutput;
   }
 );
+
