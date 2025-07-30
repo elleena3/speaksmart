@@ -207,7 +207,7 @@ export function PdfStorageAnalyzerTool() {
             <div>
                 <h3 className="text-lg font-semibold mb-2">AI 분석 결과</h3>
                 <div className="p-4 bg-muted/50 rounded-lg whitespace-pre-wrap font-body text-sm leading-relaxed min-h-[150px]">
-                {analysisResult.analysis}
+                  {analysisResult.analysis}
                 </div>
             </div>
         )}
