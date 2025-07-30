@@ -19,6 +19,7 @@ import { InteractiveTextAnalyzer } from "@/components/feature-tools/interactive-
 import { SpeculativeConversationTool } from "@/components/feature-tools/speculative-conversation-tool";
 import { StorageUploaderTool } from "@/components/feature-tools/storage-uploader-tool";
 import { YoutubeSummarizerTool } from "./youtube-summarizer-tool";
+import { PdfStorageAnalyzerTool } from "./pdf-storage-analyzer-tool";
 
 
 export default function MiscPage() {
@@ -31,6 +32,13 @@ export default function MiscPage() {
                 <p className="text-muted-foreground">{t.teacherMisc.description}</p>
             </div>
             <div className="grid grid-cols-1 gap-6">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>PDF 분석 도구 (Storage)</CardTitle>
+                        <CardDescription>Firebase Storage에 PDF를 업로드하고, AI에게 분석을 요청하는 테스트 도구입니다.</CardDescription>
+                    </CardHeader>
+                    <PdfStorageAnalyzerTool />
+                </Card>
                 <Card>
                     <CardHeader>
                         <CardTitle>유튜브 요약 도구</CardTitle>
@@ -104,7 +112,7 @@ export default function MiscPage() {
                         <PresentationAnalyzerTool />
                     </CardContent>
                 </Card>
-                 <Card>
+                 {/* <Card>
                     <CardHeader>
                         <CardTitle>범용 동영상 분석 도구</CardTitle>
                         <CardDescription>동영상을 업로드하고 텍스트로 질문하여 분석 결과를 얻습니다.</CardDescription>
@@ -112,7 +120,7 @@ export default function MiscPage() {
                     <CardContent>
                         <VideoAnalyzerTool />
                     </CardContent>
-                </Card>
+                </Card> */}
                 <Card>
                     <CardHeader>
                         <CardTitle>AI 원어민 대화 (기본)</CardTitle>
