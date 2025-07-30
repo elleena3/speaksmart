@@ -16,12 +16,14 @@ import { useRouter } from "next/navigation";
 import { collection, query, where, getDocs, orderBy, doc, getDoc, collectionGroup } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { cn } from "@/lib/utils"
+import { format } from "date-fns"
 
 
 type CombinedAssessment = TeacherAssessment & {
     resultStatus?: '채점 완료' | '채점 중' | '오류' | '분석 중' | '분석 중: upload' | '분석 중: transcribe' | '분석 중: analyze' | '분석 중: report' | null;
     resultId?: string;
     completedAttemptsCount: number;
+    displayDate: string;
 };
 
 function AssessmentCard({ assessment, t }: { assessment: CombinedAssessment, t: any }) {
@@ -116,6 +118,7 @@ function AssessmentCard({ assessment, t }: { assessment: CombinedAssessment, t: 
                         루브릭 평가
                       </Badge>
                     )}
+                     <span className="text-xs text-muted-foreground">{assessment.displayDate}</span>
                 </div>
             </div>
             <Badge variant={displayBadgeVariant} className="whitespace-nowrap ml-2">
@@ -198,13 +201,22 @@ export default function StudentDashboard() {
             const studentResults = resultsByAssessment.get(assessment.id) || [];
             studentResults.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)); // newest first
             const latestResult = studentResults[0];
-            const completedAttemptsCount = studentResults.filter(r => r.status === '채점 완료').length;
+            const completedAttempts = studentResults.filter(r => r.status === '채점 완료');
+            const latestCompletedAttempt = completedAttempts.sort((a,b) => (b.createdAt || 0) - (a.createdAt || 0))[0];
+
+            let displayDate = "";
+            if (completedAttempts.length > 0 && latestCompletedAttempt.createdAt) {
+                displayDate = `최종 응시일: ${format(new Date(latestCompletedAttempt.createdAt), 'yyyy-MM-dd')}`;
+            } else if (assessment.createdAt) {
+                displayDate = `생성일: ${format(new Date(assessment.createdAt), 'yyyy-MM-dd')}`;
+            }
 
             return {
                 ...assessment,
                 resultStatus: latestResult ? latestResult.status : null,
                 resultId: latestResult ? latestResult.id : undefined,
-                completedAttemptsCount,
+                completedAttemptsCount: completedAttempts.length,
+                displayDate,
             };
         });
 
