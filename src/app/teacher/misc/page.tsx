@@ -39,7 +39,9 @@ export default function MiscPage() {
                         <CardTitle>수행평가 채점 도구 (PDF)</CardTitle>
                         <CardDescription>학생들의 PDF 답안 파일들과 채점 기준표 PDF 파일을 각각 업로드하면, AI가 기준에 따라 각 답안을 순차적으로 채점하고 결과를 표시합니다.</CardDescription>
                     </CardHeader>
-                    <PdfGradingTool />
+                    <CardContent>
+                        <PdfGradingTool />
+                    </CardContent>
                 </Card>
                  <Card>
                     <CardHeader>
@@ -135,7 +137,7 @@ export default function MiscPage() {
                         <PresentationAnalyzerTool />
                     </CardContent>
                 </Card>
-                 {/* <Card>
+                 <Card>
                     <CardHeader>
                         <CardTitle>범용 동영상 분석 도구</CardTitle>
                         <CardDescription>동영상을 업로드하고 텍스트로 질문하여 분석 결과를 얻습니다.</CardDescription>
@@ -143,7 +145,7 @@ export default function MiscPage() {
                     <CardContent>
                         <VideoAnalyzerTool />
                     </CardContent>
-                </Card> */}
+                </Card>
                 <Card>
                     <CardHeader>
                         <CardTitle>AI 원어민 대화 (기본)</CardTitle>
