@@ -42,5 +42,8 @@ import '@/ai/flows/retry-analysis-flow';
 // New flow for presentation analysis
 import '@/ai/flows/analyze-presentation-video-flow';
 
+// New flow for Rubric management
+import '@/ai/flows/analyze-rubric-file-flow';
+
 // This flow is being removed due to errors.
 // import '@/ai/flows/regenerate-html-feedback-flow';
