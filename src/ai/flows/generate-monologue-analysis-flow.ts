@@ -325,7 +325,7 @@ export const generateMonologueAnalysisFlow = ai.defineFlow(
               contentScore: contentOutput.contentScore,
               aiFeedback: contentOutput.aiFeedback,
               teacherGuidance: contentOutput.teacherGuidance,
-              curricularRemarks: contentOutput.curricularRemarks,
+              curricularRemarks: contentOutput.curricularRemarks || '', // Ensure it's not undefined
               pronunciationScore: pronunciationOutput.pronunciationScore,
               pronunciationFeedback: pronunciationOutput.pronunciationFeedback,
           };
