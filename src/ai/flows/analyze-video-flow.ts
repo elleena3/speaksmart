@@ -20,6 +20,8 @@ const AnalyzeVideoInputSchema = z.object({
   mimeType: z.string().describe("The MIME type of the video file (e.g., 'video/mp4')."),
   prompt: z.string().describe("A text prompt describing what to analyze in the video."),
 });
+type AnalyzeVideoInput = z.infer<typeof AnalyzeVideoInputSchema>;
+
 
 // Define the output schema for the flow.
 type AnalyzeVideoOutput = {
@@ -35,7 +37,7 @@ type AnalyzeVideoOutput = {
  * @returns {Promise<AnalyzeVideoOutput>} A promise that resolves to the analysis result.
  */
 export async function analyzeVideo(
-  input: z.infer<typeof AnalyzeVideoInputSchema>
+  input: AnalyzeVideoInput
 ): Promise<AnalyzeVideoOutput> {
   return analyzeVideoFlow(input);
 }
@@ -52,15 +54,15 @@ const analyzeVideoFlow = ai.defineFlow(
   },
   async ({ filePath, mimeType, prompt }) => {
     
-    // Get the default bucket name directly from the Firebase Admin SDK.
-    // This is the most reliable way to get the correct bucket name for the gs:// URI.
-    const bucketName = adminStorage.bucket().name;
+    // Use the storage bucket name directly from the environment variables.
+    // This ensures the correct format (e.g., 'project-id.appspot.com') is used.
+    const bucketName = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
 
     if (!bucketName) {
-        throw new Error("Firebase Storage bucket name could not be retrieved from the admin SDK.");
+        throw new Error("Firebase Storage bucket name (NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET) is not configured in the .env file.");
     }
     
-    // Construct the correct gs:// URI using the retrieved bucket name and the file path.
+    // Construct the correct gs:// URI using the bucket name and the file path.
     const videoUrl = `gs://${bucketName}/${filePath}`;
 
     const { text } = await ai.generate({
