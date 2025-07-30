@@ -4,7 +4,6 @@
 import { ai } from '@/ai/genkit';
 import { googleAI } from '@genkit-ai/googleai';
 import { z } from 'zod';
-import { adminStorage } from '@/lib/firebase-admin';
 
 /**
  * @fileOverview A flow to analyze a video file from Firebase Storage.
@@ -54,8 +53,8 @@ const analyzeVideoFlow = ai.defineFlow(
   },
   async ({ filePath, mimeType, prompt }) => {
     
-    // Use the admin SDK to get the default bucket name for constructing the GCS URI.
-    // This is the most reliable way to get the correct bucket name.
+    // The bucket name is retrieved from the environment variable, which should be set
+    // to the correct format (e.g., 'your-project-id.appspot.com').
     const bucketName = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
 
     if (!bucketName) {
