@@ -10,18 +10,10 @@ import { VadConversationTool } from "@/app/teacher/misc/vad-conversation-tool";
 import { ParallelConversationTool } from "@/app/teacher/misc/parallel-conversation-tool";
 import { HybridConversationTool } from "@/app/teacher/misc/hybrid-conversation-tool";
 import { ReadAloudTool } from "@/app/teacher/misc/read-aloud-tool";
-import { HandwritingAnalyzerTool } from "@/components/feature-tools/handwriting-analyzer-tool";
-import { HandwritingSubmissionAnalyzerTool } from "./handwriting-submission-analyzer-tool";
+import { HandwritingAnalyzerTool } from "@/app/teacher/misc/handwriting-analyzer-tool";
 import { PresentationAnalyzerTool } from "./presentation-analyzer-tool";
-import { VideoAnalyzerTool } from "./video-analyzer-tool";
 import { InteractiveTextAnalyzer } from "@/components/feature-tools/interactive-text-analyzer";
 import { SpeculativeConversationTool } from "@/components/feature-tools/speculative-conversation-tool";
-import { StorageUploaderTool } from "@/components/feature-tools/storage-uploader-tool";
-import { YoutubeSummarizerTool } from "./youtube-summarizer-tool";
-import { PdfStorageAnalyzerTool } from "./pdf-storage-analyzer-tool";
-import { PdfMultiAnalyzerTool } from "./pdf-multi-analyzer-tool";
-import { PdfSequentialAnalyzerTool } from "./pdf-sequential-analyzer-tool";
-import { PdfGradingTool } from "./pdf-grading-tool";
 
 
 export default function MiscPage() {
@@ -34,50 +26,6 @@ export default function MiscPage() {
                 <p className="text-muted-foreground">{t.teacherMisc.description}</p>
             </div>
             <div className="grid grid-cols-1 gap-6">
-                 <Card>
-                    <CardHeader>
-                        <CardTitle>수행평가 채점 도구 (PDF)</CardTitle>
-                        <CardDescription>학생들의 PDF 답안 파일들과 채점 기준표 PDF 파일을 각각 업로드하면, AI가 기준에 따라 각 답안을 순차적으로 채점하고 결과를 표시합니다.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <PdfGradingTool />
-                    </CardContent>
-                </Card>
-                 <Card>
-                    <CardHeader>
-                        <CardTitle>PDF 분석 도구 3 (순차 분석)</CardTitle>
-                        <CardDescription>여러 개의 PDF 파일을 업로드하면, 분석이 완료되는 순서대로 결과를 즉시 화면에 표시합니다. 사용자 경험의 차이를 비교해보세요.</CardDescription>
-                    </CardHeader>
-                    <PdfSequentialAnalyzerTool />
-                </Card>
-                <Card>
-                    <CardHeader>
-                        <CardTitle>PDF 분석 도구 2 (일괄 분석)</CardTitle>
-                        <CardDescription>여러 개의 PDF 파일을 한 번에 업로드하여, 모든 분석이 끝난 후 결과를 한꺼번에 확인합니다.</CardDescription>
-                    </CardHeader>
-                    <PdfMultiAnalyzerTool />
-                </Card>
-                <Card>
-                    <CardHeader>
-                        <CardTitle>PDF 분석 도구 (Storage)</CardTitle>
-                        <CardDescription>Firebase Storage에 PDF를 업로드하고, AI에게 분석을 요청하는 테스트 도구입니다.</CardDescription>
-                    </CardHeader>
-                    <PdfStorageAnalyzerTool />
-                </Card>
-                <Card>
-                    <CardHeader>
-                        <CardTitle>유튜브 요약 도구</CardTitle>
-                        <CardDescription>유튜브 동영상 링크를 입력하면 AI가 내용을 요약하고 핵심 포인트를 정리합니다.</CardDescription>
-                    </CardHeader>
-                    <YoutubeSummarizerTool />
-                </Card>
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Storage 파일 업로더</CardTitle>
-                        <CardDescription>파일을 선택하여 Firebase Storage에 직접 업로드하는 기능입니다.</CardDescription>
-                    </CardHeader>
-                    <StorageUploaderTool />
-                </Card>
                 <Card>
                     <CardHeader>
                         <CardTitle>{t.teacherMisc.transcriberTool.title}</CardTitle>
@@ -119,15 +67,6 @@ export default function MiscPage() {
                         <HandwritingAnalyzerTool />
                     </CardContent>
                 </Card>
-                <Card>
-                    <CardHeader>
-                        <CardTitle>AI 자필 분석 도구 2</CardTitle>
-                        <CardDescription>학생의 손글씨 과제(이미지/PDF)를 채점 기준(텍스트/파일)에 따라 분석하고 피드백을 생성합니다.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <HandwritingSubmissionAnalyzerTool />
-                    </CardContent>
-                </Card>
                  <Card>
                     <CardHeader>
                         <CardTitle>{t.teacherMisc.presentationAnalyzerTool.title}</CardTitle>
@@ -135,15 +74,6 @@ export default function MiscPage() {
                     </CardHeader>
                     <CardContent>
                         <PresentationAnalyzerTool />
-                    </CardContent>
-                </Card>
-                 <Card>
-                    <CardHeader>
-                        <CardTitle>범용 동영상 분석 도구</CardTitle>
-                        <CardDescription>동영상을 업로드하고 텍스트로 질문하여 분석 결과를 얻습니다.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <VideoAnalyzerTool />
                     </CardContent>
                 </Card>
                 <Card>
