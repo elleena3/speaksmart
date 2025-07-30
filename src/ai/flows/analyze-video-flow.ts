@@ -1,8 +1,9 @@
 
 'use server';
 
-import { generate } from '@genkit-ai/ai';
 import { z } from 'zod';
+import { ai } from '@/ai/genkit';
+import { googleAI } from '@genkit-ai/googleai';
 
 /**
  * @fileOverview A flow to analyze a video file from Firebase Storage.
@@ -55,12 +56,12 @@ export async function analyzeVideo(
     },
   ];
 
-  const response = await generate({
-    model: "googleai/gemini-2.5-pro",
+  const response = await ai.generate({
+    model: googleAI.model("gemini-2.5-pro"),
     prompt: content,
   });
 
-  const analysisText = response.text();
+  const analysisText = response.text;
 
   if (!analysisText) {
     throw new Error("AI model did not return a valid text analysis from the video.");
