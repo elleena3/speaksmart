@@ -2,7 +2,7 @@
 'use server';
 
 import { z } from 'zod';
-import { ai } from '@/ai/genkit';
+import { generate } from '@genkit-ai/ai';
 import { googleAI } from '@genkit-ai/googleai';
 
 /**
@@ -56,12 +56,12 @@ export async function analyzeVideo(
     },
   ];
 
-  const response = await ai.generate({
-    model: googleAI.model("gemini-2.5-pro"),
+  const response = await generate({
+    model: googleAI('gemini-2.5-pro'),
     prompt: content,
   });
 
-  const analysisText = response.text;
+  const analysisText = response.text();
 
   if (!analysisText) {
     throw new Error("AI model did not return a valid text analysis from the video.");
