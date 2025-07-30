@@ -15,7 +15,7 @@ const AnalyzeVideoInputSchema = z.object({
   prompt: z.string().describe("A text prompt describing what to analyze in the video."),
 });
 
-export const AnalyzeVideoOutputSchema = z.object({
+const AnalyzeVideoOutputSchema = z.object({
   analysis: z.string().describe("The text-based analysis of the video content."),
 });
 export type AnalyzeVideoOutput = z.infer<typeof AnalyzeVideoOutputSchema>;
