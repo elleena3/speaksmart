@@ -63,7 +63,6 @@ export async function generateDialogueAnalysis(
 
   try {
       console.log(`[Dialogue Flow] Starting analysis for result ID: ${input.resultId}`);
-      await updateDoc(resultDocRef, { status: "분석 중: analyze", assessmentType: "dialogue" });
       
       const analysisResult = await generateDialogueAnalysisFlow(input);
 

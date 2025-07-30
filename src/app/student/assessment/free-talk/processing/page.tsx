@@ -1,16 +1,15 @@
 
-
 "use client";
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState, useRef } from "react";
-import { type StudentResult, type TeacherAssessment, type ConversationTurn, type HistoricalScore } from "@/lib/types";
+import { type StudentResult, type TeacherAssessment, type ConversationTurn } from "@/lib/types";
 import { useAuth } from "@/context/auth-context";
 import { Loader2, AlertTriangle, CheckCircle2, UploadCloud, FileScan, Sparkles } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { db, storage } from "@/lib/firebase";
-import { collection, query, where, onSnapshot, doc, updateDoc, getDocs, addDoc, orderBy, runTransaction } from "firebase/firestore";
+import { collection, query, where, onSnapshot, doc, updateDoc, getDocs, addDoc, runTransaction } from "firebase/firestore";
 import { generateDialogueAnalysis } from "@/ai/flows/generate-dialogue-analysis-flow";
 import { ref, uploadString, getDownloadURL } from "firebase/storage";
 import { useToast } from '@/hooks/use-toast';
@@ -128,6 +127,7 @@ export default function DialogueProcessingPage() {
         console.log("[Dialogue Processing Page] Starting analysis process.");
 
         const { assessment, studentRecordingDataUri, conversationHistory } = sessionData;
+        let downloadURL = "";
         
         try {
             const newResultDocRef = await addDoc(collection(db, "results"), {
@@ -140,6 +140,7 @@ export default function DialogueProcessingPage() {
                 createdAt: Date.now(),
                 date: new Date().toISOString(),
                 status: "분석 중: upload",
+                assessmentType: "dialogue",
             });
             resultIdRef.current = newResultDocRef.id;
             console.log(`[Dialogue Processing] Created preliminary result document: ${newResultDocRef.id}`);
@@ -202,7 +203,7 @@ export default function DialogueProcessingPage() {
             // Step 1: Upload recording
             const storageRef = ref(storage, `recordings/${user.uid}_dialogue_${newResultDocRef.id}.webm`);
             const uploadSnapshot = await uploadString(storageRef, studentRecordingDataUri, 'data_url');
-            const downloadURL = await getDownloadURL(uploadSnapshot.ref);
+            downloadURL = await getDownloadURL(uploadSnapshot.ref);
             
             // Step 2: Update status to 'analyze' after upload
             await updateDoc(newResultDocRef, { studentRecordingUrl: downloadURL, status: "분석 중: analyze" });
@@ -248,7 +249,8 @@ export default function DialogueProcessingPage() {
                 try {
                     await updateDoc(doc(db, "results", resultIdRef.current), { 
                         status: '오류', 
-                        aiFeedback: errorMessage
+                        aiFeedback: errorMessage,
+                        studentRecordingUrl: downloadURL || "",
                     });
                 } catch (updateError) {
                     console.error("[Dialogue Processing] Error updating document to error state:", updateError);
