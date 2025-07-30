@@ -1,11 +1,12 @@
 
+
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useParams, useRouter, notFound } from "next/navigation";
 import { type TeacherAssessment, type StudentResult, type ResultSummary, type RubricScores, type UserData } from "@/lib/types";
 import { useAuth, mockStudents } from "@/context/auth-context";
-import { Loader2, User, Sparkles, TrendingUp, DraftingCompass, RefreshCcw } from "lucide-react";
+import { Loader2, User, Sparkles, TrendingUp, DraftingCompass, RefreshCcw, FileDown } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
 import { useToast } from "@/hooks/use-toast";
@@ -19,6 +20,8 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import { generateGrowthFeedback, type GenerateGrowthFeedbackOutput } from "@/ai/flows/generate-growth-feedback-flow";
 import { regenerateCurricularRemarks } from "@/ai/flows/regenerate-curricular-remarks-flow";
 import { Button } from "@/components/ui/button";
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 
 function AttemptDetailView({ result, assessment, attemptNumber }: { result: StudentResult, assessment: TeacherAssessment, attemptNumber: number }) {
@@ -187,6 +190,8 @@ const chartConfig = {
 function TeacherGrowthView({ results, assessment }: { results: StudentResult[], assessment: TeacherAssessment }) {
     const [growthFeedback, setGrowthFeedback] = useState<GenerateGrowthFeedbackOutput | null>(null);
     const [isLoadingFeedback, setIsLoadingFeedback] = useState(true);
+    const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+    const overviewRef = useRef<HTMLDivElement>(null);
     const { toast } = useToast();
     
     const latestResult = results[results.length - 1];
@@ -265,7 +270,7 @@ function TeacherGrowthView({ results, assessment }: { results: StudentResult[], 
             await updateDoc(resultRef, {
                 growthFeedback: feedback.growthFeedback,
                 growthTeacherGuidance: feedback.teacherGuidance,
-                growthCurricularRemarks: feedback.curricularRemarks,
+                growthCurricularRemarks: feedback.growthCurricularRemarks,
                 growthFeedbackForAttempts: results.length
             });
             toast({ title: "AI 종합 분석 완료", description: "학생의 성장 과정에 대한 종합 분석이 완료되었습니다."});
@@ -298,19 +303,19 @@ function TeacherGrowthView({ results, assessment }: { results: StudentResult[], 
                 curricularRemarks: r.curricularRemarks ?? ""
             }));
 
-            const { growthCurricularRemarks } = await regenerateCurricularRemarks({
+            const { curricularRemarks } = await regenerateCurricularRemarks({
                 attempts: validAttempts,
                 assessmentTitle: assessment.title,
             });
 
             setGrowthFeedback(prev => ({
                 ...(prev || { growthFeedback: "", teacherGuidance: "" }),
-                curricularRemarks: growthCurricularRemarks
+                curricularRemarks
             }));
             
             const resultRef = doc(db, "results", latestResult.id);
             await updateDoc(resultRef, {
-                growthCurricularRemarks: growthCurricularRemarks,
+                growthCurricularRemarks: curricularRemarks,
             });
             
             toast({ title: "생활기록부(종합) 재생성 완료!", description: "새로운 종합 의견이 생성되었습니다." });
@@ -322,6 +327,37 @@ function TeacherGrowthView({ results, assessment }: { results: StudentResult[], 
             setIsLoadingFeedback(false);
         }
     }, [results, assessment.title, toast, latestResult.id]);
+    
+    const handleDownloadPdf = async () => {
+        if (!overviewRef.current) return;
+        
+        setIsDownloadingPdf(true);
+        toast({title: "PDF 생성 중...", description: "분석 결과를 PDF 파일로 만들고 있습니다."});
+
+        try {
+            const canvas = await html2canvas(overviewRef.current, {
+                useCORS: true,
+                scale: 2, 
+            });
+            const imgData = canvas.toDataURL('image/png');
+            
+            const pdf = new jsPDF({
+                orientation: 'portrait',
+                unit: 'px',
+                format: [canvas.width, canvas.height]
+            });
+            
+            pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+            pdf.save(`${latestResult.name}_${assessment.title}_종합분석.pdf`);
+            toast({title: "PDF 다운로드 완료"});
+        } catch (error) {
+            console.error("Failed to download PDF:", error);
+            toast({title: "PDF 생성 오류", description: "PDF 파일을 만드는 중 문제가 발생했습니다.", variant: "destructive"});
+        } finally {
+            setIsDownloadingPdf(false);
+        }
+    };
+
 
      useEffect(() => {
         if (results.length > 1) {
@@ -359,79 +395,75 @@ function TeacherGrowthView({ results, assessment }: { results: StudentResult[], 
 
     return (
         <div className="space-y-6">
-            {!isRubricUsed && (
+            <div className="flex justify-end">
+                <Button onClick={handleDownloadPdf} disabled={isDownloadingPdf}>
+                    {isDownloadingPdf ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <FileDown className="mr-2 h-4 w-4" />}
+                    종합 분석 PDF로 저장
+                </Button>
+            </div>
+            <div ref={overviewRef} className="space-y-6 bg-background p-4 rounded-lg">
+                {!isRubricUsed && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2"><TrendingUp />성장 곡선</CardTitle>
+                            <CardDescription>평가 시도별 점수 변화입니다.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="h-64">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <LineChart data={chartData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis dataKey="name" />
+                                    <YAxis domain={[0, 100]} />
+                                    <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}/>
+                                    <Legend />
+                                    <Line type="monotone" dataKey="contentScore" name="내용 점수" stroke={chartConfig.contentScore.color} activeDot={{ r: 8 }} />
+                                    <Line type="monotone" dataKey="pronunciationScore" name="발음 점수" stroke={chartConfig.pronunciationScore.color} />
+                                </LineChart>
+                            </ResponsiveContainer>
+                        </CardContent>
+                    </Card>
+                )}
+                {isRubricUsed && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2"><DraftingCompass />루브릭 영역별 성장 분석</CardTitle>
+                            <CardDescription>시도별 루브릭 항목 점수 변화를 비교합니다. (5점 만점)</CardDescription>
+                        </CardHeader>
+                        <CardContent className="h-80">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarChartData}>
+                                    <PolarGrid />
+                                    <PolarAngleAxis dataKey="subject" />
+                                    <PolarRadiusAxis angle={30} domain={[0, 5]} tickCount={6} />
+                                    <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}/>
+                                    <Legend />
+                                    {chartData.map((_r, i) => (
+                                       <Radar key={i} name={`${i+1}차 시도`} dataKey={`attempt${i+1}`} stroke={`hsl(var(--chart-${(i % 5) + 1}))`} fill={`hsl(var(--chart-${(i % 5) + 1}))`} fillOpacity={0.4} />
+                                    ))}
+                                </RadarChart>
+                            </ResponsiveContainer>
+                        </CardContent>
+                    </Card>
+                )}
                 <Card>
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><TrendingUp />성장 곡선</CardTitle>
-                        <CardDescription>평가 시도별 점수 변화입니다.</CardDescription>
+                        <div className="flex justify-between items-center">
+                            <CardTitle className="flex items-center gap-2"><Sparkles />AI 종합 성장 피드백</CardTitle>
+                        </div>
+                        <CardDescription>모든 시도를 종합하여 AI가 분석한 학생의 성장 과정입니다.</CardDescription>
                     </CardHeader>
-                    <CardContent className="h-64">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={chartData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="name" />
-                                <YAxis domain={[0, 100]} />
-                                <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}/>
-                                <Legend />
-                                <Line type="monotone" dataKey="contentScore" name="내용 점수" stroke={chartConfig.contentScore.color} activeDot={{ r: 8 }} />
-                                <Line type="monotone" dataKey="pronunciationScore" name="발음 점수" stroke={chartConfig.pronunciationScore.color} />
-                            </LineChart>
-                        </ResponsiveContainer>
+                    <CardContent>
+                        <div className="grid md:grid-cols-2 gap-6">
+                            <RemarksCard 
+                                title="생활기록부 교과 특기 사항 (종합)" 
+                                content={finalCurricularRemarks} 
+                                onRegenerate={results.length > 1 ? handleRegenerateRemarks : undefined}
+                            />
+                            <RemarksCard title="교사용 AI 조언 (종합)" content={growthFeedback?.teacherGuidance} />
+                        </div>
                     </CardContent>
                 </Card>
-            )}
-            {isRubricUsed && (
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><DraftingCompass />루브릭 영역별 성장 분석</CardTitle>
-                        <CardDescription>시도별 루브릭 항목 점수 변화를 비교합니다. (5점 만점)</CardDescription>
-                    </CardHeader>
-                    <CardContent className="h-80">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarChartData}>
-                                <PolarGrid />
-                                <PolarAngleAxis dataKey="subject" />
-                                <PolarRadiusAxis angle={30} domain={[0, 5]} tickCount={6} />
-                                <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}/>
-                                <Legend />
-                                {chartData.map((_r, i) => (
-                                   <Radar key={i} name={`${i+1}차 시도`} dataKey={`attempt${i+1}`} stroke={`hsl(var(--chart-${(i % 5) + 1}))`} fill={`hsl(var(--chart-${(i % 5) + 1}))`} fillOpacity={0.4} />
-                                ))}
-                            </RadarChart>
-                        </ResponsiveContainer>
-                    </CardContent>
-                </Card>
-            )}
-            <Card>
-                <CardHeader>
-                    <div className="flex justify-between items-center">
-                        <CardTitle className="flex items-center gap-2"><Sparkles />AI 종합 성장 피드백</CardTitle>
-                    </div>
-                    <CardDescription>모든 시도를 종합하여 AI가 분석한 학생의 성장 과정입니다.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <div className="grid md:grid-cols-2 gap-6">
-                        <RemarksCard 
-                            title="생활기록부 교과 특기 사항 (종합)" 
-                            content={finalCurricularRemarks} 
-                            onRegenerate={results.length > 1 ? handleRegenerateRemarks : undefined}
-                        />
-                        <RemarksCard title="교사용 AI 조언 (종합)" content={growthFeedback?.teacherGuidance} />
-                        <Card className="md:col-span-2">
-                            <CardHeader><CardTitle>학생에게 제공된 AI 종합 피드백</CardTitle></CardHeader>
-                            <CardContent className="p-4 bg-muted/50 rounded-lg font-body text-base leading-relaxed markdown-content">
-                               {isLoadingFeedback ? (
-                                    <div className="flex items-center gap-2 text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin"/> 생성 중...</div>
-                                ) : growthFeedback?.growthFeedback ? (
-                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{growthFeedback.growthFeedback}</ReactMarkdown>
-                                ) : (
-                                    <div className="text-muted-foreground">오류가 발생했거나 생성된 내용이 없습니다.</div>
-                                )}
-                            </CardContent>
-                        </Card>
-                    </div>
-                </CardContent>
-            </Card>
+            </div>
         </div>
     );
 }
@@ -598,4 +630,3 @@ export default function TeacherStudentResultView() {
     </div>
   );
 }
-

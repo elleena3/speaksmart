@@ -2,14 +2,14 @@
 
 "use client"
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { type StudentResult, type TeacherAssessment, type ResultSummary, type RubricScores } from "@/lib/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
 import { FreeTalkFeedbackView } from "./free-talk-feedback-view";
 import { generateGrowthFeedback, type GenerateGrowthFeedbackOutput } from "@/ai/flows/generate-growth-feedback-flow";
-import { Loader2, Sparkles, TrendingUp, DraftingCompass, RefreshCcw } from "lucide-react";
+import { Loader2, Sparkles, TrendingUp, DraftingCompass, RefreshCcw, FileDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { Repeat } from "lucide-react";
@@ -18,6 +18,8 @@ import remarkGfm from "remark-gfm";
 import { doc, updateDoc, writeBatch } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 type GrowthViewProps = {
     results: StudentResult[];
@@ -46,8 +48,10 @@ export function GrowthView({ results: initialResults, assessment, defaultTab }: 
     const [growthFeedback, setGrowthFeedback] = useState<GenerateGrowthFeedbackOutput | null>(null);
     const [isLoadingFeedback, setIsLoadingFeedback] = useState(true);
     const [isRecalculating, setIsRecalculating] = useState(false);
+    const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
     const [results, setResults] = useState(initialResults);
     const { toast } = useToast();
+    const overviewRef = useRef<HTMLDivElement>(null);
 
     const sortedResults = results;
     const latestResult = sortedResults[sortedResults.length - 1];
@@ -124,7 +128,7 @@ export function GrowthView({ results: initialResults, assessment, defaultTab }: 
                           pronunciationScore: r.pronunciationScore ?? 0,
                           transcript: r.studentTranscript ?? "",
                           aiFeedback: r.aiFeedback ?? "",
-                          curricularRemarks: r.curricularRemarks ?? "",
+                           curricularRemarks: r.curricularRemarks ?? ""
                         }));
 
                         const feedback = await generateGrowthFeedback({
@@ -137,7 +141,7 @@ export function GrowthView({ results: initialResults, assessment, defaultTab }: 
                         await updateDoc(resultRef, {
                             growthFeedback: feedback.growthFeedback,
                             growthTeacherGuidance: feedback.teacherGuidance,
-                            curricularRemarks: feedback.curricularRemarks,
+                            growthCurricularRemarks: feedback.growthCurricularRemarks,
                             growthFeedbackForAttempts: sortedResults.length
                         });
                         toast({ title: "AI 종합 분석 완료", description: "학생의 성장 과정에 대한 종합 분석이 완료되었습니다."});
@@ -147,7 +151,7 @@ export function GrowthView({ results: initialResults, assessment, defaultTab }: 
                          setGrowthFeedback({ 
                             growthFeedback: "성장 피드백을 생성하는 중 오류가 발생했습니다.",
                             teacherGuidance: "교사 조언을 생성하는 중 오류가 발생했습니다.",
-                            curricularRemarks: "생활기록부 교과 특기 사항을 생성하는 중 오류가 발생했습니다."
+                            growthCurricularRemarks: "생활기록부 교과 특기 사항을 생성하는 중 오류가 발생했습니다."
                          });
                     } finally {
                         setIsLoadingFeedback(false);
@@ -209,6 +213,36 @@ export function GrowthView({ results: initialResults, assessment, defaultTab }: 
         }
     };
     
+    const handleDownloadPdf = async () => {
+        if (!overviewRef.current) return;
+        
+        setIsDownloadingPdf(true);
+        toast({title: "PDF 생성 중...", description: "분석 결과를 PDF 파일로 만들고 있습니다."});
+
+        try {
+            const canvas = await html2canvas(overviewRef.current, {
+                useCORS: true,
+                scale: 2, 
+            });
+            const imgData = canvas.toDataURL('image/png');
+            
+            const pdf = new jsPDF({
+                orientation: 'portrait',
+                unit: 'px',
+                format: [canvas.width, canvas.height]
+            });
+            
+            pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+            pdf.save(`${latestResult.name}_${assessment.title}_종합분석.pdf`);
+            toast({title: "PDF 다운로드 완료"});
+        } catch (error) {
+            console.error("Failed to download PDF:", error);
+            toast({title: "PDF 생성 오류", description: "PDF 파일을 만드는 중 문제가 발생했습니다.", variant: "destructive"});
+        } finally {
+            setIsDownloadingPdf(false);
+        }
+    };
+
     const retryLink = assessment.assessmentType === 'dialogue'
         ? `/student/assessment/free-talk?id=${assessment.id}`
         : `/student/assessment/${assessment.id}`;
@@ -222,99 +256,105 @@ export function GrowthView({ results: initialResults, assessment, defaultTab }: 
                 ))}
             </TabsList>
 
-            <TabsContent value="overview" className="mt-4 space-y-6">
-                {!isRubricUsed && (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2"><TrendingUp />성장 곡선</CardTitle>
-                            <CardDescription>평가 시도별 점수 변화입니다.</CardDescription>
-                        </CardHeader>
-                        <CardContent className="h-64">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <LineChart data={chartData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="name" />
-                                    <YAxis domain={[0, 100]} />
-                                    <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}/>
-                                    <Legend />
-                                    <Line type="monotone" dataKey="contentScore" name="내용 점수" stroke={chartConfig.contentScore.color} activeDot={{ r: 8 }} />
-                                    <Line type="monotone" dataKey="pronunciationScore" name="발음 점수" stroke={chartConfig.pronunciationScore.color} />
-                                </LineChart>
-                            </ResponsiveContainer>
-                        </CardContent>
-                    </Card>
-                )}
-                {isRubricUsed && (
-                    <Card>
-                        <CardHeader>
-                             <div className="flex justify-between items-center">
-                                <div>
-                                    <CardTitle className="flex items-center gap-2"><DraftingCompass />루브릭 영역별 성장 분석</CardTitle>
-                                    <CardDescription>시도별 루브릭 항목 점수 변화를 비교합니다. (5점 만점)</CardDescription>
+            <TabsContent value="overview" className="mt-4">
+                 <div className="space-y-6" ref={overviewRef}>
+                    {!isRubricUsed && (
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2"><TrendingUp />성장 곡선</CardTitle>
+                                <CardDescription>평가 시도별 점수 변화입니다.</CardDescription>
+                            </CardHeader>
+                            <CardContent className="h-64">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <LineChart data={chartData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                                        <CartesianGrid strokeDasharray="3 3" />
+                                        <XAxis dataKey="name" />
+                                        <YAxis domain={[0, 100]} />
+                                        <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}/>
+                                        <Legend />
+                                        <Line type="monotone" dataKey="contentScore" name="내용 점수" stroke={chartConfig.contentScore.color} activeDot={{ r: 8 }} />
+                                        <Line type="monotone" dataKey="pronunciationScore" name="발음 점수" stroke={chartConfig.pronunciationScore.color} />
+                                    </LineChart>
+                                </ResponsiveContainer>
+                            </CardContent>
+                        </Card>
+                    )}
+                    {isRubricUsed && (
+                        <Card>
+                            <CardHeader>
+                                 <div className="flex justify-between items-center">
+                                    <div>
+                                        <CardTitle className="flex items-center gap-2"><DraftingCompass />루브릭 영역별 성장 분석</CardTitle>
+                                        <CardDescription>시도별 루브릭 항목 점수 변화를 비교합니다. (5점 만점)</CardDescription>
+                                    </div>
+                                    <Button variant="outline" size="sm" onClick={handleRecalculateAll} disabled={isRecalculating}>
+                                        {isRecalculating ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <RefreshCcw className="mr-2 h-4 w-4"/>}
+                                        모든 시도 점수 다시 읽기
+                                    </Button>
                                 </div>
-                                <Button variant="outline" size="sm" onClick={handleRecalculateAll} disabled={isRecalculating}>
-                                    {isRecalculating ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <RefreshCcw className="mr-2 h-4 w-4"/>}
-                                    모든 시도 점수 다시 읽기
-                                </Button>
-                            </div>
-                        </CardHeader>
-                        <CardContent className="h-80">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarChartData}>
-                                    <PolarGrid />
-                                    <PolarAngleAxis dataKey="subject" />
-                                    <PolarRadiusAxis angle={30} domain={[0, 5]} tickCount={6} />
-                                    <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}/>
-                                    <Legend />
-                                    {chartData.map((_r, i) => (
-                                       <Radar 
-                                         key={i} 
-                                         name={`${i+1}차 시도`} 
-                                         dataKey={`attempt${i+1}`} 
-                                         stroke={`hsl(var(--chart-${(i % 5) + 1}))`} 
-                                         fill={`hsl(var(--chart-${(i % 5) + 1}))`} 
-                                         fillOpacity={0.4} 
-                                        />
-                                    ))}
-                                </RadarChart>
-                            </ResponsiveContainer>
-                        </CardContent>
-                    </Card>
-                )}
-                {sortedResults.length > 1 && (
-                    <Card>
+                            </CardHeader>
+                            <CardContent className="h-80">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarChartData}>
+                                        <PolarGrid />
+                                        <PolarAngleAxis dataKey="subject" />
+                                        <PolarRadiusAxis angle={30} domain={[0, 5]} tickCount={6} />
+                                        <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}/>
+                                        <Legend />
+                                        {chartData.map((_r, i) => (
+                                           <Radar 
+                                             key={i} 
+                                             name={`${i+1}차 시도`} 
+                                             dataKey={`attempt${i+1}`} 
+                                             stroke={`hsl(var(--chart-${(i % 5) + 1}))`} 
+                                             fill={`hsl(var(--chart-${(i % 5) + 1}))`} 
+                                             fillOpacity={0.4} 
+                                            />
+                                        ))}
+                                    </RadarChart>
+                                </ResponsiveContainer>
+                            </CardContent>
+                        </Card>
+                    )}
+                    {sortedResults.length > 1 && (
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2"><Sparkles />AI 종합 성장 피드백</CardTitle>
+                                <CardDescription>모든 시도를 종합하여 AI가 분석한 학생의 성장 과정입니다.</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                {isLoadingFeedback ? (
+                                    <div className="flex items-center justify-center p-8">
+                                        <Loader2 className="h-8 w-8 animate-spin" />
+                                    </div>
+                                ) : (
+                                    <div className="p-4 bg-muted/50 rounded-lg markdown-content">
+                                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                            {growthFeedback?.growthFeedback || ''}
+                                        </ReactMarkdown>
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+                    )}
+                     <Card>
                         <CardHeader>
-                            <CardTitle className="flex items-center gap-2"><Sparkles />AI 종합 성장 피드백</CardTitle>
-                            <CardDescription>모든 시도를 종합하여 AI가 분석한 학생의 성장 과정입니다.</CardDescription>
+                          <CardTitle>활동 옵션</CardTitle>
+                          <CardDescription>평가에 다시 도전하거나, 종합 분석 결과를 PDF로 저장하세요.</CardDescription>
                         </CardHeader>
-                        <CardContent>
-                            {isLoadingFeedback ? (
-                                <div className="flex items-center justify-center p-8">
-                                    <Loader2 className="h-8 w-8 animate-spin" />
-                                </div>
-                            ) : (
-                                <div className="p-4 bg-muted/50 rounded-lg markdown-content">
-                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                        {growthFeedback?.growthFeedback || ''}
-                                    </ReactMarkdown>
-                                </div>
-                            )}
+                        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <Link href={retryLink} passHref>
+                            <Button className="w-full">
+                              <Repeat className="mr-2 h-4 w-4" /> 다시 해보기
+                            </Button>
+                          </Link>
+                          <Button onClick={handleDownloadPdf} disabled={isDownloadingPdf} variant="secondary" className="w-full">
+                                {isDownloadingPdf ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <FileDown className="mr-2 h-4 w-4" />}
+                                종합 분석 PDF로 저장
+                           </Button>
                         </CardContent>
-                    </Card>
-                )}
-                 <Card>
-                    <CardHeader>
-                      <CardTitle>다시 해보기</CardTitle>
-                      <CardDescription>이 평가에 다시 도전하여 실력을 향상시켜 보세요.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <Link href={retryLink} passHref>
-                        <Button className="w-full">
-                          <Repeat className="mr-2 h-4 w-4" /> 다시 해보기
-                        </Button>
-                      </Link>
-                    </CardContent>
-                  </Card>
+                      </Card>
+                </div>
             </TabsContent>
 
             {sortedResults.map((result, index) => (
