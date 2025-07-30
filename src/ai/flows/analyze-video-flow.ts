@@ -1,16 +1,14 @@
 
 'use server';
 
-import { ai } from '@/ai/genkit';
-import { googleAI } from '@genkit-ai/googleai';
+import { generate } from '@genkit-ai/ai';
 import { z } from 'zod';
 
 /**
  * @fileOverview A flow to analyze a video file from Firebase Storage.
  *
  * This flow takes a file path from Firebase Storage and uses a generative AI model
- * to analyze the video content based on the prompt. It uses the Vertex AI
- * method of passing file URIs.
+ * to analyze the video content based on the prompt.
  * 참고: 이 도구는 현재 작은 용량의 동영상 파일 분석에 최적화되어 있습니다.
  */
 
@@ -40,52 +38,33 @@ type AnalyzeVideoOutput = {
 export async function analyzeVideo(
   input: AnalyzeVideoInput
 ): Promise<AnalyzeVideoOutput> {
-  return analyzeVideoFlow(input);
-}
-
-
-// The Genkit flow definition.
-const analyzeVideoFlow = ai.defineFlow(
-  {
-    name: 'analyzeVideoFlow',
-    inputSchema: AnalyzeVideoInputSchema,
-    outputSchema: z.object({
-        analysis: z.string().describe("The text-based analysis of the video content."),
-    })
-  },
-  async ({ filePath, mimeType, prompt }) => {
-    
-    const bucketName = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
-    if (!bucketName) {
-        throw new Error("Firebase Storage bucket name is not configured in environment variables.");
-    }
-    
-    const gcsUri = `gs://${bucketName}/${filePath}`;
-
-    // Get the specific model instance from the googleAI() plugin
-    const model = googleAI().model('gemini-2.5-pro');
-
-    const content = [
-      { text: prompt },
-      {
-        fileData: {
-          uri: gcsUri,
-          type: mimeType,
-        },
-      },
-    ];
-    
-    // Correctly call the generate method on the model object
-    const response = await model.generate({
-        content: [content],
-    });
-    
-    const analysisText = response.text();
-
-    if (!analysisText) {
-      throw new Error("AI model did not return a valid text analysis from the video.");
-    }
-
-    return { analysis: analysisText };
+  const bucketName = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
+  if (!bucketName) {
+      throw new Error("Firebase Storage bucket name is not configured in environment variables.");
   }
-);
+  
+  const gcsUri = `gs://${bucketName}/${input.filePath}`;
+  
+  const content = [
+    { text: input.prompt },
+    {
+      fileData: {
+        uri: gcsUri,
+        type: input.mimeType,
+      },
+    },
+  ];
+
+  const response = await generate({
+    model: "googleai/gemini-2.5-pro",
+    prompt: content,
+  });
+
+  const analysisText = response.text();
+
+  if (!analysisText) {
+    throw new Error("AI model did not return a valid text analysis from the video.");
+  }
+
+  return { analysis: analysisText };
+}
