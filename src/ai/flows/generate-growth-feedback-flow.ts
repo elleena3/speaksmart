@@ -54,7 +54,7 @@ Please perform the following steps based on ALL attempts provided:
     -   **Tone:** Professional and advisory.
     -   **Content:** Summarize the student's overall progress across all attempts. Pinpoint the most significant areas of improvement and persistent weaknesses. Provide clear, actionable advice by suggesting specific activities or teaching strategies. Separate your points into distinct paragraphs for readability.
 
-3.  **Generate '생활기록부 교과 특기 사항' ('growthCurricularRemarks'):**
+3.  **Generate '생활기록부 교과 특기 사항' (MUST be named 'growthCurricularRemarks'):**
     -   **Format:** Formal Korean prose, with sentences ending in '~함' or '~임'.
     -   **Tone:** Official and descriptive, suitable for a school record.
     -   **Content:** 
@@ -67,7 +67,7 @@ Please perform the following steps based on ALL attempts provided:
         You MUST return the exact following message in the 'growthCurricularRemarks' field: "종합 의견을 생성하기 위한 개별 시도의 교과 특기 사항 기록이 부족하거나 유효하지 않습니다."
         {{/if}}
 
-The final output must be a single JSON object containing 'growthFeedback', 'teacherGuidance', and 'growthCurricularRemarks'.
+The final output MUST be a single JSON object containing 'growthFeedback', 'teacherGuidance', and 'growthCurricularRemarks'.
 `,
 });
 
@@ -101,11 +101,13 @@ const generateGrowthFeedbackFlow = ai.defineFlow(
     
     const defaultErrorMsg = "오류가 발생했거나 생성된 내용이 없습니다.";
 
-    // 4. Final safety check on the output to prevent undefined values.
+    // 4. Final safety check on the output to prevent schema validation errors.
+    const rawOutput = output as any;
     const finalOutput: GenerateGrowthFeedbackOutput = {
-        growthFeedback: output?.growthFeedback || defaultErrorMsg,
-        teacherGuidance: output?.teacherGuidance || defaultErrorMsg,
-        curricularRemarks: output?.growthCurricularRemarks || defaultErrorMsg,
+        growthFeedback: rawOutput?.growthFeedback || defaultErrorMsg,
+        teacherGuidance: rawOutput?.teacherGuidance || defaultErrorMsg,
+        // If the model mistakenly uses 'curricularRemarks', correct it to 'growthCurricularRemarks'.
+        growthCurricularRemarks: rawOutput?.growthCurricularRemarks || rawOutput?.curricularRemarks || defaultErrorMsg,
     };
     
     return finalOutput;
