@@ -4,7 +4,6 @@
 import { ai } from '@/ai/genkit';
 import { googleAI } from '@genkit-ai/googleai';
 import { z } from 'zod';
-import { adminStorage } from '@/lib/firebase-admin';
 
 /**
  * @fileOverview A flow to analyze a video file from Firebase Storage.
@@ -55,34 +54,30 @@ const analyzeVideoFlow = ai.defineFlow(
   },
   async ({ filePath, mimeType, prompt }) => {
     
-    // In a production environment, you would get the bucket name from a secure source.
-    // For this environment, we'll use the environment variable which should be correctly configured.
     const bucketName = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
     if (!bucketName) {
         throw new Error("Firebase Storage bucket name is not configured in environment variables.");
     }
     
-    // Construct the GCS URI.
-    const videoUrl = `gs://${bucketName}/${filePath}`;
+    const gcsUri = `gs://${bucketName}/${filePath}`;
 
-    // Call the model using the fileData format for GCS URIs, as required by Vertex AI.
-    const { text } = await ai.generate({
-      model: googleAI.model('gemini-2.5-pro'),
-      prompt: [
-        { text: prompt },
-        { 
-            fileData: { 
-              uri: videoUrl, 
-              mimeType: mimeType 
-            } 
+    const content = [
+      { text: prompt },
+      {
+        fileData: {
+          uri: gcsUri,
+          type: mimeType,
         },
-      ],
-    });
+      },
+    ];
 
-    if (!text) {
+    const response = await ai.generateContent(content);
+    const analysisText = response.text();
+
+    if (!analysisText) {
       throw new Error("AI model did not return a valid text analysis from the video.");
     }
 
-    return { analysis: text };
+    return { analysis: analysisText };
   }
 );
