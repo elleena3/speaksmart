@@ -54,14 +54,14 @@ const analyzeVideoFlow = ai.defineFlow(
   },
   async ({ filePath, mimeType, prompt }) => {
     
-    // Use the admin SDK to get the default bucket name, which is in the correct format (e.g., 'project-id.appspot.com').
-    const bucketName = adminStorage.bucket().name;
+    // Use the admin SDK to get the default bucket name for constructing the GCS URI.
+    // This is the most reliable way to get the correct bucket name.
+    const bucketName = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
 
     if (!bucketName) {
-        throw new Error("Could not determine Firebase Storage bucket name via Admin SDK.");
+        throw new Error("Could not determine Firebase Storage bucket name. Check NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET environment variable.");
     }
     
-    // Construct the correct gs:// URI using the bucket name and the file path.
     const videoUrl = `gs://${bucketName}/${filePath}`;
 
     const { text } = await ai.generate({

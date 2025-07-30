@@ -5,27 +5,34 @@ import {config} from 'dotenv';
 config();
 
 // ====================================================================
-// 중요: .env 파일에 Google AI API 키를 설정해주세요.
+// 중요: Vertex AI 인증으로 변경되었습니다.
 //
-// 1. [Google Cloud 자격 증명 페이지](https://console.cloud.google.com/apis/credentials)로 이동합니다.
-// 2. 'API 키' 목록에서 "Browser key (auto created by Firebase)" 라는 이름의 키를 클릭합니다.
-//    (이름이 다르다면, 사용 중인 API 키를 선택하세요.)
-// 3. '키 제한사항' 섹션에서 '웹사이트' 제한을 '없음'으로 설정하고 저장합니다.
-//    (이 과정이 서버 환경에서 발생하는 'API_KEY_HTTP_REFERRER_BLOCKED' 오류를 해결합니다.)
-// 4. '키 표시'를 눌러 키를 복사한 후, 이 프로젝트의 .env 파일에 GOOGLE_API_KEY="여기에_키_붙여넣기" 형식으로 저장하세요.
+// 1. 기존 .env 파일의 GOOGLE_API_KEY는 더 이상 사용되지 않습니다.
+// 2. 이 프로젝트의 루트에 있는 .env 파일에 다음 두 가지 환경 변수를 설정해야 합니다.
+//    - GOOGLE_CLOUD_PROJECT="speaksmart-evaluator2" (Firebase 프로젝트 ID)
+//    - GOOGLE_CLOUD_LOCATION="us-central1" (또는 사용하려는 Vertex AI 리전)
+// 3. 서버 환경(Genkit)을 실행하는 서비스 계정에 다음 IAM 역할이 필요합니다.
+//    - "Vertex AI 사용자"
+//    - "Storage 개체 뷰어" (Firebase Storage 버킷 접근용)
 // ====================================================================
-const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
+const GOOGLE_CLOUD_PROJECT = process.env.GOOGLE_CLOUD_PROJECT;
+const GOOGLE_CLOUD_LOCATION = process.env.GOOGLE_CLOUD_LOCATION;
 
-if (!GOOGLE_API_KEY) {
+if (!GOOGLE_CLOUD_PROJECT || !GOOGLE_CLOUD_LOCATION) {
     console.warn(
-      'GOOGLE_API_KEY is not set in the .env file. AI features will not work. Please get a key from the Google Cloud Console.'
+      'GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION must be set in the .env file for Vertex AI to work.'
     );
 }
 
 export const ai = genkit({
   plugins: [
     googleAI({
-      apiKey: GOOGLE_API_KEY,
+      // Vertex AI를 사용하도록 설정합니다.
+      // 이 설정은 자동으로 Application Default Credentials (ADC)를 사용하여 인증합니다.
+      vertex: {
+        project: GOOGLE_CLOUD_PROJECT!,
+        location: GOOGLE_CLOUD_LOCATION!,
+      },
     }),
   ],
 });
