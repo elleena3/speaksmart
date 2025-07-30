@@ -29,17 +29,17 @@ const summarizePrompt = ai.definePrompt({
     model: googleAI.model('gemini-2.5-pro'),
     input: { schema: z.object({ transcript: z.string() }) },
     output: { schema: SummarizeYoutubeVideoOutputSchema },
-    prompt: `You are an expert content summarizer. Your task is to read the following transcript from a YouTube video and create a clear, concise summary in Korean. The summary should be well-structured and easy to read.
+    prompt: `You are an expert content analyst. Your task is to read the following transcript from a YouTube video and create a clear, concise summary in Korean. The summary should be well-structured and easy to read, capturing the main topic, key arguments, and overall message of the video.
 
 Please perform the following steps:
-1.  Read the entire transcript to understand the main topic and key arguments.
+1.  Read the entire transcript to understand the main topic, key arguments, and underlying message.
 2.  Create a summary that includes:
     -   A main title for the summary.
     -   A brief introductory paragraph explaining the overall topic of the video.
     -   A bulleted list of the main points or key takeaways.
-    -   A concluding sentence that wraps up the video's core message.
+    -   A concluding sentence that wraps up the video's core message or call to action.
 3.  Format the entire output in Markdown. Use headings, bold text, and bullet points for readability.
-4.  The final output must be only the summary text.
+4.  The final output must be only the summary text, written in Korean.
 
 Here is the transcript:
 """
