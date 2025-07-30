@@ -14,19 +14,17 @@ import { adminStorage } from '@/lib/firebase-admin';
  */
 
 
-// Define the input schema for the flow, which is not exported
-// to comply with 'use server' file constraints.
+// Define the input schema for the flow.
 const AnalyzeVideoInputSchema = z.object({
   filePath: z.string().describe("The path to the video file in Firebase Storage."),
   mimeType: z.string().describe("The MIME type of the video file (e.g., 'video/mp4')."),
   prompt: z.string().describe("A text prompt describing what to analyze in the video."),
 });
 
-// The output schema for the flow, also not exported.
-const AnalyzeVideoOutputSchema = z.object({
-  analysis: z.string().describe("The text-based analysis of the video content."),
-});
-export type AnalyzeVideoOutput = z.infer<typeof AnalyzeVideoOutputSchema>;
+// Define the output schema for the flow.
+type AnalyzeVideoOutput = {
+    analysis: string;
+}
 
 
 /**
@@ -48,19 +46,21 @@ const analyzeVideoFlow = ai.defineFlow(
   {
     name: 'analyzeVideoFlow',
     inputSchema: AnalyzeVideoInputSchema,
-    outputSchema: AnalyzeVideoOutputSchema,
+    outputSchema: z.object({
+        analysis: z.string().describe("The text-based analysis of the video content."),
+    })
   },
   async ({ filePath, mimeType, prompt }) => {
     
     // Get the default bucket name directly from the Firebase Admin SDK.
-    // This is the most reliable way to get the correct bucket name for gs:// URI.
+    // This is the most reliable way to get the correct bucket name for the gs:// URI.
     const bucketName = adminStorage.bucket().name;
 
     if (!bucketName) {
         throw new Error("Firebase Storage bucket name could not be retrieved from the admin SDK.");
     }
     
-    // Construct the correct gs:// URI using the retrieved bucket name.
+    // Construct the correct gs:// URI using the retrieved bucket name and the file path.
     const videoUrl = `gs://${bucketName}/${filePath}`;
 
     const { text } = await ai.generate({
