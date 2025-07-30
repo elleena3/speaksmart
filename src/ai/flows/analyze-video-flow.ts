@@ -9,8 +9,9 @@ import { adminStorage } from '@/lib/firebase-admin';
 /**
  * @fileOverview A flow to analyze a video file from Firebase Storage.
  *
- * This flow takes a file path from Firebase Storage and a text prompt,
- * and uses a generative AI model to analyze the video content based on the prompt.
+ * This flow takes a file path from Firebase Storage, downloads it,
+ * converts it to a base64 data URI, and then uses a generative AI model
+ * to analyze the video content based on the prompt.
  */
 
 
@@ -54,17 +55,20 @@ const analyzeVideoFlow = ai.defineFlow(
   },
   async ({ filePath, mimeType, prompt }) => {
     
-    // Using Firebase Admin SDK to get the default bucket name.
-    // This is more reliable than environment variables.
-    const bucketName = adminStorage.bucket().name;
-    
-    const videoUrl = `gs://${bucketName}/${filePath}`;
+    // 1. Download the file from Firebase Storage into a buffer.
+    const bucket = adminStorage.bucket();
+    const file = bucket.file(filePath);
+    const [buffer] = await file.download();
 
+    // 2. Convert the buffer to a Base64 Data URI.
+    const videoDataUri = `data:${mimeType};base64,${buffer.toString('base64')}`;
+
+    // 3. Call the model with the Data URI.
     const { text } = await ai.generate({
       model: googleAI.model('gemini-2.5-pro'),
       prompt: [
         { text: prompt },
-        { media: { url: videoUrl, contentType: mimeType } },
+        { media: { url: videoDataUri } },
       ],
     });
 
