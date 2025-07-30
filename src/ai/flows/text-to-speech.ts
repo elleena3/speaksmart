@@ -183,7 +183,7 @@ const converseWithStudentFlow = ai.defineFlow(
       const sttResponse = await withRetry(() => ai.generate({
         model: googleAI.model(model),
         prompt: [
-          { text: 'Transcribe this English audio.' },
+          { text: "Your sole task is to transcribe the provided English audio with absolute precision. Do NOT correct grammar, mispronunciations, or any other errors. Transcribe ONLY the words that are spoken. If a word is unclear, represent it as best you can phonetically. Do not add, remove, or change any words based on context or interpretation. Provide only the raw, transcribed text." },
           { media: { url: studentRecordingDataUri } },
         ],
       }));
