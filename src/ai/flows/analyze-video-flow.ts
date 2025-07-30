@@ -11,6 +11,7 @@ import { z } from 'zod';
  * This flow takes a file path from Firebase Storage and uses a generative AI model
  * to analyze the video content based on the prompt. It uses the Vertex AI
  * method of passing file URIs.
+ * 참고: 이 도구는 현재 작은 용량의 동영상 파일 분석에 최적화되어 있습니다.
  */
 
 
@@ -62,7 +63,7 @@ const analyzeVideoFlow = ai.defineFlow(
     const gcsUri = `gs://${bucketName}/${filePath}`;
 
     // Get the specific model instance from the googleAI() plugin
-    const model = googleAI.model('gemini-1.5-pro');
+    const model = googleAI().model('gemini-2.5-pro');
 
     const content = [
       { text: prompt },
@@ -74,8 +75,11 @@ const analyzeVideoFlow = ai.defineFlow(
       },
     ];
     
-    // Call invoke on the model object, not generateContent
-    const response = await model.invoke(content);
+    // Correctly call the generate method on the model object
+    const response = await model.generate({
+        content: [content],
+    });
+    
     const analysisText = response.text();
 
     if (!analysisText) {
