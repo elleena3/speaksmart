@@ -1,3 +1,4 @@
+
 'use server';
 
 /**
@@ -15,6 +16,8 @@ const AnalyzeVideoInputSchema = z.object({
   prompt: z.string().describe("A text prompt describing what to analyze in the video."),
 });
 
+type AnalyzeVideoInput = z.infer<typeof AnalyzeVideoInputSchema>;
+
 const AnalyzeVideoOutputSchema = z.object({
   analysis: z.string().describe("The text-based analysis of the video content."),
 });
@@ -22,7 +25,7 @@ export type AnalyzeVideoOutput = z.infer<typeof AnalyzeVideoOutputSchema>;
 
 // This is the function that the UI component will call.
 export async function analyzeVideo(
-  input: z.infer<typeof AnalyzeVideoInputSchema>
+  input: AnalyzeVideoInput
 ): Promise<AnalyzeVideoOutput> {
   return analyzeVideoFlow(input);
 }
@@ -35,10 +38,18 @@ const analyzeVideoFlow = ai.defineFlow(
     outputSchema: AnalyzeVideoOutputSchema,
   },
   async ({ filePath, mimeType, prompt }) => {
-    // Note: The Genkit Google AI plugin automatically creates a downloadable URL
-    // from the Firebase Storage path. We don't need to manually create a data URI.
-    // The `gs://` prefix is implicitly handled.
-    const videoUrl = `gs://${process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET}/${filePath}`;
+    // The `gs://` protocol requires the pure bucket name, not the full domain.
+    // The environment variable NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET contains the full domain like 'project-id.firebasestorage.app'.
+    // We need to extract the bucket name, which is 'project-id.appspot.com'.
+    const fullBucketDomain = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || '';
+    const bucketName = fullBucketDomain.replace('.firebasestorage.app', '.appspot.com');
+
+    if (!bucketName) {
+        throw new Error("Firebase Storage bucket name is not configured correctly in environment variables.");
+    }
+    
+    // Construct the correct gs:// URI.
+    const videoUrl = `gs://${bucketName}/${filePath}`;
 
     const { text } = await ai.generate({
       model: googleAI.model('gemini-2.5-pro'),
