@@ -410,8 +410,6 @@ export function FreeTalkView({ assessment }: { assessment: TeacherAssessment }) 
         {sessionState !== 'idle' && sessionState !== 'initializing' && sessionState !== 'submitting' && sessionState !== 'countdown' && (
             <p className="text-xs text-center text-muted-foreground">
                 AI의 응답이 끝나면 <strong className="text-foreground">[응답하기]</strong> 버튼을 누르고 말씀하세요. 발언이 끝나면 <strong className="text-foreground">[말하기 중지]</strong> 버튼을 누릅니다.
-                 <br/>
-                <span className="font-semibold text-destructive">참고: 전체 대화 시간이 길어지면 브라우저의 메모리 한계로 오류가 발생할 수 있습니다.</span>
             </p>
         )}
         {sessionState === 'countdown' && (
