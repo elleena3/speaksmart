@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useLanguage } from "@/context/language-context";
@@ -20,6 +19,7 @@ import { SpeculativeConversationTool } from "@/components/feature-tools/speculat
 import { StorageUploaderTool } from "@/components/feature-tools/storage-uploader-tool";
 import { YoutubeSummarizerTool } from "./youtube-summarizer-tool";
 import { PdfStorageAnalyzerTool } from "./pdf-storage-analyzer-tool";
+import { PdfMultiAnalyzerTool } from "./pdf-multi-analyzer-tool";
 
 
 export default function MiscPage() {
@@ -32,6 +32,13 @@ export default function MiscPage() {
                 <p className="text-muted-foreground">{t.teacherMisc.description}</p>
             </div>
             <div className="grid grid-cols-1 gap-6">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>PDF 분석 도구 2 (다중 파일)</CardTitle>
+                        <CardDescription>여러 개의 PDF 파일을 한 번에 업로드하여, 각 파일에 대한 AI 분석을 개별적으로 요청하고 결과를 확인합니다.</CardDescription>
+                    </CardHeader>
+                    <PdfMultiAnalyzerTool />
+                </Card>
                 <Card>
                     <CardHeader>
                         <CardTitle>PDF 분석 도구 (Storage)</CardTitle>
