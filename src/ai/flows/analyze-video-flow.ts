@@ -1,11 +1,6 @@
 
 'use server';
 
-/**
- * @fileOverview A flow to analyze a generic video file based on a user's text prompt.
- * This flow takes a file path from Firebase Storage.
- */
-
 import { ai } from '@/ai/genkit';
 import { googleAI } from '@genkit-ai/googleai';
 import { z } from 'zod';
@@ -38,14 +33,11 @@ const analyzeVideoFlow = ai.defineFlow(
     outputSchema: AnalyzeVideoOutputSchema,
   },
   async ({ filePath, mimeType, prompt }) => {
-    // The `gs://` protocol requires the pure bucket name, not the full domain.
-    // The environment variable NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET contains the full domain like 'project-id.firebasestorage.app'.
-    // We need to extract the bucket name, which is 'project-id.appspot.com'.
-    const fullBucketDomain = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || '';
-    const bucketName = fullBucketDomain.replace('.firebasestorage.app', '.appspot.com');
+    // The `gs://` protocol requires the bucket name from the environment variable.
+    const bucketName = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
 
     if (!bucketName) {
-        throw new Error("Firebase Storage bucket name is not configured correctly in environment variables.");
+        throw new Error("Firebase Storage bucket name is not configured in environment variables.");
     }
     
     // Construct the correct gs:// URI.
