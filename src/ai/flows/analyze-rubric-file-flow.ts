@@ -11,31 +11,7 @@
 import { ai } from '@/ai/genkit';
 import { googleAI } from '@genkit-ai/googleai';
 import { z } from 'zod';
-
-const CriterionDetailSchema = z.object({
-  score: z.number().int().describe("The score for this specific level of performance."),
-  description: z.string().describe("The detailed description for this performance level."),
-});
-
-const RubricCriterionSchema = z.object({
-  name: z.string().describe("The name of the evaluation criterion (e.g., '유창성 (Fluency)')."),
-  maxScore: z.number().int().describe("The maximum possible score for this criterion."),
-  details: z.array(CriterionDetailSchema).describe("An array of detailed descriptions for each score level."),
-});
-
-export const AnalyzeRubricFileOutputSchema = z.object({
-  criteria: z.array(RubricCriterionSchema).describe("An array of all extracted evaluation criteria from the file."),
-});
-export type AnalyzeRubricFileOutput = z.infer<typeof AnalyzeRubricFileOutputSchema>;
-
-
-export const AnalyzeRubricFileInputSchema = z.object({
-  fileDataUri: z.string().describe(
-    "A file (image or PDF) containing the rubric, as a data URI."
-  ),
-});
-export type AnalyzeRubricFileInput = z.infer<typeof AnalyzeRubricFileInputSchema>;
-
+import { AnalyzeRubricFileInputSchema, AnalyzeRubricFileOutputSchema, type AnalyzeRubricFileInput, type AnalyzeRubricFileOutput } from '@/lib/types/ai-schemas';
 
 export async function analyzeRubricFile(input: AnalyzeRubricFileInput): Promise<AnalyzeRubricFileOutput> {
   const result = await analyzeRubricFileFlow(input);
