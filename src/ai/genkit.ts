@@ -9,7 +9,7 @@ config();
 //
 // 1. 기존 .env 파일의 GOOGLE_API_KEY는 더 이상 사용되지 않습니다.
 // 2. 이 프로젝트의 루트에 있는 .env 파일에 다음 두 가지 환경 변수를 설정해야 합니다.
-//    - GOOGLE_CLOUD_PROJECT="speaksmart-evaluator2" (Firebase 프로젝트 ID)
+//    - GOOGLE_CLOUD_PROJECT="your-project-id" (Firebase 프로젝트 ID)
 //    - GOOGLE_CLOUD_LOCATION="us-central1" (또는 사용하려는 Vertex AI 리전)
 // 3. 서버 환경(Genkit)을 실행하는 서비스 계정에 다음 IAM 역할이 필요합니다.
 //    - "Vertex AI 사용자"

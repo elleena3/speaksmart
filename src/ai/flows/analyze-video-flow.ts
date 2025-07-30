@@ -4,6 +4,7 @@
 import { ai } from '@/ai/genkit';
 import { googleAI } from '@genkit-ai/googleai';
 import { z } from 'zod';
+import { adminStorage } from '@/lib/firebase-admin';
 
 /**
  * @fileOverview A flow to analyze a video file from Firebase Storage.
@@ -53,13 +54,9 @@ const analyzeVideoFlow = ai.defineFlow(
   },
   async ({ filePath, mimeType, prompt }) => {
     
-    // The bucket name is retrieved from the environment variable, which should be set
-    // to the correct format (e.g., 'your-project-id.appspot.com').
-    const bucketName = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
-
-    if (!bucketName) {
-        throw new Error("Could not determine Firebase Storage bucket name. Check NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET environment variable.");
-    }
+    // Using Firebase Admin SDK to get the default bucket name.
+    // This is more reliable than environment variables.
+    const bucketName = adminStorage.bucket().name;
     
     const videoUrl = `gs://${bucketName}/${filePath}`;
 
