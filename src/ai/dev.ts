@@ -41,8 +41,11 @@ import '@/ai/flows/retry-analysis-flow';
 
 // New flow for presentation analysis
 import '@/ai/flows/analyze-presentation-video-flow';
+
+// New flows for PDF analysis tools
 import '@/ai/flows/analyze-pdf-from-storage-flow';
 import '@/ai/flows/analyze-multiple-pdfs-flow';
+import '@/ai/flows/grade-pdf-submission-flow';
 
 // This flow is being removed due to errors.
 // import '@/ai/flows/regenerate-html-feedback-flow';

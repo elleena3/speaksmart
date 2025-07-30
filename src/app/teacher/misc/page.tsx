@@ -21,6 +21,7 @@ import { YoutubeSummarizerTool } from "./youtube-summarizer-tool";
 import { PdfStorageAnalyzerTool } from "./pdf-storage-analyzer-tool";
 import { PdfMultiAnalyzerTool } from "./pdf-multi-analyzer-tool";
 import { PdfSequentialAnalyzerTool } from "./pdf-sequential-analyzer-tool";
+import { PdfGradingTool } from "./pdf-grading-tool";
 
 
 export default function MiscPage() {
@@ -33,6 +34,13 @@ export default function MiscPage() {
                 <p className="text-muted-foreground">{t.teacherMisc.description}</p>
             </div>
             <div className="grid grid-cols-1 gap-6">
+                 <Card>
+                    <CardHeader>
+                        <CardTitle>수행평가 채점 도구 (PDF)</CardTitle>
+                        <CardDescription>학생들의 PDF 답안 파일들과 채점 기준표 PDF 파일을 각각 업로드하면, AI가 기준에 따라 각 답안을 순차적으로 채점하고 결과를 표시합니다.</CardDescription>
+                    </CardHeader>
+                    <PdfGradingTool />
+                </Card>
                  <Card>
                     <CardHeader>
                         <CardTitle>PDF 분석 도구 3 (순차 분석)</CardTitle>
