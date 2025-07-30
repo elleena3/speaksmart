@@ -252,7 +252,7 @@ function TeacherGrowthView({ results, assessment }: { results: StudentResult[], 
                 pronunciationScore: r.pronunciationScore ?? 0,
                 transcript: r.studentTranscript ?? "",
                 aiFeedback: r.aiFeedback ?? "",
-                curricularRemarks: r.curricularRemarks ?? ""
+                curricularRemarks: r.curricularRemarks ?? "" // Pass this crucial field
             }));
 
             const feedback = await generateGrowthFeedback({
@@ -598,3 +598,4 @@ export default function TeacherStudentResultView() {
     </div>
   );
 }
+

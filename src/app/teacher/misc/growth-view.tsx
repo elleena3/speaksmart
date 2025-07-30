@@ -1,6 +1,6 @@
 
 
-"use client";
+"use client"
 
 import { useState, useEffect, useMemo } from "react";
 import { type StudentResult, type TeacherAssessment, type ResultSummary, type RubricScores } from "@/lib/types";
@@ -124,6 +124,7 @@ export function GrowthView({ results: initialResults, assessment, defaultTab }: 
                           pronunciationScore: r.pronunciationScore ?? 0,
                           transcript: r.studentTranscript ?? "",
                           aiFeedback: r.aiFeedback ?? "",
+                          curricularRemarks: r.curricularRemarks ?? ""
                         }));
 
                         const feedback = await generateGrowthFeedback({

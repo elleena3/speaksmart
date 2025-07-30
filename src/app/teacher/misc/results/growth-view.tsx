@@ -1,6 +1,6 @@
 
 
-"use client"
+"use client";
 
 import { useState, useEffect, useMemo } from "react";
 import { type StudentResult, type TeacherAssessment, type ResultSummary, type RubricScores } from "@/lib/types";
@@ -325,4 +325,3 @@ export function GrowthView({ results: initialResults, assessment, defaultTab }: 
         </Tabs>
     );
 }
-
