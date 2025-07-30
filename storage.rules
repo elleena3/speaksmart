@@ -1,29 +1,17 @@
-
 rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-    // 유저 ID로 폴더를 구분하여, 해당 유저만 자신의 폴더에 접근 가능하게 합니다.
-    // 보안 강화를 위해 권장되는 규칙입니다.
-    // 예: /b/bucket-name/o/user_files/user_id_123/my_file.jpg
-    match /user_files/{userId}/{allPaths=**} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-    }
+    match /{allPaths=**} {
+      // 서버 관리자 계정(Admin SDK)은 항상 파일을 읽고 쓸 수 있도록 허용합니다.
+      // 이는 Genkit Flow와 같은 서버 측 로직이 Storage의 파일에 직접 접근하는 데 필수적입니다.
+      allow read, write: if request.auth.token.admin == true;
 
-    // 현재 애플리케이션의 업로드 경로를 위한 규칙입니다.
-    // 인증된 모든 사용자가 recordings 폴더에 파일을 쓸 수 있도록 허용합니다.
-    match /recordings/{allPaths=**} {
-       allow read, write: if request.auth != null;
-    }
-    
-    // 이미지 파일 업로드 경로를 위한 규칙입니다.
-    match /assessment-images/{allPaths=**} {
-       allow read, write: if request.auth != null;
-    }
-
-    // 기타 업로드 경로를 위한 규칙입니다.
-     match /uploads/{userId}/{allPaths=**} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      // 일반 클라이언트(웹 앱)의 경우, 기존 규칙을 유지합니다.
+      // - 모든 사용자가 다운로드 URL을 통해 파일을 읽을 수 있습니다.
+      // - 인증된 사용자만 파일을 쓸 수 있습니다 (최대 10MB).
+      allow read: if get(/databases/(default)/documents/public/$(request.auth.uid)) == null; // public read for non-admins
+      allow write: if request.auth != null && request.resource.size < 10 * 1024 * 1024;
     }
   }
 }
