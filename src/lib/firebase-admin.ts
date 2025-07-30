@@ -21,38 +21,34 @@ import { getAuth } from 'firebase-admin/auth';
 // 로컬 개발 환경과 배포 환경(예: Vercel, App Hosting) 모두에서 이 환경 변수 설정이 필요합니다.
 // ====================================================================
 
-let serviceAccount;
-try {
-  if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
-    serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
-  } else {
-    console.warn("FIREBASE_SERVICE_ACCOUNT_KEY is not set in .env file. Firebase Admin features requiring authentication (like Storage access from server) will fail.");
+function initializeAdminApp(): App {
+  if (getApps().some(app => app.name === 'admin')) {
+    return getApps().find(app => app.name === 'admin')!;
   }
-} catch (error) {
-  console.error("Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY. Make sure it's a valid JSON string.", error);
-  serviceAccount = undefined;
-}
 
+  const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
 
-let adminApp: App;
+  if (!serviceAccountKey) {
+    throw new Error(
+      "FIREBASE_SERVICE_ACCOUNT_KEY is not set in the environment variables. " +
+      "This is required for server-side Firebase Admin operations like Storage access. " +
+      "Please check the setup guide in 'src/lib/firebase-admin.ts'."
+    );
+  }
 
-if (!getApps().some(app => app.name === 'admin')) {
-  if (serviceAccount) {
-    adminApp = initializeApp({
+  try {
+    const serviceAccount = JSON.parse(serviceAccountKey);
+    return initializeApp({
       credential: cert(serviceAccount),
       storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
     }, 'admin');
-  } else {
-    // Initialize without credentials if service account is not available
-    // This will limit functionalities to those not requiring auth (e.g. some Firestore operations if rules allow)
-    adminApp = initializeApp({
-       storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-    }, 'admin');
+  } catch (error) {
+    console.error("Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY. Make sure it's a valid JSON string.", error);
+    throw new Error("Could not initialize Firebase Admin SDK. The service account key is invalid.");
   }
-} else {
-  adminApp = getApps().find(app => app.name === 'admin')!;
 }
 
+const adminApp = initializeAdminApp();
 const adminDb = getFirestore(adminApp);
 const adminStorage = getStorage(adminApp);
 const adminAuth = getAuth(adminApp);
