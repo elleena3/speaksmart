@@ -9,9 +9,9 @@ import { adminStorage } from '@/lib/firebase-admin';
 /**
  * @fileOverview A flow to analyze a video file from Firebase Storage.
  *
- * This flow takes a file path from Firebase Storage, downloads it,
- * converts it to a base64 data URI, and then uses a generative AI model
- * to analyze the video content based on the prompt.
+ * This flow takes a file path from Firebase Storage and uses a generative AI model
+ * to analyze the video content based on the prompt. It now uses the Vertex AI
+ * method of passing file URIs.
  */
 
 
@@ -55,20 +55,27 @@ const analyzeVideoFlow = ai.defineFlow(
   },
   async ({ filePath, mimeType, prompt }) => {
     
-    // 1. Download the file from Firebase Storage into a buffer.
-    const bucket = adminStorage.bucket();
-    const file = bucket.file(filePath);
-    const [buffer] = await file.download();
+    // In a production environment, you would get the bucket name from a secure source.
+    // For this environment, we'll use the environment variable which should be correctly configured.
+    const bucketName = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
+    if (!bucketName) {
+        throw new Error("Firebase Storage bucket name is not configured in environment variables.");
+    }
+    
+    // Construct the GCS URI.
+    const videoUrl = `gs://${bucketName}/${filePath}`;
 
-    // 2. Convert the buffer to a Base64 Data URI.
-    const videoDataUri = `data:${mimeType};base64,${buffer.toString('base64')}`;
-
-    // 3. Call the model with the Data URI.
+    // Call the model using the fileData format for GCS URIs, as required by Vertex AI.
     const { text } = await ai.generate({
       model: googleAI.model('gemini-2.5-pro'),
       prompt: [
         { text: prompt },
-        { media: { url: videoDataUri } },
+        { 
+            fileData: { 
+              uri: videoUrl, 
+              mimeType: mimeType 
+            } 
+        },
       ],
     });
 
