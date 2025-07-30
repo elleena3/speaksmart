@@ -178,6 +178,9 @@ export function VideoAnalyzerTool() {
             <FileUp />
             자료 업로드 및 분석 요청
           </CardTitle>
+          <CardDescription>
+            참고: 이 도구는 현재 작은 용량의 동영상 파일 분석에 최적화되어 있습니다. 대용량 파일은 오류가 발생할 수 있습니다.
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* 파일 업로드 */}
