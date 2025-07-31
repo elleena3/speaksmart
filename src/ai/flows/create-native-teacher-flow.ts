@@ -85,7 +85,7 @@ This is a summary of the conversation so far. You must use this to understand th
 ---
 {{/if}}
 
-Here is the most recent part of the conversation (last ${CONVERSATION_MEMORY_LIMIT} turns). You must continue from here:
+Here is the most recent part of the conversation. You must continue from here:
 {{#each history}}
 {{#if isUser}}User{{else}}You{{/if}}: {{{text}}}
 {{/each}}
@@ -206,18 +206,27 @@ const converseWithNativeTeacherFlow = ai.defineFlow(
     }));
     let historySummary: string | undefined = undefined;
 
-    if (historyForPrompt.length > CONVERSATION_MEMORY_LIMIT) {
-        const oldHistory = historyForPrompt.slice(0, -CONVERSATION_MEMORY_LIMIT);
-        const recentHistory = historyForPrompt.slice(-CONVERSATION_MEMORY_LIMIT);
+    if (historyForPrompt.length >= CONVERSATION_MEMORY_LIMIT) {
+        const splitIndex = Math.max(0, historyForPrompt.length - CONVERSATION_MEMORY_LIMIT);
+        const oldHistory = historyForPrompt.slice(0, splitIndex);
+        const recentHistory = historyForPrompt.slice(splitIndex);
         
-        const summaryResult = await summarizeConversationHistoryFlow({ conversationToSummarize: oldHistory });
-        historySummary = summaryResult.summary;
+        if (oldHistory.length > 0) {
+          const summaryResult = await summarizeConversationHistoryFlow({ conversationToSummarize: oldHistory });
+          historySummary = summaryResult.summary;
+        }
         historyForPrompt = recentHistory;
+    }
+
+    let finalTranscriptForPrompt = studentTranscript || undefined;
+    const lastTurn = historyForPrompt[historyForPrompt.length - 1];
+    if (lastTurn && lastTurn.isUser && lastTurn.text === studentTranscript) {
+        finalTranscriptForPrompt = undefined;
     }
 
     const { output } = await conversationalPrompt({
       history: historyForPrompt,
-      studentTranscript: studentTranscript || undefined, 
+      studentTranscript: finalTranscriptForPrompt, 
       historySummary,
       conversationGoal,
     });
