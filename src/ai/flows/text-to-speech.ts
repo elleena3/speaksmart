@@ -1,5 +1,3 @@
-
-
 'use server';
 
 /**
@@ -77,10 +75,9 @@ async function toWav(
   });
 }
 
-// Reusable function to convert text to speech
+// Reusable function to convert text to speech with fallback logic
 async function textToSpeech(text: string, voiceName: string = 'algenib'): Promise<string> {
-    const ttsResponse = await withRetry(() => ai.generate({
-        model: googleAI.model('gemini-2.5-flash-preview-tts'),
+    const ttsRequestPayload = {
         config: {
             responseModalities: ['AUDIO'],
             speechConfig: {
@@ -90,7 +87,29 @@ async function textToSpeech(text: string, voiceName: string = 'algenib'): Promis
             },
         },
         prompt: text,
-    }));
+    };
+    
+    let ttsResponse;
+    try {
+        // 1. Try the faster, but lower-quota model first.
+        ttsResponse = await withRetry(() => ai.generate({
+            model: googleAI.model('gemini-2.5-flash-preview-tts'),
+            ...ttsRequestPayload,
+        }));
+    } catch (error: any) {
+        // 2. If it fails with a quota or server error, fallback to the more stable model.
+        const errorMessage = (error.message || '').toLowerCase();
+        if (errorMessage.includes('429') || errorMessage.includes('500') || errorMessage.includes('503') || errorMessage.includes('overloaded')) {
+            console.warn("TTS Flash model failed, falling back to Pro model.", error);
+            ttsResponse = await withRetry(() => ai.generate({
+                model: googleAI.model('gemini-2.5-pro-preview-tts'), // Fallback model
+                ...ttsRequestPayload,
+            }));
+        } else {
+            // 3. For any other error, re-throw it.
+            throw error;
+        }
+    }
 
     const audioMedia = ttsResponse.media;
     if (!audioMedia) {
@@ -119,7 +138,7 @@ const createConversationalPrompt = (modelName: z.infer<typeof evaluationModels[n
       model: googleAI.model(modelName),
       input: {
         schema: ConverseWithStudentInputSchema.pick({
-          studentTranscript: true,
+          studentRecordingDataUri: true,
           scenario: true,
           scenarioPrompt: true, 
           conversationHistory: true,
@@ -151,9 +170,9 @@ const createConversationalPrompt = (modelName: z.infer<typeof evaluationModels[n
     {{#if isUser}}Student{{else}}You{{/if}}: {{{text}}}
     {{/each}}
 
-    {{#if studentTranscript}}
-    The student's latest message is a transcript from their speech. Respond to it.
-    Student: {{{studentTranscript}}}
+    {{#if studentRecordingDataUri}}
+    The student's latest message is an audio recording. Transcribe it and respond.
+    {{media url=studentRecordingDataUri}}
     You:
     {{else}}
     You are starting the conversation. Greet the student according to your role and the situation. Keep it short and friendly.
@@ -201,7 +220,7 @@ const converseWithStudentFlow = ai.defineFlow(
 
     const { output } = await withRetry(() => conversationalPrompt({
       history: historyForPrompt,
-      studentTranscript: studentTranscript || undefined, 
+      studentRecordingDataUri: studentRecordingDataUri, 
       scenario: scenario || 'free-talk',
       scenarioPrompt: scenarioPrompt,
       conversationHistory: conversationHistory,

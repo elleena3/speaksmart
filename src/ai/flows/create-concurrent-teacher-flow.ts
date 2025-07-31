@@ -1,4 +1,3 @@
-
 'use server';
 
 /**
@@ -125,8 +124,7 @@ async function toWav(
 }
 
 async function textToSpeech(text: string): Promise<string> {
-    const ttsResponse = await ai.generate({
-        model: googleAI.model('gemini-2.5-flash-preview-tts'),
+    const ttsRequestPayload = {
         config: {
             responseModalities: ['AUDIO'],
             speechConfig: {
@@ -136,7 +134,29 @@ async function textToSpeech(text: string): Promise<string> {
             },
         },
         prompt: text,
-    });
+    };
+    
+    let ttsResponse;
+    try {
+        // 1. Try the faster, but lower-quota model first.
+        ttsResponse = await ai.generate({
+            model: googleAI.model('gemini-2.5-flash-preview-tts'),
+            ...ttsRequestPayload,
+        });
+    } catch (error: any) {
+        // 2. If it fails with a quota or server error, fallback to the more stable model.
+        const errorMessage = (error.message || '').toLowerCase();
+        if (errorMessage.includes('429') || errorMessage.includes('500') || errorMessage.includes('503') || errorMessage.includes('overloaded')) {
+            console.warn("TTS Flash model failed, falling back to Pro model.", error);
+            ttsResponse = await ai.generate({
+                model: googleAI.model('gemini-2.5-pro-preview-tts'), // Fallback model
+                ...ttsRequestPayload,
+            });
+        } else {
+            // 3. For any other error, re-throw it.
+            throw error;
+        }
+    }
 
     const audioMedia = ttsResponse.media;
     if (!audioMedia) {

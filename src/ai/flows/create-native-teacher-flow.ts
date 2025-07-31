@@ -1,4 +1,3 @@
-
 'use server';
 
 /**
@@ -18,10 +17,10 @@ import wav from 'wav';
 
 
 const ConverseWithNativeTeacherInputSchema = z.object({
-  studentTranscript: z
+  studentRecordingDataUri: z
     .string()
     .describe(
-      "The user's speech already transcribed to text."
+      "The user's voice recording as a data URI."
     ).nullable(),
   conversationHistory: z
     .array(ConversationTurnSchema)
@@ -32,6 +31,7 @@ type ConverseWithNativeTeacherInput = z.infer<typeof ConverseWithNativeTeacherIn
 const ConverseWithNativeTeacherOutputSchema = z.object({
   aiResponseText: z.string().describe('The text of the AI conversational partner.'),
   aiResponseAudioDataUri: z.string().describe("The AI's response as a playable audio data URI."),
+  studentTranscript: z.string().describe("The transcript of the user's speech."),
 });
 type ConverseWithNativeTeacherOutput = z.infer<typeof ConverseWithNativeTeacherOutputSchema>;
 
@@ -60,7 +60,7 @@ Your primary goals are:
 3.  Assess the user's English proficiency level based on their speech.
 4.  Adapt your language to the user's level. If their English is basic, use simpler words and sentence structures. If they are advanced, use more sophisticated language.
 
-IMPORTANT RULE: If the user's transcript is empty or indicates no speech (e.g., "(The user did not say anything)"), you MUST ask them to speak again, for example: "Sorry, I didn't catch that. Could you please say that again?" or "I couldn't hear you, can you repeat that?". Do not try to continue the conversation.
+IMPORTANT RULE: If the user's transcript is empty or indicates no speech, you MUST ask them to speak again, for example: "Sorry, I didn't catch that. Could you please say that again?" or "I couldn't hear you, can you repeat that?". Do not try to continue the conversation.
 
 Conversation History (if any):
 {{#each history}}
@@ -108,8 +108,7 @@ async function toWav(
 }
 
 async function textToSpeech(text: string): Promise<string> {
-    const ttsResponse = await ai.generate({
-        model: googleAI.model('gemini-2.5-flash-preview-tts'),
+    const ttsRequestPayload = {
         config: {
             responseModalities: ['AUDIO'],
             speechConfig: {
@@ -119,7 +118,29 @@ async function textToSpeech(text: string): Promise<string> {
             },
         },
         prompt: text,
-    });
+    };
+    
+    let ttsResponse;
+    try {
+        // 1. Try the faster, but lower-quota model first.
+        ttsResponse = await ai.generate({
+            model: googleAI.model('gemini-2.5-flash-preview-tts'),
+            ...ttsRequestPayload,
+        });
+    } catch (error: any) {
+        // 2. If it fails with a quota or server error, fallback to the more stable model.
+        const errorMessage = (error.message || '').toLowerCase();
+        if (errorMessage.includes('429') || errorMessage.includes('500') || errorMessage.includes('503') || errorMessage.includes('overloaded')) {
+            console.warn("TTS Flash model failed, falling back to Pro model.", error);
+            ttsResponse = await ai.generate({
+                model: googleAI.model('gemini-2.5-pro-preview-tts'), // Fallback model
+                ...ttsRequestPayload,
+            });
+        } else {
+            // 3. For any other error, re-throw it.
+            throw error;
+        }
+    }
 
     const audioMedia = ttsResponse.media;
     if (!audioMedia) {
@@ -140,14 +161,32 @@ const converseWithNativeTeacherFlow = ai.defineFlow(
     inputSchema: ConverseWithNativeTeacherInputSchema,
     outputSchema: ConverseWithNativeTeacherOutputSchema,
   },
-  async ({ studentTranscript, conversationHistory }) => {
+  async ({ studentRecordingDataUri, conversationHistory }) => {
+    let studentTranscript = "";
     let aiResponseText = "";
-    
+
+    // Step 1: Transcribe student's audio if it exists.
+    if (studentRecordingDataUri) {
+      const sttResponse = await ai.generate({
+        model: googleAI.model('gemini-2.5-flash'),
+        prompt: [
+          { text: 'Transcribe this English audio.' },
+          { media: { url: studentRecordingDataUri } },
+        ],
+      });
+      studentTranscript = sttResponse.text;
+      if (!studentTranscript?.trim()) {
+          console.warn("Transcription result was empty.");
+          studentTranscript = "(The user did not say anything)"; 
+      }
+    }
+
     const historyForPrompt = conversationHistory.map(turn => ({
       ...turn,
       isUser: turn.role === 'user',
     }));
 
+    // Step 2: Generate AI's text response based on transcript and history
     const { output } = await conversationalPrompt({
       history: historyForPrompt,
       studentTranscript: studentTranscript || undefined, 
@@ -160,9 +199,11 @@ const converseWithNativeTeacherFlow = ai.defineFlow(
         aiResponseText = "Sorry, I'm having a little trouble right now. Could you say that again?";
     }
 
+    // Step 3: Convert AI's text response to speech (TTS)
     const aiResponseAudioDataUri = await textToSpeech(aiResponseText);
 
     return {
+      studentTranscript: studentTranscript === "(The user did not say anything)" ? "" : studentTranscript,
       aiResponseText,
       aiResponseAudioDataUri,
     };
