@@ -1,16 +1,16 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { PlusCircle, Loader2, MoreHorizontal, Trash2 } from 'lucide-react';
+import { PlusCircle, Loader2, MoreHorizontal, Trash2, Eye } from 'lucide-react';
 import { useAuth } from '@/context/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, deleteDoc, doc, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { type TeacherAssessment } from '@/lib/types'; // Using this for type consistency, can be improved
 import {
   Table,
   TableBody,
@@ -37,6 +37,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { format } from 'date-fns';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
 type Rubric = {
     id: string;
@@ -119,7 +120,7 @@ export default function RubricsPage() {
              <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[60%]">이름</TableHead>
+                  <TableHead className="w-[50%]">이름</TableHead>
                   <TableHead className="text-center">항목 수</TableHead>
                   <TableHead className="text-center">생성일</TableHead>
                   <TableHead className="text-right">작업</TableHead>
@@ -131,7 +132,22 @@ export default function RubricsPage() {
                     <TableCell className="font-medium">{rubric.name}</TableCell>
                     <TableCell className="text-center">{rubric.criteria.length}</TableCell>
                     <TableCell className="text-center">{format(new Date(rubric.createdAt), 'yyyy-MM-dd')}</TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right space-x-2">
+                        <Dialog>
+                            <DialogTrigger asChild>
+                                <Button variant="ghost" size="sm"><Eye className="mr-2 h-4 w-4" /> 자세히 보기</Button>
+                            </DialogTrigger>
+                             <DialogContent className="max-w-4xl h-[600px] flex flex-col">
+                                <DialogHeader>
+                                    <DialogTitle>{rubric.name}</DialogTitle>
+                                </DialogHeader>
+                                <iframe 
+                                    srcDoc={`<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{font-family:sans-serif;margin:2em}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:8px;text-align:left}th{background-color:#f2f2f2}</style></head><body><h2>${rubric.name}</h2>${rubric.criteria.map((c:any) => `<h3>${c.name} (만점: ${c.maxScore}점)</h3><table><tr><th>점수</th><th>설명</th></tr>${c.details.map((d:any) => `<tr><td>${d.score}</td><td>${d.description}</td></tr>`).join('')}</table>`).join('')}</body></html>`}
+                                    className="w-full flex-grow border-0"
+                                    title={`${rubric.name} - 루브릭 미리보기`}
+                                />
+                            </DialogContent>
+                        </Dialog>
                        <AlertDialog>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -143,7 +159,7 @@ export default function RubricsPage() {
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem disabled>편집 (개발 중)</DropdownMenuItem>
                               <AlertDialogTrigger asChild>
-                                <DropdownMenuItem className="text-destructive focus:text-destructive">
+                                <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={(e) => e.preventDefault()}>
                                   <Trash2 className="mr-2 h-4 w-4" /> 삭제
                                 </DropdownMenuItem>
                               </AlertDialogTrigger>

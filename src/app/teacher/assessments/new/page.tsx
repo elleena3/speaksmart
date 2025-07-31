@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useRouter } from "next/navigation";
@@ -936,7 +937,7 @@ export default function NewAssessmentPage() {
                                                         <Eye className="mr-2 h-4 w-4"/> 자세히 보기
                                                     </Button>
                                                 </DialogTrigger>
-                                                <DialogContent className="max-w-4xl h-[90vh] flex flex-col">
+                                                <DialogContent className="max-w-4xl h-[600px] flex flex-col">
                                                     <DialogHeader>
                                                         <DialogTitle>{rubric.name}</DialogTitle>
                                                     </DialogHeader>
@@ -975,7 +976,7 @@ export default function NewAssessmentPage() {
                           <DialogTrigger asChild>
                             <Button type="button" variant="ghost" size="sm"><Info className="mr-2 h-4 w-4"/> 자세히 보기</Button>
                           </DialogTrigger>
-                           <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+                           <DialogContent className="max-w-4xl h-[600px] flex flex-col">
                             <DialogHeader>
                                 <DialogTitle>{loadedRubricName || "표준 루브릭"}</DialogTitle>
                             </DialogHeader>
