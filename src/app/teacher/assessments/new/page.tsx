@@ -297,9 +297,9 @@ export default function NewAssessmentPage() {
     if (selectedRubric) {
       // Create a formatted string from criteria for the 'expectedFormat' field
       const criteriaText = selectedRubric.criteria.map((c: any) => {
-        const detailsText = c.details.map((d: any) => `- ${d.score}점: ${d.description}`).join('\n');
-        return `### ${c.name} (만점: ${c.maxScore}점)\n${detailsText}`;
-      }).join('\n\n');
+        const detailsText = c.details.map((d: any) => `- ${d.score}점: ${d.description}`).join('\\n');
+        return `### ${c.name} (만점: ${c.maxScore}점)\\n${detailsText}`;
+      }).join('\\n\\n');
 
       form.setValue('expectedFormat', criteriaText);
       form.setValue('useRubric', true);
@@ -435,7 +435,7 @@ export default function NewAssessmentPage() {
                                 form.setValue('targetStudentIds', []);
                             }
                         }}
-                        value={field.value}
+                        defaultValue={field.value}
                         className="flex items-center space-x-4"
                       >
                         <FormItem className="flex items-center space-x-2 space-y-0">
@@ -782,7 +782,7 @@ export default function NewAssessmentPage() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>AI 평가 모델 선택</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="평가에 사용할 AI 모델을 선택하세요..." />
