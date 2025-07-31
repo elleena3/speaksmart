@@ -23,6 +23,7 @@ import {
   Trash2,
   PlusCircle,
   Save,
+  PenSquare,
 } from 'lucide-react';
 import { analyzeRubricFile, type AnalyzeRubricFileOutput } from '@/ai/flows/analyze-rubric-file-flow';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
@@ -34,6 +35,58 @@ import { db } from '@/lib/firebase';
 
 type AnalysisState = 'idle' | 'analyzing' | 'analyzed' | 'error';
 type RubricCriterion = AnalyzeRubricFileOutput['criteria'][0] & { id: string };
+
+const defaultRubricTemplate: RubricCriterion[] = [
+  {
+    id: crypto.randomUUID(),
+    name: "유창성 (Fluency)",
+    maxScore: 5,
+    details: [
+      { score: 5, description: "원어민과 가까운 속도와 리듬으로 매우 자연스럽게 말함." },
+      { score: 4, description: "큰 막힘 없이 안정적인 속도로 말함." },
+      { score: 3, description: "비교적 이해 가능한 속도로 말하지만, 머뭇거림이 눈에 띔." },
+      { score: 2, description: "매우 느리고 자주 끊어지며 말함." },
+      { score: 1, description: "단어 단위로 말함." },
+    ],
+  },
+  {
+    id: crypto.randomUUID(),
+    name: "발음 및 억양 (Pronunciation & Intonation)",
+    maxScore: 5,
+    details: [
+      { score: 5, description: "발음이 매우 명확하고 자연스러운 억양을 사용함." },
+      { score: 4, description: "대부분의 발음이 정확하여 쉽게 이해할 수 있음." },
+      { score: 3, description: "일부 단어의 발음이 부정확하여 가끔 재확인이 필요함." },
+      { score: 2, description: "부정확한 발음이 많아 이해하기 위해 노력이 필요함." },
+      { score: 1, description: "발음을 거의 이해할 수 없음." },
+    ],
+  },
+  {
+    id: crypto.randomUUID(),
+    name: "문법 (Grammar)",
+    maxScore: 5,
+    details: [
+      { score: 5, description: "복잡한 문장 구조를 포함하여 다양한 문법을 거의 실수 없이 사용함." },
+      { score: 4, description: "일상적인 문법 구조를 대부분 정확하게 사용함." },
+      { score: 3, description: "기본적인 문장 구조는 사용하나, 반복적인 실수가 나타남." },
+      { score: 2, description: "기본적인 문장 구성에도 오류가 많음." },
+      { score: 1, description: "문장을 거의 구성하지 못함." },
+    ],
+  },
+  {
+    id: crypto.randomUUID(),
+    name: "어휘 (Vocabulary)",
+    maxScore: 5,
+    details: [
+      { score: 5, description: "주제에 맞게 폭넓고 수준 높은 어휘를 정확하게 사용함." },
+      { score: 4, description: "주제에 대해 논의하기에 충분한 어휘를 구사함." },
+      { score: 3, description: "기본적인 어휘는 구사하나, 어휘의 폭이 좁아 반복적인 단어를 사용함." },
+      { score: 2, description: "매우 제한적인 어휘만 알고 있음." },
+      { score: 1, description: "극소수의 기본 단어만 알고 있음." },
+    ],
+  },
+];
+
 
 export default function NewRubricPage() {
   const [analysisState, setAnalysisState] = useState<AnalysisState>('idle');
@@ -89,6 +142,12 @@ export default function NewRubricPage() {
       setAnalysisState('error');
       toast({ title: '분석 실패', description: e.message, variant: 'destructive' });
     }
+  };
+  
+  const handleDirectCreate = () => {
+    setVerifiedCriteria(defaultRubricTemplate);
+    setAnalysisState('analyzed');
+    toast({ title: '기본 루브릭 생성됨', description: '표준 템플릿을 기반으로 루브릭을 편집할 수 있습니다.' });
   };
 
   const handleReset = () => {
@@ -195,21 +254,32 @@ export default function NewRubricPage() {
         <CardHeader>
           <CardTitle>AI 기반 루브릭 생성 도구</CardTitle>
           <CardDescription>
-            이미지 또는 PDF 형식의 채점 기준표를 업로드하면 AI가 평가 항목을 자동으로 추출하고 편집할 수 있도록 도와줍니다.
+            파일에서 평가 기준을 추출하거나, 표준 템플릿을 기반으로 직접 루브릭을 생성하세요.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor={fileInputId}>Step 1: 루브릭 파일 업로드 (이미지/PDF)</Label>
-            <div className="flex gap-2">
-              <Input id={fileInputId} type="file" accept="image/*,application/pdf" onChange={handleFileChange} />
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor={fileInputId}>옵션 1: 파일에서 추출하기</Label>
+                <div className="flex gap-2">
+                  <Input id={fileInputId} type="file" accept="image/*,application/pdf" onChange={handleFileChange} />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>옵션 2: 직접 만들기</Label>
+                 <Button onClick={handleDirectCreate} variant="secondary" className="w-full">
+                    <PenSquare className="mr-2 h-4 w-4" />
+                    표준 템플릿으로 직접 만들기
+                </Button>
+              </div>
+            </div>
+            <div className="flex justify-center gap-2">
               <Button onClick={handleAnalyze} disabled={!rubricFile || analysisState === 'analyzing'}>
                 {analysisState === 'analyzing' ? <Loader2 className="mr-2 animate-spin" /> : <Sparkles className="mr-2" />}
-                AI로 기준 추출
+                파일에서 기준 추출
               </Button>
               <Button onClick={handleReset} variant="outline"><RefreshCw /></Button>
             </div>
-          </div>
         </CardContent>
       </Card>
       
