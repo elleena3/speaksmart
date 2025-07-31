@@ -212,9 +212,17 @@ export default function EditRubricPage() {
                                             onChange={(e) => handleCriterionChange(criterion.id, 'maxScore', e.target.value)}
                                             className="w-16"
                                         />
-                                        <Button variant="ghost" size="icon" onClick={() => handleDeleteCriterion(criterion.id)}>
+                                        <div
+                                            role="button"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleDeleteCriterion(criterion.id);
+                                            }}
+                                            className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors hover:bg-muted hover:text-muted-foreground h-10 w-10"
+                                        >
                                             <Trash2 className="h-4 w-4" />
-                                        </Button>
+                                            <span className="sr-only">Delete criterion</span>
+                                        </div>
                                    </div>
                                 </AccordionTrigger>
                             </CardHeader>
