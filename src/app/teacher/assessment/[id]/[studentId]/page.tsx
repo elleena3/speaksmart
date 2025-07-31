@@ -39,24 +39,19 @@ function AttemptDetailView({ result, assessment, attemptNumber }: { result: Stud
 
   const isRubricUsed = !!rubricScores;
   const isHtmlFeedback = aiFeedback?.trim().startsWith('<!DOCTYPE html>');
-  const rubricSubjects = assessment.assessmentType === 'dialogue'
-    ? ['유창성', '발음', '문법', '어휘', '상호작용']
-    : ['유창성', '발음', '문법', '어휘'];
-
+  
   const radarChartData = useMemo(() => {
     if (!isRubricUsed || !rubricScores) return [];
-    return rubricSubjects.map(subject => {
-        let score = 0;
-        switch(subject) {
-            case '유창성': score = rubricScores.fluency; break;
-            case '발음': score = rubricScores.pronunciation; break;
-            case '문법': score = rubricScores.grammar; break;
-            case '어휘': score = rubricScores.vocabulary; break;
-            case '상호작용': score = rubricScores.interaction || 0; break;
-        }
-        return { subject, score };
-    });
-  }, [isRubricUsed, rubricScores, rubricSubjects]);
+    
+    // Dynamically create the chart data from the rubricScores object keys
+    return Object.keys(rubricScores).map(key => {
+        const score = rubricScores[key as keyof RubricScores] || 0;
+        return {
+            subject: key.charAt(0).toUpperCase() + key.slice(1), // Capitalize first letter
+            score: typeof score === 'number' ? score : 0,
+        };
+    }).filter(item => item.subject !== 'Interaction' || assessment.assessmentType === 'dialogue'); // Filter out Interaction for monologue
+  }, [isRubricUsed, rubricScores, assessment.assessmentType]);
 
 
   return (
@@ -207,36 +202,29 @@ function TeacherGrowthView({ results, assessment }: { results: StudentResult[], 
         return results.some(r => !!r.rubricScores);
     }, [results]);
 
-    const rubricSubjects = useMemo(() => assessment.assessmentType === 'dialogue'
-        ? ['유창성', '발음', '문법', '어휘', '상호작용']
-        : ['유창성', '발음', '문법', '어휘'], [assessment.assessmentType]);
-
     const radarChartData = useMemo(() => {
-        const data = rubricSubjects.map(subject => {
-            const entry: { [key: string]: string | number } = { subject };
-            const source = latestResult.historicalScores && latestResult.historicalScores.length > 0
-                ? latestResult.historicalScores
-                : results.map((r, i) => ({ ...r, attempt: i + 1 }));
-
-            source.forEach((hs, i) => {
-                const attemptData = 'historicalScores' in hs ? hs : { rubricScores: hs.rubricScores, attempt: i + 1 };
-                const key = `attempt${attemptData.attempt}`;
-                if (attemptData.rubricScores) {
-                    switch(subject) {
-                        case '유창성': entry[key] = attemptData.rubricScores.fluency; break;
-                        case '발음': entry[key] = attemptData.rubricScores.pronunciation; break;
-                        case '문법': entry[key] = attemptData.rubricScores.grammar; break;
-                        case '어휘': entry[key] = attemptData.rubricScores.vocabulary; break;
-                        case '상호작용': entry[key] = attemptData.rubricScores.interaction || 0; break;
-                    }
+        const firstResultWithRubric = results.find(r => r.rubricScores);
+        if (!firstResultWithRubric || !firstResultWithRubric.rubricScores) return [];
+    
+        const subjects = Object.keys(firstResultWithRubric.rubricScores);
+    
+        const data = subjects.map(subject => {
+            const entry: { [key: string]: string | number } = { subject: subject.charAt(0).toUpperCase() + subject.slice(1) };
+            results.forEach((r, i) => {
+                const key = `attempt${i + 1}`;
+                if (r.rubricScores && typeof r.rubricScores[subject as keyof RubricScores] === 'number') {
+                    entry[key] = r.rubricScores[subject as keyof RubricScores]!;
                 } else {
-                     entry[key] = 0;
+                    entry[key] = 0;
                 }
             });
             return entry;
         });
-        return data;
-    }, [latestResult.historicalScores, results, rubricSubjects]);
+        
+        return data.filter(item => item.subject !== 'Interaction' || assessment.assessmentType === 'dialogue');
+
+    }, [results, assessment.assessmentType]);
+
 
     const fetchGrowthFeedback = useCallback(async () => {
         setIsLoadingFeedback(true);
@@ -244,7 +232,7 @@ function TeacherGrowthView({ results, assessment }: { results: StudentResult[], 
             setGrowthFeedback({
                 growthFeedback: latestResult.growthFeedback,
                 teacherGuidance: latestResult.growthTeacherGuidance || "",
-                curricularRemarks: latestResult.growthCurricularRemarks || ""
+                growthCurricularRemarks: latestResult.growthCurricularRemarks || ""
             });
             setIsLoadingFeedback(false);
             return;
@@ -281,7 +269,7 @@ function TeacherGrowthView({ results, assessment }: { results: StudentResult[], 
             setGrowthFeedback({ 
                 growthFeedback: errorMessage,
                 teacherGuidance: errorMessage,
-                curricularRemarks: errorMessage,
+                growthCurricularRemarks: errorMessage,
             });
             toast({ title: "오류", description: errorMessage, variant: "destructive" });
         } finally {
@@ -303,19 +291,19 @@ function TeacherGrowthView({ results, assessment }: { results: StudentResult[], 
                 curricularRemarks: r.curricularRemarks ?? ""
             }));
 
-            const { curricularRemarks } = await regenerateCurricularRemarks({
+            const { growthCurricularRemarks } = await regenerateCurricularRemarks({
                 attempts: validAttempts,
                 assessmentTitle: assessment.title,
             });
 
             setGrowthFeedback(prev => ({
-                ...(prev || { growthFeedback: "", teacherGuidance: "" }),
-                curricularRemarks
+                ...(prev || { growthFeedback: "", teacherGuidance: "", growthCurricularRemarks: "" }),
+                growthCurricularRemarks,
             }));
             
             const resultRef = doc(db, "results", latestResult.id);
             await updateDoc(resultRef, {
-                growthCurricularRemarks: curricularRemarks,
+                growthCurricularRemarks,
             });
             
             toast({ title: "생활기록부(종합) 재생성 완료!", description: "새로운 종합 의견이 생성되었습니다." });
@@ -391,7 +379,7 @@ function TeacherGrowthView({ results, assessment }: { results: StudentResult[], 
     );
     
     // Display database value first, then fallback to local state.
-    const finalCurricularRemarks = latestResult.growthCurricularRemarks || growthFeedback?.curricularRemarks;
+    const finalCurricularRemarks = latestResult.growthCurricularRemarks || growthFeedback?.growthCurricularRemarks;
 
     return (
         <div className="space-y-6">
@@ -437,7 +425,7 @@ function TeacherGrowthView({ results, assessment }: { results: StudentResult[], 
                                     <PolarRadiusAxis angle={30} domain={[0, 5]} tickCount={6} />
                                     <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}/>
                                     <Legend />
-                                    {chartData.map((_r, i) => (
+                                    {results.map((_r, i) => (
                                        <Radar key={i} name={`${i+1}차 시도`} dataKey={`attempt${i+1}`} stroke={`hsl(var(--chart-${(i % 5) + 1}))`} fill={`hsl(var(--chart-${(i % 5) + 1}))`} fillOpacity={0.4} />
                                     ))}
                                 </RadarChart>
