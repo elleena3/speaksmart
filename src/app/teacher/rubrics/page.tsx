@@ -1,15 +1,14 @@
 
-
 "use client";
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { PlusCircle, Loader2, MoreHorizontal, Trash2, Eye } from 'lucide-react';
+import { PlusCircle, Loader2, MoreHorizontal, Trash2, Eye, Copy, Edit } from 'lucide-react';
 import { useAuth } from '@/context/auth-context';
 import { useToast } from '@/hooks/use-toast';
-import { collection, query, where, getDocs, deleteDoc, doc, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, deleteDoc, doc, orderBy, addDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import {
   Table,
@@ -23,6 +22,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
@@ -77,6 +77,32 @@ export default function RubricsPage() {
       fetchRubrics();
     }
   }, [user, authLoading, fetchRubrics]);
+  
+  const handleCopyRubric = async (rubricId: string) => {
+    const rubricToCopy = rubrics.find(r => r.id === rubricId);
+    if (!rubricToCopy || !user) return;
+
+    try {
+      const { id, ...copyData } = rubricToCopy;
+      
+      await addDoc(collection(db, "rubrics"), {
+        ...copyData,
+        name: `${copyData.name} (복사본)`, 
+        createdAt: Date.now(),
+        uid: user.uid,
+      });
+
+      toast({
+        title: "루브릭 복사 완료",
+        description: `'${rubricToCopy.name}'의 복사본이 생성되었습니다.`,
+      });
+      fetchRubrics(); // Refresh the list
+    } catch (error) {
+      console.error("Error copying rubric:", error);
+      toast({ title: "복사 실패", description: "루브릭을 복사하는 중 오류가 발생했습니다.", variant: "destructive"});
+    }
+  };
+
 
   const handleDeleteRubric = async (rubricId: string, rubricName: string) => {
     try {
@@ -157,7 +183,15 @@ export default function RubricsPage() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem disabled>편집 (개발 중)</DropdownMenuItem>
+                              <DropdownMenuItem disabled>
+                                <Edit className="mr-2 h-4 w-4" />
+                                편집 (개발 중)
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleCopyRubric(rubric.id)}>
+                                <Copy className="mr-2 h-4 w-4" />
+                                복사
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
                               <AlertDialogTrigger asChild>
                                 <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={(e) => e.preventDefault()}>
                                   <Trash2 className="mr-2 h-4 w-4" /> 삭제
