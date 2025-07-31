@@ -46,6 +46,7 @@
     "firebase": "^10.12.2",
     "firebase-admin": "^12.1.1",
     "genkit": "^1.13.0",
+    "genkitx-openai": "^0.3.0",
     "html2canvas": "^1.4.1",
     "jspdf": "^2.5.1",
     "lucide-react": "^0.475.0",

@@ -1,5 +1,6 @@
 import {genkit} from 'genkit';
 import {googleAI} from '@genkit-ai/googleai';
+import {openai} from '@genkit-ai/openai';
 import {config} from 'dotenv';
 
 config();
@@ -34,5 +35,8 @@ export const ai = genkit({
         location: GOOGLE_CLOUD_LOCATION!,
       },
     }),
+    openai({
+        apiKey: process.env.OPENAI_API_KEY || "",
+    })
   ],
 });
