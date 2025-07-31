@@ -11,8 +11,8 @@ export const metadata: Metadata = {
 const navItems = [
   { href: '/teacher/dashboard', labelKey: 'dashboard' as const, icon: <LayoutDashboard /> },
   { href: '/teacher/assessments', labelKey: 'assessments' as const, icon: <BookOpenCheck /> },
-  { href: '/teacher/students', labelKey: 'students' as const, icon: <Users /> },
   { href: '/teacher/rubrics', labelKey: 'rubrics' as const, icon: <DraftingCompass /> },
+  { href: '/teacher/students', labelKey: 'students' as const, icon: <Users /> },
   { href: '/teacher/misc', labelKey: 'misc' as const, icon: <FlaskConical /> },
   { href: '/teacher/settings', labelKey: 'settings' as const, icon: <Settings /> },
 ];
