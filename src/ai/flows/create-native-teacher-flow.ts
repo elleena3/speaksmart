@@ -2,9 +2,9 @@
 
 /**
  * @fileOverview Converts text to speech and handles conversational AI responses for the teacher's tool.
- * This version is optimized to accept a direct transcript instead of an audio file for faster interaction.
+ * This version processes audio on the server for better performance.
  *
- * - converseWithNativeTeacher - A function that takes a user's transcript, gets a conversational response, and returns AI audio.
+ * - converseWithNativeTeacher - A function that takes user audio, gets a conversational response, and returns AI audio.
  */
 
 import { ai } from '@/ai/genkit';
@@ -14,6 +14,9 @@ import {
   ConversationTurnSchema,
 } from '@/lib/types/ai-schemas';
 import wav from 'wav';
+import { summarizeConversationHistoryFlow } from './summarize-conversation-history-flow';
+
+const CONVERSATION_MEMORY_LIMIT = 20;
 
 
 const ConverseWithNativeTeacherInputSchema = z.object({
@@ -49,6 +52,7 @@ const conversationalPrompt = ai.definePrompt({
     schema: z.object({
       studentTranscript: z.string().optional(),
       history: z.array(ConversationTurnSchema.extend({ isUser: z.boolean() })),
+      historySummary: z.string().optional(),
     })
   },
   output: { schema: z.object({ aiResponseText: z.string() }) },
@@ -62,7 +66,13 @@ Your primary goals are:
 
 IMPORTANT RULE: If the user's transcript is empty or indicates no speech, you MUST ask them to speak again, for example: "Sorry, I didn't catch that. Could you please say that again?" or "I couldn't hear you, can you repeat that?". Do not try to continue the conversation.
 
-Conversation History (if any):
+{{#if historySummary}}
+Here is a summary of the conversation so far, which you must consider to maintain context:
+{{{historySummary}}}
+---
+{{/if}}
+
+Recent Conversation History (You must also consider this to maintain context):
 {{#each history}}
 {{#if isUser}}User{{else}}You{{/if}}: {{{text}}}
 {{/each}}
@@ -122,22 +132,19 @@ async function textToSpeech(text: string): Promise<string> {
     
     let ttsResponse;
     try {
-        // 1. Try the faster, but lower-quota model first.
         ttsResponse = await ai.generate({
             model: googleAI.model('gemini-2.5-flash-preview-tts'),
             ...ttsRequestPayload,
         });
     } catch (error: any) {
-        // 2. If it fails with a quota or server error, fallback to the more stable model.
         const errorMessage = (error.message || '').toLowerCase();
         if (errorMessage.includes('429') || errorMessage.includes('500') || errorMessage.includes('503') || errorMessage.includes('overloaded')) {
             console.warn("TTS Flash model failed, falling back to Pro model.", error);
             ttsResponse = await ai.generate({
-                model: googleAI.model('gemini-2.5-pro-preview-tts'), // Fallback model
+                model: googleAI.model('gemini-2.5-pro-preview-tts'),
                 ...ttsRequestPayload,
             });
         } else {
-            // 3. For any other error, re-throw it.
             throw error;
         }
     }
@@ -165,7 +172,6 @@ const converseWithNativeTeacherFlow = ai.defineFlow(
     let studentTranscript = "";
     let aiResponseText = "";
 
-    // Step 1: Transcribe student's audio if it exists.
     if (studentRecordingDataUri) {
       const sttResponse = await ai.generate({
         model: googleAI.model('gemini-2.5-flash'),
@@ -181,15 +187,25 @@ const converseWithNativeTeacherFlow = ai.defineFlow(
       }
     }
 
-    const historyForPrompt = conversationHistory.map(turn => ({
+    let historyForPrompt = conversationHistory.map(turn => ({
       ...turn,
       isUser: turn.role === 'user',
     }));
+    let historySummary: string | undefined = undefined;
 
-    // Step 2: Generate AI's text response based on transcript and history
+    if (historyForPrompt.length > CONVERSATION_MEMORY_LIMIT) {
+        const oldHistory = historyForPrompt.slice(0, -CONVERSATION_MEMORY_LIMIT);
+        const recentHistory = historyForPrompt.slice(-CONVERSATION_MEMORY_LIMIT);
+        
+        const summaryResult = await summarizeConversationHistoryFlow({ conversationToSummarize: oldHistory });
+        historySummary = summaryResult.summary;
+        historyForPrompt = recentHistory;
+    }
+
     const { output } = await conversationalPrompt({
       history: historyForPrompt,
       studentTranscript: studentTranscript || undefined, 
+      historySummary,
     });
 
     aiResponseText = output?.aiResponseText || "";
@@ -199,7 +215,6 @@ const converseWithNativeTeacherFlow = ai.defineFlow(
         aiResponseText = "Sorry, I'm having a little trouble right now. Could you say that again?";
     }
 
-    // Step 3: Convert AI's text response to speech (TTS)
     const aiResponseAudioDataUri = await textToSpeech(aiResponseText);
 
     return {
