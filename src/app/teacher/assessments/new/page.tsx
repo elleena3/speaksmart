@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useRouter } from "next/navigation";
@@ -286,9 +285,10 @@ export default function NewAssessmentPage() {
     if (!user) return;
     setIsRubricListLoading(true);
     try {
-        const q = query(collection(db, "rubrics"), where("uid", "==", user.uid), orderBy("createdAt", "desc"));
+        const q = query(collection(db, "rubrics"), where("uid", "==", user.uid));
         const querySnapshot = await getDocs(q);
         const fetchedRubrics = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        fetchedRubrics.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
         setSavedRubrics(fetchedRubrics);
     } catch(e) {
         console.error("Error fetching rubrics:", e);
