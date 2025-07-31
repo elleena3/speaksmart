@@ -55,9 +55,13 @@ export default function RubricsPage() {
     if (!user) return;
     setIsLoading(true);
     try {
-      const q = query(collection(db, "rubrics"), where("uid", "==", user.uid), orderBy("createdAt", "desc"));
+      const q = query(collection(db, "rubrics"), where("uid", "==", user.uid));
       const querySnapshot = await getDocs(q);
       const fetchedRubrics = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Rubric));
+      
+      // Sort on the client-side instead of in the query
+      fetchedRubrics.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      
       setRubrics(fetchedRubrics);
     } catch (e) {
       console.error("Error fetching rubrics: ", e);
