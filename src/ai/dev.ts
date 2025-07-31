@@ -1,5 +1,4 @@
-import { config } from 'dotenv';
-config();
+'use server';
 
 // The following flows are now integrated into the new analysis flow
 // and no longer need to be individually registered for direct client use.
@@ -44,6 +43,9 @@ import '@/ai/flows/analyze-presentation-video-flow';
 
 // New flow for Rubric management
 import '@/ai/flows/analyze-rubric-file-flow';
+
+// New flow for batch re-evaluation
+import '@/ai/flows/rerun-all-analyses-flow';
 
 // This flow is being removed due to errors.
 // import '@/ai/flows/regenerate-html-feedback-flow';

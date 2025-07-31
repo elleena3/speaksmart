@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
-import { Loader2, User, ArrowRight, CheckCircle, XCircle, RefreshCcw, Trash2 } from "lucide-react"
+import { Loader2, User, ArrowRight, CheckCircle, XCircle, RefreshCcw, Trash2, Bot } from "lucide-react"
 import { type TeacherAssessment, type StudentResult, type UserData } from "@/lib/types";
 import { useAuth, mockStudents } from "@/context/auth-context";
 import { useToast } from "@/hooks/use-toast";
@@ -19,6 +19,7 @@ import { db } from "@/lib/firebase";
 import { format } from "date-fns";
 import { retryAnalysis } from "@/ai/flows/retry-analysis-flow";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { rerunAllAnalyses } from "@/ai/flows/rerun-all-analyses-flow";
 
 
 type EnrichedStudent = UserData & {
@@ -34,6 +35,7 @@ export default function AssessmentSubmissionsPage() {
   const [pendingStudents, setPendingStudents] = useState<EnrichedStudent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [retryingIds, setRetryingIds] = useState<string[]>([]);
+  const [isRerunningAll, setIsRerunningAll] = useState(false);
   const { toast } = useToast();
 
   const assessmentId = Array.isArray(params.id) ? params.id[0] : params.id;
@@ -140,6 +142,23 @@ export default function AssessmentSubmissionsPage() {
       }
     }
   }, [user, authLoading, router, fetchSubmissions]);
+
+  const handleRerunAll = async () => {
+    if (!assessmentId) return;
+    setIsRerunningAll(true);
+    toast({ title: "일괄 재평가 시작", description: "모든 제출물을 현재 기준으로 다시 채점합니다. 잠시만 기다려주세요..."});
+
+    try {
+        const result = await rerunAllAnalyses({ assessmentId });
+        toast({ title: "재평가 완료", description: result.message });
+        setTimeout(fetchSubmissions, 3000); // Give time for Firestore to update before refetching
+    } catch(error) {
+        console.error("Error re-running all analyses:", error);
+        toast({ title: "재평가 실패", description: (error as Error).message, variant: "destructive" });
+    } finally {
+        setIsRerunningAll(false);
+    }
+  }
 
   const handleRetry = async (resultId: string) => {
     setRetryingIds(prev => [...prev, resultId]);
@@ -249,9 +268,33 @@ export default function AssessmentSubmissionsPage() {
   return (
     <div className="space-y-8">
       <Card>
-        <CardHeader>
-          <CardTitle>{assessment.title} - 제출 현황</CardTitle>
-          <CardDescription>이 평가에 할당된 모든 학생들의 제출 상태입니다.</CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>{assessment.title} - 제출 현황</CardTitle>
+              <CardDescription>이 평가에 할당된 모든 학생들의 제출 상태입니다.</CardDescription>
+            </div>
+             <AlertDialog>
+                <AlertDialogTrigger asChild>
+                    <Button variant="outline" disabled={isRerunningAll || completedStudents.length === 0}>
+                        {isRerunningAll ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Bot className="mr-2 h-4 w-4"/>}
+                        모든 제출물 재평가
+                    </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>모든 제출물을 재평가하시겠습니까?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            이 작업은 완료된 모든 학생({completedStudents.length}명)의 평가 결과를 **현재 평가의 최신 채점 기준**으로 다시 채점합니다.<br/><br/>
+                            <span className="font-bold text-destructive">기존의 모든 점수와 피드백은 새로운 결과로 덮어씌워지며, 이 작업은 되돌릴 수 없습니다.</span><br/><br/>
+                            평가 기준(루브릭, 채점 기준 등)을 수정한 후 사용해주세요.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>취소</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleRerunAll}>재평가 시작</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </CardHeader>
       </Card>
 
@@ -351,4 +394,5 @@ export default function AssessmentSubmissionsPage() {
     </div>
   )
 }
+
 
