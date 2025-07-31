@@ -15,6 +15,8 @@ import { PdfSequentialAnalyzerTool } from "./pdf-sequential-analyzer-tool";
 import { PdfStorageAnalyzerTool } from "./pdf-storage-analyzer-tool";
 import { HandwritingSubmissionAnalyzerTool } from "./handwriting-submission-analyzer-tool";
 import { PdfMultiAnalyzerTool } from "./pdf-multi-analyzer-tool";
+import { FirestoreTestTool } from "@/components/feature-tools/firestore-test-tool";
+import { StorageUploaderTool } from "@/components/feature-tools/storage-uploader-tool";
 
 
 export default function MiscPage() {
@@ -27,6 +29,20 @@ export default function MiscPage() {
                 <p className="text-muted-foreground">{t.teacherMisc.description}</p>
             </div>
             <div className="grid grid-cols-1 gap-6">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Firebase Firestore 테스트 도구</CardTitle>
+                        <CardDescription>데이터베이스에 테스트 데이터를 쓰고, 읽고, 삭제하여 Firestore 연결 및 보안 규칙이 올바르게 작동하는지 확인합니다.</CardDescription>
+                    </CardHeader>
+                    <FirestoreTestTool />
+                </Card>
+                 <Card>
+                    <CardHeader>
+                        <CardTitle>Firebase Storage 파일 업로드 도구</CardTitle>
+                        <CardDescription>파일을 직접 Firebase Storage에 업로드하고 진행 상태와 결과 URL을 확인하여 파일 저장소 기능이 정상 작동하는지 테스트합니다.</CardDescription>
+                    </CardHeader>
+                    <StorageUploaderTool />
+                </Card>
                 <Card>
                     <CardHeader>
                         <CardTitle>유튜브 영상 요약 도구</CardTitle>
