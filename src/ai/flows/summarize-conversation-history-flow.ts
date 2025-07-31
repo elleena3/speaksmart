@@ -8,11 +8,11 @@ import { googleAI } from '@genkit-ai/googleai';
 import { z } from 'zod';
 import { ConversationTurnSchema } from '@/lib/types/ai-schemas';
 
-export const SummarizeConversationHistoryInputSchema = z.object({
+const SummarizeConversationHistoryInputSchema = z.object({
   conversationToSummarize: z.array(ConversationTurnSchema),
 });
 
-export const SummarizeConversationHistoryOutputSchema = z.object({
+const SummarizeConversationHistoryOutputSchema = z.object({
   summary: z.string(),
 });
 
@@ -31,21 +31,14 @@ Conversation History:
 Please provide a brief summary of this conversation.`,
 });
 
-export const summarizeConversationHistoryFlow = ai.defineFlow(
-    {
-        name: 'summarizeConversationHistoryFlow',
-        inputSchema: SummarizeConversationHistoryInputSchema,
-        outputSchema: SummarizeConversationHistoryOutputSchema
-    },
-    async ({ conversationToSummarize }) => {
-        if (conversationToSummarize.length === 0) {
-            return { summary: "" };
-        }
-        
-        const { output } = await summarizationPrompt({ conversationToSummarize });
-        if (!output) {
-            throw new Error("Failed to generate conversation summary.");
-        }
-        return output;
+export async function summarizeConversationHistoryFlow (input: z.infer<typeof SummarizeConversationHistoryInputSchema>): Promise<z.infer<typeof SummarizeConversationHistoryOutputSchema>> {
+    if (input.conversationToSummarize.length === 0) {
+        return { summary: "" };
     }
-);
+    
+    const { output } = await summarizationPrompt(input);
+    if (!output) {
+        throw new Error("Failed to generate conversation summary.");
+    }
+    return output;
+};

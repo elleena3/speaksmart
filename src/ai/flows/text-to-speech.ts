@@ -221,7 +221,6 @@ const converseWithStudentFlow = ai.defineFlow(
       historySummary,
       studentTranscript: studentTranscript || undefined, 
       scenario: scenario || 'free-talk',
-      scenarioPrompt: scenarioPrompt,
       aiVoice: aiVoice || 'algenib',
     }));
 
