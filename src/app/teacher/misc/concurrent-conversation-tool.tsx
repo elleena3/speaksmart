@@ -50,7 +50,6 @@ export function ConcurrentConversationTool() {
   }, []);
 
   useEffect(() => {
-    // Cleanup on component unmount
     return () => {
       cleanupRecorders();
       cleanupAudioPlayer();
@@ -112,7 +111,6 @@ export function ConcurrentConversationTool() {
       mainRecorderRef.current.start();
       toast({ title: "전체 대화 녹음 시작됨", description: "AI 음성과 사용자 음성이 모두 녹음됩니다." });
 
-      // Get AI's first turn
       const { aiResponseText, aiResponseAudioDataUri } = await converseWithConcurrentTeacher({
           studentTranscript: null,
           conversationHistory: [],
@@ -146,7 +144,7 @@ export function ConcurrentConversationTool() {
       userReplyRecorderRef.current.onstop = () => {
         userStream.getTracks().forEach(track => track.stop());
         if (userChunks.length === 0) {
-            processTurn(""); // Send empty string if no audio
+            processTurn(""); 
             return;
         }
         const blob = new Blob(userChunks, { type: mimeType });
@@ -177,11 +175,13 @@ export function ConcurrentConversationTool() {
     try {
         const studentTranscript = userAudioUri ? await transcribeUserAudio(userAudioUri) : "(The user did not say anything)";
         setInterimTranscript(null);
-        setConversation(prev => [...prev, { role: 'user', text: studentTranscript }]);
+        
+        const newHistory = [...conversation, { role: 'user', text: studentTranscript }];
+        setConversation(newHistory);
 
         const { aiResponseText, aiResponseAudioDataUri } = await converseWithConcurrentTeacher({
             studentTranscript: studentTranscript,
-            conversationHistory: conversation,
+            conversationHistory: newHistory,
         });
 
         setConversation(prev => [...prev, { role: 'model', text: aiResponseText }]);
@@ -194,14 +194,14 @@ export function ConcurrentConversationTool() {
     } catch (error) {
         console.error("Error processing turn:", error);
         toast({ title: "처리 오류", description: "AI 응답을 가져오는 중 오류가 발생했습니다.", variant: "destructive" });
-        setSessionState("speaking"); // Let them try again
+        setSessionState("speaking"); 
     }
   }
 
   const handleStopConversation = () => {
     if (mainRecorderRef.current?.state === 'recording') {
         setSessionState("finishing");
-        mainRecorderRef.current.stop(); // This will trigger onstop event after a delay
+        mainRecorderRef.current.stop();
     } else {
         cleanupRecorders();
         cleanupAudioPlayer();

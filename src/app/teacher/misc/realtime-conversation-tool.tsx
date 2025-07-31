@@ -2,7 +2,6 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Mic, StopCircle, Loader2, Bot, User, Play, Volume2, BrainCircuit } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
@@ -40,7 +39,6 @@ export function RealtimeConversationTool() {
   };
 
   useEffect(() => {
-    // Cleanup on component unmount
     return () => {
       cleanupRecorder();
       if(audioPlayerRef.current){
@@ -51,7 +49,6 @@ export function RealtimeConversationTool() {
   }, []);
 
   useEffect(() => {
-    // Scroll to the bottom of the conversation
     if (scrollAreaRef.current) {
         const scrollableView = scrollAreaRef.current.querySelector('div');
         if (scrollableView) {
@@ -62,6 +59,7 @@ export function RealtimeConversationTool() {
 
 
   const startConversation = async () => {
+    setConversation([]);
     setSessionState("initializing");
     try {
       const { aiResponseText, aiResponseAudioDataUri } = await converseWithNativeTeacher({
@@ -175,12 +173,11 @@ export function RealtimeConversationTool() {
       
       setInterimTranscript(null);
 
-      const newConversation: ConversationTurn[] = [
-        ...conversation,
-        { role: 'user', text: studentTranscript },
-        { role: 'model', text: aiResponseText },
-      ];
-      setConversation(newConversation);
+      setConversation(prev => [
+          ...prev,
+          { role: 'user', text: studentTranscript },
+          { role: 'model', text: aiResponseText },
+      ]);
 
       if (audioPlayerRef.current) {
         audioPlayerRef.current.src = aiResponseAudioDataUri;
@@ -195,7 +192,7 @@ export function RealtimeConversationTool() {
         variant: "destructive",
       });
       setInterimTranscript(null);
-      setSessionState("waiting_for_user"); // Let user try again
+      setSessionState("waiting_for_user");
     }
   };
 

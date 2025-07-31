@@ -180,20 +180,21 @@ export function StandaloneDialogueTool() {
 
   const processAudio = async (studentRecordingDataUri: string) => {
     try {
-      const currentConversationHistory = [...conversation];
-
+      // Pass the current conversation history to the AI
       const { studentTranscript, aiResponseText, aiResponseAudioDataUri } = await converseWithStudent({
         studentRecordingDataUri,
-        conversationHistory: currentConversationHistory,
+        conversationHistory: conversation, // Pass the whole history
         scenario: 'free-talk',
       });
       
       setInterimTranscript(null);
 
-      const userTurn: ConversationTurn = { role: 'user', text: studentTranscript };
-      const modelTurn: ConversationTurn = { role: 'model', text: aiResponseText };
-      
-      setConversation(prev => [...prev, userTurn, modelTurn]);
+      // Correctly accumulate the conversation history
+      setConversation(prev => [
+        ...prev,
+        { role: 'user', text: studentTranscript },
+        { role: 'model', text: aiResponseText }
+      ]);
 
       if (audioPlayerRef.current) {
         audioPlayerRef.current.src = aiResponseAudioDataUri;

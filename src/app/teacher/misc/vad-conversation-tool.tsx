@@ -124,16 +124,14 @@ export function VadConversationTool() {
     }
     
     setSessionState("processing");
-    const newHistory = [...conversation, {role: 'user', text: transcript}];
-    setConversation(newHistory);
     
     try {
         const { aiResponseText, aiResponseAudioDataUri } = await converseWithNativeTeacher({
             studentTranscript: transcript.trim(),
-            conversationHistory: newHistory,
+            conversationHistory: conversation,
         });
 
-        setConversation(prev => [...prev, {role: 'model', text: aiResponseText}]);
+        setConversation(prev => [...prev, { role: 'user', text: transcript }, { role: 'model', text: aiResponseText }]);
         setSessionState("speaking");
         
         if (audioPlayerRef.current) {
