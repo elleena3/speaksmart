@@ -254,7 +254,7 @@ export default function NewRubricPage() {
         <CardHeader>
           <CardTitle>AI 기반 루브릭 생성 도구</CardTitle>
           <CardDescription>
-            파일에서 평가 기준을 추출하거나, 표준 템플릿을 기반으로 직접 루브릭을 생성하세요.
+            한글(hwp) 같은 문서를 pdf 또는 이미지로 변환하여 그 변환된 파일을 업로드하면 AI가 루브릭을 추출해줍니다. 표준 템플릿으로 직접 만들 수도 있습니다.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
