@@ -27,8 +27,9 @@ export const translations = {
       assessments: "평가 관리",
       students: "학생 관리",
       rubrics: "루브릭 관리",
+      conversationTools: "대화형 도구",
       settings: "설정",
-      misc: "기타",
+      misc: "기타 도구",
       logout: "로그아웃",
     },
     titles: {
@@ -262,14 +263,6 @@ export const translations = {
         toastCompleteTitle: "분석 완료",
         toastCompleteDescription: "모든 모델의 분석이 완료되었습니다.",
       },
-      realtimeConversationTool: {
-        title: "AI 원어민 선생님과 대화하기",
-        description: "실시간으로 AI와 영어 회화를 연습하고, 어떤 주제로든 질문해보세요. AI가 당신의 영어 수준에 맞춰 대화해 줄 것입니다. (사용자 음성만 녹음)",
-      },
-      concurrentConversationTool: {
-          title: "AI 원어민 선생님과 대화하기 2",
-          description: "전체 대화(AI 음성 + 사용자 음성)를 녹음하는 기능입니다. '녹음 시작'을 누르면 AI와 사용자의 모든 음성이 하나의 파일로 저장됩니다.",
-      },
       readAloudTool: {
         title: "Read Aloud 연습 도구",
         description: "제공된 지문을 따라 읽고 AI에게 발음, 정확도, 유창성 피드백을 받아보세요. 직접 텍스트를 입력하여 테스트할 수도 있습니다.",
@@ -334,8 +327,9 @@ export const translations = {
       assessments: "Assessments",
       students: "Students",
       rubrics: "Rubrics",
+      conversationTools: "Conversation Tools",
       settings: "Settings",
-      misc: "Misc",
+      misc: "Misc Tools",
       logout: "Logout",
     },
     titles: {
@@ -568,14 +562,6 @@ export const translations = {
         toastStartDescription: "Beginning parallel pronunciation analysis by model.",
         toastCompleteTitle: "Analysis Complete",
         toastCompleteDescription: "Analysis from all models is complete.",
-      },
-      realtimeConversationTool: {
-        title: "Converse with AI Native Teacher",
-        description: "Practice English conversation with an AI in real-time and ask about any topic. The AI will adapt to your English proficiency level. (Records user voice only)",
-      },
-      concurrentConversationTool: {
-          title: "Converse with AI Native Teacher 2",
-          description: "This feature records the entire conversation (both AI and user audio). Press 'Start Recording' to begin recording all audio into a single file.",
       },
       readAloudTool: {
         title: "Read Aloud Practice Tool",
