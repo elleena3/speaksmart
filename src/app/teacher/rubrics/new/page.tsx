@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useId } from 'react';
@@ -277,14 +278,14 @@ export default function NewRubricPage() {
                                    <div className="p-4 space-y-4">
                                         {criterion.details.map((detail, index) => (
                                             <div key={index} className="flex items-start gap-4">
-                                                <div className="flex items-center gap-2 w-24">
-                                                    <Label htmlFor={`score-${criterion.id}-${index}`} className="whitespace-nowrap">점수:</Label>
+                                                <div className="flex items-center gap-2">
+                                                    <Label htmlFor={`score-${criterion.id}-${index}`} className="whitespace-nowrap">점수</Label>
                                                     <Input
                                                         id={`score-${criterion.id}-${index}`}
                                                         type="number"
                                                         value={detail.score}
                                                         onChange={(e) => handleDetailChange(criterion.id, index, 'score', e.target.value)}
-                                                        className="w-full"
+                                                        className="w-20"
                                                     />
                                                 </div>
                                                 <Textarea
