@@ -22,7 +22,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogClose } from "@/components/ui/dialog";
-import { scenarios, type TeacherAssessment, femaleVoices, maleVoices, allVoices, evaluationModels, voiceDescriptions, type AiVoice, type MonologueType, monologueTypes, type UserData, imageGenerationModels, type Scenario, type EvaluationModel, type ImageGenerationModel } from "@/lib/types";
+import { scenarios, type TeacherAssessment, femaleVoices, maleVoices, allVoices, evaluationModels, voiceDescriptions, type AiVoice, type MonologueType, type UserData, imageGenerationModels, type Scenario, type EvaluationModel, type ImageGenerationModel, monologueTypes } from "@/lib/types";
 import { useAuth, mockStudents } from "@/context/auth-context";
 import { addDoc, collection, getDocs, query, where, orderBy } from "firebase/firestore";
 import { db, storage } from "@/lib/firebase";
@@ -111,6 +111,9 @@ export default function NewAssessmentPage() {
   
   const [savedRubrics, setSavedRubrics] = useState<any[]>([]);
   const [isRubricListLoading, setIsRubricListLoading] = useState(false);
+  const [loadedRubricName, setLoadedRubricName] = useState<string | null>(null);
+  const [loadedRubricContent, setLoadedRubricContent] = useState<any[] | null>(null);
+
 
   const formSchema = useMemo(() => z.object({
     title: z.string().optional(),
@@ -278,7 +281,7 @@ export default function NewAssessmentPage() {
       }
   };
 
-  const fetchRubrics = async () => {
+  const fetchRubrics = useCallback(async () => {
     if (!user) return;
     setIsRubricListLoading(true);
     try {
@@ -288,26 +291,26 @@ export default function NewAssessmentPage() {
         fetchedRubrics.sort((a,b) => (b.createdAt || 0) - (a.createdAt || 0));
         setSavedRubrics(fetchedRubrics);
     } catch(e) {
+        console.error("Error fetching rubrics:", e);
         toast({ title: "오류", description: "저장된 루브릭을 불러오지 못했습니다.", variant: "destructive" });
     } finally {
         setIsRubricListLoading(false);
     }
-  }
+  }, [user, toast]);
 
-  const handleApplyRubric = (rubricId: string) => {
-    const selectedRubric = savedRubrics.find(r => r.id === rubricId);
-    if (selectedRubric) {
-      // Create a formatted string from criteria for the 'expectedFormat' field
-      const criteriaText = selectedRubric.criteria.map((c: any) => {
-        const detailsText = c.details.map((d: any) => `- ${d.score}점: ${d.description}`).join('\\n');
-        return `### ${c.name} (만점: ${c.maxScore}점)\\n${detailsText}`;
-      }).join('\\n\\n');
+  const handleApplyRubric = (rubric: any) => {
+    const { id, name, criteria } = rubric;
+    const criteriaText = criteria.map((c: any) => {
+      const detailsText = c.details.map((d: any) => `- ${d.score}점: ${d.description}`).join('\\n');
+      return `### ${c.name} (만점: ${c.maxScore}점)\\n${detailsText}`;
+    }).join('\\n\\n');
 
-      form.setValue('expectedFormat', criteriaText);
-      form.setValue('useRubric', true);
-      form.setValue('loadedRubricId', rubricId);
-      toast({ title: "루브릭 적용됨", description: `'${selectedRubric.name}'의 채점 기준이 적용되었습니다.`});
-    }
+    form.setValue('expectedFormat', criteriaText);
+    form.setValue('useRubric', true);
+    form.setValue('loadedRubricId', id);
+    setLoadedRubricName(name);
+    setLoadedRubricContent(criteria);
+    toast({ title: "루브릭 적용됨", description: `'${name}'의 채점 기준이 적용되었습니다.`});
   }
 
 
@@ -919,34 +922,36 @@ export default function NewAssessmentPage() {
                         {isRubricListLoading ? <Loader2 className="animate-spin" /> :
                             <div className="max-h-96 overflow-y-auto space-y-2 p-1">
                                 {savedRubrics.map(rubric => (
-                                  <Card key={rubric.id} className="cursor-pointer" onClick={() => handleApplyRubric(rubric.id)}>
-                                    <div className="p-3 flex items-center justify-between">
-                                        <div>
-                                            <p className="font-semibold">{rubric.name}</p>
-                                            <p className="text-sm text-muted-foreground">
-                                                {rubric.criteria.length}개 항목 | 생성일: {format(new Date(rubric.createdAt), 'yyyy-MM-dd')}
-                                            </p>
+                                  <DialogClose key={rubric.id} asChild>
+                                      <Card className="cursor-pointer hover:bg-muted/50" onClick={() => handleApplyRubric(rubric)}>
+                                        <div className="p-3 flex items-center justify-between">
+                                            <div>
+                                                <p className="font-semibold">{rubric.name}</p>
+                                                <p className="text-sm text-muted-foreground">
+                                                    {rubric.criteria.length}개 항목 | 생성일: {format(new Date(rubric.createdAt), 'yyyy-MM-dd')}
+                                                </p>
+                                            </div>
+                                            <Dialog>
+                                                <DialogTrigger asChild>
+                                                    <Button variant="ghost" size="sm" onClick={(e) => e.stopPropagation()}>
+                                                        <Eye className="mr-2 h-4 w-4"/> 자세히 보기
+                                                    </Button>
+                                                </DialogTrigger>
+                                                <DialogContent className="max-w-4xl h-[90vh]">
+                                                    <DialogHeader>
+                                                        <DialogTitle>{rubric.name}</DialogTitle>
+                                                    </DialogHeader>
+                                                    <div className="h-full overflow-y-auto">
+                                                    <iframe srcDoc={`<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{font-family:sans-serif;margin:2em}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:8px;text-align:left}th{background-color:#f2f2f2}</style></head><body><h2>${rubric.name}</h2>${rubric.criteria.map((c:any) => `<h3>${c.name} (만점: ${c.maxScore}점)</h3><table><tr><th>점수</th><th>설명</th></tr>${c.details.map((d:any) => `<tr><td>${d.score}</td><td>${d.description}</td></tr>`).join('')}</table>`).join('')}</body></html>`}
+                                                        className="w-full h-full border-0"
+                                                        title={`${rubric.name} - 루브릭 미리보기`}
+                                                    />
+                                                    </div>
+                                                </DialogContent>
+                                            </Dialog>
                                         </div>
-                                        <Dialog>
-                                            <DialogTrigger asChild>
-                                                <Button variant="ghost" size="sm" onClick={(e) => e.stopPropagation()}>
-                                                    <Eye className="mr-2 h-4 w-4"/> 자세히 보기
-                                                </Button>
-                                            </DialogTrigger>
-                                            <DialogContent className="max-w-4xl h-[90vh]">
-                                                <DialogHeader>
-                                                    <DialogTitle>{rubric.name}</DialogTitle>
-                                                </DialogHeader>
-                                                <div className="h-full overflow-y-auto">
-                                                <iframe srcDoc={`<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{font-family:sans-serif;margin:2em}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:8px;text-align:left}th{background-color:#f2f2f2}</style></head><body><h2>${rubric.name}</h2>${rubric.criteria.map((c:any) => `<h3>${c.name} (만점: ${c.maxScore}점)</h3><table><tr><th>점수</th><th>설명</th></tr>${c.details.map((d:any) => `<tr><td>${d.score}</td><td>${d.description}</td></tr>`).join('')}</table>`).join('')}</body></html>`}
-                                                    className="w-full h-full border-0"
-                                                    title={`${rubric.name} - 루브릭 미리보기`}
-                                                />
-                                                </div>
-                                            </DialogContent>
-                                        </Dialog>
-                                    </div>
-                                  </Card>
+                                      </Card>
+                                  </DialogClose>
                                 ))}
                                 {savedRubrics.length === 0 && <p className="text-center text-muted-foreground py-4">저장된 루브릭이 없습니다.</p>}
                             </div>
@@ -959,12 +964,13 @@ export default function NewAssessmentPage() {
                   render={({ field }) => (
                     <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
                       <div className="space-y-0.5">
-                        <FormLabel className="text-base">
-                          루브릭 평가 적용
-                        </FormLabel>
-                        <FormDescription>
-                          AI가 루브릭 채점 기준에 맞춰 점수를 매기고 HTML 피드백을 생성합니다.
-                        </FormDescription>
+                         <FormLabel className="text-base">루브릭 평가 적용</FormLabel>
+                         <FormDescription>
+                           {loadedRubricName 
+                             ? <>적용된 루브릭: <span className="font-semibold text-primary">{loadedRubricName}</span></> 
+                             : "AI가 루브릭 채점 기준에 맞춰 점수를 매기고 HTML 피드백을 생성합니다."
+                           }
+                         </FormDescription>
                       </div>
                       <div className="flex items-center space-x-4">
                         <Dialog>
@@ -973,9 +979,16 @@ export default function NewAssessmentPage() {
                           </DialogTrigger>
                           <DialogContent className="max-w-4xl h-[90vh]">
                             <DialogHeader>
-                              <DialogTitle>영어 회화 능력 평가 루브릭</DialogTitle>
+                                <DialogTitle>{loadedRubricName || "표준 루브릭"}</DialogTitle>
                             </DialogHeader>
-                            <iframe src="/rubric.html" className="w-full h-full border-0" title="영어 회화 능력 평가 루브릭"></iframe>
+                            <div className="h-full overflow-y-auto">
+                            <iframe 
+                                srcDoc={loadedRubricContent ? `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{font-family:sans-serif;margin:2em}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:8px;text-align:left}th{background-color:#f2f2f2}</style></head><body><h2>${loadedRubricName}</h2>${loadedRubricContent.map((c:any) => `<h3>${c.name} (만점: ${c.maxScore}점)</h3><table><tr><th>점수</th><th>설명</th></tr>${c.details.map((d:any) => `<tr><td>${d.score}</td><td>${d.description}</td></tr>`).join('')}</table>`).join('')}</body></html>` : undefined}
+                                src={!loadedRubricContent ? "/rubric.html" : undefined}
+                                className="w-full h-full border-0" 
+                                title="루브릭 미리보기"
+                            />
+                            </div>
                           </DialogContent>
                         </Dialog>
                         <FormControl>
