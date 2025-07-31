@@ -137,14 +137,12 @@ const createConversationalPrompt = (modelName: z.infer<typeof evaluationModels[n
       name: `conversationalPrompt_${modelName.replace(/[-.]/g, '_')}`,
       model: googleAI.model(modelName),
       input: {
-        schema: ConverseWithStudentInputSchema.pick({
-          studentRecordingDataUri: true,
-          conversationHistory: true, // This was missing!
-          scenario: true,
-          scenarioPrompt: true, 
-          aiVoice: true,
-        }).extend({
+        schema: z.object({
+            studentTranscript: z.string().optional(),
             history: z.array(ConversationTurnSchema.extend({ isUser: z.boolean() })),
+            scenario: z.enum(scenarios).optional(),
+            scenarioPrompt: z.string().optional(),
+            aiVoice: z.enum(allVoices).optional(),
         })
       },
       output: { schema: ConverseWithStudentOutputSchema.pick({ aiResponseText: true }) },
@@ -170,9 +168,9 @@ const createConversationalPrompt = (modelName: z.infer<typeof evaluationModels[n
     {{#if isUser}}Student{{else}}You{{/if}}: {{{text}}}
     {{/each}}
 
-    {{#if studentRecordingDataUri}}
-    The student's latest message is an audio recording. Transcribe it and respond.
-    {{media url=studentRecordingDataUri}}
+    {{#if studentTranscript}}
+    The student's latest message is a transcript from their speech. Respond to it.
+    Student: {{{studentTranscript}}}
     You:
     {{else}}
     You are starting the conversation. Greet the student according to your role and the situation. Keep it short and friendly.
@@ -192,13 +190,11 @@ const converseWithStudentFlow = ai.defineFlow(
   },
   async ({ studentRecordingDataUri, conversationHistory, scenario, scenarioPrompt, aiVoice, evaluationModel }) => {
     let studentTranscript = "";
+    let aiResponseText = "";
     
-    // Use the faster model for real-time conversation.
     const model = 'gemini-2.5-flash-lite-preview-06-17';
     const conversationalPrompt = createConversationalPrompt(model);
 
-    // This is a temporary solution to get the transcript from the media part.
-    // In a future version, the prompt should ideally handle this directly.
     if (studentRecordingDataUri) {
       const sttResponse = await withRetry(() => ai.generate({
         model: googleAI.model(model),
@@ -221,15 +217,13 @@ const converseWithStudentFlow = ai.defineFlow(
 
     const { output } = await withRetry(() => conversationalPrompt({
       history: historyForPrompt,
-      studentRecordingDataUri: studentRecordingDataUri, // Pass the audio URI to the prompt
-      studentTranscript: studentTranscript || undefined, // And the transcript
+      studentTranscript: studentTranscript || undefined, 
       scenario: scenario || 'free-talk',
       scenarioPrompt: scenarioPrompt,
-      conversationHistory: conversationHistory,
       aiVoice: aiVoice || 'algenib',
     }));
 
-    const aiResponseText = output?.aiResponseText || "Sorry, I'm having a little trouble right now. Could you say that again?";
+    aiResponseText = output?.aiResponseText || "Sorry, I'm having a little trouble right now. Could you say that again?";
 
     const aiResponseAudioDataUri = await textToSpeech(aiResponseText, aiVoice || 'algenib');
 
@@ -257,7 +251,6 @@ const readAloudTextFlow = ai.defineFlow(
         if (!text.trim()) {
             throw new Error("Cannot read empty text.");
         }
-        // Using a standard, clear male voice for reading.
         const audioDataUri = await textToSpeech(text, 'puck');
         return { audioDataUri };
     }
