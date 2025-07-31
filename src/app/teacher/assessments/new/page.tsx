@@ -22,7 +22,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogClose } from "@/components/ui/dialog";
-import { scenarios, type TeacherAssessment, femaleVoices, maleVoices, allVoices, evaluationModels, voiceDescriptions, type AiVoice, type MonologueType, type UserData, imageGenerationModels } from "@/lib/types";
+import { scenarios, type TeacherAssessment, femaleVoices, maleVoices, allVoices, evaluationModels, voiceDescriptions, type AiVoice, type MonologueType, monologueTypes, type UserData, imageGenerationModels, type Scenario, type EvaluationModel, type ImageGenerationModel } from "@/lib/types";
 import { useAuth, mockStudents } from "@/context/auth-context";
 import { addDoc, collection, getDocs, query, where, orderBy } from "firebase/firestore";
 import { db, storage } from "@/lib/firebase";
@@ -933,6 +933,43 @@ export default function NewAssessmentPage() {
               )}
             />
             
+            <FormField
+              control={form.control}
+              name="useRubric"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                  <div className="space-y-0.5">
+                    <FormLabel className="text-base">
+                      루브릭 평가 적용
+                    </FormLabel>
+                    <FormDescription>
+                      AI가 루브릭 채점 기준에 맞춰 점수를 매기고 HTML 피드백을 생성합니다.
+                    </FormDescription>
+                  </div>
+                  <div className="flex items-center space-x-4">
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button type="button" variant="ghost" size="sm"><Info className="mr-2 h-4 w-4"/> 자세히 보기</Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-4xl h-[90vh]">
+                        <DialogHeader>
+                          <DialogTitle>영어 회화 능력 평가 루브릭</DialogTitle>
+                        </DialogHeader>
+                        <iframe src="/rubric.html" className="w-full h-full border-0" title="영어 회화 능력 평가 루브릭"></iframe>
+                      </DialogContent>
+                    </Dialog>
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                  </div>
+                </FormItem>
+              )}
+            />
+            
+
             {assessmentType === 'monologue' && (
               <FormField
                 control={form.control}
