@@ -1,3 +1,4 @@
+
 'use server';
 
 /**
@@ -46,7 +47,7 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 2, delay = 1500): Pr
     } catch (error: any) {
       lastError = error;
       const errorMessage = error.message || '';
-      if (errorMessage.includes('overloaded') || errorMessage.includes('503') || errorMessage.includes('500')) {
+      if (errorMessage.includes('overloaded') || errorMessage.includes('503') || errorMessage.includes('500') || errorMessage.includes('429')) {
         console.warn(`[withRetry] Attempt ${i + 1} failed due to server error. Retrying in ${delay}ms...`);
         if (i < retries) {
           await new Promise(resolve => setTimeout(resolve, delay));
