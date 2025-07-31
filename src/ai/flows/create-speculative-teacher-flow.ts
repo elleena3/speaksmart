@@ -180,7 +180,7 @@ const converseWithSpeculativeTeacherFlow = ai.defineFlow(
     // Case 2: Process a conversational turn
     // Step 1: Transcribe initial chunk and final audio in parallel
     const [initialTranscriptionResult, finalTranscriptionResult] = await Promise.all([
-        withRetry(() => sttPrompt({ audioDataUri: input.initialChunkDataUri })),
+        withRetry(() => sttPrompt({ audioDataUri: input.initialChunkDataUri! })),
         withRetry(() => sttPrompt({ audioDataUri: input.finalAudioDataUri })),
     ]);
 

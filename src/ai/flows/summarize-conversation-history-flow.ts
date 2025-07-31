@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview A flow to summarize a conversation history.
@@ -31,14 +32,21 @@ Conversation History:
 Please provide a brief summary of this conversation.`,
 });
 
-export async function summarizeConversationHistoryFlow (input: z.infer<typeof SummarizeConversationHistoryInputSchema>): Promise<z.infer<typeof SummarizeConversationHistoryOutputSchema>> {
-    if (input.conversationToSummarize.length === 0) {
-        return { summary: "" };
+export const summarizeConversationHistoryFlow = ai.defineFlow(
+    {
+        name: 'summarizeConversationHistoryFlow',
+        inputSchema: SummarizeConversationHistoryInputSchema,
+        outputSchema: SummarizeConversationHistoryOutputSchema,
+    },
+    async (input) => {
+        if (input.conversationToSummarize.length === 0) {
+            return { summary: "" };
+        }
+        
+        const { output } = await summarizationPrompt(input);
+        if (!output) {
+            throw new Error("Failed to generate conversation summary.");
+        }
+        return output;
     }
-    
-    const { output } = await summarizationPrompt(input);
-    if (!output) {
-        throw new Error("Failed to generate conversation summary.");
-    }
-    return output;
-};
+);

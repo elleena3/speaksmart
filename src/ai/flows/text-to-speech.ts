@@ -231,7 +231,6 @@ const converseWithStudentFlow = ai.defineFlow(
     }));
     let historySummary: string | undefined = undefined;
 
-    // 대화 기록이 한계에 도달하거나 초과하면 요약 로직을 실행
     if (historyForPrompt.length >= CONVERSATION_MEMORY_LIMIT) {
         const splitIndex = Math.max(0, historyForPrompt.length - CONVERSATION_MEMORY_LIMIT);
         const oldHistory = historyForPrompt.slice(0, splitIndex);
@@ -249,6 +248,7 @@ const converseWithStudentFlow = ai.defineFlow(
     if (lastTurn && lastTurn.isUser && lastTurn.text === studentTranscript) {
         finalTranscriptForPrompt = undefined;
     }
+
 
     const { output } = await withRetry(() => conversationalPrompt({
       history: historyForPrompt,
