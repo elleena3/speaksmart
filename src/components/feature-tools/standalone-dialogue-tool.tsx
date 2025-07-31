@@ -10,6 +10,7 @@ import { converseWithStudent } from "@/ai/flows/text-to-speech"
 import { type ConversationTurn } from "@/lib/types/ai-schemas";
 
 const mimeType = 'audio/webm;codecs=opus';
+const CONVERSATION_HISTORY_LIMIT = 20; // AI에게 전달할 최근 대화 기록의 수 (10턴)
 
 type SessionState = "idle" | "initializing" | "countdown" | "recording" | "processing" | "speaking" | "waiting_for_user";
 
@@ -180,21 +181,21 @@ export function StandaloneDialogueTool() {
 
   const processAudio = async (studentRecordingDataUri: string) => {
     try {
-      // Pass the current conversation history to the AI
+      // AI에게 보낼 대화 기록을 최근 N개로 제한 (Sliding Window)
+      const historyForAI = conversation.slice(-CONVERSATION_HISTORY_LIMIT);
+      
       const { studentTranscript, aiResponseText, aiResponseAudioDataUri } = await converseWithStudent({
         studentRecordingDataUri,
-        conversationHistory: conversation, // Pass the whole history
+        conversationHistory: historyForAI, // 전체 대신 제한된 기록 전달
         scenario: 'free-talk',
       });
       
       setInterimTranscript(null);
 
-      // Correctly accumulate the conversation history
-      setConversation(prev => [
-        ...prev,
-        { role: 'user', text: studentTranscript },
-        { role: 'model', text: aiResponseText }
-      ]);
+      const userTurn: ConversationTurn = { role: 'user', text: studentTranscript };
+      const modelTurn: ConversationTurn = { role: 'model', text: aiResponseText };
+      
+      setConversation(prev => [...prev, userTurn, modelTurn]);
 
       if (audioPlayerRef.current) {
         audioPlayerRef.current.src = aiResponseAudioDataUri;
