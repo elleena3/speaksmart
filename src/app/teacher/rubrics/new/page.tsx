@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useId } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -21,13 +22,14 @@ import {
   Trash2,
   PlusCircle,
   Save,
-  CheckCircle,
-  FileJson,
 } from 'lucide-react';
 import { analyzeRubricFile, type AnalyzeRubricFileOutput } from '@/ai/flows/analyze-rubric-file-flow';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { useAuth } from '@/context/auth-context';
+import { addDoc, collection } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 type AnalysisState = 'idle' | 'analyzing' | 'analyzed' | 'error';
 type RubricCriterion = AnalyzeRubricFileOutput['criteria'][0] & { id: string };
@@ -36,8 +38,12 @@ export default function NewRubricPage() {
   const [analysisState, setAnalysisState] = useState<AnalysisState>('idle');
   const [rubricFile, setRubricFile] = useState<File | null>(null);
   const [verifiedCriteria, setVerifiedCriteria] = useState<RubricCriterion[]>([]);
+  const [rubricName, setRubricName] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
+  const { user } = useAuth();
+  const router = useRouter();
   const fileInputId = useId();
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -89,6 +95,7 @@ export default function NewRubricPage() {
     setRubricFile(null);
     setVerifiedCriteria([]);
     setError(null);
+    setRubricName('');
     const input = document.getElementById(fileInputId) as HTMLInputElement;
     if(input) input.value = '';
   };
@@ -149,17 +156,36 @@ export default function NewRubricPage() {
     ]);
   };
   
-  const handleSaveToJson = () => {
-    const dataStr = JSON.stringify(verifiedCriteria, null, 2);
-    const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
+  const handleSaveToDb = async () => {
+    if (!user) {
+        toast({ title: "로그인 필요", description: "루브릭을 저장하려면 로그인이 필요합니다.", variant: "destructive" });
+        return;
+    }
+    if (!rubricName.trim()) {
+        toast({ title: "이름 입력 필요", description: "루브릭의 이름을 입력해주세요.", variant: "destructive" });
+        return;
+    }
+    if (verifiedCriteria.length === 0) {
+        toast({ title: "기준 없음", description: "하나 이상의 평가 기준이 있어야 합니다.", variant: "destructive" });
+        return;
+    }
     
-    const exportFileDefaultName = 'custom_rubric.json';
-
-    const linkElement = document.createElement('a');
-    linkElement.setAttribute('href', dataUri);
-    linkElement.setAttribute('download', exportFileDefaultName);
-    linkElement.click();
-    toast({ title: '파일 저장됨', description: '수정된 루브릭 기준이 JSON 파일로 저장되었습니다.' });
+    setIsSaving(true);
+    try {
+        await addDoc(collection(db, "rubrics"), {
+            uid: user.uid,
+            name: rubricName,
+            criteria: verifiedCriteria.map(({ id, ...rest }) => rest), // Remove temporary id before saving
+            createdAt: Date.now(),
+        });
+        toast({ title: '저장 완료', description: `'${rubricName}' 루브릭이 데이터베이스에 저장되었습니다.` });
+        router.push('/teacher/rubrics');
+    } catch (e: any) {
+        console.error("Error saving rubric:", e);
+        toast({ title: '저장 실패', description: "루브릭을 저장하는 중 오류가 발생했습니다.", variant: 'destructive' });
+    } finally {
+        setIsSaving(false);
+    }
   }
 
   return (
@@ -190,7 +216,7 @@ export default function NewRubricPage() {
         <Card>
           <CardHeader>
             <CardTitle>Step 2: AI 분석 결과 확인 및 수정</CardTitle>
-            <CardDescription>AI가 추출한 평가 기준입니다. 내용을 자유롭게 수정, 추가, 삭제할 수 있습니다.</CardDescription>
+            <CardDescription>AI가 추출한 평가 기준입니다. 내용을 자유롭게 수정, 추가, 삭제한 후 이름을 정해 저장하세요.</CardDescription>
           </CardHeader>
           <CardContent>
             {analysisState === 'analyzing' && (
@@ -207,6 +233,15 @@ export default function NewRubricPage() {
             )}
             {analysisState === 'analyzed' && (
                 <div className="space-y-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="rubric-name" className="text-base font-semibold">루브릭 이름</Label>
+                        <Input 
+                            id="rubric-name"
+                            placeholder="예: 1학기 영어 말하기 평가 기준표"
+                            value={rubricName}
+                            onChange={(e) => setRubricName(e.target.value)}
+                        />
+                    </div>
                      <Accordion type="multiple" defaultValue={verifiedCriteria.map(c => c.id)} className="w-full">
                         {verifiedCriteria.map((criterion) => (
                           <AccordionItem key={criterion.id} value={criterion.id} className="border-b-0">
@@ -277,11 +312,9 @@ export default function NewRubricPage() {
                         <PlusCircle className="mr-2 h-4 w-4" /> 평가 요소 추가
                     </Button>
                     <div className="flex justify-end gap-2 pt-4">
-                         <Button onClick={handleSaveToJson} variant="outline">
-                            <FileJson className="mr-2 h-4 w-4" /> 기준 파일로 저장
-                        </Button>
-                        <Button>
-                            <CheckCircle className="mr-2 h-4 w-4"/> 확인 및 다음 단계
+                        <Button onClick={handleSaveToDb} disabled={isSaving}>
+                            {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Save className="mr-2 h-4 w-4" />}
+                            루브릭 데이터베이스에 저장
                         </Button>
                     </div>
                 </div>
