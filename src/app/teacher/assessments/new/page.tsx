@@ -242,6 +242,7 @@ export default function NewAssessmentPage() {
   
   const handleSelectAllMock = (field: any) => {
      const currentSelection = new Set(Array.isArray(field.value) ? field.value : []);
+     const allMockIds = new Set(mockStudents.map(s => s.uid));
      const areAllSelected = mockStudents.every(s => currentSelection.has(s.uid));
      
      if(areAllSelected) {
@@ -281,9 +282,10 @@ export default function NewAssessmentPage() {
     if (!user) return;
     setIsRubricListLoading(true);
     try {
-        const q = query(collection(db, "rubrics"), where("uid", "==", user.uid), orderBy("createdAt", "desc"));
+        const q = query(collection(db, "rubrics"), where("uid", "==", user.uid));
         const querySnapshot = await getDocs(q);
         const fetchedRubrics = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        fetchedRubrics.sort((a,b) => (b.createdAt || 0) - (a.createdAt || 0));
         setSavedRubrics(fetchedRubrics);
     } catch(e) {
         toast({ title: "오류", description: "저장된 루브릭을 불러오지 못했습니다.", variant: "destructive" });
@@ -887,37 +889,6 @@ export default function NewAssessmentPage() {
                 <FormItem>
                   <div className="flex items-center justify-between mb-2">
                      <FormLabel>{t.teacherAssessmentForm.expectedFormatLabel} {(assessmentType === 'dialogue' || useRubric) && `(${t.teacherAssessmentForm.optional})`}</FormLabel>
-                     <Dialog>
-                        <DialogTrigger asChild>
-                            <Button type="button" variant="outline" size="sm" onClick={fetchRubrics}>
-                                <FolderSearch className="mr-2 h-4 w-4"/> 저장된 루브릭 불러오기
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                            <DialogHeader>
-                                <DialogTitle>저장된 루브릭 불러오기</DialogTitle>
-                                <DialogDescription>
-                                    적용할 루브릭을 선택하면 채점 기준이 자동으로 입력됩니다.
-                                </DialogDescription>
-                            </DialogHeader>
-                            {isRubricListLoading ? <Loader2 className="animate-spin" /> :
-                                <div className="max-h-80 overflow-y-auto space-y-2 p-1">
-                                    {savedRubrics.map(rubric => (
-                                      <DialogClose asChild key={rubric.id}>
-                                        <Card className="hover:bg-accent cursor-pointer" onClick={() => handleApplyRubric(rubric.id)}>
-                                            <CardHeader className="p-3">
-                                                <CardTitle className="text-base">{rubric.name}</CardTitle>
-                                                <CardDescription>
-                                                    {rubric.criteria.length}개 항목 | 생성일: {format(new Date(rubric.createdAt), 'yyyy-MM-dd')}
-                                                </CardDescription>
-                                            </CardHeader>
-                                        </Card>
-                                      </DialogClose>
-                                    ))}
-                                </div>
-                            }
-                        </DialogContent>
-                     </Dialog>
                    </div>
                   <FormControl>
                     <Textarea
@@ -933,41 +904,75 @@ export default function NewAssessmentPage() {
               )}
             />
             
-            <FormField
-              control={form.control}
-              name="useRubric"
-              render={({ field }) => (
-                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                  <div className="space-y-0.5">
-                    <FormLabel className="text-base">
-                      루브릭 평가 적용
-                    </FormLabel>
-                    <FormDescription>
-                      AI가 루브릭 채점 기준에 맞춰 점수를 매기고 HTML 피드백을 생성합니다.
-                    </FormDescription>
-                  </div>
-                  <div className="flex items-center space-x-4">
-                    <Dialog>
-                      <DialogTrigger asChild>
-                        <Button type="button" variant="ghost" size="sm"><Info className="mr-2 h-4 w-4"/> 자세히 보기</Button>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-4xl h-[90vh]">
+            <div className="space-y-3">
+                <Dialog>
+                    <DialogTrigger asChild>
+                        <Button type="button" variant="outline" className="w-full" onClick={fetchRubrics}>
+                            <FolderSearch className="mr-2 h-4 w-4"/> 저장된 루브릭 불러오기
+                        </Button>
+                    </DialogTrigger>
+                    <DialogContent>
                         <DialogHeader>
-                          <DialogTitle>영어 회화 능력 평가 루브릭</DialogTitle>
+                            <DialogTitle>저장된 루브릭 불러오기</DialogTitle>
+                            <DialogDescription>
+                                적용할 루브릭을 선택하면 채점 기준이 자동으로 입력됩니다.
+                            </DialogDescription>
                         </DialogHeader>
-                        <iframe src="/rubric.html" className="w-full h-full border-0" title="영어 회화 능력 평가 루브릭"></iframe>
-                      </DialogContent>
-                    </Dialog>
-                    <FormControl>
-                      <Checkbox
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    </FormControl>
-                  </div>
-                </FormItem>
-              )}
-            />
+                        {isRubricListLoading ? <Loader2 className="animate-spin" /> :
+                            <div className="max-h-80 overflow-y-auto space-y-2 p-1">
+                                {savedRubrics.map(rubric => (
+                                  <DialogClose asChild key={rubric.id}>
+                                    <Card className="hover:bg-accent cursor-pointer" onClick={() => handleApplyRubric(rubric.id)}>
+                                        <CardHeader className="p-3">
+                                            <CardTitle className="text-base">{rubric.name}</CardTitle>
+                                            <CardDescription>
+                                                {rubric.criteria.length}개 항목 | 생성일: {format(new Date(rubric.createdAt), 'yyyy-MM-dd')}
+                                            </CardDescription>
+                                        </CardHeader>
+                                    </Card>
+                                  </DialogClose>
+                                ))}
+                            </div>
+                        }
+                    </DialogContent>
+                </Dialog>
+                <FormField
+                  control={form.control}
+                  name="useRubric"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                      <div className="space-y-0.5">
+                        <FormLabel className="text-base">
+                          루브릭 평가 적용
+                        </FormLabel>
+                        <FormDescription>
+                          AI가 루브릭 채점 기준에 맞춰 점수를 매기고 HTML 피드백을 생성합니다.
+                        </FormDescription>
+                      </div>
+                      <div className="flex items-center space-x-4">
+                        <Dialog>
+                          <DialogTrigger asChild>
+                            <Button type="button" variant="ghost" size="sm"><Info className="mr-2 h-4 w-4"/> 자세히 보기</Button>
+                          </DialogTrigger>
+                          <DialogContent className="max-w-4xl h-[90vh]">
+                            <DialogHeader>
+                              <DialogTitle>영어 회화 능력 평가 루브릭</DialogTitle>
+                            </DialogHeader>
+                            <iframe src="/rubric.html" className="w-full h-full border-0" title="영어 회화 능력 평가 루브릭"></iframe>
+                          </DialogContent>
+                        </Dialog>
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                      </div>
+                    </FormItem>
+                  )}
+                />
+            </div>
+            
             
 
             {assessmentType === 'monologue' && (
@@ -1112,4 +1117,3 @@ export default function NewAssessmentPage() {
     </Card>
   );
 }
-
