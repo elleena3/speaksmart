@@ -21,8 +21,8 @@ import { useLanguage } from "@/context/language-context";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
-import { scenarios, type TeacherAssessment, femaleVoices, maleVoices, allVoices, evaluationModels, voiceDescriptions, type AiVoice, monologueTypes, type UserData, imageGenerationModels } from "@/lib/types";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogClose } from "@/components/ui/dialog";
+import { scenarios, type TeacherAssessment, femaleVoices, maleVoices, allVoices, evaluationModels, voiceDescriptions, type AiVoice, type MonologueType, type UserData, imageGenerationModels } from "@/lib/types";
 import { useAuth, mockStudents } from "@/context/auth-context";
 import { addDoc, collection, getDocs, query, where, orderBy } from "firebase/firestore";
 import { db, storage } from "@/lib/firebase";
@@ -120,16 +120,16 @@ export default function NewAssessmentPage() {
     startDate: z.date().optional(),
     endDate: z.date().optional(),
     assessmentType: z.enum(["monologue", "dialogue"]),
-    monologueType: z.enum(monologueTypes).optional(),
+    monologueType: z.enum(monologueTypes as [MonologueType, ...MonologueType[]]).optional(),
     targetType: z.enum(["all", "specific"]).default("all"),
     targetStudentIds: z.union([z.literal('all'), z.array(z.string()).min(1, "한 명 이상의 학생을 선택해야 합니다.")]),
-    scenario: z.enum(scenarios).optional(),
+    scenario: z.enum(scenarios as [Scenario, ...Scenario[]]).optional(),
     recordingTimeLimit: z.coerce.number().int().min(0).optional(),
-    aiVoice: z.enum(allVoices).optional().default('algenib'),
-    evaluationModel: z.enum(evaluationModels).optional().default('gemini-2.5-pro'),
+    aiVoice: z.enum(allVoices as [AiVoice, ...AiVoice[]]).optional().default('algenib'),
+    evaluationModel: z.enum(evaluationModels as [EvaluationModel, ...EvaluationModel[]]).optional().default('gemini-2.5-pro'),
     useRubric: z.boolean().default(false),
     loadedRubricId: z.string().optional(),
-    imageGenerationModel: z.enum(imageGenerationModels).optional().default('gemini-2.0-flash-preview-image-generation'),
+    imageGenerationModel: z.enum(imageGenerationModels as [ImageGenerationModel, ...ImageGenerationModel[]]).optional().default('gemini-2.0-flash-preview-image-generation'),
   }).superRefine((data, ctx) => {
     const isFreeTalkDialogue = data.assessmentType === 'dialogue' && data.scenario === 'free-talk';
 
@@ -281,10 +281,9 @@ export default function NewAssessmentPage() {
     if (!user) return;
     setIsRubricListLoading(true);
     try {
-        const q = query(collection(db, "rubrics"), where("uid", "==", user.uid));
+        const q = query(collection(db, "rubrics"), where("uid", "==", user.uid), orderBy("createdAt", "desc"));
         const querySnapshot = await getDocs(q);
         const fetchedRubrics = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        fetchedRubrics.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
         setSavedRubrics(fetchedRubrics);
     } catch(e) {
         toast({ title: "오류", description: "저장된 루브릭을 불러오지 못했습니다.", variant: "destructive" });
@@ -886,7 +885,7 @@ export default function NewAssessmentPage() {
               name="expectedFormat"
               render={({ field }) => (
                 <FormItem>
-                   <div className="flex items-center gap-2">
+                  <div className="flex items-center justify-between mb-2">
                      <FormLabel>{t.teacherAssessmentForm.expectedFormatLabel} {(assessmentType === 'dialogue' || useRubric) && `(${t.teacherAssessmentForm.optional})`}</FormLabel>
                      <Dialog>
                         <DialogTrigger asChild>
@@ -902,9 +901,10 @@ export default function NewAssessmentPage() {
                                 </DialogDescription>
                             </DialogHeader>
                             {isRubricListLoading ? <Loader2 className="animate-spin" /> :
-                                <div className="max-h-80 overflow-y-auto space-y-2">
+                                <div className="max-h-80 overflow-y-auto space-y-2 p-1">
                                     {savedRubrics.map(rubric => (
-                                        <Card key={rubric.id} className="hover:bg-accent cursor-pointer" onClick={() => handleApplyRubric(rubric.id)}>
+                                      <DialogClose asChild key={rubric.id}>
+                                        <Card className="hover:bg-accent cursor-pointer" onClick={() => handleApplyRubric(rubric.id)}>
                                             <CardHeader className="p-3">
                                                 <CardTitle className="text-base">{rubric.name}</CardTitle>
                                                 <CardDescription>
@@ -912,6 +912,7 @@ export default function NewAssessmentPage() {
                                                 </CardDescription>
                                             </CardHeader>
                                         </Card>
+                                      </DialogClose>
                                     ))}
                                 </div>
                             }
@@ -932,45 +933,6 @@ export default function NewAssessmentPage() {
               )}
             />
             
-             <FormField
-              control={form.control}
-              name="useRubric"
-              render={({ field }) => (
-                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                  <div className="space-y-0.5">
-                    <FormLabel className="text-base">
-                      영어 회화 평가 루브릭 적용
-                    </FormLabel>
-                    <FormDescription>
-                      표준화된 루브릭을 사용하여 AI 평가의 일관성과 정확성을 높입니다.
-                    </FormDescription>
-                  </div>
-                  <div className="flex items-center space-x-4">
-                    <Dialog>
-                      <DialogTrigger asChild>
-                        <Button type="button" variant="ghost" size="sm"><Info className="mr-2 h-4 w-4"/> 자세히 보기</Button>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-4xl h-[90vh]">
-                        <DialogHeader>
-                          <DialogTitle>영어 회화 능력 평가 루브릭</DialogTitle>
-                          <DialogDescription>
-                            AI 평가에 사용되는 표준화된 영어 회화 능력 평가 기준표입니다.
-                          </DialogDescription>
-                        </DialogHeader>
-                        <iframe src="/rubric.html" className="w-full h-full border-0" title="영어 회화 능력 평가 루브릭"></iframe>
-                      </DialogContent>
-                    </Dialog>
-                    <FormControl>
-                      <Checkbox
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    </FormControl>
-                  </div>
-                </FormItem>
-              )}
-            />
-
             {assessmentType === 'monologue' && (
               <FormField
                 control={form.control}
@@ -1113,3 +1075,4 @@ export default function NewAssessmentPage() {
     </Card>
   );
 }
+
