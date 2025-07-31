@@ -11,7 +11,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, CalendarIcon, ChevronsUpDown, Check, Info, Type, ImageIcon, Wand2, Copy, BookOpen, Film, Edit, Users, Search } from "lucide-react";
+import { Loader2, CalendarIcon, ChevronsUpDown, Check, Info, Type, ImageIcon, Wand2, Copy, BookOpen, Film, Edit, Users, Search, FolderSearch } from "lucide-react";
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -24,10 +24,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { scenarios, type TeacherAssessment, femaleVoices, maleVoices, allVoices, evaluationModels, voiceDescriptions, type AiVoice, monologueTypes, type UserData, imageGenerationModels } from "@/lib/types";
 import { useAuth, mockStudents } from "@/context/auth-context";
-import { addDoc, collection, getDocs, query, where } from "firebase/firestore";
+import { addDoc, collection, getDocs, query, where, orderBy } from "firebase/firestore";
 import { db, storage } from "@/lib/firebase";
 import { ref, uploadString, getDownloadURL } from "firebase/storage";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { generateImage } from "@/ai/flows/generate-image-flow";
 import Image from 'next/image';
 import { Label } from "@/components/ui/label";
@@ -108,7 +108,9 @@ export default function NewAssessmentPage() {
   const [realStudents, setRealStudents] = useState<UserData[]>([]);
   const [isStudentListLoading, setIsStudentListLoading] = useState(true);
   const [studentFilter, setStudentFilter] = useState<{ grade: string, class: string }>({ grade: 'all', class: 'all' });
-
+  
+  const [savedRubrics, setSavedRubrics] = useState<any[]>([]);
+  const [isRubricListLoading, setIsRubricListLoading] = useState(false);
 
   const formSchema = useMemo(() => z.object({
     title: z.string().optional(),
@@ -126,6 +128,7 @@ export default function NewAssessmentPage() {
     aiVoice: z.enum(allVoices).optional().default('algenib'),
     evaluationModel: z.enum(evaluationModels).optional().default('gemini-2.5-pro'),
     useRubric: z.boolean().default(false),
+    loadedRubricId: z.string().optional(),
     imageGenerationModel: z.enum(imageGenerationModels).optional().default('gemini-2.0-flash-preview-image-generation'),
   }).superRefine((data, ctx) => {
     const isFreeTalkDialogue = data.assessmentType === 'dialogue' && data.scenario === 'free-talk';
@@ -227,7 +230,6 @@ export default function NewAssessmentPage() {
 
   const handleSelectAll = (studentsToSelect: UserData[], field: any) => {
     const currentSelection = new Set(Array.isArray(field.value) ? field.value : []);
-    const allIds = new Set(studentsToSelect.map(s => s.docId!));
     const areAllSelected = studentsToSelect.every(s => currentSelection.has(s.docId!));
 
     if (areAllSelected) {
@@ -240,7 +242,6 @@ export default function NewAssessmentPage() {
   
   const handleSelectAllMock = (field: any) => {
      const currentSelection = new Set(Array.isArray(field.value) ? field.value : []);
-     const allMockIds = new Set(mockStudents.map(s => s.uid));
      const areAllSelected = mockStudents.every(s => currentSelection.has(s.uid));
      
      if(areAllSelected) {
@@ -275,6 +276,38 @@ export default function NewAssessmentPage() {
           setIsGeneratingImage(false);
       }
   };
+
+  const fetchRubrics = async () => {
+    if (!user) return;
+    setIsRubricListLoading(true);
+    try {
+        const q = query(collection(db, "rubrics"), where("uid", "==", user.uid), orderBy("createdAt", "desc"));
+        const querySnapshot = await getDocs(q);
+        const fetchedRubrics = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setSavedRubrics(fetchedRubrics);
+    } catch(e) {
+        toast({ title: "오류", description: "저장된 루브릭을 불러오지 못했습니다.", variant: "destructive" });
+    } finally {
+        setIsRubricListLoading(false);
+    }
+  }
+
+  const handleApplyRubric = (rubricId: string) => {
+    const selectedRubric = savedRubrics.find(r => r.id === rubricId);
+    if (selectedRubric) {
+      // Create a formatted string from criteria for the 'expectedFormat' field
+      const criteriaText = selectedRubric.criteria.map((c: any) => {
+        const detailsText = c.details.map((d: any) => `- ${d.score}점: ${d.description}`).join('\n');
+        return `### ${c.name} (만점: ${c.maxScore}점)\n${detailsText}`;
+      }).join('\n\n');
+
+      form.setValue('expectedFormat', criteriaText);
+      form.setValue('useRubric', true);
+      form.setValue('loadedRubricId', rubricId);
+      toast({ title: "루브릭 적용됨", description: `'${selectedRubric.name}'의 채점 기준이 적용되었습니다.`});
+    }
+  }
+
 
   const proceedToSubmit = async (values: z.infer<typeof formSchema>) => {
     if (!user) return;
@@ -852,7 +885,38 @@ export default function NewAssessmentPage() {
               name="expectedFormat"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>{t.teacherAssessmentForm.expectedFormatLabel} {(assessmentType === 'dialogue' || useRubric) && `(${t.teacherAssessmentForm.optional})`}</FormLabel>
+                   <div className="flex items-center gap-2">
+                     <FormLabel>{t.teacherAssessmentForm.expectedFormatLabel} {(assessmentType === 'dialogue' || useRubric) && `(${t.teacherAssessmentForm.optional})`}</FormLabel>
+                     <Dialog>
+                        <DialogTrigger asChild>
+                            <Button type="button" variant="outline" size="sm" onClick={fetchRubrics}>
+                                <FolderSearch className="mr-2 h-4 w-4"/> 저장된 루브릭 불러오기
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>저장된 루브릭 불러오기</DialogTitle>
+                                <DialogDescription>
+                                    적용할 루브릭을 선택하면 채점 기준이 자동으로 입력됩니다.
+                                </DialogDescription>
+                            </DialogHeader>
+                            {isRubricListLoading ? <Loader2 className="animate-spin" /> :
+                                <div className="max-h-80 overflow-y-auto space-y-2">
+                                    {savedRubrics.map(rubric => (
+                                        <Card key={rubric.id} className="hover:bg-accent cursor-pointer" onClick={() => handleApplyRubric(rubric.id)}>
+                                            <CardHeader className="p-3">
+                                                <CardTitle className="text-base">{rubric.name}</CardTitle>
+                                                <CardDescription>
+                                                    {rubric.criteria.length}개 항목 | 생성일: {format(new Date(rubric.createdAt), 'yyyy-MM-dd')}
+                                                </CardDescription>
+                                            </CardHeader>
+                                        </Card>
+                                    ))}
+                                </div>
+                            }
+                        </DialogContent>
+                     </Dialog>
+                   </div>
                   <FormControl>
                     <Textarea
                       placeholder={assessmentType === 'dialogue' ? '발음, 문법, 단어, 문장 등을 평가 주제에 맞게 종합적으로 판단.' : t.teacherAssessmentForm.expectedFormatPlaceholder}
