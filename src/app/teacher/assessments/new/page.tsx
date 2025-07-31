@@ -281,9 +281,10 @@ export default function NewAssessmentPage() {
     if (!user) return;
     setIsRubricListLoading(true);
     try {
-        const q = query(collection(db, "rubrics"), where("uid", "==", user.uid), orderBy("createdAt", "desc"));
+        const q = query(collection(db, "rubrics"), where("uid", "==", user.uid));
         const querySnapshot = await getDocs(q);
         const fetchedRubrics = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        fetchedRubrics.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
         setSavedRubrics(fetchedRubrics);
     } catch(e) {
         toast({ title: "오류", description: "저장된 루브릭을 불러오지 못했습니다.", variant: "destructive" });
