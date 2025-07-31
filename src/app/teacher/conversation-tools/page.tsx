@@ -8,6 +8,7 @@ import { VadConversationTool } from "@/app/teacher/misc/vad-conversation-tool";
 import { ParallelConversationTool } from "@/app/teacher/misc/parallel-conversation-tool";
 import { HybridConversationTool } from "@/app/teacher/misc/hybrid-conversation-tool";
 import { SpeculativeConversationTool } from "@/components/feature-tools/speculative-conversation-tool";
+import { StandaloneDialogueTool } from "@/components/feature-tools/standalone-dialogue-tool";
 
 
 export default function ConversationToolsPage() {
@@ -18,6 +19,15 @@ export default function ConversationToolsPage() {
                 <p className="text-muted-foreground">다양한 방식의 AI 대화 시뮬레이션 프로토타입입니다.</p>
             </div>
             <div className="grid grid-cols-1 gap-6">
+                 <Card>
+                    <CardHeader>
+                        <CardTitle>AI와 대화하기 (연습용)</CardTitle>
+                        <CardDescription>학생들이 응시하는 'AI와 대화하기' 평가와 동일한 환경에서 자유롭게 대화를 연습할 수 있는 도구입니다.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <StandaloneDialogueTool />
+                    </CardContent>
+                </Card>
                 <Card>
                     <CardHeader>
                         <CardTitle>AI 원어민 대화 (기본)</CardTitle>
