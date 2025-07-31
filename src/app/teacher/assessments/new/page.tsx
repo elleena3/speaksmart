@@ -123,7 +123,7 @@ export default function NewAssessmentPage() {
     startDate: z.date().optional(),
     endDate: z.date().optional(),
     assessmentType: z.enum(["monologue", "dialogue"]),
-    monologueType: z.enum(monologueTypes).optional(),
+    monologueType: z.enum(monologueTypes as [MonologueType, ...MonologueType[]]).optional(),
     targetType: z.enum(["all", "specific"]).default("all"),
     targetStudentIds: z.union([z.literal('all'), z.array(z.string()).min(1, "한 명 이상의 학생을 선택해야 합니다.")]),
     scenario: z.enum(scenarios as [Scenario, ...Scenario[]]).optional(),
@@ -906,7 +906,7 @@ export default function NewAssessmentPage() {
             />
             
             <div className="space-y-3">
-                <Dialog>
+                 <Dialog>
                     <DialogTrigger asChild>
                         <Button type="button" variant="outline" className="w-full" onClick={fetchRubrics}>
                             <FolderSearch className="mr-2 h-4 w-4"/> 저장된 루브릭 불러오기
@@ -999,8 +999,6 @@ export default function NewAssessmentPage() {
                   )}
                 />
             </div>
-            
-            
 
             {assessmentType === 'monologue' && (
               <FormField
