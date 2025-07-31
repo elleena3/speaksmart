@@ -23,7 +23,7 @@ import {
   type ReadAloudOutput,
 } from '@/lib/types/ai-schemas';
 import wav from 'wav';
-import { evaluationModels } from '@/lib/types';
+import { evaluationModels, scenarios, allVoices } from '@/lib/types';
 
 // Helper function for retrying API calls on overload
 async function withRetry<T>(fn: () => Promise<T>, retries = 2, delay = 1500): Promise<T> {
@@ -192,6 +192,7 @@ const converseWithStudentFlow = ai.defineFlow(
     let studentTranscript = "";
     let aiResponseText = "";
     
+    // Use the faster model for real-time conversation.
     const model = 'gemini-2.5-flash-lite-preview-06-17';
     const conversationalPrompt = createConversationalPrompt(model);
 
@@ -251,6 +252,7 @@ const readAloudTextFlow = ai.defineFlow(
         if (!text.trim()) {
             throw new Error("Cannot read empty text.");
         }
+        // Using a standard, clear male voice for reading.
         const audioDataUri = await textToSpeech(text, 'puck');
         return { audioDataUri };
     }
