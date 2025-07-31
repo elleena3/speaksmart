@@ -11,7 +11,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, CalendarIcon, ChevronsUpDown, Check, Info, Type, ImageIcon, Wand2, Copy, BookOpen, Film, Edit, Users, Search, FolderSearch } from "lucide-react";
+import { Loader2, CalendarIcon, ChevronsUpDown, Check, Info, Type, ImageIcon, Wand2, Copy, BookOpen, Film, Edit, Users, Search, FolderSearch, Eye } from "lucide-react";
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -282,10 +282,9 @@ export default function NewAssessmentPage() {
     if (!user) return;
     setIsRubricListLoading(true);
     try {
-        const q = query(collection(db, "rubrics"), where("uid", "==", user.uid));
+        const q = query(collection(db, "rubrics"), where("uid", "==", user.uid), orderBy("createdAt", "desc"));
         const querySnapshot = await getDocs(q);
         const fetchedRubrics = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        fetchedRubrics.sort((a,b) => (b.createdAt || 0) - (a.createdAt || 0));
         setSavedRubrics(fetchedRubrics);
     } catch(e) {
         toast({ title: "오류", description: "저장된 루브릭을 불러오지 못했습니다.", variant: "destructive" });
@@ -887,9 +886,7 @@ export default function NewAssessmentPage() {
               name="expectedFormat"
               render={({ field }) => (
                 <FormItem>
-                  <div className="flex items-center justify-between mb-2">
-                     <FormLabel>{t.teacherAssessmentForm.expectedFormatLabel} {(assessmentType === 'dialogue' || useRubric) && `(${t.teacherAssessmentForm.optional})`}</FormLabel>
-                   </div>
+                   <FormLabel>{t.teacherAssessmentForm.expectedFormatLabel} {(assessmentType === 'dialogue' || useRubric) && `(${t.teacherAssessmentForm.optional})`}</FormLabel>
                   <FormControl>
                     <Textarea
                       placeholder={assessmentType === 'dialogue' ? '발음, 문법, 단어, 문장 등을 평가 주제에 맞게 종합적으로 판단.' : t.teacherAssessmentForm.expectedFormatPlaceholder}
@@ -911,7 +908,7 @@ export default function NewAssessmentPage() {
                             <FolderSearch className="mr-2 h-4 w-4"/> 저장된 루브릭 불러오기
                         </Button>
                     </DialogTrigger>
-                    <DialogContent>
+                    <DialogContent className="max-w-xl">
                         <DialogHeader>
                             <DialogTitle>저장된 루브릭 불러오기</DialogTitle>
                             <DialogDescription>
@@ -919,19 +916,38 @@ export default function NewAssessmentPage() {
                             </DialogDescription>
                         </DialogHeader>
                         {isRubricListLoading ? <Loader2 className="animate-spin" /> :
-                            <div className="max-h-80 overflow-y-auto space-y-2 p-1">
+                            <div className="max-h-96 overflow-y-auto space-y-2 p-1">
                                 {savedRubrics.map(rubric => (
-                                  <DialogClose asChild key={rubric.id}>
-                                    <Card className="hover:bg-accent cursor-pointer" onClick={() => handleApplyRubric(rubric.id)}>
-                                        <CardHeader className="p-3">
-                                            <CardTitle className="text-base">{rubric.name}</CardTitle>
-                                            <CardDescription>
+                                  <Card key={rubric.id} className="cursor-pointer" onClick={() => handleApplyRubric(rubric.id)}>
+                                    <div className="p-3 flex items-center justify-between">
+                                        <div>
+                                            <p className="font-semibold">{rubric.name}</p>
+                                            <p className="text-sm text-muted-foreground">
                                                 {rubric.criteria.length}개 항목 | 생성일: {format(new Date(rubric.createdAt), 'yyyy-MM-dd')}
-                                            </CardDescription>
-                                        </CardHeader>
-                                    </Card>
-                                  </DialogClose>
+                                            </p>
+                                        </div>
+                                        <Dialog>
+                                            <DialogTrigger asChild>
+                                                <Button variant="ghost" size="sm" onClick={(e) => e.stopPropagation()}>
+                                                    <Eye className="mr-2 h-4 w-4"/> 자세히 보기
+                                                </Button>
+                                            </DialogTrigger>
+                                            <DialogContent className="max-w-4xl h-[90vh]">
+                                                <DialogHeader>
+                                                    <DialogTitle>{rubric.name}</DialogTitle>
+                                                </DialogHeader>
+                                                <div className="h-full overflow-y-auto">
+                                                <iframe srcDoc={`<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{font-family:sans-serif;margin:2em}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:8px;text-align:left}th{background-color:#f2f2f2}</style></head><body><h2>${rubric.name}</h2>${rubric.criteria.map((c:any) => `<h3>${c.name} (만점: ${c.maxScore}점)</h3><table><tr><th>점수</th><th>설명</th></tr>${c.details.map((d:any) => `<tr><td>${d.score}</td><td>${d.description}</td></tr>`).join('')}</table>`).join('')}</body></html>`}
+                                                    className="w-full h-full border-0"
+                                                    title={`${rubric.name} - 루브릭 미리보기`}
+                                                />
+                                                </div>
+                                            </DialogContent>
+                                        </Dialog>
+                                    </div>
+                                  </Card>
                                 ))}
+                                {savedRubrics.length === 0 && <p className="text-center text-muted-foreground py-4">저장된 루브릭이 없습니다.</p>}
                             </div>
                         }
                     </DialogContent>
