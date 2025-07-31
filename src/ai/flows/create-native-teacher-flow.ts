@@ -1,7 +1,8 @@
+
 'use server';
 
 /**
- * @fileOverview Converts text to speech and handles conversational AI responses for the teacher's tool.
+ * @fileOverview Converts audio to speech and handles conversational AI responses for the teacher's tool.
  * This version processes audio on the server for better performance.
  *
  * - converseWithNativeTeacher - A function that takes user audio, gets a conversational response, and returns AI audio.
@@ -28,6 +29,7 @@ const ConverseWithNativeTeacherInputSchema = z.object({
   conversationHistory: z
     .array(ConversationTurnSchema)
     .describe('The history of the conversation so far.'),
+  conversationGoal: z.string().optional().describe('The goal for this specific conversation session.'),
 });
 type ConverseWithNativeTeacherInput = z.infer<typeof ConverseWithNativeTeacherInputSchema>;
 
@@ -53,32 +55,43 @@ const conversationalPrompt = ai.definePrompt({
       studentTranscript: z.string().optional(),
       history: z.array(ConversationTurnSchema.extend({ isUser: z.boolean() })),
       historySummary: z.string().optional(),
+      conversationGoal: z.string().optional(),
     })
   },
   output: { schema: z.object({ aiResponseText: z.string() }) },
-  prompt: `You are an AI English conversation partner for a teacher. Your name is "Dr. Alex". You are a native English speaker and an omniscient expert on all topics. Your persona is friendly, patient, and incredibly knowledgeable.
+  prompt: `You are an AI English conversation partner for a teacher. Your name is "Dr. Alex". Your persona is friendly, patient, and incredibly knowledgeable.
 
 Your primary goals are:
 1.  Have a natural, engaging conversation in English.
 2.  Answer any question the user asks, demonstrating your vast knowledge.
 3.  Assess the user's English proficiency level based on their speech.
-4.  Adapt your language to the user's level. If their English is basic, use simpler words and sentence structures. If they are advanced, use more sophisticated language.
+4.  Adapt your language to the user's level.
 
-IMPORTANT RULE: If the user's transcript is empty or indicates no speech, you MUST ask them to speak again, for example: "Sorry, I didn't catch that. Could you please say that again?" or "I couldn't hear you, can you repeat that?". Do not try to continue the conversation.
+Your response style MUST follow these specific rules:
+- Keep your responses under 3 sentences.
+- Ask a follow-up question about 50% of the time to keep the conversation flowing.
+- Do not repeat the user's sentence unless you are asking for clarification.
+
+{{#if conversationGoal}}
+Today's conversation goal is: "{{conversationGoal}}"
+Please try to guide the conversation towards this topic.
+{{/if}}
+
+IMPORTANT RULE: If the user's transcript is empty or indicates no speech, you MUST ask them to speak again, for example: "Sorry, I didn't catch that. Could you please say that again?" or "I couldn't hear you, can you repeat that?".
 
 {{#if historySummary}}
-Here is a summary of the conversation so far, which you must consider to maintain context:
+This is a summary of the conversation so far. You must use this to understand the long-term context:
 {{{historySummary}}}
 ---
 {{/if}}
 
-Recent Conversation History (You must also consider this to maintain context):
+Here is the most recent part of the conversation (last ${CONVERSATION_MEMORY_LIMIT} turns). You must continue from here:
 {{#each history}}
 {{#if isUser}}User{{else}}You{{/if}}: {{{text}}}
 {{/each}}
 
 {{#if studentTranscript}}
-The user's latest message is a transcript from their speech. Respond to it naturally, keeping your persona in mind.
+The user's latest message is a transcript from their speech. Respond to it naturally, keeping your persona and all rules in mind.
 User: {{{studentTranscript}}}
 You:
 {{else}}
@@ -168,7 +181,7 @@ const converseWithNativeTeacherFlow = ai.defineFlow(
     inputSchema: ConverseWithNativeTeacherInputSchema,
     outputSchema: ConverseWithNativeTeacherOutputSchema,
   },
-  async ({ studentRecordingDataUri, conversationHistory }) => {
+  async ({ studentRecordingDataUri, conversationHistory, conversationGoal }) => {
     let studentTranscript = "";
     let aiResponseText = "";
 
@@ -206,6 +219,7 @@ const converseWithNativeTeacherFlow = ai.defineFlow(
       history: historyForPrompt,
       studentTranscript: studentTranscript || undefined, 
       historySummary,
+      conversationGoal,
     });
 
     aiResponseText = output?.aiResponseText || "";

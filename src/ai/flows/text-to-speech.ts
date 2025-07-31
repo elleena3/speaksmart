@@ -1,3 +1,4 @@
+
 'use server';
 
 /**
@@ -147,47 +148,51 @@ const createConversationalPrompt = (modelName: z.infer<typeof evaluationModels[n
             scenario: z.enum(scenarios).optional(),
             scenarioPrompt: z.string().optional(),
             aiVoice: z.enum(allVoices).optional(),
+            conversationGoal: z.string().optional(),
         })
       },
       output: { schema: ConverseWithStudentOutputSchema.pick({ aiResponseText: true }) },
-      prompt: `You are an AI English conversation partner. Your name is "{{aiVoice}}". You are friendly, patient, and encouraging. Your goal is to have a natural, engaging conversation with a student learning English.
+      prompt: `You are an AI English conversation partner. Your name is "{{aiVoice}}". Your persona is friendly, patient, and encouraging.
 
-    IMPORTANT RULE: If the student's transcript is "(The user did not say anything)", you MUST respond by asking them to speak again, for example: "Sorry, I didn't catch that. Could you please say that again?" or "I couldn't hear you, can you repeat that?". Do not say "Okay, I see" or try to continue the conversation.
+Your response style MUST follow these specific rules:
+- Keep your responses under 3 sentences.
+- Ask a follow-up question about 50% of the time to keep the conversation flowing.
+- Do not repeat the student's sentence unless you are asking for clarification.
+- Do not correct grammar directly unless it significantly hinders understanding. The goal is conversation, not a grammar test.
 
-    {{#if scenario}}
-    You are in a role-playing scenario. Adapt your persona and responses accordingly.
-    Scenario: {{{scenario}}}
-    Situation: {{#if scenarioPrompt}} {{{scenarioPrompt}}} {{else}} You are just having a friendly conversation. {{/if}}
+{{#if conversationGoal}}
+Today's conversation goal is: "{{conversationGoal}}"
+Please try to guide the conversation towards this topic.
+{{/if}}
 
-    Based on the situation, start the conversation or respond to the student.
-    {{else}}
-    This is a free-talk session. Have a natural, friendly conversation.
-    - Keep your responses relatively short and natural.
-    - Ask questions to keep the conversation going.
-    - If the student makes a grammatical error, don't correct them directly unless it significantly hinders understanding. The goal is conversation, not a grammar test.
-    {{/if}}
+IMPORTANT RULE: If the student's transcript is "(The user did not say anything)", you MUST respond by asking them to speak again, for example: "Sorry, I didn't catch that. Could you please say that again?" or "I couldn't hear you, can you repeat that?".
 
-    {{#if historySummary}}
-    Here is a summary of the conversation so far, which you must consider to maintain context:
-    {{{historySummary}}}
-    ---
-    {{/if}}
+{{#if historySummary}}
+This is a summary of the conversation so far. You must use this to understand the long-term context:
+{{{historySummary}}}
+---
+{{/if}}
 
-    Recent Conversation History (You must also consider this to maintain context):
-    {{#each history}}
-    {{#if isUser}}Student{{else}}You{{/if}}: {{{text}}}
-    {{/each}}
+Here is the most recent part of the conversation (last ${CONVERSATION_MEMORY_LIMIT} turns). You must continue from here:
+{{#each history}}
+{{#if isUser}}Student{{else}}You{{/if}}: {{{text}}}
+{{/each}}
 
-    {{#if studentTranscript}}
-    The student's latest message is a transcript from their speech. Respond to it.
-    Student: {{{studentTranscript}}}
-    You:
-    {{else}}
-    You are starting the conversation. Greet the student according to your role and the situation. Keep it short and friendly.
-    For example, if you are a shop assistant: "Hi, welcome to our store. Let me know if you need any help finding something."
-    For a free talk, you could say: "Hi there! I'm {{aiVoice}}. How are you doing today?"
-    You:
-    {{/if}}
+{{#if studentTranscript}}
+The student's latest message is a transcript from their speech. Respond to it.
+Student: {{{studentTranscript}}}
+You:
+{{else}}
+You are starting the conversation. Greet the student according to the situation. Keep it short and friendly.
+{{#if scenario}}
+You are in a role-playing scenario: {{{scenario}}}.
+Situation: {{#if scenarioPrompt}} {{{scenarioPrompt}}} {{else}} You are just having a friendly conversation. {{/if}}
+{{else}}
+This is a free-talk session.
+Example: "Hi there! I'm {{aiVoice}}. How are you doing today?"
+{{/if}}
+You:
+{{/if}}
     `,
     });
 }
@@ -202,7 +207,6 @@ const converseWithStudentFlow = ai.defineFlow(
     let studentTranscript = "";
     let aiResponseText = "";
     
-    // Use the faster model for real-time conversation.
     const model = 'gemini-2.5-flash-lite-preview-06-17';
     const conversationalPrompt = createConversationalPrompt(model);
 
@@ -244,6 +248,7 @@ const converseWithStudentFlow = ai.defineFlow(
       scenario: scenario || 'free-talk',
       scenarioPrompt: scenarioPrompt,
       aiVoice: aiVoice || 'algenib',
+      conversationGoal: "Practice general conversational skills.", // Default goal
     }));
 
     aiResponseText = output?.aiResponseText || "Sorry, I'm having a little trouble right now. Could you say that again?";
@@ -274,7 +279,6 @@ const readAloudTextFlow = ai.defineFlow(
         if (!text.trim()) {
             throw new Error("Cannot read empty text.");
         }
-        // Using a standard, clear male voice for reading.
         const audioDataUri = await textToSpeech(text, 'puck');
         return { audioDataUri };
     }
