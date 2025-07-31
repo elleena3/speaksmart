@@ -937,16 +937,15 @@ export default function NewAssessmentPage() {
                                                         <Eye className="mr-2 h-4 w-4"/> 자세히 보기
                                                     </Button>
                                                 </DialogTrigger>
-                                                <DialogContent className="max-w-4xl h-[90vh]">
+                                                <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
                                                     <DialogHeader>
                                                         <DialogTitle>{rubric.name}</DialogTitle>
                                                     </DialogHeader>
-                                                    <div className="h-full overflow-y-auto">
-                                                    <iframe srcDoc={`<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{font-family:sans-serif;margin:2em}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:8px;text-align:left}th{background-color:#f2f2f2}</style></head><body><h2>${rubric.name}</h2>${rubric.criteria.map((c:any) => `<h3>${c.name} (만점: ${c.maxScore}점)</h3><table><tr><th>점수</th><th>설명</th></tr>${c.details.map((d:any) => `<tr><td>${d.score}</td><td>${d.description}</td></tr>`).join('')}</table>`).join('')}</body></html>`}
-                                                        className="w-full h-full border-0"
-                                                        title={`${rubric.name} - 루브릭 미리보기`}
+                                                    <iframe 
+                                                      srcDoc={`<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{font-family:sans-serif;margin:2em}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:8px;text-align:left}th{background-color:#f2f2f2}</style></head><body><h2>${rubric.name}</h2>${rubric.criteria.map((c:any) => `<h3>${c.name} (만점: ${c.maxScore}점)</h3><table><tr><th>점수</th><th>설명</th></tr>${c.details.map((d:any) => `<tr><td>${d.score}</td><td>${d.description}</td></tr>`).join('')}</table>`).join('')}</body></html>`}
+                                                      className="w-full flex-grow border-0"
+                                                      title={`${rubric.name} - 루브릭 미리보기`}
                                                     />
-                                                    </div>
                                                 </DialogContent>
                                             </Dialog>
                                         </div>
@@ -977,18 +976,16 @@ export default function NewAssessmentPage() {
                           <DialogTrigger asChild>
                             <Button type="button" variant="ghost" size="sm"><Info className="mr-2 h-4 w-4"/> 자세히 보기</Button>
                           </DialogTrigger>
-                          <DialogContent className="max-w-4xl h-[90vh]">
+                          <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
                             <DialogHeader>
                                 <DialogTitle>{loadedRubricName || "표준 루브릭"}</DialogTitle>
                             </DialogHeader>
-                            <div className="h-full overflow-y-auto">
                             <iframe 
                                 srcDoc={loadedRubricContent ? `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{font-family:sans-serif;margin:2em}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:8px;text-align:left}th{background-color:#f2f2f2}</style></head><body><h2>${loadedRubricName}</h2>${loadedRubricContent.map((c:any) => `<h3>${c.name} (만점: ${c.maxScore}점)</h3><table><tr><th>점수</th><th>설명</th></tr>${c.details.map((d:any) => `<tr><td>${d.score}</td><td>${d.description}</td></tr>`).join('')}</table>`).join('')}</body></html>` : undefined}
                                 src={!loadedRubricContent ? "/rubric.html" : undefined}
-                                className="w-full h-full border-0" 
+                                className="w-full flex-grow border-0" 
                                 title="루브릭 미리보기"
                             />
-                            </div>
                           </DialogContent>
                         </Dialog>
                         <FormControl>
