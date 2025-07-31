@@ -46,8 +46,6 @@
     "firebase": "^10.12.2",
     "firebase-admin": "^12.1.1",
     "genkit": "^1.13.0",
-    "html2canvas": "^1.4.1",
-    "jspdf": "^2.5.1",
     "lucide-react": "^0.475.0",
     "next": "15.3.3",
     "patch-package": "^8.0.0",
@@ -62,10 +60,10 @@
     "tailwindcss-animate": "^1.0.7",
     "uuid": "^9.0.1",
     "wav": "^1.0.2",
+    "youtube-transcript": "^1.2.1",
     "zod": "^3.24.2"
   },
   "devDependencies": {
-    "@types/jspdf": "^2.0.0",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
