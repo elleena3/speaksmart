@@ -24,6 +24,9 @@ import {
 } from '@/lib/types/ai-schemas';
 import wav from 'wav';
 import { evaluationModels, scenarios, allVoices } from '@/lib/types';
+import { summarizeConversationHistoryFlow } from './summarize-conversation-history-flow';
+
+const CONVERSATION_MEMORY_LIMIT = 20;
 
 // Helper function for retrying API calls on overload
 async function withRetry<T>(fn: () => Promise<T>, retries = 2, delay = 1500): Promise<T> {
@@ -75,9 +78,10 @@ async function toWav(
   });
 }
 
-// Reusable function to convert text to speech with fallback logic
+// Reusable function to convert text to speech
 async function textToSpeech(text: string, voiceName: string = 'algenib'): Promise<string> {
-    const ttsRequestPayload = {
+    const ttsResponse = await withRetry(() => ai.generate({
+        model: googleAI.model('gemini-2.5-flash-preview-tts'),
         config: {
             responseModalities: ['AUDIO'],
             speechConfig: {
@@ -87,29 +91,7 @@ async function textToSpeech(text: string, voiceName: string = 'algenib'): Promis
             },
         },
         prompt: text,
-    };
-    
-    let ttsResponse;
-    try {
-        // 1. Try the faster, but lower-quota model first.
-        ttsResponse = await withRetry(() => ai.generate({
-            model: googleAI.model('gemini-2.5-flash-preview-tts'),
-            ...ttsRequestPayload,
-        }));
-    } catch (error: any) {
-        // 2. If it fails with a quota or server error, fallback to the more stable model.
-        const errorMessage = (error.message || '').toLowerCase();
-        if (errorMessage.includes('429') || errorMessage.includes('500') || errorMessage.includes('503') || errorMessage.includes('overloaded')) {
-            console.warn("TTS Flash model failed, falling back to Pro model.", error);
-            ttsResponse = await withRetry(() => ai.generate({
-                model: googleAI.model('gemini-2.5-pro-preview-tts'), // Fallback model
-                ...ttsRequestPayload,
-            }));
-        } else {
-            // 3. For any other error, re-throw it.
-            throw error;
-        }
-    }
+    }));
 
     const audioMedia = ttsResponse.media;
     if (!audioMedia) {
@@ -139,6 +121,7 @@ const createConversationalPrompt = (modelName: z.infer<typeof evaluationModels[n
       input: {
         schema: z.object({
             studentTranscript: z.string().optional(),
+            historySummary: z.string().optional(),
             history: z.array(ConversationTurnSchema.extend({ isUser: z.boolean() })),
             scenario: z.enum(scenarios).optional(),
             scenarioPrompt: z.string().optional(),
@@ -148,8 +131,7 @@ const createConversationalPrompt = (modelName: z.infer<typeof evaluationModels[n
       output: { schema: ConverseWithStudentOutputSchema.pick({ aiResponseText: true }) },
       prompt: `You are an AI English conversation partner. Your name is "{{aiVoice}}". You are friendly, patient, and encouraging. Your goal is to have a natural, engaging conversation with a student learning English.
 
-    IMPORTANT RULE 1: You must consider the entire 'Conversation History' to understand the context and maintain a natural conversational flow.
-    IMPORTANT RULE 2: If the student's transcript is "(The user did not say anything)", you MUST respond by asking them to speak again, for example: "Sorry, I didn't catch that. Could you please say that again?" or "I couldn't hear you, can you repeat that?". Do not say "Okay, I see" or try to continue the conversation.
+    IMPORTANT RULE: If the student's transcript is "(The user did not say anything)", you MUST respond by asking them to speak again, for example: "Sorry, I didn't catch that. Could you please say that again?" or "I couldn't hear you, can you repeat that?". Do not say "Okay, I see" or try to continue the conversation.
 
     {{#if scenario}}
     You are in a role-playing scenario. Adapt your persona and responses accordingly.
@@ -164,7 +146,13 @@ const createConversationalPrompt = (modelName: z.infer<typeof evaluationModels[n
     - If the student makes a grammatical error, don't correct them directly unless it significantly hinders understanding. The goal is conversation, not a grammar test.
     {{/if}}
 
-    Conversation History (if any):
+    {{#if historySummary}}
+    Here is a summary of the conversation so far:
+    {{{historySummary}}}
+    ---
+    {{/if}}
+
+    Recent Conversation History (You must consider this to maintain context):
     {{#each history}}
     {{#if isUser}}Student{{else}}You{{/if}}: {{{text}}}
     {{/each}}
@@ -211,14 +199,26 @@ const converseWithStudentFlow = ai.defineFlow(
           studentTranscript = "(The user did not say anything)"; 
       }
     }
-
-    const historyForPrompt = conversationHistory.map(turn => ({
+    
+    let historyForPrompt = conversationHistory.map(turn => ({
       ...turn,
       isUser: turn.role === 'user',
     }));
+    let historySummary: string | undefined = undefined;
+
+    if (historyForPrompt.length > CONVERSATION_MEMORY_LIMIT) {
+        const oldHistory = historyForPrompt.slice(0, -CONVERSATION_MEMORY_LIMIT);
+        const recentHistory = historyForPrompt.slice(-CONVERSATION_MEMORY_LIMIT);
+        
+        const summaryResult = await summarizeConversationHistoryFlow({ conversationToSummarize: oldHistory });
+        historySummary = summaryResult.summary;
+        historyForPrompt = recentHistory;
+    }
+
 
     const { output } = await withRetry(() => conversationalPrompt({
       history: historyForPrompt,
+      historySummary,
       studentTranscript: studentTranscript || undefined, 
       scenario: scenario || 'free-talk',
       scenarioPrompt: scenarioPrompt,
