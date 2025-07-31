@@ -1,7 +1,7 @@
-import {genkit} from 'genkit';
+import {genkit, type Plugin} from 'genkit';
 import {googleAI} from '@genkit-ai/googleai';
-import openai from 'genkitx-openai';
 import {config} from 'dotenv';
+import openai from 'genkitx-openai';
 
 config();
 
@@ -16,27 +16,39 @@ config();
 //    - "Vertex AI 사용자"
 //    - "Storage 개체 뷰어" (Firebase Storage 버킷 접근용)
 // ====================================================================
+
 const GOOGLE_CLOUD_PROJECT = process.env.GOOGLE_CLOUD_PROJECT;
 const GOOGLE_CLOUD_LOCATION = process.env.GOOGLE_CLOUD_LOCATION;
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
-if (!GOOGLE_CLOUD_PROJECT || !GOOGLE_CLOUD_LOCATION) {
+const plugins: Plugin[] = [];
+
+if (GOOGLE_CLOUD_PROJECT && GOOGLE_CLOUD_LOCATION) {
+    plugins.push(googleAI({
+      vertex: {
+        project: GOOGLE_CLOUD_PROJECT,
+        location: GOOGLE_CLOUD_LOCATION,
+      },
+    }));
+} else {
     console.warn(
-      'GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION must be set in the .env file for Vertex AI to work.'
+      'Google Cloud (Vertex AI) environment variables not set. Google AI models will not be available.'
     );
 }
 
+if (OPENAI_API_KEY) {
+    plugins.push(openai({
+        apiKey: process.env.OPENAI_API_KEY,
+    }));
+} else {
+    console.warn('OPENAI_API_KEY not set. OpenAI models will not be available.');
+}
+
+if (plugins.length === 0) {
+    console.error("CRITICAL: No AI model providers have been configured. The application will not work as expected.");
+}
+
+
 export const ai = genkit({
-  plugins: [
-    googleAI({
-      // Vertex AI를 사용하도록 설정합니다.
-      // 이 설정은 자동으로 Application Default Credentials (ADC)를 사용하여 인증합니다.
-      vertex: {
-        project: GOOGLE_CLOUD_PROJECT!,
-        location: GOOGLE_CLOUD_LOCATION!,
-      },
-    }),
-    openai({
-        apiKey: process.env.OPENAI_API_KEY || "",
-    })
-  ],
+  plugins: plugins,
 });
