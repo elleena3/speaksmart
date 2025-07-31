@@ -1,7 +1,7 @@
-import {genkit, type Plugin} from 'genkit';
-import {googleAI} from '@genkit-ai/googleai';
-import {config} from 'dotenv';
-import { openAI } from 'genkitx-openai'; // Corrected: named import
+import { genkit, type Plugin } from 'genkit';
+import { googleAI } from '@genkit-ai/googleai';
+import { openai } from '@genkit-ai/openai'; // ✅ 1.x 전용
+import { config } from 'dotenv';
 
 config();
 
@@ -21,15 +21,10 @@ const GOOGLE_CLOUD_PROJECT = process.env.GOOGLE_CLOUD_PROJECT;
 const GOOGLE_CLOUD_LOCATION = process.env.GOOGLE_CLOUD_LOCATION;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
-const plugins: Plugin[] = [];
+const providers: Plugin[] = [];
 
 if (GOOGLE_CLOUD_PROJECT && GOOGLE_CLOUD_LOCATION) {
-    plugins.push(googleAI({
-      vertex: {
-        project: GOOGLE_CLOUD_PROJECT,
-        location: GOOGLE_CLOUD_LOCATION,
-      },
-    }));
+    providers.push(googleAI());
 } else {
     console.warn(
       'Google Cloud (Vertex AI) environment variables not set. Google AI models will not be available.'
@@ -37,18 +32,16 @@ if (GOOGLE_CLOUD_PROJECT && GOOGLE_CLOUD_LOCATION) {
 }
 
 if (OPENAI_API_KEY) {
-    plugins.push(openAI({ // Corrected: Call openAI as a function
-        apiKey: process.env.OPENAI_API_KEY,
-    }));
+    providers.push(openai({ apiKey: OPENAI_API_KEY }));
 } else {
     console.warn('OPENAI_API_KEY not set. OpenAI models will not be available.');
 }
 
-if (plugins.length === 0) {
+if (providers.length === 0) {
     console.error("CRITICAL: No AI model providers have been configured. The application will not work as expected.");
 }
 
 
 export const ai = genkit({
-  plugins: plugins,
+  providers,
 });
