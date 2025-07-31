@@ -24,6 +24,7 @@ import {
   PlusCircle,
   Save,
   PenSquare,
+  Eye,
 } from 'lucide-react';
 import { analyzeRubricFile, type AnalyzeRubricFileOutput } from '@/ai/flows/analyze-rubric-file-flow';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
@@ -32,6 +33,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/context/auth-context';
 import { addDoc, collection } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
 type AnalysisState = 'idle' | 'analyzing' | 'analyzed' | 'error';
 type RubricCriterion = AnalyzeRubricFileOutput['criteria'][0] & { id: string };

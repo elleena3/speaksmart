@@ -285,10 +285,9 @@ export default function NewAssessmentPage() {
     if (!user) return;
     setIsRubricListLoading(true);
     try {
-        const q = query(collection(db, "rubrics"), where("uid", "==", user.uid));
+        const q = query(collection(db, "rubrics"), where("uid", "==", user.uid), orderBy("createdAt", "desc"));
         const querySnapshot = await getDocs(q);
         const fetchedRubrics = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        fetchedRubrics.sort((a,b) => (b.createdAt || 0) - (a.createdAt || 0));
         setSavedRubrics(fetchedRubrics);
     } catch(e) {
         console.error("Error fetching rubrics:", e);
@@ -937,7 +936,7 @@ export default function NewAssessmentPage() {
                                                         <Eye className="mr-2 h-4 w-4"/> 자세히 보기
                                                     </Button>
                                                 </DialogTrigger>
-                                                <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+                                                <DialogContent className="max-w-4xl h-[90vh] flex flex-col">
                                                     <DialogHeader>
                                                         <DialogTitle>{rubric.name}</DialogTitle>
                                                     </DialogHeader>
