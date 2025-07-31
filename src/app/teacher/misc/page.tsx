@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useLanguage } from "@/context/language-context";
@@ -13,6 +14,8 @@ import { PdfGradingTool } from "./pdf-grading-tool";
 import { PdfSequentialAnalyzerTool } from "./pdf-sequential-analyzer-tool";
 import { PdfStorageAnalyzerTool } from "./pdf-storage-analyzer-tool";
 import { HandwritingSubmissionAnalyzerTool } from "./handwriting-submission-analyzer-tool";
+import { PdfMultiAnalyzerTool } from "./pdf-multi-analyzer-tool";
+
 
 export default function MiscPage() {
     const { t } = useLanguage();
