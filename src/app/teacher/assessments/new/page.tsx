@@ -123,7 +123,7 @@ export default function NewAssessmentPage() {
     startDate: z.date().optional(),
     endDate: z.date().optional(),
     assessmentType: z.enum(["monologue", "dialogue"]),
-    monologueType: z.enum(monologueTypes as [MonologueType, ...MonologueType[]]).optional(),
+    monologueType: z.enum(monologueTypes).optional(),
     targetType: z.enum(["all", "specific"]).default("all"),
     targetStudentIds: z.union([z.literal('all'), z.array(z.string()).min(1, "한 명 이상의 학생을 선택해야 합니다.")]),
     scenario: z.enum(scenarios as [Scenario, ...Scenario[]]).optional(),
@@ -976,7 +976,7 @@ export default function NewAssessmentPage() {
                           <DialogTrigger asChild>
                             <Button type="button" variant="ghost" size="sm"><Info className="mr-2 h-4 w-4"/> 자세히 보기</Button>
                           </DialogTrigger>
-                          <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+                           <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
                             <DialogHeader>
                                 <DialogTitle>{loadedRubricName || "표준 루브릭"}</DialogTitle>
                             </DialogHeader>
