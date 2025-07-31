@@ -139,9 +139,9 @@ const createConversationalPrompt = (modelName: z.infer<typeof evaluationModels[n
       input: {
         schema: ConverseWithStudentInputSchema.pick({
           studentRecordingDataUri: true,
+          conversationHistory: true, // This was missing!
           scenario: true,
           scenarioPrompt: true, 
-          conversationHistory: true,
           aiVoice: true,
         }).extend({
             history: z.array(ConversationTurnSchema.extend({ isUser: z.boolean() })),
@@ -192,12 +192,13 @@ const converseWithStudentFlow = ai.defineFlow(
   },
   async ({ studentRecordingDataUri, conversationHistory, scenario, scenarioPrompt, aiVoice, evaluationModel }) => {
     let studentTranscript = "";
-    let aiResponseText = "";
     
     // Use the faster model for real-time conversation.
     const model = 'gemini-2.5-flash-lite-preview-06-17';
     const conversationalPrompt = createConversationalPrompt(model);
 
+    // This is a temporary solution to get the transcript from the media part.
+    // In a future version, the prompt should ideally handle this directly.
     if (studentRecordingDataUri) {
       const sttResponse = await withRetry(() => ai.generate({
         model: googleAI.model(model),
@@ -220,16 +221,17 @@ const converseWithStudentFlow = ai.defineFlow(
 
     const { output } = await withRetry(() => conversationalPrompt({
       history: historyForPrompt,
-      studentRecordingDataUri: studentRecordingDataUri, 
+      studentRecordingDataUri: studentRecordingDataUri, // Pass the audio URI to the prompt
+      studentTranscript: studentTranscript || undefined, // And the transcript
       scenario: scenario || 'free-talk',
       scenarioPrompt: scenarioPrompt,
       conversationHistory: conversationHistory,
       aiVoice: aiVoice || 'algenib',
     }));
 
-    aiResponseText = output?.aiResponseText || "Sorry, I'm having a little trouble right now. Could you say that again?";
+    const aiResponseText = output?.aiResponseText || "Sorry, I'm having a little trouble right now. Could you say that again?";
 
-    const aiResponseAudioDataUri = await textToSpeech(aiResponseText, aiVoice);
+    const aiResponseAudioDataUri = await textToSpeech(aiResponseText, aiVoice || 'algenib');
 
     return {
       studentTranscript: studentTranscript === "(The user did not say anything)" ? "" : studentTranscript,

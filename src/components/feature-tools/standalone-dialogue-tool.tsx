@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, useRef, useEffect, useCallback } from "react"
@@ -180,9 +179,12 @@ export function StandaloneDialogueTool() {
 
   const processAudio = async (studentRecordingDataUri: string) => {
     try {
+      // Create a snapshot of the current conversation to pass to the AI
+      const currentConversationHistory = [...conversation];
+
       const { studentTranscript, aiResponseText, aiResponseAudioDataUri } = await converseWithStudent({
         studentRecordingDataUri,
-        conversationHistory: conversation,
+        conversationHistory: currentConversationHistory, // Pass the history
         scenario: 'free-talk',
       });
       
@@ -191,6 +193,7 @@ export function StandaloneDialogueTool() {
       const userTurn: ConversationTurn = { role: 'user', text: studentTranscript };
       const modelTurn: ConversationTurn = { role: 'model', text: aiResponseText };
       
+      // Update the conversation state with the new turns
       setConversation(prev => [...prev, userTurn, modelTurn]);
 
       if (audioPlayerRef.current) {
