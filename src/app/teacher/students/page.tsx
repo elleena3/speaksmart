@@ -97,10 +97,33 @@ function StudentManagementPage() {
   };
   
   const handlePasswordReset = async (student: UserData) => {
-    toast({
-      title: "기능 안내",
-      description: `이 기능은 보통 이메일로 비밀번호 재설정 링크를 보내지만, 현재 시스템에서는 학생의 비밀번호를 직접 수정할 수 있도록 구현할 수 있습니다.`,
-    });
+    if (!student.docId || student.isMock) {
+        toast({
+            title: "작업 불가",
+            description: "목업 계정의 비밀번호는 초기화할 수 없습니다.",
+            variant: "destructive",
+        });
+        return;
+    }
+
+    try {
+        const studentRef = doc(db, "users", student.docId);
+        await updateDoc(studentRef, {
+            password: '1234567890'
+        });
+
+        toast({
+            title: "비밀번호 초기화 완료",
+            description: `${student.displayName} 학생의 비밀번호가 '1234567890'으로 초기화되었습니다.`,
+        });
+    } catch (error) {
+        console.error("Error resetting password:", error);
+        toast({
+            title: "오류",
+            description: "비밀번호 초기화 중 오류가 발생했습니다.",
+            variant: "destructive",
+        });
+    }
   };
 
   const handleDeleteStudent = async (studentToDelete: UserData) => {
@@ -220,20 +243,38 @@ function StudentManagementPage() {
                             </TooltipTrigger>
                             <TooltipContent>정보 수정</TooltipContent>
                         </Tooltip>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <Button variant="ghost" size="icon" onClick={() => handlePasswordReset(student)}>
-                                    <KeyRound className="h-4 w-4"/>
-                                    <span className="sr-only">비밀번호 초기화</span>
-                                </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>비밀번호 초기화</TooltipContent>
-                        </Tooltip>
                         <AlertDialog>
                             <Tooltip>
                                 <TooltipTrigger asChild>
                                     <AlertDialogTrigger asChild>
-                                        <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
+                                        <Button variant="ghost" size="icon" disabled={student.isMock}>
+                                            <KeyRound className="h-4 w-4"/>
+                                            <span className="sr-only">비밀번호 초기화</span>
+                                        </Button>
+                                    </AlertDialogTrigger>
+                                </TooltipTrigger>
+                                <TooltipContent>비밀번호 초기화</TooltipContent>
+                            </Tooltip>
+                             <AlertDialogContent>
+                                <AlertDialogHeader>
+                                    <AlertDialogTitle>{student.displayName} 학생의 비밀번호를 초기화하시겠습니까?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                        이 작업은 학생의 비밀번호를 '1234567890'으로 즉시 변경합니다. 학생에게 이 임시 비밀번호를 안내하고, 로그인 후 직접 변경하도록 지도해주세요.
+                                    </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel>취소</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => handlePasswordReset(student)}>
+                                        초기화
+                                    </AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
+                        <AlertDialog>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <AlertDialogTrigger asChild>
+                                        <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" disabled={student.isMock}>
                                             <Trash2 className="h-4 w-4"/>
                                             <span className="sr-only">삭제</span>
                                         </Button>
