@@ -60,7 +60,6 @@ export default function RubricsPage() {
       const querySnapshot = await getDocs(q);
       const fetchedRubrics = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Rubric));
       
-      // Sort on the client-side instead of in the query
       fetchedRubrics.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
       
       setRubrics(fetchedRubrics);
@@ -183,9 +182,11 @@ export default function RubricsPage() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem disabled>
-                                <Edit className="mr-2 h-4 w-4" />
-                                편집 (개발 중)
+                              <DropdownMenuItem asChild>
+                                <Link href={`/teacher/rubrics/edit/${rubric.id}`}>
+                                  <Edit className="mr-2 h-4 w-4" />
+                                  편집
+                                </Link>
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => handleCopyRubric(rubric.id)}>
                                 <Copy className="mr-2 h-4 w-4" />
