@@ -182,7 +182,6 @@ export function StandaloneDialogueTool() {
     try {
       const currentConversationHistory = [...conversation];
 
-      // Pass the current conversation history to the AI
       const { studentTranscript, aiResponseText, aiResponseAudioDataUri } = await converseWithStudent({
         studentRecordingDataUri,
         conversationHistory: currentConversationHistory,
@@ -191,11 +190,9 @@ export function StandaloneDialogueTool() {
       
       setInterimTranscript(null);
 
-      // Create the new turns for this exchange
       const userTurn: ConversationTurn = { role: 'user', text: studentTranscript };
       const modelTurn: ConversationTurn = { role: 'model', text: aiResponseText };
       
-      // Update the conversation state with the new turns
       setConversation(prev => [...prev, userTurn, modelTurn]);
 
       if (audioPlayerRef.current) {
