@@ -1,6 +1,6 @@
 import {genkit, type Plugin} from 'genkit';
 import {googleAI} from '@genkit-ai/googleai';
-import {openAI} from 'genkitx-openai';
+import openai from 'genkitx-openai';
 import {config} from 'dotenv';
 
 config();
@@ -25,7 +25,7 @@ if (GOOGLE_CLOUD_PROJECT && GOOGLE_CLOUD_LOCATION) {
 }
 
 if (OPENAI_API_KEY) {
-    plugins.push(openAI({
+    plugins.push(openai({
         apiKey: OPENAI_API_KEY,
     }));
 } else {
