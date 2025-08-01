@@ -14,7 +14,8 @@ import { z } from 'zod';
 import {
   ConversationTurnSchema,
 } from '@/lib/types/ai-schemas';
-import wav from 'wav';
+import { generateAudio } from '@genkit-ai/googleai/audio';
+
 
 const ConverseWithNeural2TeacherInputSchema = z.object({
   studentRecordingDataUri: z
@@ -77,58 +78,15 @@ You:
 `,
 });
 
-async function toWav(
-  pcmData: Buffer,
-  channels = 1,
-  rate = 24000,
-  sampleWidth = 2
-): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const writer = new wav.Writer({
-      channels,
-      sampleRate: rate,
-      bitDepth: sampleWidth * 8,
-    });
-
-    const bufs: any[] = [];
-    writer.on('error', reject);
-    writer.on('data', function (d) {
-      bufs.push(d);
-    });
-    writer.on('end', function () {
-      resolve(Buffer.concat(bufs).toString('base64'));
-    });
-
-    writer.write(pcmData);
-    writer.end();
-  });
-}
-
 async function textToSpeech(text: string): Promise<string> {
-    const ttsResponse = await ai.generate({
-        model: googleAI.model('gemini-2.5-flash-preview-tts'),
-        config: {
-            responseModalities: ['AUDIO'],
-            speechConfig: {
-                voiceConfig: {
-                    prebuiltVoiceConfig: { voiceName: 'puck' }, // Using 'puck' as the Neural2-A equivalent
-                },
-            },
-        },
-        prompt: text,
+    const audioData = await generateAudio({
+      text: text,
+      voice: "en-US-Neural2-A",
+      speakingRate: 1.0,
+      pitch: 0.0,
     });
-
-    const audioMedia = ttsResponse.media;
-    if (!audioMedia) {
-        throw new Error('TTS did not return any audio media.');
-    }
-
-    const pcmBuffer = Buffer.from(
-        audioMedia.url.substring(audioMedia.url.indexOf(',') + 1),
-        'base64'
-    );
     
-    return 'data:audio/wav;base64,' + await toWav(pcmBuffer);
+    return `data:audio/mp3;base64,${audioData}`;
 }
 
 const converseWithNeural2TeacherFlow = ai.defineFlow(
