@@ -24,6 +24,7 @@ import '@/ai/flows/create-concurrent-teacher-flow'; // New flow for concurrent r
 import '@/ai/flows/create-parallel-teacher-flow'; // New flow for parallel processing tool
 import '@/ai/flows/create-hybrid-teacher-flow'; // New flow for hybrid VAD tool
 import '@/ai/flows/create-speculative-teacher-flow'; // New flow for speculative speech model
+import '@/ai/flows/create-neural2-teacher-flow'; // New flow for Neural2 voice tool
 
 // New flow for the Misc page's read-aloud tool
 import '@/ai/flows/analyze-read-aloud-flow';
@@ -41,9 +42,6 @@ import '@/ai/flows/retry-analysis-flow';
 
 // New flow for presentation analysis
 import '@/ai/flows/analyze-presentation-video-flow';
-
-// New flow for conversation summarization
-import '@/ai/flows/summarize-conversation-history-flow';
 
 // This flow is being removed due to errors.
 // import '@/ai/flows/regenerate-html-feedback-flow';

@@ -9,6 +9,7 @@ import { ParallelConversationTool } from "@/app/teacher/misc/parallel-conversati
 import { HybridConversationTool } from "@/app/teacher/misc/hybrid-conversation-tool";
 import { SpeculativeConversationTool } from "@/components/feature-tools/speculative-conversation-tool";
 import { StandaloneDialogueTool } from "@/components/feature-tools/standalone-dialogue-tool";
+import { Neural2DialogueTool } from "@/components/feature-tools/neural2-dialogue-tool";
 
 
 export default function ConversationToolsPage() {
@@ -26,6 +27,15 @@ export default function ConversationToolsPage() {
                     </CardHeader>
                     <CardContent>
                         <StandaloneDialogueTool />
+                    </CardContent>
+                </Card>
+                 <Card>
+                    <CardHeader>
+                        <CardTitle>AI와 대화하기 (연습용-Neural2)</CardTitle>
+                        <CardDescription>Google Cloud TTS의 'en-US-Neural2-A'와 유사한 표준 남성 목소리('puck')를 사용하여 대화를 연습합니다.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <Neural2DialogueTool />
                     </CardContent>
                 </Card>
                 <Card>
