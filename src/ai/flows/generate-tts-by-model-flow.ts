@@ -2,18 +2,20 @@
 'use server';
 
 /**
- * @fileOverview A flow to generate speech from text using a specific voice model.
+ * @fileOverview A flow to generate speech from text using a specific TTS model.
+ * This tool is for testing the operational status of different TTS models.
  */
 
 import { ai } from '@/ai/genkit';
 import { googleAI } from '@genkit-ai/googleai';
 import { z } from 'zod';
 import wav from 'wav';
-import { allVoices, type AiVoice } from '@/lib/types';
+
+const ttsModels = ["gemini-2.5-flash-preview-tts", "gemini-2.5-pro-preview-tts"] as const;
 
 const GenerateTtsByModelInputSchema = z.object({
   text: z.string().describe('The text to be converted to speech.'),
-  voice: z.enum(allVoices).describe('The voice model to use for generation.'),
+  model: z.enum(ttsModels).describe('The TTS model to use for generation.'),
 });
 export type GenerateTtsByModelInput = z.infer<typeof GenerateTtsByModelInputSchema>;
 
@@ -22,26 +24,6 @@ const GenerateTtsByModelOutputSchema = z.object({
 });
 export type GenerateTtsByModelOutput = z.infer<typeof GenerateTtsByModelOutputSchema>;
 
-
-// Helper function for retrying API calls on overload
-async function withRetry<T>(fn: () => Promise<T>, retries = 2, delay = 1500): Promise<T> {
-  let lastError: any;
-  for (let i = 0; i <= retries; i++) {
-    try {
-      return await fn();
-    } catch (error: any) {
-      lastError = error;
-      if (error.message && (error.message.includes('overloaded') || error.message.includes('503') || error.message.includes('429'))) {
-        if (i < retries) {
-          await new Promise(resolve => setTimeout(resolve, delay));
-        }
-      } else {
-        throw error;
-      }
-    }
-  }
-  throw lastError;
-}
 
 // Helper function to convert PCM audio buffer to WAV format
 async function toWav(
@@ -71,36 +53,20 @@ async function toWav(
   });
 }
 
-async function textToSpeech(text: string, voiceName: AiVoice): Promise<string> {
-    const ttsRequestPayload = {
+// Reusable function to convert text to speech
+async function textToSpeech(text: string, modelName: (typeof ttsModels)[number]): Promise<string> {
+    const ttsResponse = await ai.generate({
+        model: googleAI.model(modelName),
         config: {
-            responseModalities: ['AUDIO'] as const,
+            responseModalities: ['AUDIO'],
             speechConfig: {
                 voiceConfig: {
-                    prebuiltVoiceConfig: { voiceName: voiceName },
+                    prebuiltVoiceConfig: { voiceName: 'algenib' }, // Fixed voice for consistency
                 },
             },
         },
         prompt: text,
-    };
-    
-    let ttsResponse;
-    try {
-        ttsResponse = await withRetry(() => ai.generate({
-            model: googleAI.model('gemini-2.5-flash-preview-tts'),
-            ...ttsRequestPayload,
-        }));
-    } catch (error: any) {
-        const errorMessage = (error.message || '').toLowerCase();
-        if (errorMessage.includes('429') || errorMessage.includes('500') || errorMessage.includes('503') || errorMessage.includes('overloaded')) {
-            ttsResponse = await withRetry(() => ai.generate({
-                model: googleAI.model('gemini-2.5-pro-preview-tts'),
-                ...ttsRequestPayload,
-            }));
-        } else {
-            throw error;
-        }
-    }
+    });
 
     const audioMedia = ttsResponse.media;
     if (!audioMedia) {
@@ -122,11 +88,11 @@ export const generateTtsByModelFlow = ai.defineFlow(
     inputSchema: GenerateTtsByModelInputSchema,
     outputSchema: GenerateTtsByModelOutputSchema,
   },
-  async ({ text, voice }) => {
+  async ({ text, model }) => {
     if (!text.trim()) {
         throw new Error("Cannot convert empty text to speech.");
     }
-    const audioDataUri = await textToSpeech(text, voice);
+    const audioDataUri = await textToSpeech(text, model);
     return { audioDataUri };
   }
 );
