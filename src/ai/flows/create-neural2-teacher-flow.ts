@@ -45,7 +45,7 @@ export async function converseWithNeural2Teacher(
 
 const conversationalPrompt = ai.definePrompt({
   name: 'neural2TeacherConversationalPrompt',
-  model: googleAI.model('gemini-2.5-flash-lite-preview-06-17'),
+  model: googleAI.model('gemini-2.5-flash'),
   input: {
     schema: z.object({
       studentTranscript: z.string().optional(),
