@@ -14,8 +14,7 @@ import { z } from 'zod';
 import {
   ConversationTurnSchema,
 } from '@/lib/types/ai-schemas';
-import wav from 'wav';
-
+import { TextToSpeechClient } from '@google-cloud/text-to-speech';
 
 const ConverseWithNeural2TeacherInputSchema = z.object({
   studentRecordingDataUri: z
@@ -78,59 +77,23 @@ You:
 `,
 });
 
-async function toWav(
-  pcmData: Buffer,
-  channels = 1,
-  rate = 24000,
-  sampleWidth = 2
-): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const writer = new wav.Writer({
-      channels,
-      sampleRate: rate,
-      bitDepth: sampleWidth * 8,
-    });
-
-    const bufs: any[] = [];
-    writer.on('error', reject);
-    writer.on('data', function (d) {
-      bufs.push(d);
-    });
-    writer.on('end', function () {
-      resolve(Buffer.concat(bufs).toString('base64'));
-    });
-
-    writer.write(pcmData);
-    writer.end();
-  });
-}
-
-// Use Gemini Text-to-Speech API
+// Use Google Cloud Text-to-Speech API
+const textToSpeechClient = new TextToSpeechClient();
 async function textToSpeech(text: string): Promise<string> {
-    const ttsResponse = await ai.generate({
-        model: googleAI.model('gemini-2.5-flash-preview-tts'),
-        config: {
-            responseModalities: ['AUDIO'],
-            speechConfig: {
-                voiceConfig: {
-                    prebuiltVoiceConfig: { voiceName: 'puck' }, // Use 'puck' as the designated voice
-                },
-            },
-        },
-        prompt: text,
-    });
+  const request = {
+    input: { text: text },
+    voice: { languageCode: 'en-US', name: 'en-US-Neural2-A' },
+    audioConfig: { audioEncoding: 'MP3' as const },
+  };
 
-    const audioMedia = ttsResponse.media;
-    if (!audioMedia) {
-        throw new Error('Gemini TTS did not return any audio media.');
-    }
-    
-    const pcmBuffer = Buffer.from(
-        audioMedia.url.substring(audioMedia.url.indexOf(',') + 1),
-        'base64'
-    );
-    
-    return 'data:audio/wav;base64,' + await toWav(pcmBuffer);
+  const [response] = await textToSpeechClient.synthesizeSpeech(request);
+  const audioContent = response.audioContent;
+  if (!audioContent) {
+    throw new Error('Google Cloud TTS did not return any audio content.');
+  }
+  
+  const audioBase64 = Buffer.from(audioContent as Uint8Array).toString('base64');
+  return `data:audio/mp3;base64,${audioBase64}`;
 }
 
 

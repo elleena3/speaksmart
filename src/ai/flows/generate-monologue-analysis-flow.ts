@@ -70,18 +70,21 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 2, delay = 1500): Pr
 }
 
 // Internal Sub-prompts
-const createPrompt = (modelName: z.infer<typeof evaluationModels[number]>) => ({
+const createPrompt = (modelName: z.infer<typeof evaluationModels[number]>) => {
+    const isGoogleModel = modelName.startsWith('gemini');
+    const model = isGoogleModel ? googleAI.model(modelName) : modelName;
+
+    return {
     transcription: ai.definePrompt({
-        name: `transcribeAudioPrompt_${modelName.replace(/[-.]/g, '_')}`,
-        model: googleAI.model(modelName),
-        input: { schema: z.object({ studentRecordingUrl: z.string() }) },
-        prompt: `Transcribe this English audio. If the audio is silent or contains no discernible speech, return a note that it was not recognized. Do not correct any grammatical errors or mispronunciations. Transcribe exactly what is heard.
+        name: `transcribeAudioPrompt_${modelName.replace(/[\/-.]/g, '_')}`,
+        model: model, 
+        prompt: `Transcribe this English audio. If the audio is silent or contains no discernible speech, return an empty string. Do not correct any grammatical errors or mispronunciations. Transcribe exactly what is heard.
     Audio: {{media url=studentRecordingUrl}}
     `,
     }),
     content: ai.definePrompt({
-      name: `monologueContentAnalysisPrompt_${modelName.replace(/[-.]/g, '_')}`,
-      model: googleAI.model(modelName),
+      name: `monologueContentAnalysisPrompt_${modelName.replace(/[\/-.]/g, '_')}`,
+      model: model,
       input: { schema: z.object({
         studentTranscript: z.string(),
         activityPrompt: z.string(),
@@ -107,8 +110,8 @@ const createPrompt = (modelName: z.infer<typeof evaluationModels[number]>) => ({
     `,
     }),
     pronunciation: ai.definePrompt({
-        name: `monologuePronunciationAnalysisPrompt_${modelName.replace(/[-.]/g, '_')}`,
-        model: googleAI.model(modelName),
+        name: `monologuePronunciationAnalysisPrompt_${modelName.replace(/[\/-.]/g, '_')}`,
+        model: model,
         input: { schema: z.object({
             studentRecordingUrl: z.string(),
             studentTranscript: z.string(),
@@ -127,8 +130,8 @@ const createPrompt = (modelName: z.infer<typeof evaluationModels[number]>) => ({
     `,
     }),
     rubric: ai.definePrompt({
-      name: `monologueRubricAnalysisPrompt_${modelName.replace(/[-.]/g, '_')}`,
-      model: googleAI.model(modelName),
+      name: `monologueRubricAnalysisPrompt_${modelName.replace(/[\/-.]/g, '_')}`,
+      model: model,
       input: { schema: z.object({ studentTranscript: z.string() }) },
       prompt: `You are an HTML generation machine. Your ONLY task is to create a complete, single HTML file for a web-based report based on the user's speech and the provided rubric.
 
@@ -208,8 +211,8 @@ Now, generate the HTML code.
 `,
     }),
     teacherGuidance: ai.definePrompt({
-      name: `monologueTeacherGuidancePrompt_${modelName.replace(/[-.]/g, '_')}`,
-      model: googleAI.model(modelName),
+      name: `monologueTeacherGuidancePrompt_${modelName.replace(/[\/-.]/g, '_')}`,
+      model: model,
       input: { schema: z.object({ studentFeedbackHtml: z.string() }) },
       prompt: `You are an expert English education consultant. Your task is to provide actionable advice to a teacher based on an AI-generated feedback report for a student.
 
@@ -226,7 +229,7 @@ Based on the provided HTML report, write concise and actionable guidance for the
 
 Please provide only the teacher guidance text.`,
     }),
-});
+}};
 
 
 // The Main Orchestration Flow
@@ -253,8 +256,8 @@ export const generateMonologueAnalysisFlow = ai.defineFlow(
       // Step 2: Transcribe the audio
       await updateDoc(resultDocRef, { status: "분석 중: transcribe" });
       console.log("[Flow] Step 2: Transcribing audio.");
-      const transcriptionResult = await withRetry(() => prompts.transcription({ studentRecordingUrl: input.studentRecordingDataUri }));
-      const studentTranscript = transcriptionResult.text;
+      const transcriptionResult = await withRetry(() => prompts.transcription.generate({ input: { studentRecordingUrl: input.studentRecordingDataUri } }));
+      const studentTranscript = transcriptionResult.text();
 
       if (!studentTranscript || studentTranscript.trim() === "" || studentTranscript.includes('기록되지 않았습니다') || studentTranscript.includes('인식하지 못했습니다')) {
           throw new Error('학생 답변을 인식하지 못했습니다. 마이크 상태를 확인하고 다시 시도해주세요.');
@@ -271,8 +274,8 @@ export const generateMonologueAnalysisFlow = ai.defineFlow(
       let finalResult: z.infer<typeof CombinedAnalysisOutputSchema>;
 
       if (input.useRubric) {
-          const rubricResult = await withRetry(() => prompts.rubric({ studentTranscript }));
-          let rubricText = rubricResult.text;
+          const rubricResult = await withRetry(() => prompts.rubric.generate({ input: { studentTranscript } }));
+          let rubricText = rubricResult.text();
           if (rubricText.startsWith("```html")) {
               rubricText = rubricText.substring(7, rubricText.length - 3).trim();
           }
@@ -289,34 +292,38 @@ export const generateMonologueAnalysisFlow = ai.defineFlow(
           const pronunciationScore = rubricScores.pronunciation * 20;
 
           // New step: Generate teacher guidance based on the rubric HTML
-          const guidanceResult = await withRetry(() => prompts.teacherGuidance({ studentFeedbackHtml: rubricText }));
+          const guidanceResult = await withRetry(() => prompts.teacherGuidance.generate({ input: { studentFeedbackHtml: rubricText }}));
 
           finalResult = {
               studentTranscript,
               contentScore: contentScore,
               pronunciationScore: pronunciationScore,
               aiFeedback: rubricText,
-              teacherGuidance: guidanceResult.text,
+              teacherGuidance: guidanceResult.text(),
               curricularRemarks: `'${input.assessmentTitle}' 평가에서 루브릭 기반으로 유창성(${rubricScores.fluency}점), 문법(${rubricScores.grammar}점), 어휘(${rubricScores.vocabulary}점) 영역에서 종합 ${contentScore}점, 발음 영역에서 ${pronunciationScore}점을 받는 등 준수한 성취를 보임.`,
               pronunciationFeedback: `루브릭 기반 발음 점수는 ${pronunciationScore}점입니다. 상세 내용은 종합 분석 리포트를 참고하세요.`,
               rubricScores,
           };
       } else {
           const [contentResult, pronunciationResult] = await Promise.all([
-              withRetry(() => prompts.content({
-                  studentTranscript,
-                  activityPrompt: input.activityPrompt,
-                  expectedFormat: input.expectedFormat,
-                  studentName: input.studentName,
-                  assessmentTitle: input.assessmentTitle,
+              withRetry(() => prompts.content.generate({
+                input: {
+                    studentTranscript,
+                    activityPrompt: input.activityPrompt,
+                    expectedFormat: input.expectedFormat,
+                    studentName: input.studentName,
+                    assessmentTitle: input.assessmentTitle,
+                }
               })),
-              withRetry(() => prompts.pronunciation({
-                  studentRecordingUrl: input.studentRecordingDataUri,
-                  studentTranscript,
+              withRetry(() => prompts.pronunciation.generate({
+                input: {
+                    studentRecordingDataUri: input.studentRecordingDataUri,
+                    studentTranscript,
+                }
               }))
           ]);
-          const contentOutput = contentResult.output;
-          const pronunciationOutput = pronunciationResult.output;
+          const contentOutput = contentResult.output();
+          const pronunciationOutput = pronunciationResult.output();
           if (!contentOutput || !pronunciationOutput) {
               throw new Error("Failed to get a valid response from one or more analysis models.");
           }
