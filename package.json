@@ -1,4 +1,3 @@
-
 {
   "name": "nextn",
   "version": "0.1.0",
@@ -48,6 +47,7 @@
     "firebase": "^10.12.2",
     "firebase-admin": "^12.1.1",
     "genkit": "^1.13.0",
+    "genkitx-openai": "^0.3.0",
     "html2canvas": "^1.4.1",
     "jspdf": "^2.5.1",
     "lucide-react": "^0.475.0",
@@ -63,6 +63,7 @@
     "tailwind-merge": "^3.0.1",
     "tailwindcss-animate": "^1.0.7",
     "uuid": "^9.0.1",
+    "wav": "^1.0.2",
     "youtube-transcript": "^1.2.1",
     "zod": "^3.24.2"
   },
