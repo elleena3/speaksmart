@@ -17,6 +17,7 @@ import { HandwritingSubmissionAnalyzerTool } from "./handwriting-submission-anal
 import { PdfMultiAnalyzerTool } from "./pdf-multi-analyzer-tool";
 import { FirestoreTestTool } from "@/components/feature-tools/firestore-test-tool";
 import { StorageUploaderTool } from "@/components/feature-tools/storage-uploader-tool";
+import { TtsModelTesterTool } from "@/components/feature-tools/tts-model-tester-tool";
 
 
 export default function MiscPage() {
@@ -29,6 +30,15 @@ export default function MiscPage() {
                 <p className="text-muted-foreground">{t.teacherMisc.description}</p>
             </div>
             <div className="grid grid-cols-1 gap-6">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>TTS 모델별 음성 테스트</CardTitle>
+                        <CardDescription>현재 사용 가능한 Gemini TTS 모델의 목소리를 직접 들어보고 비교할 수 있습니다.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <TtsModelTesterTool />
+                    </CardContent>
+                </Card>
                 <Card>
                     <CardHeader>
                         <CardTitle>Firebase Firestore 테스트 도구</CardTitle>

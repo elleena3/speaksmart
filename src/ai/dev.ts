@@ -1,3 +1,4 @@
+
 import { config } from 'dotenv';
 config();
 
@@ -30,6 +31,7 @@ import '@/ai/flows/create-neural2-teacher-flow'; // New flow for Neural2 voice t
 import '@/ai/flows/analyze-read-aloud-flow';
 import '@/ai/flows/enhance-selected-text-flow'; // New flow for Read Aloud Tool 2.0
 import '@/ai/flows/extract-text-from-file.ts'; // New flow for file upload text extraction
+import '@/ai/flows/generate-tts-by-model-flow.ts'; // New flow for TTS model tester
 
 // New flow for the Misc page's handwriting analysis tool
 import '@/ai/flows/analyze-handwriting-flow';
