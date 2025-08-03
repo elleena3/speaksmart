@@ -71,19 +71,18 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 2, delay = 1500): Pr
 
 // Internal Sub-prompts
 const createPrompt = (modelName: z.infer<typeof evaluationModels[number]>) => {
-    const isGoogleModel = modelName.startsWith('gemini');
-    const model = isGoogleModel ? googleAI.model(modelName) : modelName;
+    const model = ai.model(modelName);
 
     return {
     transcription: ai.definePrompt({
-        name: `transcribeAudioPrompt_${modelName.replace(/[\/-.]/g, '_')}`,
+        name: `transcribeAudioPrompt_${modelName.replace(/[-\/.]/g, '_')}`,
         model: model, 
         prompt: `Transcribe this English audio. If the audio is silent or contains no discernible speech, return an empty string. Do not correct any grammatical errors or mispronunciations. Transcribe exactly what is heard.
     Audio: {{media url=studentRecordingUrl}}
     `,
     }),
     content: ai.definePrompt({
-      name: `monologueContentAnalysisPrompt_${modelName.replace(/[\/-.]/g, '_')}`,
+      name: `monologueContentAnalysisPrompt_${modelName.replace(/[-\/.]/g, '_')}`,
       model: model,
       input: { schema: z.object({
         studentTranscript: z.string(),
@@ -110,7 +109,7 @@ const createPrompt = (modelName: z.infer<typeof evaluationModels[number]>) => {
     `,
     }),
     pronunciation: ai.definePrompt({
-        name: `monologuePronunciationAnalysisPrompt_${modelName.replace(/[\/-.]/g, '_')}`,
+        name: `monologuePronunciationAnalysisPrompt_${modelName.replace(/[-\/.]/g, '_')}`,
         model: model,
         input: { schema: z.object({
             studentRecordingUrl: z.string(),
@@ -130,7 +129,7 @@ const createPrompt = (modelName: z.infer<typeof evaluationModels[number]>) => {
     `,
     }),
     rubric: ai.definePrompt({
-      name: `monologueRubricAnalysisPrompt_${modelName.replace(/[\/-.]/g, '_')}`,
+      name: `monologueRubricAnalysisPrompt_${modelName.replace(/[-\/.]/g, '_')}`,
       model: model,
       input: { schema: z.object({ studentTranscript: z.string() }) },
       prompt: `You are an HTML generation machine. Your ONLY task is to create a complete, single HTML file for a web-based report based on the user's speech and the provided rubric.
@@ -211,7 +210,7 @@ Now, generate the HTML code.
 `,
     }),
     teacherGuidance: ai.definePrompt({
-      name: `monologueTeacherGuidancePrompt_${modelName.replace(/[\/-.]/g, '_')}`,
+      name: `monologueTeacherGuidancePrompt_${modelName.replace(/[-\/.]/g, '_')}`,
       model: model,
       input: { schema: z.object({ studentFeedbackHtml: z.string() }) },
       prompt: `You are an expert English education consultant. Your task is to provide actionable advice to a teacher based on an AI-generated feedback report for a student.

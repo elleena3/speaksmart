@@ -1,4 +1,6 @@
 
+import { ai } from './genkit';
+import { gpt4o } from '@genkit-ai/compat-oai';
 import { config } from 'dotenv';
 config();
 
@@ -47,3 +49,14 @@ import '@/ai/flows/analyze-presentation-video-flow';
 
 // This flow is being removed due to errors.
 // import '@/ai/flows/regenerate-html-feedback-flow';
+
+(async () => {
+  // ⬇️  최상위 await → 함수 안 await
+  const res = await ai.generate({
+    prompt: '연결 테스트: GPT-4o 처리',
+    model: 'gpt-4o',
+    config: { temperature: 0 }
+  });
+  console.log('✅ 응답:', res.text);
+})();
+
