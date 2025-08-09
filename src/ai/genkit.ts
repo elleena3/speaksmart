@@ -1,7 +1,10 @@
 import {genkit, type Plugin} from 'genkit';
 import {googleAI} from '@genkit-ai/googleai';
 import {config} from 'dotenv';
-import openAI, { gpt4o, gpt4Turbo, gpt35Turbo } from '@genkit-ai/compat-oai';
+import openAI from '@genkit-ai/compat-oai';
+import { config } from 'dotenv';
+config({ path: '.env' });          // ← 경로를 명시
+
 
 config();
 
@@ -22,8 +25,23 @@ if (GOOGLE_CLOUD_PROJECT && GOOGLE_CLOUD_LOCATION) {
 if (OPENAI_API_KEY) {
   plugins.push(
     openAI({
+      name: 'openai',
+      provider: 'openai',          
       apiKey: OPENAI_API_KEY,
-      models: [gpt4o, gpt4Turbo, gpt35Turbo],
+      defaultModel: 'gpt-4o-preview',
+  
+      models: [
+        {
+          name: 'gpt-4o-preview',
+          id:   'gpt-4o-preview',
+          modality: 'chat'
+        },
+        {
+          name: 'gpt-4o',
+          id:   'gpt-4o',
+          modality: 'chat'
+        }
+      ]
     })
   );
 } else {
@@ -36,6 +54,7 @@ if (plugins.length === 0) {
 
 export const ai = genkit({
   plugins,
+  model: 'gpt-4o-preview'
 });
 
 console.log('🔍 등록된 플러그인', plugins.map(p => p.name));
