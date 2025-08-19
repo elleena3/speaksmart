@@ -1,8 +1,9 @@
 
-import { ai } from './genkit';
-import { gpt4o } from '@genkit-ai/compat-oai';
 import { config } from 'dotenv';
 config();
+
+import './ai/genkit'; /
+import './ai/flows/test-openai-flow';
 
 // The following flows are now integrated into the new analysis flow
 // and no longer need to be individually registered for direct client use.

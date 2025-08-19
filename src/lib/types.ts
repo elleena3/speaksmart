@@ -104,6 +104,7 @@ export type TeacherAssessment = {
   // For Firestore timestamp
   createdAt: number;
   submissions?: { [studentId: string]: 'completed' | 'in_progress' };
+  loadedRubricId?: string;
 };
 
 export type { ConversationTurn };
