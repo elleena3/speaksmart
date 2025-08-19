@@ -2,7 +2,6 @@
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { RealtimeConversationTool } from "@/components/feature-tools/realtime-conversation-tool";
 import { StandaloneDialogueTool } from "@/components/feature-tools/standalone-dialogue-tool";
 import { OpenAiTtsDialogueTool } from "@/components/feature-tools/openai-tts-dialogue-tool";
 
@@ -31,15 +30,6 @@ export default function ConversationToolsPage() {
                     </CardHeader>
                     <CardContent>
                         <OpenAiTtsDialogueTool />
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader>
-                        <CardTitle>AI 원어민 대화 (기본)</CardTitle>
-                        <CardDescription>턴 기반으로 AI와 대화합니다. 사용자 응답이 끝나면 AI가 응답을 생성합니다.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <RealtimeConversationTool />
                     </CardContent>
                 </Card>
             </div>
