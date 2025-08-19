@@ -1,9 +1,5 @@
-
 import { config } from 'dotenv';
 config();
-
-import './ai/genkit'; /
-import './ai/flows/test-openai-flow';
 
 // The following flows are now integrated into the new analysis flow
 // and no longer need to be individually registered for direct client use.
@@ -28,7 +24,7 @@ import '@/ai/flows/create-concurrent-teacher-flow'; // New flow for concurrent r
 import '@/ai/flows/create-parallel-teacher-flow'; // New flow for parallel processing tool
 import '@/ai/flows/create-hybrid-teacher-flow'; // New flow for hybrid VAD tool
 import '@/ai/flows/create-speculative-teacher-flow'; // New flow for speculative speech model
-import '@/ai/flows/create-neural2-teacher-flow'; // New flow for Neural2 voice tool
+import '@/ai/flows/create-neural2-teacher-flow'; // Now uses OpenAI TTS
 
 // New flow for the Misc page's read-aloud tool
 import '@/ai/flows/analyze-read-aloud-flow';
@@ -50,14 +46,3 @@ import '@/ai/flows/analyze-presentation-video-flow';
 
 // This flow is being removed due to errors.
 // import '@/ai/flows/regenerate-html-feedback-flow';
-
-(async () => {
-  // ⬇️  최상위 await → 함수 안 await
-  const res = await ai.generate({
-    prompt: '연결 테스트: GPT-4o 처리',
-    model: 'gpt-4o',
-    config: { temperature: 0 }
-  });
-  console.log('✅ 응답:', res.text);
-})();
-

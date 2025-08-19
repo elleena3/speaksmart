@@ -1,12 +1,12 @@
 
-"use client"
+"use client";
 
 import { useState, useRef, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Mic, StopCircle, Loader2, Bot, User, Play, Volume2, BrainCircuit } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { converseWithNeural2Teacher } from "@/ai/flows/create-neural2-teacher-flow"
+import { converseWithOpenAiTtsTeacher } from "@/ai/flows/create-neural2-teacher-flow"
 import { type ConversationTurn } from "@/lib/types/ai-schemas";
 
 const mimeType = 'audio/webm;codecs=opus';
@@ -14,7 +14,7 @@ const CONVERSATION_HISTORY_LIMIT = 20;
 
 type SessionState = "idle" | "initializing" | "countdown" | "recording" | "processing" | "speaking" | "waiting_for_user";
 
-export function Neural2DialogueTool() {
+export function OpenAiTtsDialogueTool() {
   const [sessionState, setSessionState] = useState<SessionState>("idle");
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
   const [interimTranscript, setInterimTranscript] = useState<string | null>(null);
@@ -76,7 +76,7 @@ export function Neural2DialogueTool() {
     setConversation([]);
     setSessionState("initializing");
     try {
-      const { aiResponseText, aiResponseAudioDataUri } = await converseWithNeural2Teacher({
+      const { aiResponseText, aiResponseAudioDataUri } = await converseWithOpenAiTtsTeacher({
         studentRecordingDataUri: null,
         conversationHistory: [],
       });
@@ -180,7 +180,7 @@ export function Neural2DialogueTool() {
     try {
       const historyForAI = conversation.slice(-CONVERSATION_HISTORY_LIMIT);
       
-      const { studentTranscript, aiResponseText, aiResponseAudioDataUri } = await converseWithNeural2Teacher({
+      const { studentTranscript, aiResponseText, aiResponseAudioDataUri } = await converseWithOpenAiTtsTeacher({
         studentRecordingDataUri,
         conversationHistory: historyForAI,
       });
@@ -206,6 +206,7 @@ export function Neural2DialogueTool() {
       setSessionState("waiting_for_user");
     }
   };
+
 
   const getButtonState = () => {
     switch (sessionState) {
@@ -260,6 +261,7 @@ export function Neural2DialogueTool() {
         );
     }
   };
+
 
   return (
     <div className="flex flex-col gap-4">
