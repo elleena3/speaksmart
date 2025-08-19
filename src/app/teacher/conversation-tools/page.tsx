@@ -22,8 +22,8 @@ export default function ConversationToolsPage() {
             <div className="grid grid-cols-1 gap-6">
                  <Card>
                     <CardHeader>
-                        <CardTitle>AI와 대화하기 (연습용)</CardTitle>
-                        <CardDescription>학생들이 응시하는 'AI와 대화하기' 평가와 동일한 환경에서 자유롭게 대화를 연습할 수 있는 도구입니다.</CardDescription>
+                        <CardTitle>AI와 대화하기 (연습용 - Gemini TTS)</CardTitle>
+                        <CardDescription>학생들이 응시하는 'AI와 대화하기' 평가와 동일한 환경에서 Genkit 기반 Gemini TTS 모델을 사용하여 자유롭게 대화를 연습할 수 있는 도구입니다.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <StandaloneDialogueTool />
@@ -31,8 +31,8 @@ export default function ConversationToolsPage() {
                 </Card>
                  <Card>
                     <CardHeader>
-                        <CardTitle>AI와 대화하기 (연습용-Neural2)</CardTitle>
-                        <CardDescription>Google Cloud TTS의 'en-US-Neural2-A'와 유사한 표준 남성 목소리('puck')를 사용하여 대화를 연습합니다.</CardDescription>
+                        <CardTitle>AI와 대화하기 (Google Cloud TTS)</CardTitle>
+                        <CardDescription>Google Cloud의 표준 Text-to-Speech API('en-US-Neural2-A' 음성)를 사용하여 대화를 연습합니다. 가장 안정적이고 표준적인 발음을 제공합니다.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <Neural2DialogueTool />
