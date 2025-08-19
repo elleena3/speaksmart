@@ -3,7 +3,7 @@
 
 /**
  * @fileOverview Converts audio to speech and handles conversational AI responses.
- * This version is a practice tool that uses a specific voice profile similar to en-US-Neural2-A.
+ * This version is a practice tool that uses a standard, clear voice profile.
  *
  * - converseWithNeural2Teacher - A function that takes user audio and returns AI audio with a specific voice.
  */
@@ -14,7 +14,7 @@ import { z } from 'zod';
 import {
   ConversationTurnSchema,
 } from '@/lib/types/ai-schemas';
-import { TextToSpeechClient } from '@google-cloud/text-to-speech';
+import wav from 'wav';
 
 const ConverseWithNeural2TeacherInputSchema = z.object({
   studentRecordingDataUri: z
@@ -77,25 +77,78 @@ You:
 `,
 });
 
-// Use Google Cloud Text-to-Speech API
-const textToSpeechClient = new TextToSpeechClient();
-async function textToSpeech(text: string): Promise<string> {
-  const request = {
-    input: { text: text },
-    voice: { languageCode: 'en-US', name: 'en-US-Neural2-A' },
-    audioConfig: { audioEncoding: 'MP3' as const },
-  };
+async function toWav(
+  pcmData: Buffer,
+  channels = 1,
+  rate = 24000,
+  sampleWidth = 2
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const writer = new wav.Writer({
+      channels,
+      sampleRate: rate,
+      bitDepth: sampleWidth * 8,
+    });
 
-  const [response] = await textToSpeechClient.synthesizeSpeech(request);
-  const audioContent = response.audioContent;
-  if (!audioContent) {
-    throw new Error('Google Cloud TTS did not return any audio content.');
-  }
-  
-  const audioBase64 = Buffer.from(audioContent as Uint8Array).toString('base64');
-  return `data:audio/mp3;base64,${audioBase64}`;
+    const bufs: any[] = [];
+    writer.on('error', reject);
+    writer.on('data', function (d) {
+      bufs.push(d);
+    });
+    writer.on('end', function () {
+      resolve(Buffer.concat(bufs).toString('base64'));
+    });
+
+    writer.write(pcmData);
+    writer.end();
+  });
 }
 
+
+async function textToSpeech(text: string): Promise<string> {
+    const ttsRequestPayload = {
+        config: {
+            responseModalities: ['AUDIO'],
+            speechConfig: {
+                voiceConfig: {
+                    prebuiltVoiceConfig: { voiceName: 'puck' }, // Using a clear, standard Gemini voice
+                },
+            },
+        },
+        prompt: text,
+    };
+    
+    let ttsResponse;
+    try {
+        ttsResponse = await ai.generate({
+            model: googleAI.model('gemini-2.5-flash-preview-tts'),
+            ...ttsRequestPayload,
+        });
+    } catch (error: any) {
+        const errorMessage = (error.message || '').toLowerCase();
+        if (errorMessage.includes('429') || errorMessage.includes('500') || errorMessage.includes('503') || errorMessage.includes('overloaded')) {
+            console.warn("TTS Flash model failed, falling back to Pro model.", error);
+            ttsResponse = await ai.generate({
+                model: googleAI.model('gemini-2.5-pro-preview-tts'), // Fallback model
+                ...ttsRequestPayload,
+            });
+        } else {
+            throw error;
+        }
+    }
+
+    const audioMedia = ttsResponse.media;
+    if (!audioMedia) {
+        throw new Error('TTS did not return any audio media.');
+    }
+
+    const pcmBuffer = Buffer.from(
+        audioMedia.url.substring(audioMedia.url.indexOf(',') + 1),
+        'base64'
+    );
+    
+    return 'data:audio/wav;base64,' + await toWav(pcmBuffer);
+}
 
 const converseWithNeural2TeacherFlow = ai.defineFlow(
   {
@@ -141,7 +194,7 @@ const converseWithNeural2TeacherFlow = ai.defineFlow(
         aiResponseText = "Sorry, I'm having a little trouble right now. Could you say that again?";
     }
 
-    // Step 3: Convert AI's text response to speech (TTS) using the correct API
+    // Step 3: Convert AI's text response to speech (TTS) using Genkit
     const aiResponseAudioDataUri = await textToSpeech(aiResponseText);
 
     return {
