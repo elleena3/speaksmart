@@ -137,8 +137,8 @@ export async function converseWithStudent(
 
 const createConversationalPrompt = (modelName: z.infer<typeof evaluationModels[number]>) => {
     return ai.definePrompt({
-      name: `conversationalPrompt_${modelName.replace(/[-.]/g, '_')}`,
-      model: googleAI.model(modelName),
+      name: `conversationalPrompt_${modelName.replace(/[-.\/]/g, '_')}`,
+      model: ai.model(modelName),
       input: {
         schema: z.object({
             studentTranscript: z.string().optional(),
@@ -206,18 +206,19 @@ const converseWithStudentFlow = ai.defineFlow(
     let studentTranscript = "";
     let aiResponseText = "";
     
-    const model = 'gemini-2.5-flash-lite-preview-06-17';
+    // Use the faster model for real-time conversation.
+    const model = evaluationModel || 'gemini-1.5-flash-latest';
     const conversationalPrompt = createConversationalPrompt(model);
 
     if (studentRecordingDataUri) {
       const sttResponse = await withRetry(() => ai.generate({
-        model: googleAI.model(model),
+        model: googleAI.model('gemini-1.5-flash-latest'),
         prompt: [
           { text: "Your sole task is to transcribe the provided English audio with absolute precision. Do NOT correct grammar, mispronunciations, or any other errors. Transcribe ONLY the words that are spoken. If a word is unclear, represent it as best you can phonetically. Do not add, remove, or change any words based on context or interpretation. Provide only the raw, transcribed text." },
           { media: { url: studentRecordingDataUri } },
         ],
       }));
-      studentTranscript = sttResponse.text;
+      studentTranscript = sttResponse.text();
       if (!studentTranscript?.trim()) {
           console.warn("Transcription result was empty.");
           studentTranscript = "(The user did not say anything)"; 
