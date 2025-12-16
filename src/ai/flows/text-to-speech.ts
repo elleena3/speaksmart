@@ -1,3 +1,4 @@
+
 'use server';
 
 /**
@@ -138,7 +139,7 @@ export async function converseWithStudent(
 const createConversationalPrompt = (modelName: z.infer<typeof evaluationModels[number]>) => {
     return ai.definePrompt({
       name: `conversationalPrompt_${modelName.replace(/[-.\/]/g, '_')}`,
-      model: ai.model(modelName),
+      model: modelName,
       input: {
         schema: z.object({
             studentTranscript: z.string().optional(),
