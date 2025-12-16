@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useRouter } from "next/navigation";
@@ -129,7 +128,7 @@ export default function NewAssessmentPage() {
     scenario: z.enum(scenarios as [Scenario, ...Scenario[]]).optional(),
     recordingTimeLimit: z.coerce.number().int().min(0).optional(),
     aiVoice: z.enum(allVoices as [AiVoice, ...AiVoice[]]).optional().default('algenib'),
-    evaluationModel: z.enum(evaluationModels as [EvaluationModel, ...EvaluationModel[]]).optional().default('gemini-2.5-pro'),
+    evaluationModel: z.enum(evaluationModels as [EvaluationModel, ...EvaluationModel[]]).optional().default('gemini-2.5-flash-preview-09-2025'),
     useRubric: z.boolean().default(false),
     loadedRubricId: z.string().optional(),
     imageGenerationModel: z.enum(imageGenerationModels as [ImageGenerationModel, ...ImageGenerationModel[]]).optional().default('gemini-2.0-flash-preview-image-generation'),
@@ -189,7 +188,7 @@ export default function NewAssessmentPage() {
       scenario: "free-talk",
       recordingTimeLimit: 0,
       aiVoice: 'algenib',
-      evaluationModel: 'gemini-2.5-pro',
+      evaluationModel: 'gemini-2.5-flash-preview-09-2025',
       useRubric: false,
       imageGenerationModel: 'gemini-2.0-flash-preview-image-generation',
     },

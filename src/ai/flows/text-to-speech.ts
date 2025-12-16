@@ -207,12 +207,12 @@ const converseWithStudentFlow = ai.defineFlow(
     let aiResponseText = "";
     
     // Use the faster model for real-time conversation.
-    const model = evaluationModel || 'gemini-1.5-flash-latest';
+    const model = evaluationModel || 'gemini-2.5-flash-preview-09-2025';
     const conversationalPrompt = createConversationalPrompt(model);
 
     if (studentRecordingDataUri) {
       const sttResponse = await withRetry(() => ai.generate({
-        model: 'gemini-1.5-flash-latest',
+        model: 'gemini-2.5-flash-preview-09-2025',
         prompt: [
           { text: "Your sole task is to transcribe the provided English audio with absolute precision. Do NOT correct grammar, mispronunciations, or any other errors. Transcribe ONLY the words that are spoken. If a word is unclear, represent it as best you can phonetically. Do not add, remove, or change any words based on context or interpretation. Provide only the raw, transcribed text." },
           { media: { url: studentRecordingDataUri } },

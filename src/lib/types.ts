@@ -1,4 +1,3 @@
-
 import { type ConversationTurn, type ResultSummarySchema } from "@/lib/types/ai-schemas";
 import { z } from 'zod';
 
@@ -31,8 +30,8 @@ export const voiceDescriptions: Record<AiVoice, string> = {
 
 export const evaluationModels = [
     // Google AI Models
+    "gemini-2.5-flash-preview-09-2025",
     "gemini-2.5-pro", 
-    "gemini-2.5-flash", 
     "gemini-2.0-flash",
     // OpenAI Models
     "openai/gpt-4o",
