@@ -46,7 +46,8 @@ export default function FreeTalkPage() {
                 prompt: "AI와 자유롭게 영어로 대화해 보세요. 이 대화는 저장되지 않습니다.",
                 assessmentType: "dialogue",
                 scenario: "free-talk",
-                expectedFormat: "자연스러운 대화 능력 평가"
+                expectedFormat: "자연스러운 대화 능력 평가",
+                evaluationModel: "gemini-2.5-flash-preview-09-2025", // FIX: Use a valid model
             } as any);
         }
         setIsLoading(false);
