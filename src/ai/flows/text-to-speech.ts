@@ -1,4 +1,3 @@
-
 'use server';
 
 /**
@@ -27,7 +26,7 @@ import wav from 'wav';
 import { evaluationModels, scenarios, allVoices } from '@/lib/types';
 import { summarizeConversationHistoryFlow } from './summarize-conversation-history-flow';
 
-const CONVERSATION_MEMORY_LIMIT = 20;
+const CONVERSATION_HISTORY_LIMIT = 20;
 
 // Helper function for retrying API calls on overload
 async function withRetry<T>(fn: () => Promise<T>, retries = 2, delay = 1500): Promise<T> {
@@ -213,7 +212,7 @@ const converseWithStudentFlow = ai.defineFlow(
 
     if (studentRecordingDataUri) {
       const sttResponse = await withRetry(() => ai.generate({
-        model: googleAI.model('gemini-1.5-flash-latest'),
+        model: 'gemini-1.5-flash-latest',
         prompt: [
           { text: "Your sole task is to transcribe the provided English audio with absolute precision. Do NOT correct grammar, mispronunciations, or any other errors. Transcribe ONLY the words that are spoken. If a word is unclear, represent it as best you can phonetically. Do not add, remove, or change any words based on context or interpretation. Provide only the raw, transcribed text." },
           { media: { url: studentRecordingDataUri } },
@@ -232,8 +231,8 @@ const converseWithStudentFlow = ai.defineFlow(
     }));
     let historySummary: string | undefined = undefined;
 
-    if (historyForPrompt.length >= CONVERSATION_MEMORY_LIMIT) {
-        const splitIndex = Math.max(0, historyForPrompt.length - CONVERSATION_MEMORY_LIMIT);
+    if (historyForPrompt.length >= CONVERSATION_HISTORY_LIMIT) {
+        const splitIndex = Math.max(0, historyForPrompt.length - CONVERSATION_HISTORY_LIMIT);
         const oldHistory = historyForPrompt.slice(0, splitIndex);
         const recentHistory = historyForPrompt.slice(splitIndex);
         
