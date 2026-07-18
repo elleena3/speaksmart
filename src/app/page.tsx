@@ -36,6 +36,7 @@ export default function Home() {
 
   const handleTeacherLoginAttempt = (e: React.MouseEvent) => {
     e.preventDefault();
+    // 교사 목업 로그인 비밀번호: 2918
     if (teacherPassword === '2918') {
       setPasswordError('');
       document.getElementById('teacher-login-dialog-close')?.click();
@@ -108,7 +109,7 @@ export default function Home() {
                  <DialogHeader>
                     <DialogTitle>교사 로그인</DialogTitle>
                     <DialogDescription>
-                        교사 목업 계정에 접근하려면 비밀번호를 입력하세요.
+                        교사 목업 계정에 접근하려면 비밀번호를 입력하세요. (비밀번호: 2918)
                     </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
