@@ -3,7 +3,7 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 import { adminStorage } from '@/lib/firebase-admin';
-import { googleAI } from '@genkit-ai/googleai';
+import { googleAI } from '@genkit-ai/google-genai';
 
 const AnalyzePdfFromStorageInputSchema = z.object({
   filePath: z.string().describe("The path to the PDF file in Firebase Storage."),
@@ -70,7 +70,7 @@ const analyzePdfFromStorageFlow = ai.defineFlow(
       // 2. Call the model with the Data URI, now wrapped in our retry logic.
       const result = await withRetry(() => 
         ai.generate({
-          model: googleAI.model('gemini-2.5-pro'),
+          model: googleAI.model('gemini-3.1-pro-preview'),
           prompt: [
               { text: prompt },
               { media: { url: pdfDataUri } }

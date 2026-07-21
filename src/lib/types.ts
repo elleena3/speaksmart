@@ -12,34 +12,34 @@ export type AiVoice = (typeof allVoices)[number];
 
 // Descriptions updated for accuracy
 export const voiceDescriptions: Record<AiVoice, string> = {
-    // Female
-    laomedeia: "부드럽고 차분한 톤 (여성)",
-    callirrhoe: "안정적이고 신뢰감 있는 톤 (여성)",
-    autonoe: "활기차고 밝은 톤 (여성)",
-    erinome: "깊고 성숙한 톤 (여성)",
-    // Male
-    achernar: "명료하고 전문적인 톤 (남성)",
-    algenib: "중립적이고 표준적인 톤 (남성)",
-    gacrux: "부드럽고 감성적인 톤 (남성)",
-    iapetus: "깊고 권위 있는 톤 (남성)",
-    orus: "활기차고 설득력 있는 톤 (남성)",
-    puck: "명료하고 교육적인 톤 (남성)",
-    schedar: "따뜻하고 친근한 톤 (남성)",
-    zubenelgenubi: "밝고 긍정적인 톤 (남성)",
+  // Female
+  laomedeia: "부드럽고 차분한 톤 (여성)",
+  callirrhoe: "안정적이고 신뢰감 있는 톤 (여성)",
+  autonoe: "활기차고 밝은 톤 (여성)",
+  erinome: "깊고 성숙한 톤 (여성)",
+  // Male
+  achernar: "명료하고 전문적인 톤 (남성)",
+  algenib: "중립적이고 표준적인 톤 (남성)",
+  gacrux: "부드럽고 감성적인 톤 (남성)",
+  iapetus: "깊고 권위 있는 톤 (남성)",
+  orus: "활기차고 설득력 있는 톤 (남성)",
+  puck: "명료하고 교육적인 톤 (남성)",
+  schedar: "따뜻하고 친근한 톤 (남성)",
+  zubenelgenubi: "밝고 긍정적인 톤 (남성)",
 };
 
 export const evaluationModels = [
-    // Google AI Models
-    "gemini-2.5-flash-preview-09-2025",
-    "gemini-2.5-pro",
-    // OpenAI Models
-    "openai/gpt-4o",
-    "openai/gpt-4-turbo",
-    "openai/gpt-3.5-turbo"
+  // Google AI Models
+  "googleai/gemini-3.5-flash",
+  "googleai/gemini-3.1-pro-preview",
+  // OpenAI Models
+  "openai/gpt-4o",
+  "openai/gpt-4-turbo",
+  "openai/gpt-3.5-turbo"
 ] as const;
 export type EvaluationModel = (typeof evaluationModels)[number];
 
-export const imageGenerationModels = ["gemini-2.0-flash-preview-image-generation"] as const;
+export const imageGenerationModels = ["googleai/gemini-3.1-flash-image"] as const;
 export type ImageGenerationModel = (typeof imageGenerationModels)[number];
 
 
@@ -49,18 +49,18 @@ export type MonologueType = (typeof monologueTypes)[number];
 
 // New UserData type for Firestore
 export type UserData = {
-    uid: string;
-    docId?: string; // Firestore document ID
-    email: string;
-    displayName: string;
-    photoURL: string;
-    role: 'student' | 'teacher';
-    grade?: string;
-    class?: string;
-    number?: string;
-    password?: string;
-    isMock?: boolean; // To identify mock users
-    createdAt: number;
+  uid: string;
+  docId?: string; // Firestore document ID
+  email: string;
+  displayName: string;
+  photoURL: string;
+  role: 'student' | 'teacher';
+  grade?: string;
+  class?: string;
+  number?: string;
+  password?: string;
+  isMock?: boolean; // To identify mock users
+  createdAt: number;
 };
 
 
@@ -74,7 +74,7 @@ export type Assessment = {
   scenario?: Scenario;
   // Firestore fields
   uid?: string; // Teacher's UID
-  createdAt?: number; 
+  createdAt?: number;
 };
 
 export type TeacherAssessment = {
@@ -109,10 +109,10 @@ export type { ConversationTurn };
 export type ResultSummary = z.infer<typeof ResultSummarySchema>;
 
 export type HistoricalScore = {
-    attempt: number;
-    contentScore: number;
-    pronunciationScore: number;
-    rubricScores?: RubricScores;
+  attempt: number;
+  contentScore: number;
+  pronunciationScore: number;
+  rubricScores?: RubricScores;
 };
 
 export type ConversationHistory = {
@@ -120,9 +120,9 @@ export type ConversationHistory = {
   studentRecordingUrl?: string;
 }
 
-export type ResultStatus = 
-  | "채점 완료" 
-  | "오류" 
+export type ResultStatus =
+  | "채점 완료"
+  | "오류"
   | "분석 중"
   | "분석 중: upload"
   | "분석 중: transcribe"
@@ -131,18 +131,18 @@ export type ResultStatus =
 
 
 export type RubricScores = {
-    fluency: number;
-    pronunciation: number;
-    grammar: number;
-    vocabulary: number;
-    interaction?: number; // Optional for monologue
+  fluency: number;
+  pronunciation: number;
+  grammar: number;
+  vocabulary: number;
+  interaction?: number; // Optional for monologue
 };
 
 export type StudentResult = {
   id: string; // Firestore document ID
   studentId: string; // Student's UID
   assessmentId: string;
-  assessmentTitle: string; 
+  assessmentTitle: string;
   assessmentType?: 'monologue' | 'dialogue'; // Keep track of type for reprocessing
   name: string; // Student's display name
   avatarUrl: string;

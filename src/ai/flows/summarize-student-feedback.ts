@@ -9,7 +9,7 @@
  */
 
 import {ai} from '@/ai/genkit';
-import { googleAI } from '@genkit-ai/googleai';
+import { googleAI } from '@genkit-ai/google-genai';
 import {z} from 'genkit';
 
 const SummarizeStudentFeedbackInputSchema = z.object({
@@ -40,7 +40,7 @@ export async function summarizeStudentFeedback(
 
 const summarizeStudentFeedbackPrompt = ai.definePrompt({
   name: 'summarizeStudentFeedbackPrompt',
-  model: googleAI.model('gemini-2.5-flash'),
+  model: googleAI.model('gemini-3.5-flash'),
   input: {schema: SummarizeStudentFeedbackInputSchema},
   output: {schema: SummarizeStudentFeedbackOutputSchema},
   prompt: `You are an AI assistant helping teachers improve their assessment activities.

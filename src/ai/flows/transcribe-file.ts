@@ -18,9 +18,9 @@ const TranscriptionResultSchema = z.object({
 
 export async function transcribeFile(audioDataUri: string): Promise<any[]> {
   const modelsToCompare = [
-    'gemini-1.5-flash-latest',
-    'gemini-2.5-flash-preview-09-2025',
-    'gemini-2.5-pro'
+    'googleai/gemini-3.5-flash',
+    'googleai/gemini-3.5-flash',
+    'googleai/gemini-3.1-pro-preview'
   ];
 
   const results = await Promise.all(modelsToCompare.map(async (model) => {

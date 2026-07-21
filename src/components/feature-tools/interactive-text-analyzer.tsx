@@ -93,7 +93,9 @@ export function InteractiveTextAnalyzer() {
                 action: 'translate', 
             });
 
-            const { audioDataUri } = await readAloudText({ text: correctedText });
+            const _res_readAloudText = await readAloudText({ text: correctedText });
+      if (!_res_readAloudText) throw new Error("서버 응답이 없습니다 (API 한도 초과 또는 내부 오류).");
+      const { audioDataUri  } = _res_readAloudText;
             if (audioPlayerRef.current) {
                 audioPlayerRef.current.src = audioDataUri;
                 audioPlayerRef.current.play();

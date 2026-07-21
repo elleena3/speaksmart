@@ -54,35 +54,35 @@ async function toWav(
 }
 
 async function textToSpeech(text: string, voiceName: string = 'algenib'): Promise<string> {
-    const ttsResponse = await withRetry(() => ai.generate({
-        model: 'gemini-2.5-flash-preview-tts',
-        config: {
-            responseModalities: ['AUDIO'],
-            speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voiceName as any } } },
-        },
-        prompt: text,
-    }));
+  const ttsResponse = await withRetry(() => ai.generate({
+    model: 'googleai/gemini-3.1-flash-tts-preview',
+    config: {
+      responseModalities: ['AUDIO'],
+      speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voiceName as any } } },
+    },
+    prompt: text,
+  }));
 
-    if (!ttsResponse.media) throw new Error('TTS 응답에 오디오가 없습니다.');
-    const pcmBuffer = Buffer.from(ttsResponse.media.url.substring(ttsResponse.media.url.indexOf(',') + 1), 'base64');
-    return 'data:audio/wav;base64,' + await toWav(pcmBuffer);
+  if (!ttsResponse.media) throw new Error('TTS 응답에 오디오가 없습니다.');
+  const pcmBuffer = Buffer.from(ttsResponse.media.url.substring(ttsResponse.media.url.indexOf(',') + 1), 'base64');
+  return 'data:audio/wav;base64,' + await toWav(pcmBuffer);
 }
 
 // --- Top-level Prompts ---
 
 const baseConversationalPrompt = ai.definePrompt({
-    name: 'baseConversationalPrompt',
-    input: {
-        schema: z.object({
-            studentTranscript: z.string().optional(),
-            historySummary: z.string().optional(),
-            history: z.array(ConversationTurnSchema.extend({ isUser: z.boolean() })),
-            scenario: z.string().optional(),
-            scenarioPrompt: z.string().optional(),
-            aiVoice: z.string().optional(),
-        })
-    },
-    prompt: `You are an AI English conversation partner "{{aiVoice}}". 
+  name: 'baseConversationalPrompt',
+  input: {
+    schema: z.object({
+      studentTranscript: z.string().optional(),
+      historySummary: z.string().optional(),
+      history: z.array(ConversationTurnSchema.extend({ isUser: z.boolean() })),
+      scenario: z.string().optional(),
+      scenarioPrompt: z.string().optional(),
+      aiVoice: z.string().optional(),
+    })
+  },
+  prompt: `You are an AI English conversation partner "{{aiVoice}}". 
 Rules:
 - Short responses (under 3 sentences).
 - Ask questions.
@@ -102,49 +102,56 @@ You:{{/if}}`,
 // --- Exported Functions ---
 
 export async function converseWithStudent(input: any): Promise<any> {
-    const { studentRecordingDataUri, conversationHistory, scenario, scenarioPrompt, aiVoice, evaluationModel } = input;
-    const model = evaluationModel || 'gemini-2.5-flash-preview-09-2025';
-    let studentTranscript = "";
+  const { studentRecordingDataUri, conversationHistory, scenario, scenarioPrompt, aiVoice, evaluationModel } = input;
 
-    if (studentRecordingDataUri) {
-        const sttResponse = await withRetry(() => ai.generate({
-            model: 'gemini-2.5-flash-preview-09-2025',
-            prompt: [
-                { text: "Transcribe ONLY the words spoken in this audio with absolute precision." },
-                { media: { url: studentRecordingDataUri } }
-            ]
-        }));
-        studentTranscript = sttResponse.text;
-    }
+  // Resolve potentially outdated or unprefixed model strings from Firestore
+  let model = evaluationModel || 'googleai/gemini-3.5-flash';
+  if (model.includes('1.5') || model.includes('2.5')) {
+    model = model.includes('pro') ? 'googleai/gemini-3.1-pro-preview' : 'googleai/gemini-3.5-flash';
+  } else if (!model.includes('/')) {
+    model = 'googleai/' + model;
+  }
+  let studentTranscript = "";
 
-    let historyForPrompt = conversationHistory.map((turn: any) => ({ ...turn, isUser: turn.role === 'user' }));
-    let historySummary: string | undefined;
+  if (studentRecordingDataUri) {
+    const sttResponse = await withRetry(() => ai.generate({
+      model: 'googleai/gemini-3.5-flash',
+      prompt: [
+        { text: "Transcribe ONLY the words spoken in this audio with absolute precision." },
+        { media: { url: studentRecordingDataUri } }
+      ]
+    }));
+    studentTranscript = sttResponse.text;
+  }
 
-    if (historyForPrompt.length >= CONVERSATION_HISTORY_LIMIT) {
-        const summaryResult = await summarizeConversationHistoryFlow({ conversationToSummarize: historyForPrompt.slice(0, -10) });
-        historySummary = summaryResult.summary;
-        historyForPrompt = historyForPrompt.slice(-10);
-    }
+  let historyForPrompt = conversationHistory.map((turn: any) => ({ ...turn, isUser: turn.role === 'user' }));
+  let historySummary: string | undefined;
 
-    const { text } = await withRetry(() => baseConversationalPrompt({
-        history: historyForPrompt,
-        historySummary,
-        studentTranscript: studentTranscript || undefined,
-        scenario,
-        scenarioPrompt,
-        aiVoice: aiVoice || 'algenib',
-    }, { model }));
+  if (historyForPrompt.length >= CONVERSATION_HISTORY_LIMIT) {
+    const summaryResult = await summarizeConversationHistoryFlow({ conversationToSummarize: historyForPrompt.slice(0, -10) });
+    historySummary = summaryResult.summary;
+    historyForPrompt = historyForPrompt.slice(-10);
+  }
 
-    const aiResponseAudioDataUri = await textToSpeech(text || "Sorry, I missed that.", aiVoice);
+  const { text } = await withRetry(() => baseConversationalPrompt({
+    history: historyForPrompt,
+    historySummary,
+    studentTranscript: studentTranscript || undefined,
+    scenario,
+    scenarioPrompt,
+    aiVoice: aiVoice || 'algenib',
+  }, { model }));
 
-    return {
-        studentTranscript: studentTranscript === "(The user did not say anything)" ? "" : studentTranscript,
-        aiResponseText: text,
-        aiResponseAudioDataUri,
-    };
+  const aiResponseAudioDataUri = await textToSpeech(text || "Sorry, I missed that.", aiVoice);
+
+  return {
+    studentTranscript: studentTranscript === "(The user did not say anything)" ? "" : studentTranscript,
+    aiResponseText: text,
+    aiResponseAudioDataUri,
+  };
 }
 
 export async function readAloudText(input: any): Promise<any> {
-    const audioDataUri = await textToSpeech(input.text, 'puck');
-    return { audioDataUri };
+  const audioDataUri = await textToSpeech(input.text, 'puck');
+  return { audioDataUri };
 }

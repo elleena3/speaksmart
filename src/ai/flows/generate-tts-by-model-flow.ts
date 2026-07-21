@@ -7,11 +7,11 @@
  */
 
 import { ai } from '@/ai/genkit';
-import { googleAI } from '@genkit-ai/googleai';
+import { googleAI } from '@genkit-ai/google-genai';
 import { z } from 'zod';
 import wav from 'wav';
 
-const ttsModels = ["gemini-2.5-flash-preview-tts", "gemini-2.5-pro-preview-tts"] as const;
+const ttsModels = ["googleai/gemini-3.1-flash-tts-preview", "openai/gpt-4o-mini-tts"] as const;
 
 const GenerateTtsByModelInputSchema = z.object({
   text: z.string().describe('The text to be converted to speech.'),
@@ -55,30 +55,57 @@ async function toWav(
 
 // Reusable function to convert text to speech
 async function textToSpeech(text: string, modelName: (typeof ttsModels)[number]): Promise<string> {
-    const ttsResponse = await ai.generate({
-        model: googleAI.model(modelName),
-        config: {
-            responseModalities: ['AUDIO'],
-            speechConfig: {
-                voiceConfig: {
-                    prebuiltVoiceConfig: { voiceName: 'algenib' }, // Fixed voice for consistency
-                },
-            },
-        },
-        prompt: text,
+  if (modelName === 'openai/gpt-4o-mini-tts') {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) throw new Error("OPENAI API Key is missing in environment variables.");
+
+    const response = await fetch("https://api.openai.com/v1/audio/speech", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini-tts",
+        input: text,
+        voice: "alloy"
+      })
     });
 
-    const audioMedia = ttsResponse.media;
-    if (!audioMedia) {
-        throw new Error('TTS did not return any audio media.');
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`OpenAI TTS Error: ${errorText}`);
     }
 
-    const pcmBuffer = Buffer.from(
-        audioMedia.url.substring(audioMedia.url.indexOf(',') + 1),
-        'base64'
-    );
-    
-    return 'data:audio/wav;base64,' + await toWav(pcmBuffer);
+    const arrayBuffer = await response.arrayBuffer();
+    const base64 = Buffer.from(arrayBuffer).toString('base64');
+    return `data:audio/mp3;base64,${base64}`;
+  }
+
+  const ttsResponse = await ai.generate({
+    model: modelName,
+    config: {
+      responseModalities: ['AUDIO'],
+      speechConfig: {
+        voiceConfig: {
+          prebuiltVoiceConfig: { voiceName: 'algenib' }, // Fixed voice for consistency
+        },
+      },
+    },
+    prompt: text,
+  });
+
+  const audioMedia = ttsResponse.media;
+  if (!audioMedia) {
+    throw new Error('TTS did not return any audio media.');
+  }
+
+  const pcmBuffer = Buffer.from(
+    audioMedia.url.substring(audioMedia.url.indexOf(',') + 1),
+    'base64'
+  );
+
+  return 'data:audio/wav;base64,' + await toWav(pcmBuffer);
 }
 
 
@@ -90,7 +117,7 @@ export const generateTtsByModelFlow = ai.defineFlow(
   },
   async ({ text, model }) => {
     if (!text.trim()) {
-        throw new Error("Cannot convert empty text to speech.");
+      throw new Error("Cannot convert empty text to speech.");
     }
     const audioDataUri = await textToSpeech(text, model);
     return { audioDataUri };

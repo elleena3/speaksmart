@@ -9,7 +9,7 @@
  */
 
 import { ai } from '@/ai/genkit';
-import { googleAI } from '@genkit-ai/googleai';
+import { googleAI } from '@genkit-ai/google-genai';
 import { z } from 'zod';
 import { AnalyzeRubricFileInputSchema, AnalyzeRubricFileOutputSchema, type AnalyzeRubricFileInput, type AnalyzeRubricFileOutput } from '@/lib/types/ai-schemas';
 
@@ -20,7 +20,7 @@ export async function analyzeRubricFile(input: AnalyzeRubricFileInput): Promise<
 
 const rubricAnalysisPrompt = ai.definePrompt({
     name: 'rubricAnalysisPrompt',
-    model: googleAI.model('gemini-2.5-pro'),
+    model: googleAI.model('gemini-3.1-pro-preview'),
     input: { schema: AnalyzeRubricFileInputSchema },
     output: { schema: AnalyzeRubricFileOutputSchema },
     prompt: `You are an expert in educational assessment. Your task is to analyze the provided file (image or PDF) which contains a grading rubric. You must extract all evaluation criteria with extreme precision. Do not miss any items, scores, or descriptions.

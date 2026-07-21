@@ -10,7 +10,7 @@
  */
 
 import { ai } from '@/ai/genkit';
-import { googleAI } from '@genkit-ai/googleai';
+import { googleAI } from '@genkit-ai/google-genai';
 import { z } from 'zod';
 
 const FeedbackSchema = z.object({
@@ -48,7 +48,7 @@ export async function analyzePresentationVideo(input: AnalyzePresentationVideoIn
 
 const presentationAnalysisPrompt = ai.definePrompt({
     name: 'presentationAnalysisPrompt',
-    model: googleAI.model('gemini-2.5-pro'),
+    model: googleAI.model('gemini-3.1-pro-preview'),
     input: { schema: AnalyzePresentationVideoInputSchema },
     output: { schema: AnalyzePresentationVideoOutputSchema },
     prompt: `You are an expert AI teacher evaluating a student's English presentation or conversation performance. Your task is to provide a comprehensive, multi-faceted evaluation based on a video, optional presentation materials, and specific criteria. All feedback must be in Korean.

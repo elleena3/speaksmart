@@ -25,7 +25,7 @@ export const ConverseWithStudentInputSchema = z.object({
   scenario: z.enum(scenarios).optional().describe('The role-playing scenario for the conversation.'),
   scenarioPrompt: z.string().optional().describe('The teacher-provided prompt for the role-playing scenario.'),
   aiVoice: z.enum(allVoices).optional().describe("The voice for the AI to use for text-to-speech."),
-  evaluationModel: z.enum(evaluationModels).optional().default('gemini-2.5-flash-preview-09-2025').describe("The AI model to use for generating responses."),
+  evaluationModel: z.enum(evaluationModels).optional().default('googleai/gemini-3.5-flash').describe("The AI model to use for generating responses."),
 });
 export type ConverseWithStudentInput = z.infer<typeof ConverseWithStudentInputSchema>;
 
@@ -42,35 +42,35 @@ export type ConverseWithStudentOutput = z.infer<typeof ConverseWithStudentOutput
 // ##                SCHEMAS FOR ANALYSIS FLOWS                ##
 // ##############################################################
 export const RubricScoresSchema = z.object({
-    fluency: z.number(),
-    pronunciation: z.number(),
-    grammar: z.number(),
-    vocabulary: z.number(),
-    interaction: z.number().optional(),
+  fluency: z.number(),
+  pronunciation: z.number(),
+  grammar: z.number(),
+  vocabulary: z.number(),
+  interaction: z.number().optional(),
 });
 
 // Internal schemas for sub-prompts, used by both flows
 export const ContentAnalysisOutputSchema = z.object({
-    aiFeedback: z.string().describe('The generated feedback for the student in Korean.'),
-    teacherGuidance: z.string().describe('Actionable guidance for the teacher based on the performance in Korean.'),
-    contentScore: z.number().int().min(0).max(100).describe('A score from 0-100 for the performance content.'),
-    curricularRemarks: z.string().describe('A draft of school record remarks, in formal Korean.'),
+  aiFeedback: z.string().describe('The generated feedback for the student in Korean.'),
+  teacherGuidance: z.string().describe('Actionable guidance for the teacher based on the performance in Korean.'),
+  contentScore: z.number().int().min(0).max(100).describe('A score from 0-100 for the performance content.'),
+  curricularRemarks: z.string().describe('A draft of school record remarks, in formal Korean.'),
 });
 
 export const PronunciationAnalysisOutputSchema = z.object({
-    pronunciationScore: z.number().int().min(0).max(100).describe('A score from 0-100 for pronunciation.'),
-    pronunciationFeedback: z.string().describe('Specific, constructive feedback on the student\'s pronunciation in Korean.'),
+  pronunciationScore: z.number().int().min(0).max(100).describe('A score from 0-100 for pronunciation.'),
+  pronunciationFeedback: z.string().describe('Specific, constructive feedback on the student\'s pronunciation in Korean.'),
 });
 
 export const CombinedAnalysisOutputSchema = z.object({
-    studentTranscript: z.string(),
-    contentScore: z.number(),
-    aiFeedback: z.string(),
-    teacherGuidance: z.string(),
-    curricularRemarks: z.string(),
-    pronunciationScore: z.number(),
-    pronunciationFeedback: z.string(),
-    rubricScores: RubricScoresSchema.optional(),
+  studentTranscript: z.string(),
+  contentScore: z.number(),
+  aiFeedback: z.string(),
+  teacherGuidance: z.string(),
+  curricularRemarks: z.string(),
+  pronunciationScore: z.number(),
+  pronunciationFeedback: z.string(),
+  rubricScores: RubricScoresSchema.optional(),
 });
 
 
@@ -113,24 +113,24 @@ export type GenerateDialogueAnalysisInput = z.infer<typeof GenerateDialogueAnaly
 // ##############################################################
 
 export const ResultSummarySchema = z.object({
-    attemptNumber: z.number().int(),
-    contentScore: z.number().int(),
-    pronunciationScore: z.number().int(),
-    transcript: z.string(),
-    aiFeedback: z.string(),
-    curricularRemarks: z.string(),
+  attemptNumber: z.number().int(),
+  contentScore: z.number().int(),
+  pronunciationScore: z.number().int(),
+  transcript: z.string(),
+  aiFeedback: z.string(),
+  curricularRemarks: z.string(),
 });
 
 export const GenerateGrowthFeedbackInputSchema = z.object({
-    attempts: z.array(ResultSummarySchema).describe("An array of all the student's attempts, from oldest to newest."),
-    assessmentTitle: z.string(),
+  attempts: z.array(ResultSummarySchema).describe("An array of all the student's attempts, from oldest to newest."),
+  assessmentTitle: z.string(),
 });
 export type GenerateGrowthFeedbackInput = z.infer<typeof GenerateGrowthFeedbackInputSchema>;
 
 export const GenerateGrowthFeedbackOutputSchema = z.object({
-    growthFeedback: z.string().describe("A comprehensive Markdown-formatted analysis of the student's growth."),
-    teacherGuidance: z.string().describe("Actionable advice for the teacher based on the student's entire journey."),
-    growthCurricularRemarks: z.string().describe("A comprehensive school record remark based on the student's entire journey."),
+  growthFeedback: z.string().describe("A comprehensive Markdown-formatted analysis of the student's growth."),
+  teacherGuidance: z.string().describe("Actionable advice for the teacher based on the student's entire journey."),
+  growthCurricularRemarks: z.string().describe("A comprehensive school record remark based on the student's entire journey."),
 });
 export type GenerateGrowthFeedbackOutput = z.infer<typeof GenerateGrowthFeedbackOutputSchema>;
 
@@ -160,12 +160,12 @@ export const EnhanceSelectedTextOutputSchema = z.object({
 export type EnhanceSelectedTextOutput = z.infer<typeof EnhanceSelectedTextOutputSchema>;
 
 export const ReadAloudInputSchema = z.object({
-    text: z.string().describe("The text to be read aloud.")
+  text: z.string().describe("The text to be read aloud.")
 });
 export type ReadAloudInput = z.infer<typeof ReadAloudInputSchema>;
 
 export const ReadAloudOutputSchema = z.object({
-    audioDataUri: z.string().describe("The AI's reading of the text as a playable audio data URI.")
+  audioDataUri: z.string().describe("The AI's reading of the text as a playable audio data URI.")
 });
 export type ReadAloudOutput = z.infer<typeof ReadAloudOutputSchema>;
 

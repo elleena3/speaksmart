@@ -10,7 +10,7 @@
  */
 
 import { ai } from '@/ai/genkit';
-import { googleAI } from '@genkit-ai/googleai';
+import { googleAI } from '@genkit-ai/google-genai';
 import { z } from 'zod';
 import { evaluationModels } from '@/lib/types';
 
@@ -19,7 +19,7 @@ const AnalyzeHandwritingInputSchema = z.object({
   imageDataUri: z.string().describe(
     "An image file of the user's handwriting, as a data URI."
   ),
-  model: z.enum(evaluationModels).optional().default('gemini-2.5-flash'),
+  model: z.enum(evaluationModels).optional().default('googleai/gemini-3.5-flash'),
 });
 export type AnalyzeHandwritingInput = z.infer<typeof AnalyzeHandwritingInputSchema>;
 
@@ -70,7 +70,7 @@ const analyzeHandwritingFlow = ai.defineFlow(
     outputSchema: AnalyzeHandwritingOutputSchema,
   },
   async ({ imageDataUri, model }) => {
-    const analysisModel = googleAI.model(model || 'gemini-2.5-flash');
+    const analysisModel = googleAI.model(model || 'googleai/gemini-3.5-flash');
 
     const { output } = await handwritingAnalysisPrompt(
       { imageDataUri, model },

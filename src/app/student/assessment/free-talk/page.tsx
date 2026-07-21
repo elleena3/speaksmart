@@ -47,7 +47,7 @@ export default function FreeTalkPage() {
                 assessmentType: "dialogue",
                 scenario: "free-talk",
                 expectedFormat: "자연스러운 대화 능력 평가",
-                evaluationModel: "gemini-2.5-flash-preview-09-2025", // FIX: Use a valid model
+                evaluationModel: "googleai/gemini-3.5-flash", // FIX: Use a valid model
             } as any);
         }
         setIsLoading(false);

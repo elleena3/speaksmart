@@ -89,7 +89,7 @@ export function FreeTalkView({ assessment }: { assessment: TeacherAssessment }) 
     setSessionState("initializing");
     try {
       // Call the flow with no student input to get a greeting
-      const { aiResponseText, aiResponseAudioDataUri } = await converseWithStudent({
+      const _res_converseWithStudent = await converseWithStudent({
         studentRecordingDataUri: null,
         conversationHistory: [],
         scenario: assessment.scenario,
@@ -97,6 +97,8 @@ export function FreeTalkView({ assessment }: { assessment: TeacherAssessment }) 
         aiVoice: assessment.aiVoice,
         evaluationModel: assessment.evaluationModel,
       });
+      if (!_res_converseWithStudent) throw new Error("서버 응답이 없습니다 (API 한도 초과 또는 내부 오류).");
+      const { aiResponseText, aiResponseAudioDataUri  } = _res_converseWithStudent;
 
       const initialTurn: ConversationTurn = { role: 'model', text: aiResponseText };
       setConversation([initialTurn]);
@@ -200,7 +202,7 @@ export function FreeTalkView({ assessment }: { assessment: TeacherAssessment }) 
 
   const processAudio = async (studentRecordingDataUri: string) => {
     try {
-      const { studentTranscript, aiResponseText, aiResponseAudioDataUri } = await converseWithStudent({
+      const _res_converseWithStudent = await converseWithStudent({
         studentRecordingDataUri,
         conversationHistory: conversation,
         scenario: assessment.scenario,
@@ -208,6 +210,8 @@ export function FreeTalkView({ assessment }: { assessment: TeacherAssessment }) 
         aiVoice: assessment.aiVoice,
         evaluationModel: assessment.evaluationModel,
       });
+      if (!_res_converseWithStudent) throw new Error("서버 응답이 없습니다 (API 한도 초과 또는 내부 오류).");
+      const { studentTranscript, aiResponseText, aiResponseAudioDataUri  } = _res_converseWithStudent;
       
       setInterimTranscript(null);
 

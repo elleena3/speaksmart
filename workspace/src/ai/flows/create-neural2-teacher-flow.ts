@@ -9,7 +9,7 @@
  */
 
 import { ai } from '@/ai/genkit';
-import { googleAI } from '@genkit-ai/googleai';
+import { googleAI } from '@genkit-ai/google-genai';
 import { z } from 'zod';
 import {
   ConversationTurnSchema,
@@ -77,20 +77,20 @@ You:
 });
 
 async function textToSpeech(text: string): Promise<string> {
-    const { media } = await ai.generate({
-        model: 'openai/tts-1',
-        prompt: text,
-        config: {
-            // OpenAI tts-1 model supports various options like voice, speed, etc.
-            // Example: voice: 'alloy', speed: 1.0
-        }
-    });
-
-    if (!media?.url) {
-        throw new Error('OpenAI TTS did not return any audio media.');
+  const { media } = await ai.generate({
+    model: 'openai/tts-1',
+    prompt: text,
+    config: {
+      // OpenAI tts-1 model supports various options like voice, speed, etc.
+      // Example: voice: 'alloy', speed: 1.0
     }
-    // OpenAI TTS returns a data URI with the correct MIME type (e.g., audio/mpeg)
-    return media.url;
+  });
+
+  if (!media?.url) {
+    throw new Error('OpenAI TTS did not return any audio media.');
+  }
+  // OpenAI TTS returns a data URI with the correct MIME type (e.g., audio/mpeg)
+  return media.url;
 }
 
 
@@ -115,8 +115,8 @@ const converseWithOpenAiTtsTeacherFlow = ai.defineFlow(
       });
       studentTranscript = sttResponse.text;
       if (!studentTranscript?.trim()) {
-          console.warn("Transcription result was empty.");
-          studentTranscript = "(The user did not say anything)"; 
+        console.warn("Transcription result was empty.");
+        studentTranscript = "(The user did not say anything)";
       }
     }
 
@@ -128,14 +128,14 @@ const converseWithOpenAiTtsTeacherFlow = ai.defineFlow(
     // Step 2: Generate AI's text response based on transcript and history
     const { output } = await conversationalPrompt({
       history: historyForPrompt,
-      studentTranscript: studentTranscript || undefined, 
+      studentTranscript: studentTranscript || undefined,
     });
 
     aiResponseText = output?.aiResponseText || "";
 
     if (!aiResponseText) {
-        console.error("AI did not generate a text response. Received:", output);
-        aiResponseText = "Sorry, I'm having a little trouble right now. Could you say that again?";
+      console.error("AI did not generate a text response. Received:", output);
+      aiResponseText = "Sorry, I'm having a little trouble right now. Could you say that again?";
     }
 
     // Step 3: Convert AI's text response to speech (TTS) using OpenAI

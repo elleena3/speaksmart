@@ -7,7 +7,7 @@
  */
 
 import { ai } from '@/ai/genkit';
-import { googleAI } from '@genkit-ai/googleai';
+import { googleAI } from '@genkit-ai/google-genai';
 import { z } from 'zod';
 import { GenerateGrowthFeedbackInputSchema, GenerateGrowthFeedbackOutputSchema, type GenerateGrowthFeedbackInput, type GenerateGrowthFeedbackOutput, ResultSummarySchema } from '@/lib/types/ai-schemas';
 
@@ -19,7 +19,7 @@ export async function generateGrowthFeedback(
 
 const growthFeedbackPrompt = ai.definePrompt({
   name: 'growthFeedbackPrompt',
-  model: googleAI.model('gemini-2.5-flash'),
+  model: googleAI.model('gemini-3.5-flash'),
   input: { schema: GenerateGrowthFeedbackInputSchema.extend({ hasValidCurricularRemarks: z.boolean() }) },
   output: { schema: GenerateGrowthFeedbackOutputSchema },
   prompt: `You are an expert AI English teacher. Your task is to provide a comprehensive growth analysis for a student by comparing all of their attempts of the same speaking assessment. Your entire response must be in Korean.

@@ -9,7 +9,7 @@
  */
 
 import { ai } from '@/ai/genkit';
-import { googleAI } from '@genkit-ai/googleai';
+import { googleAI } from '@genkit-ai/google-genai';
 import { z } from 'zod';
 import { EnhanceSelectedTextInputSchema, EnhanceSelectedTextOutputSchema, EnhanceSelectedTextInput, EnhanceSelectedTextOutput } from '@/lib/types/ai-schemas';
 
@@ -20,7 +20,7 @@ export async function enhanceSelectedText(input: EnhanceSelectedTextInput): Prom
 
 const enhanceTextPrompt = ai.definePrompt({
     name: 'enhanceTextPrompt',
-    model: googleAI.model('gemini-2.5-flash'),
+    model: googleAI.model('gemini-3.5-flash'),
     input: { schema: EnhanceSelectedTextInputSchema },
     output: { schema: EnhanceSelectedTextOutputSchema },
     prompt: `You are an expert English language teaching assistant. A user has selected a snippet of text from a larger sentence to get help. Your task is to first determine the user's true intended selection, and then perform a requested action on that corrected text. All output text for the user must be in Korean.

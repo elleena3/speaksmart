@@ -128,7 +128,12 @@ export const generateMonologueAnalysisFlow = ai.defineFlow(
     inputSchema: MonologueProcessingInputSchema,
   },
   async (input) => {
-    const model = input.evaluationModel || 'gemini-2.5-flash-preview-09-2025';
+    let model = input.evaluationModel || 'googleai/gemini-3.5-flash';
+  if (model.includes('1.5') || model.includes('2.5')) {
+      model = model.includes('pro') ? 'googleai/gemini-3.1-pro-preview' : 'googleai/gemini-3.5-flash';
+  } else if (!model.includes('/')) {
+      model = 'googleai/' + model;
+  }
     const resultDocRef = doc(db, "results", input.resultId);
     let downloadURL = "";
 

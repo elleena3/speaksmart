@@ -77,11 +77,13 @@ export function StandaloneDialogueTool() {
     setConversation([]);
     setSessionState("initializing");
     try {
-      const { aiResponseText, aiResponseAudioDataUri } = await converseWithStudent({
+      const _res_converseWithStudent = await converseWithStudent({
         studentRecordingDataUri: null,
         conversationHistory: [],
         scenario: 'free-talk',
       });
+      if (!_res_converseWithStudent) throw new Error("서버 응답이 없습니다 (API 한도 초과 또는 내부 오류).");
+      const { aiResponseText, aiResponseAudioDataUri  } = _res_converseWithStudent;
 
       const initialTurn: ConversationTurn = { role: 'model', text: aiResponseText };
       setConversation([initialTurn]);
@@ -184,11 +186,13 @@ export function StandaloneDialogueTool() {
       // AI에게 보낼 대화 기록을 최근 N개로 제한 (Sliding Window)
       const historyForAI = conversation.slice(-CONVERSATION_HISTORY_LIMIT);
       
-      const { studentTranscript, aiResponseText, aiResponseAudioDataUri } = await converseWithStudent({
+      const _res_converseWithStudent = await converseWithStudent({
         studentRecordingDataUri,
         conversationHistory: historyForAI, // 전체 대신 제한된 기록 전달
         scenario: 'free-talk',
       });
+      if (!_res_converseWithStudent) throw new Error("서버 응답이 없습니다 (API 한도 초과 또는 내부 오류).");
+      const { studentTranscript, aiResponseText, aiResponseAudioDataUri  } = _res_converseWithStudent;
       
       setInterimTranscript(null);
 

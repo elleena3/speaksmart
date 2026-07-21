@@ -11,7 +11,7 @@
  */
 
 import { ai } from '@/ai/genkit';
-import { googleAI } from '@genkit-ai/googleai';
+import { googleAI } from '@genkit-ai/google-genai';
 import { z } from 'zod';
 
 // Schema for a single file input when analyzing one by one
@@ -38,7 +38,7 @@ export type SingleFileAnalysisResult = z.infer<typeof SingleFileAnalysisResultSc
 export async function analyzeSinglePdf(input: SingleFileInput): Promise<SingleFileAnalysisResult> {
     try {
         const { text } = await ai.generate({
-            model: googleAI.model('gemini-2.5-pro'),
+            model: googleAI.model('gemini-3.1-pro-preview'),
             prompt: [
                 { text: input.prompt },
                 { media: { url: input.dataUri } }
@@ -93,7 +93,7 @@ export async function analyzeMultiplePdfs(input: AnalyzeMultiplePdfsInput): Prom
 
 const analyzePdfPrompt = ai.definePrompt({
     name: 'analyzeSinglePdfForMulti',
-    model: googleAI.model('gemini-2.5-pro'),
+    model: googleAI.model('gemini-3.1-pro-preview'),
     input: { schema: z.object({ prompt: z.string(), fileUri: z.string() }) },
     prompt: `You are an expert document analyst. Analyze the provided PDF document based on the user's request.
 

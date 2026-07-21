@@ -6,7 +6,7 @@
  */
 
 import { ai } from '@/ai/genkit';
-import { googleAI } from '@genkit-ai/googleai';
+import { googleAI } from '@genkit-ai/google-genai';
 import { z } from 'zod';
 import { YoutubeTranscript } from 'youtube-transcript';
 
@@ -26,7 +26,7 @@ export async function summarizeYoutubeVideo(input: SummarizeYoutubeVideoInput): 
 
 const summarizePrompt = ai.definePrompt({
     name: 'summarizeYoutubeTranscriptPrompt',
-    model: googleAI.model('gemini-2.5-pro'),
+    model: googleAI.model('gemini-3.1-pro-preview'),
     input: { schema: z.object({ transcript: z.string() }) },
     output: { schema: SummarizeYoutubeVideoOutputSchema },
     prompt: `You are an expert content analyst. Your task is to read the following transcript from a YouTube video and create a clear, concise summary in Korean. The summary should be well-structured and easy to read, capturing the main topic, key arguments, and overall message of the video.

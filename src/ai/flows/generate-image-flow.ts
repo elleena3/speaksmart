@@ -8,13 +8,13 @@
  */
 
 import { ai } from '@/ai/genkit';
-import { googleAI } from '@genkit-ai/googleai';
+import { googleAI } from '@genkit-ai/google-genai';
 import { z } from 'zod';
 import { imageGenerationModels } from '@/lib/types';
 
 const GenerateImageInputSchema = z.object({
   prompt: z.string().describe('A text prompt describing the image to generate.'),
-  imageModel: z.enum(imageGenerationModels).optional().default('gemini-2.0-flash-preview-image-generation'),
+  imageModel: z.enum(imageGenerationModels).optional().default('googleai/gemini-3.1-flash-image'),
 });
 export type GenerateImageInput = z.infer<typeof GenerateImageInputSchema>;
 
@@ -35,7 +35,7 @@ const generateImageFlow = ai.defineFlow(
   },
   async ({ prompt, imageModel }) => {
     
-    const modelToUse = imageModel || 'gemini-2.0-flash-preview-image-generation';
+    const modelToUse = imageModel || 'googleai/gemini-3.1-flash-image';
 
     const { media } = await ai.generate({
       model: googleAI.model(modelToUse as any),

@@ -3,7 +3,7 @@
 
 import { z } from 'zod';
 import { generate } from '@genkit-ai/ai';
-import { googleAI } from '@genkit-ai/googleai';
+import { googleAI } from '@genkit-ai/google-genai';
 
 /**
  * @fileOverview A flow to analyze a video file from Firebase Storage.
@@ -57,7 +57,7 @@ export async function analyzeVideo(
   ];
 
   const response = await generate({
-    model: googleAI('gemini-2.5-pro'),
+    model: googleAI('gemini-3.1-pro-preview'),
     prompt: content,
   });
 

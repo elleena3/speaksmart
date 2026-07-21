@@ -6,7 +6,7 @@
  */
 
 import { ai } from '@/ai/genkit';
-import { googleAI } from '@genkit-ai/googleai';
+import { googleAI } from '@genkit-ai/google-genai';
 import { z } from 'zod';
 import { ResultSummarySchema } from '@/lib/types/ai-schemas';
 
@@ -30,7 +30,7 @@ export async function regenerateCurricularRemarks(
 
 const regenerateRemarksPrompt = ai.definePrompt({
   name: 'regenerateRemarksPrompt',
-  model: googleAI.model('gemini-2.5-flash'),
+  model: googleAI.model('gemini-3.5-flash'),
   input: { schema: RegenerateRemarksInputSchema.extend({ hasValidCurricularRemarks: z.boolean() }) },
   output: { schema: RegenerateRemarksOutputSchema },
   prompt: `You are an expert AI English teacher specializing in writing official school records. Your task is to synthesize a student's performance journey into a single, cohesive narrative for their school record ('생활기록부 교과 특기 사항'). Your entire response must be in Korean and formatted in formal prose, with sentences ending in '~함' or '~임'.

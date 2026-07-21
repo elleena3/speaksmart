@@ -26,7 +26,7 @@ export function HandwritingSubmissionAnalyzerTool() {
     const [criteriaText, setCriteriaText] = useState('');
     const [analysisResult, setAnalysisResult] = useState<AnalyzeHandwritingSubmissionOutput | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const [selectedModel, setSelectedModel] = useState<EvaluationModel>('gemini-2.5-flash');
+    const [selectedModel, setSelectedModel] = useState<EvaluationModel>('googleai/gemini-3.5-flash');
     const { toast } = useToast();
 
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>, fileType: 'student' | 'criteria') => {
@@ -144,8 +144,8 @@ export function HandwritingSubmissionAnalyzerTool() {
                                 <SelectValue placeholder="모델을 선택하세요..." />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="gemini-2.5-flash">gemini-2.5-flash (빠름)</SelectItem>
-                                <SelectItem value="gemini-2.5-pro">gemini-2.5-pro (고성능)</SelectItem>
+                                <SelectItem value="googleai/gemini-3.5-flash">gemini-3.5-flash (빠름)</SelectItem>
+                                <SelectItem value="googleai/gemini-3.1-pro-preview">gemini-3.1-pro-preview (고성능)</SelectItem>
                             </SelectContent>
                         </Select>
                      </div>

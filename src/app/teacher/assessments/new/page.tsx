@@ -129,10 +129,10 @@ export default function NewAssessmentPage() {
     scenario: z.enum(scenarios as [Scenario, ...Scenario[]]).optional(),
     recordingTimeLimit: z.coerce.number().int().min(0).optional(),
     aiVoice: z.enum(allVoices as [AiVoice, ...AiVoice[]]).optional().default('algenib'),
-    evaluationModel: z.enum(evaluationModels as [EvaluationModel, ...EvaluationModel[]]).optional().default('gemini-2.5-flash-preview-09-2025'),
+    evaluationModel: z.enum(evaluationModels as [EvaluationModel, ...EvaluationModel[]]).optional().default('googleai/gemini-3.5-flash'),
     useRubric: z.boolean().default(false),
     loadedRubricId: z.string().optional(),
-    imageGenerationModel: z.enum(imageGenerationModels as [ImageGenerationModel, ...ImageGenerationModel[]]).optional().default('gemini-2.0-flash-preview-image-generation'),
+    imageGenerationModel: z.enum(imageGenerationModels as [ImageGenerationModel, ...ImageGenerationModel[]]).optional().default('googleai/gemini-3.1-flash-image'),
   }).superRefine((data, ctx) => {
     const isFreeTalkDialogue = data.assessmentType === 'dialogue' && data.scenario === 'free-talk';
 
@@ -189,9 +189,9 @@ export default function NewAssessmentPage() {
       scenario: "free-talk",
       recordingTimeLimit: 0,
       aiVoice: 'algenib',
-      evaluationModel: 'gemini-2.5-flash-preview-09-2025',
+      evaluationModel: 'googleai/gemini-3.5-flash',
       useRubric: false,
-      imageGenerationModel: 'gemini-2.0-flash-preview-image-generation',
+      imageGenerationModel: 'googleai/gemini-3.1-flash-image',
     },
   });
   
