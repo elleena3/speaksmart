@@ -28,6 +28,7 @@ export function LiveConversationTool() {
     const micStreamRef = useRef<MediaStream | null>(null);
     const recognitionRef = useRef<any>(null);
     const setupCompleteRef = useRef<boolean>(false);
+    const aiIsSpeakingRef = useRef<boolean>(false);
 
     // For AI audio playback queue
     const nextPlayTimeRef = useRef<number>(0);
@@ -126,17 +127,17 @@ export function LiveConversationTool() {
 
                 processor.onaudioprocess = (e) => {
                     if (!wsRef.current || !setupCompleteRef.current) return;
+                    if (aiIsSpeakingRef.current) return; // STRICTLY block microphone if AI is generating/speaking to prevent false barge-ins!
 
                     const float32Data = e.inputBuffer.getChannelData(0);
 
-                    // Simple RMS Noise Gate to prevent background noise from interrupting the AI (false barge-in)
+                    // Simple RMS Noise Gate to prevent background noise from interrupting the AI
                     let rms = 0;
                     for (let i = 0; i < float32Data.length; i++) {
                         rms += float32Data[i] * float32Data[i];
                     }
                     rms = Math.sqrt(rms / float32Data.length);
-                    // Standard background noise is usually around 0.001 to 0.005. 0.01 is a safe speaking threshold.
-                    if (rms < 0.01) return;
+                    if (rms < 0.05) return; // Raised gate threshold significantly
 
                     // Convert Float32 to Int16 PCM
                     const pcmData = new Int16Array(float32Data.length);
@@ -184,8 +185,9 @@ export function LiveConversationTool() {
                         setTurns(prev => {
                             const newTurns = [...prev];
                             const last = newTurns[newTurns.length - 1];
-                            if (last && last.role === 'user') { last.text = transcript; }
-                            else { newTurns.push({ role: 'user', text: transcript, id: Math.random() }); }
+                            if (last && last.role === 'user') {
+                                newTurns[newTurns.length - 1] = { ...last, text: transcript };
+                            } else { newTurns.push({ role: 'user', text: transcript, id: Math.random() }); }
                             return newTurns;
                         });
                     };
@@ -214,6 +216,7 @@ export function LiveConversationTool() {
                     console.log("WebSocket Received:", debugResp);
 
                     if (response.setupComplete) {
+                        aiIsSpeakingRef.current = true; // AI will start generating greeting
                         setupCompleteRef.current = true;
                         setAppState('connected');
                         ws.send(JSON.stringify({ clientContent: { turns: [{ role: "user", parts: [{ text: "Hello! I want to practice English. Let's talk!" }] }], turnComplete: true } }));
@@ -221,6 +224,7 @@ export function LiveConversationTool() {
                     }
 
                     if (response.serverContent?.modelTurn) {
+                        aiIsSpeakingRef.current = true; // Lock mic while AI generates
                         const parts = response.serverContent.modelTurn.parts;
                         for (const part of parts) {
                             if (part.text) {
@@ -238,8 +242,9 @@ export function LiveConversationTool() {
                                 setTurns(prev => {
                                     const newTurns = [...prev];
                                     const last = newTurns[newTurns.length - 1];
-                                    if (last && last.role === 'model') { last.text += " " + part.text; }
-                                    else { newTurns.push({ role: 'model', text: part.text, id: Math.random() }); }
+                                    if (last && last.role === 'model') {
+                                        newTurns[newTurns.length - 1] = { ...last, text: last.text + " " + part.text };
+                                    } else { newTurns.push({ role: 'model', text: part.text, id: Math.random() }); }
                                     return newTurns;
                                 });
                             }
@@ -280,6 +285,7 @@ export function LiveConversationTool() {
 
                     if (response.serverContent?.turnComplete) {
                         currentTurnText = ""; // reset for next turn
+                        aiIsSpeakingRef.current = false; // Unlock mic for user
                     }
 
                     // Handle Live API transcriptions
@@ -289,8 +295,9 @@ export function LiveConversationTool() {
                             const newTurns = [...prev];
                             const last = newTurns[newTurns.length - 1];
                             // The API sends the cumulative text for the turn, so we replace, we DO NOT append.
-                            if (last && last.role === 'user') { last.text = inputTranscription.text; }
-                            else { newTurns.push({ role: 'user', text: inputTranscription.text, id: Math.random() }); }
+                            if (last && last.role === 'user') {
+                                newTurns[newTurns.length - 1] = { ...last, text: inputTranscription.text };
+                            } else { newTurns.push({ role: 'user', text: inputTranscription.text, id: Math.random() }); }
                             return newTurns;
                         });
                     }
@@ -298,9 +305,10 @@ export function LiveConversationTool() {
                         setTurns(prev => {
                             const newTurns = [...prev];
                             const last = newTurns[newTurns.length - 1];
-                            // The API sends cumulative strings for outputTranscription
-                            if (last && last.role === 'model') { last.text = outputTranscription.text; }
-                            else { newTurns.push({ role: 'model', text: outputTranscription.text, id: Math.random() }); }
+                            // The API sends incremental deltas for outputTranscription, so we MUST append immutable
+                            if (last && last.role === 'model') {
+                                newTurns[newTurns.length - 1] = { ...last, text: last.text + " " + outputTranscription.text };
+                            } else { newTurns.push({ role: 'model', text: outputTranscription.text, id: Math.random() }); }
                             return newTurns;
                         });
                     }
