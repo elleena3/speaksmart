@@ -75,6 +75,13 @@ export function LiveConversationTool() {
         setTurns([]);
         setResult(null);
         try {
+            // Must create AudioContext BEFORE 'await' to guarantee user-gesture token in Chrome
+            const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
+            audioContextRef.current = audioCtx;
+            if (audioCtx.state === 'suspended') {
+                await audioCtx.resume();
+            }
+
             const token = await getLiveSessionToken();
             const HOST = "generativelanguage.googleapis.com";
             // Important: Use model gemini-2.0-flash-exp for Live API over WS, or 3.1-flash-live-preview
@@ -91,7 +98,7 @@ export function LiveConversationTool() {
                     setup: {
                         model: "models/gemini-3.1-flash-live-preview",
                         generationConfig: {
-                            responseModalities: ["AUDIO"],
+                            responseModalities: ["TEXT", "AUDIO"],
                             speechConfig: {
                                 voiceConfig: { prebuiltVoiceConfig: { voiceName: "Aoede" } }
                             }
@@ -100,11 +107,10 @@ export function LiveConversationTool() {
                 };
                 ws.send(JSON.stringify(setupMessage));
 
-                // Initialize Web Audio
+                // Initialize Web Audio stream
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, sampleRate: 16000 } });
                 micStreamRef.current = stream;
-                const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
-                audioContextRef.current = audioCtx;
+
                 nextPlayTimeRef.current = 0;
 
                 const source = audioCtx.createMediaStreamSource(stream);
