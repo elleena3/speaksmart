@@ -194,17 +194,6 @@ export function LiveConversationTool() {
                         const parts = response.serverContent.modelTurn.parts;
                         for (const part of parts) {
                             if (part.text) {
-                                currentTurnText += part.text;
-                                setTurns(prev => {
-                                    const newTurns = [...prev];
-                                    const last = newTurns[newTurns.length - 1];
-                                    if (last && last.role === 'model') { last.text = currentTurnText; }
-                                    else { newTurns.push({ role: 'model', text: currentTurnText, id: Date.now() }); }
-                                    return newTurns;
-                                });
-                            }
-                            // Check if API sent text backup instead of audio
-                            if (part.text) {
                                 setTurns(prev => {
                                     const newTurns = [...prev];
                                     const last = newTurns[newTurns.length - 1];
