@@ -21,7 +21,7 @@ const validFileTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/web
 
 export function HandwritingSubmissionAnalyzerTool() {
     const [analysisState, setAnalysisState] = useState<AnalysisState>('idle');
-    const [studentFile, setStudentFile] = useState<File | null>(null);
+    const [studentFiles, setStudentFiles] = useState<File[]>([]);
     const [criteriaFile, setCriteriaFile] = useState<File | null>(null);
     const [criteriaText, setCriteriaText] = useState('');
     const [analysisResult, setAnalysisResult] = useState<AnalyzeHandwritingSubmissionOutput | null>(null);
@@ -30,17 +30,23 @@ export function HandwritingSubmissionAnalyzerTool() {
     const { toast } = useToast();
 
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>, fileType: 'student' | 'criteria') => {
-        const file = event.target.files?.[0];
-        if (!file) return;
+        const files = Array.from(event.target.files || []);
+        if (files.length === 0) return;
 
-        if (!validFileTypes.includes(file.type)) {
-            toast({ title: "지원하지 않는 파일 형식", description: "이미지(JPG, PNG) 또는 PDF 파일을 선택해주세요.", variant: "destructive" });
+        const invalidFiles = files.filter(f => !validFileTypes.includes(f.type));
+        if (invalidFiles.length > 0) {
+            toast({ title: "지원하지 않는 파일 형식", description: "이미지(JPG, PNG) 또는 PDF 파일만 선택해주세요.", variant: "destructive" });
             event.target.value = '';
             return;
         }
 
-        if (fileType === 'student') setStudentFile(file);
-        if (fileType === 'criteria') setCriteriaFile(file);
+        if (fileType === 'student') {
+            // Append or replace depending on how you want the UX. Replacing is standard for normal file inputs unless customized.
+            setStudentFiles(files);
+        }
+        if (fileType === 'criteria') {
+            setCriteriaFile(files[0]);
+        }
     };
 
     const fileToDataUri = (file: File): Promise<string> => {
@@ -53,8 +59,8 @@ export function HandwritingSubmissionAnalyzerTool() {
     };
 
     const handleAnalyze = async () => {
-        if (!studentFile) {
-            toast({ title: "학생 과제물 없음", description: "분석할 학생의 과제물 파일을 먼저 업로드해주세요.", variant: "destructive" });
+        if (studentFiles.length === 0) {
+            toast({ title: "학생 과제물 없음", description: "분석할 학생의 과제물 파일을 하나 이상 업로드해주세요.", variant: "destructive" });
             return;
         }
         if (!criteriaFile && !criteriaText.trim()) {
@@ -64,14 +70,14 @@ export function HandwritingSubmissionAnalyzerTool() {
         setAnalysisState('analyzing');
         setError(null);
         setAnalysisResult(null);
-        toast({ title: "AI 분석 시작", description: `[${selectedModel}] 모델을 사용하여 과제물을 분석하고 있습니다.` });
+        toast({ title: "AI 분석 시작", description: `[${selectedModel}] 모델을 사용하여 ${studentFiles.length}개의 과제물을 분석하고 있습니다.` });
 
         try {
-            const studentSubmissionUri = await fileToDataUri(studentFile);
+            const studentSubmissionUris = await Promise.all(studentFiles.map(fileToDataUri));
             const criteriaFileUri = criteriaFile ? await fileToDataUri(criteriaFile) : undefined;
 
             const result = await analyzeHandwritingSubmission({
-                studentSubmissionUri,
+                studentSubmissionUris,
                 criteriaFileUri,
                 criteriaText: criteriaText || undefined,
                 model: selectedModel,
@@ -90,7 +96,7 @@ export function HandwritingSubmissionAnalyzerTool() {
 
     const handleReset = () => {
         setAnalysisState('idle');
-        setStudentFile(null);
+        setStudentFiles([]);
         setCriteriaFile(null);
         setCriteriaText('');
         setAnalysisResult(null);
@@ -103,11 +109,11 @@ export function HandwritingSubmissionAnalyzerTool() {
     };
 
     const isAnalyzeButtonDisabled = useMemo(() => {
-        if (!studentFile) return true;
+        if (studentFiles.length === 0) return true;
         if (!criteriaFile && !criteriaText.trim()) return true;
         if (analysisState === 'analyzing') return true;
         return false;
-    }, [studentFile, criteriaFile, criteriaText, analysisState]);
+    }, [studentFiles, criteriaFile, criteriaText, analysisState]);
 
     return (
         <div className="space-y-4">
@@ -118,8 +124,11 @@ export function HandwritingSubmissionAnalyzerTool() {
                 <CardContent className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
-                            <Label htmlFor="student-upload">학생 과제물 (이미지/PDF) <span className="text-red-500">*</span></Label>
-                            <Input id="student-upload" type="file" accept={validFileTypes.join(',')} onChange={(e) => handleFileChange(e, 'student')} />
+                            <Label htmlFor="student-upload">학생 과제물 (이미지/PDF 여러 장 가능) <span className="text-red-500">*</span></Label>
+                            <Input id="student-upload" type="file" multiple accept={validFileTypes.join(',')} onChange={(e) => handleFileChange(e, 'student')} />
+                            {studentFiles.length > 0 && (
+                                <p className="text-xs text-muted-foreground">{studentFiles.length}개의 파일이 선택되었습니다.</p>
+                            )}
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="criteria-upload">채점 기준 자료 (이미지/PDF)</Label>

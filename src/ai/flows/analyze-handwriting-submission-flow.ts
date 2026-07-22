@@ -16,8 +16,8 @@ import { z } from 'zod';
 import { evaluationModels } from '@/lib/types';
 
 const AnalyzeHandwritingSubmissionInputSchema = z.object({
-  studentSubmissionUri: z.string().describe(
-    "The student's handwritten work as a data URI (image or PDF)."
+  studentSubmissionUris: z.array(z.string()).min(1).describe(
+    "The student's handwritten work as an array of data URIs (images or PDFs)."
   ),
   criteriaText: z.string().optional().describe(
     "The evaluation criteria as a text string."
@@ -48,8 +48,8 @@ export type AnalyzeHandwritingSubmissionOutput = z.infer<typeof AnalyzeHandwriti
 
 // Define a separate schema for the prompt's input, excluding the 'model' field.
 const PromptInputSchema = z.object({
-  studentSubmissionUri: z.string().describe(
-    "The student's handwritten work as a data URI (image or PDF)."
+  studentSubmissionUris: z.array(z.string()).min(1).describe(
+    "The student's handwritten work as an array of data URIs (images or PDFs)."
   ),
   criteriaText: z.string().optional().describe(
     "The evaluation criteria as a text string."
@@ -72,8 +72,10 @@ const handwritingSubmissionPrompt = ai.definePrompt({
 
 ### Submission Materials
 
-1.  **Student's Handwritten Submission:**
-    {{media url=studentSubmissionUri}}
+1.  **Student's Handwritten Submission(s):**
+    {{#each studentSubmissionUris}}
+    {{media url=this}}
+    {{/each}}
 
 2.  **Evaluation Criteria:**
     {{#if criteriaText}}
