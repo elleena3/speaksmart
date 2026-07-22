@@ -57,7 +57,7 @@ export function HandwritingSubmissionAnalyzerTool() {
             toast({ title: "학생 과제물 없음", description: "분석할 학생의 과제물 파일을 먼저 업로드해주세요.", variant: "destructive" });
             return;
         }
-         if (!criteriaFile && !criteriaText.trim()) {
+        if (!criteriaFile && !criteriaText.trim()) {
             toast({ title: "채점 기준 없음", description: "텍스트 또는 파일 형태의 채점 기준을 하나 이상 입력해주세요.", variant: "destructive" });
             return;
         }
@@ -69,14 +69,14 @@ export function HandwritingSubmissionAnalyzerTool() {
         try {
             const studentSubmissionUri = await fileToDataUri(studentFile);
             const criteriaFileUri = criteriaFile ? await fileToDataUri(criteriaFile) : undefined;
-            
+
             const result = await analyzeHandwritingSubmission({
                 studentSubmissionUri,
                 criteriaFileUri,
                 criteriaText: criteriaText || undefined,
                 model: selectedModel,
             });
-            
+
             setAnalysisResult(result);
             setAnalysisState('analyzed');
             toast({ title: "분석 완료", description: "AI 과제물 분석이 완료되었습니다." });
@@ -87,7 +87,7 @@ export function HandwritingSubmissionAnalyzerTool() {
             toast({ title: "분석 실패", description: `AI 분석 중 오류가 발생했습니다: ${e.message}`, variant: "destructive" });
         }
     };
-    
+
     const handleReset = () => {
         setAnalysisState('idle');
         setStudentFile(null);
@@ -95,11 +95,11 @@ export function HandwritingSubmissionAnalyzerTool() {
         setCriteriaText('');
         setAnalysisResult(null);
         setError(null);
-        
+
         const studentInput = document.getElementById('student-upload') as HTMLInputElement;
-        if(studentInput) studentInput.value = '';
+        if (studentInput) studentInput.value = '';
         const criteriaInput = document.getElementById('criteria-upload') as HTMLInputElement;
-        if(criteriaInput) criteriaInput.value = '';
+        if (criteriaInput) criteriaInput.value = '';
     };
 
     const isAnalyzeButtonDisabled = useMemo(() => {
@@ -113,7 +113,7 @@ export function HandwritingSubmissionAnalyzerTool() {
         <div className="space-y-4">
             <Card>
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2"><FileUp/> 자료 업로드</CardTitle>
+                    <CardTitle className="flex items-center gap-2"><FileUp /> 자료 업로드</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -121,23 +121,23 @@ export function HandwritingSubmissionAnalyzerTool() {
                             <Label htmlFor="student-upload">학생 과제물 (이미지/PDF) <span className="text-red-500">*</span></Label>
                             <Input id="student-upload" type="file" accept={validFileTypes.join(',')} onChange={(e) => handleFileChange(e, 'student')} />
                         </div>
-                         <div className="space-y-2">
+                        <div className="space-y-2">
                             <Label htmlFor="criteria-upload">채점 기준 자료 (이미지/PDF)</Label>
                             <Input id="criteria-upload" type="file" accept={validFileTypes.join(',')} onChange={(e) => handleFileChange(e, 'criteria')} />
                         </div>
                     </div>
-                     <div className="space-y-2">
+                    <div className="space-y-2">
                         <Label htmlFor="custom-criteria">채점 기준 (텍스트)</Label>
-                        <Textarea 
+                        <Textarea
                             id="custom-criteria"
                             placeholder="파일 대신 텍스트로 채점 기준을 입력할 수 있습니다. 예: 1. 단어의 철자가 정확한가? 2. 문법적으로 올바른 문장을 사용했는가?"
                             value={criteriaText}
                             onChange={(e) => setCriteriaText(e.target.value)}
                             rows={3}
                         />
-                         <p className="text-xs text-muted-foreground">채점 기준은 파일 또는 텍스트 중 하나 이상을 반드시 입력해야 합니다.</p>
+                        <p className="text-xs text-muted-foreground">채점 기준은 파일 또는 텍스트 중 하나 이상을 반드시 입력해야 합니다.</p>
                     </div>
-                     <div>
+                    <div>
                         <Label htmlFor="model-select" className="text-sm font-medium">AI 평가 모델 선택</Label>
                         <Select onValueChange={(value) => setSelectedModel(value as EvaluationModel)} value={selectedModel}>
                             <SelectTrigger id="model-select">
@@ -148,7 +148,7 @@ export function HandwritingSubmissionAnalyzerTool() {
                                 <SelectItem value="googleai/gemini-3.1-pro-preview">gemini-3.1-pro-preview (고성능)</SelectItem>
                             </SelectContent>
                         </Select>
-                     </div>
+                    </div>
                     <div className="flex gap-2 pt-2">
                         <Button onClick={handleAnalyze} disabled={isAnalyzeButtonDisabled} className="w-full">
                             {analysisState === 'analyzing' ? <Loader2 className="mr-2 animate-spin" /> : <Sparkles className="mr-2" />}
@@ -171,7 +171,7 @@ export function HandwritingSubmissionAnalyzerTool() {
             {analysisState === 'error' && (
                 <Card className="border-destructive">
                     <CardHeader className="flex-row items-center gap-4">
-                        <AlertTriangle className="h-8 w-8 text-destructive"/>
+                        <AlertTriangle className="h-8 w-8 text-destructive" />
                         <div>
                             <CardTitle className="text-destructive">분석 오류</CardTitle>
                             <CardDescription className="text-destructive-foreground">{error}</CardDescription>
@@ -186,21 +186,70 @@ export function HandwritingSubmissionAnalyzerTool() {
                         <CardTitle>AI 자필 과제 분석 결과</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-6">
-                         <Card>
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2"><Info/> 학생용 피드백</CardTitle>
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <Card className="bg-slate-50 dark:bg-slate-900 border-dashed">
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="flex items-center gap-2 text-base"><Info className="h-4 w-4" /> 원본 스캔 결과 (Raw As-is)</CardTitle>
+                                </CardHeader>
+                                <CardContent className="p-4 pt-0 text-sm font-mono whitespace-pre-wrap">
+                                    {analysisResult.rawTranscription || "(추출된 텍스트 없음)"}
+                                </CardContent>
+                            </Card>
+                            <Card className="bg-blue-50 dark:bg-blue-950/20 border-dashed">
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="flex items-center gap-2 text-base"><Sparkles className="h-4 w-4" /> 최종 교정본 (Polished)</CardTitle>
+                                </CardHeader>
+                                <CardContent className="p-4 pt-0 text-sm whitespace-pre-wrap">
+                                    {analysisResult.polishedText || "(교정 텍스트 없음)"}
+                                </CardContent>
+                            </Card>
+                        </div>
+
+                        {analysisResult.errorAnalysis && analysisResult.errorAnalysis.length > 0 && (
+                            <Card>
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="flex items-center gap-2 text-base"><AlertTriangle className="h-4 w-4 text-orange-500" /> 오탈자 및 교정 분석</CardTitle>
+                                </CardHeader>
+                                <CardContent className="p-0">
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-sm text-left">
+                                            <thead className="bg-muted text-muted-foreground">
+                                                <tr>
+                                                    <th className="px-4 py-2 font-medium">원본 (오타)</th>
+                                                    <th className="px-4 py-2 font-medium">교정본</th>
+                                                    <th className="px-4 py-2 font-medium">교정 이유</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y">
+                                                {analysisResult.errorAnalysis.map((err: any, idx: number) => (
+                                                    <tr key={idx} className="hover:bg-muted/50">
+                                                        <td className="px-4 py-2 font-mono text-red-500 line-through decoration-red-500/50">{err.original}</td>
+                                                        <td className="px-4 py-2 font-mono text-green-600 font-medium">{err.correction}</td>
+                                                        <td className="px-4 py-2 text-muted-foreground">{err.reason}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )}
+
+                        <Card>
+                            <CardHeader className="pb-2">
+                                <CardTitle className="flex items-center gap-2 text-base"><Info className="h-4 w-4" /> 통합 피드백 (학생용)</CardTitle>
                             </CardHeader>
-                            <CardContent className="p-4 bg-muted/50 rounded-lg markdown-content">
+                            <CardContent className="p-4 bg-muted/30 rounded-b-lg markdown-content">
                                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
                                     {analysisResult.studentFeedback}
                                 </ReactMarkdown>
                             </CardContent>
                         </Card>
-                         <Card>
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2"><Info/> 교사용 지도 조언</CardTitle>
+                        <Card>
+                            <CardHeader className="pb-2">
+                                <CardTitle className="flex items-center gap-2 text-base"><Info className="h-4 w-4" /> 교사용 지도 조언</CardTitle>
                             </CardHeader>
-                            <CardContent className="p-4 bg-muted/50 rounded-lg whitespace-pre-wrap font-body text-sm leading-relaxed">
+                            <CardContent className="p-4 bg-muted/30 rounded-b-lg whitespace-pre-wrap font-body text-sm leading-relaxed">
                                 {analysisResult.teacherGuidance}
                             </CardContent>
                         </Card>

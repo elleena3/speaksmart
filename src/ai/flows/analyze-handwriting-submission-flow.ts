@@ -27,29 +27,36 @@ const AnalyzeHandwritingSubmissionInputSchema = z.object({
   ),
   model: z.enum(evaluationModels).optional().default('googleai/gemini-3.6-flash'),
 }).refine(data => data.criteriaText || data.criteriaFileUri, {
-    message: "At least one of criteriaText or criteriaFileUri must be provided.",
-    path: ["criteriaText"], // you can pick any path for the error message
+  message: "At least one of criteriaText or criteriaFileUri must be provided.",
+  path: ["criteriaText"], // you can pick any path for the error message
 });
 
 export type AnalyzeHandwritingSubmissionInput = z.infer<typeof AnalyzeHandwritingSubmissionInputSchema>;
 
 const AnalyzeHandwritingSubmissionOutputSchema = z.object({
-  studentFeedback: z.string().describe('Constructive and encouraging feedback for the student in Korean, presented in Markdown format.'),
+  rawTranscription: z.string().describe('Exact, literal extraction of the handwritten text. Do not auto-correct.'),
+  errorAnalysis: z.array(z.object({
+    original: z.string().describe('The misspelled or unclear word exactly as written.'),
+    correction: z.string().describe('The contextually correct recommended word.'),
+    reason: z.string().describe('Explanation for the correction in Korean.')
+  })).describe('List of misspelled words or typos and their contextual corrections.'),
+  polishedText: z.string().describe('The fully corrected and naturally polished version of the student text.'),
+  studentFeedback: z.string().describe('Constructive and encouraging feedback for the student in Korean, based on evaluation criteria, presented in Markdown format.'),
   teacherGuidance: z.string().describe('Actionable guidance for the teacher on how to support the student, written in Korean.'),
 });
 export type AnalyzeHandwritingSubmissionOutput = z.infer<typeof AnalyzeHandwritingSubmissionOutputSchema>;
 
 // Define a separate schema for the prompt's input, excluding the 'model' field.
 const PromptInputSchema = z.object({
-    studentSubmissionUri: z.string().describe(
-      "The student's handwritten work as a data URI (image or PDF)."
-    ),
-    criteriaText: z.string().optional().describe(
-      "The evaluation criteria as a text string."
-    ),
-    criteriaFileUri: z.string().optional().describe(
-      "The evaluation criteria as a file data URI (image or PDF)."
-    ),
+  studentSubmissionUri: z.string().describe(
+    "The student's handwritten work as a data URI (image or PDF)."
+  ),
+  criteriaText: z.string().optional().describe(
+    "The evaluation criteria as a text string."
+  ),
+  criteriaFileUri: z.string().optional().describe(
+    "The evaluation criteria as a file data URI (image or PDF)."
+  ),
 });
 
 export async function analyzeHandwritingSubmission(input: AnalyzeHandwritingSubmissionInput): Promise<AnalyzeHandwritingSubmissionOutput> {
@@ -58,10 +65,10 @@ export async function analyzeHandwritingSubmission(input: AnalyzeHandwritingSubm
 }
 
 const handwritingSubmissionPrompt = ai.definePrompt({
-    name: 'handwritingSubmissionPrompt',
-    input: { schema: PromptInputSchema }, // Use the schema without the model field
-    output: { schema: AnalyzeHandwritingSubmissionOutputSchema },
-    prompt: `You are an expert teacher grading a handwritten assignment. Your task is to provide detailed, constructive feedback for both the student and the teacher based on the provided submission and evaluation criteria. All feedback must be in Korean.
+  name: 'handwritingSubmissionPrompt',
+  input: { schema: PromptInputSchema }, // Use the schema without the model field
+  output: { schema: AnalyzeHandwritingSubmissionOutputSchema },
+  prompt: `You are an expert teacher grading a handwritten assignment. Your task is to extract text, analyze errors, and provide detailed, constructive feedback for both the student and the teacher based on the provided submission and evaluation criteria. All Korean feedback and explanations must use polite and encouraging language.
 
 ### Submission Materials
 
@@ -78,30 +85,32 @@ const handwritingSubmissionPrompt = ai.definePrompt({
 
 ---
 
-### Your Tasks
+### Your Tasks & Output Structure
 
-1.  **Analyze the Submission (Strictly):**
-    -   Carefully read and understand the student's handwritten work.
-    -   **IMPORTANT:** When transcribing or evaluating the text, do NOT correct it based on context. Recognize typos, misspellings, and illegible words exactly as they are. Base your initial assessment on this strict, literal interpretation.
-    -   Thoroughly review the provided evaluation criteria.
-    -   Compare the student's submission against each criterion based on your strict analysis. Note strengths, weaknesses, and areas of misunderstanding.
+Follow these steps exactly to fulfill the output schema:
 
-2.  **Generate Student Feedback ('studentFeedback'):**
-    -   **Format:** Use Markdown for clear formatting (headings, bullet points).
-    -   **Tone:** Be encouraging, positive, and constructive.
-    -   **Content:**
-        -   Start with what the student did well based on the strict analysis.
-        -   Explain the areas for improvement (e.g., specific spelling mistakes, unclear letters) with concrete examples from their work.
-        -   **Crucially, in a separate section, provide additional feedback considering the likely context.** For example, "비록 'apple'을 'aple'로 썼지만, 전체 문맥을 보니 '사과'를 의미하려 했던 것 같아요. 철자를 다시 한번 확인해보면 더 좋아질 거예요."
-        -   Provide clear, actionable advice on how they can improve for next time.
+1.  **Raw Transcription (\`rawTranscription\`)**
+    - Extract text exactly as written in the image.
+    - IMPORTANT: Do NOT auto-correct typos based on context. Recognize typos, misspellings, and illegible words exactly as they are (As-is).
 
-3.  **Generate Teacher Guidance ('teacherGuidance'):**
-    -   **Format:** Plain text, professional tone.
-    -   **Content:** Provide a concise summary of the student's performance. Highlight key strengths and persistent errors (distinguishing between simple mistakes and potential misunderstandings). Suggest specific teaching strategies or follow-up activities to help this student.
+2.  **Spelling Error Analysis (\`errorAnalysis\`)**
+    - Identify words from the raw transcription that are misspelled or written incorrectly.
+    - For each error, provide the \`original\` word, the \`correction\` (the contextually correct recommended word), and a brief \`reason\` in Korean explaining why it was corrected.
 
----
+3.  **Polished Version (\`polishedText\`)**
+    - Provide a fully corrected, naturally polished version of the raw text where all spelling and grammatical errors are fixed.
 
-Please now generate the feedback in the specified JSON format.
+4.  **Student Feedback (\`studentFeedback\`)**
+    - Compare the polished submission against the Evaluation Criteria (if provided).
+    - Format: Use Markdown.
+    - Tone: Very encouraging, positive, and constructive.
+    - Content: Start with praise for what they did well based on the criteria. Discuss overall areas for improvement. Give actionable advice on how they can improve for next time.
+
+5.  **Teacher Guidance (\`teacherGuidance\`)**
+    - Format: Plain text, professional tone.
+    - Content: Provide a concise summary of the student's performance. Highlight key strengths and persistent fundamental errors (distinguishing between simple mistakes and potential misunderstandings). Suggest specific teaching strategies or follow-up activities.
+
+Please now generate the structured response in the required JSON format.
 `,
 });
 
@@ -112,7 +121,7 @@ const analyzeHandwritingSubmissionFlow = ai.defineFlow(
     outputSchema: AnalyzeHandwritingSubmissionOutputSchema,
   },
   async ({ model, ...input }) => {
-    
+
     const analysisModel = googleAI.model(model || 'googleai/gemini-3.6-flash');
 
     const { output } = await handwritingSubmissionPrompt(input, { model: analysisModel });
