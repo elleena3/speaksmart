@@ -141,7 +141,13 @@ export function LiveConversationTool() {
                 };
 
                 source.connect(processor);
-                processor.connect(audioCtx.destination);
+
+                // Route through a muted gain node to prevent silent buffers from overriding the speaker out,
+                // while keeping the processor alive in WebKit browsers.
+                const dummyGain = audioCtx.createGain();
+                dummyGain.gain.value = 0;
+                processor.connect(dummyGain);
+                dummyGain.connect(audioCtx.destination);
 
                 toast({ title: "소켓 연결됨", description: "원어민 강사 서버 설정 중..." });
             };
@@ -220,6 +226,15 @@ export function LiveConversationTool() {
 
                     if (response.serverContent?.turnComplete) {
                         currentTurnText = ""; // reset for next turn
+                    }
+
+                    // Handle Live API transcriptions
+                    const { inputTranscription, outputTranscription } = response.serverContent || {};
+                    if (inputTranscription?.text) {
+                        setTurns(prev => [...prev, { role: 'user', text: inputTranscription.text, id: Date.now() }]);
+                    }
+                    if (outputTranscription?.text) {
+                        setTurns(prev => [...prev, { role: 'model', text: outputTranscription.text, id: Date.now() }]);
                     }
                 } catch (err) {
                     console.error("WebSocket Message Parse Error:", err);
