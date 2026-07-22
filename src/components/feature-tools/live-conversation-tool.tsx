@@ -120,8 +120,13 @@ export function LiveConversationTool() {
                         let s = Math.max(-1, Math.min(1, float32Data[i]));
                         pcmData[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
                     }
-                    // Basic Base64 encoding for Int16Array
-                    const base64Data = btoa(String.fromCharCode(...new Uint8Array(pcmData.buffer)));
+                    // Safe Base64 encoding without spread operator to avoid stack size limits
+                    const uint8 = new Uint8Array(pcmData.buffer);
+                    let binaryStr = '';
+                    for (let i = 0; i < uint8.length; i++) {
+                        binaryStr += String.fromCharCode(uint8[i]);
+                    }
+                    const base64Data = btoa(binaryStr);
                     ws.send(JSON.stringify({
                         realtimeInput: { mediaChunks: [{ mimeType: "audio/pcm;rate=16000", data: base64Data }] }
                     }));
@@ -143,10 +148,17 @@ export function LiveConversationTool() {
                     }
                     const response = JSON.parse(textData);
 
+                    // Verbose debug logging (ignoring huge audio chunks for readability)
+                    const debugResp = { ...response };
+                    if (debugResp.serverContent?.modelTurn?.parts) {
+                        debugResp.serverContent.modelTurn.parts = debugResp.serverContent.modelTurn.parts.map((p: any) => p.inlineData ? { inlineData: "[AUDIO BLOB]" } : p);
+                    }
+                    console.log("WebSocket Received:", debugResp);
+
                     if (response.setupComplete) {
                         setupCompleteRef.current = true;
                         setAppState('connected');
-                        ws.send(JSON.stringify({ clientContent: { turns: [{ role: "user", parts: [{ text: "Hello! I want to practice English. Let's talk!" }] }] } }));
+                        ws.send(JSON.stringify({ clientContent: { turns: [{ role: "user", parts: [{ text: "Hello! I want to practice English. Let's talk!" }] }], turnComplete: true } }));
                         toast({ title: "연결 성공", description: "이제 자유롭게 영어로 대화해 보세요!" });
                     }
 
@@ -202,11 +214,13 @@ export function LiveConversationTool() {
                 }
             };
 
-            ws.onclose = () => {
+            ws.onclose = (e) => {
+                console.log("WebSocket Closed:", e.code, e.reason);
                 if (appState === 'connected') endConversation();
             };
 
-            ws.onerror = () => {
+            ws.onerror = (err) => {
+                console.error("WebSocket Error:", err);
                 toast({ title: "연결 오류", description: "서버와의 소켓 연결이 끊어졌습니다.", variant: "destructive" });
                 endConversation();
             };
