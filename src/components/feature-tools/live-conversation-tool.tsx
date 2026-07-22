@@ -7,7 +7,6 @@ import { useToast } from "@/hooks/use-toast";
 import { Mic, Square, Loader2, Play, CheckCircle2, User, Bot, AlertTriangle, RefreshCw } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { getLiveSessionToken } from "@/ai/flows/get-live-session-token";
-import { generateTtsByModelFlow } from "@/ai/flows/generate-tts-by-model-flow";
 import { analyzeLiveConversation, type AnalyzeLiveConversationOutput } from "@/ai/flows/analyze-live-conversation-flow";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -29,8 +28,6 @@ export function LiveConversationTool() {
     const micStreamRef = useRef<MediaStream | null>(null);
     const recognitionRef = useRef<any>(null);
     const setupCompleteRef = useRef<boolean>(false);
-    const aiIsSpeakingRef = useRef<boolean>(false);
-    const turnReceivedAudioRef = useRef<boolean>(false);
 
     // For AI audio playback queue
     const nextPlayTimeRef = useRef<number>(0);
@@ -94,8 +91,6 @@ export function LiveConversationTool() {
 
             const token = await getLiveSessionToken();
             const HOST = "generativelanguage.googleapis.com";
-            // Important: Use model gemini-2.0-flash-exp for Live API over WS, or 3.1-flash-live-preview
-            // Currently 2.0-flash-exp is universally supported for Live API. We will use gemini-2.0-flash-exp as per docs for WS endpoint.
             const url = `wss://${HOST}/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${token}`;
 
             const ws = new WebSocket(url);
@@ -106,9 +101,19 @@ export function LiveConversationTool() {
                 // Send setup message
                 const setupMessage = {
                     setup: {
-                        model: "models/gemini-3.1-flash-live-preview",
+                        model: "models/gemini-2.0-flash-exp",
+                        systemInstruction: {
+                            parts: [{ text: "You are a friendly native English tutor. Speak naturally and converse interactively with the user." }]
+                        },
                         generationConfig: {
-                            responseModalities: ["AUDIO"]
+                            responseModalities: ["AUDIO"],
+                            speechConfig: {
+                                voiceConfig: {
+                                    prebuiltVoiceConfig: {
+                                        voiceName: "Puck"
+                                    }
+                                }
+                            }
                         }
                     }
                 };
@@ -120,26 +125,61 @@ export function LiveConversationTool() {
 
                 nextPlayTimeRef.current = 0;
 
-                // Delete ScriptProcessorNode completely, we will use Web Speech API to send Text-based turns perfectly
-                // Route mic stream through a muted gain node just to keep the track explicitly 'active' if needed by browser
                 const source = audioCtx.createMediaStreamSource(stream);
+                const processor = audioCtx.createScriptProcessor(4096, 1, 1);
+                scriptProcessorRef.current = processor;
+
+                processor.onaudioprocess = (e) => {
+                    if (!wsRef.current || !setupCompleteRef.current) return;
+
+                    const float32Data = e.inputBuffer.getChannelData(0);
+
+                    // Convert Float32 to Int16 PCM
+                    const pcmData = new Int16Array(float32Data.length);
+                    for (let i = 0; i < float32Data.length; i++) {
+                        let s = Math.max(-1, Math.min(1, float32Data[i]));
+                        pcmData[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+                    }
+
+                    // Convert to base64
+                    const buf = new Uint8Array(pcmData.buffer);
+                    let binaryStr = '';
+                    for (let i = 0; i < buf.length; i++) { binaryStr += String.fromCharCode(buf[i]); }
+                    const base64Data = btoa(binaryStr);
+
+                    if (wsRef.current.readyState === WebSocket.OPEN) {
+                        const audioMessage = {
+                            realtimeInput: {
+                                mediaChunks: [
+                                    {
+                                        mimeType: "audio/pcm;rate=16000",
+                                        data: base64Data
+                                    }
+                                ]
+                            }
+                        };
+                        wsRef.current.send(JSON.stringify(audioMessage));
+                    }
+                };
+
+                source.connect(processor);
+
+                // Route mic stream through a muted gain node just to keep the track explicitly 'active' if needed by browser
                 const dummyGain = audioCtx.createGain();
                 dummyGain.gain.value = 0;
-                source.connect(dummyGain);
+                processor.connect(dummyGain);
                 dummyGain.connect(audioCtx.destination);
 
-                // Setup local webkit Speech Recognition for instant user transcription fallback
+                // Setup local webkit Speech Recognition for instant user transcription fallback (UI purposes ONLY)
                 const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
                 if (SpeechRecognition) {
                     const recognition = new SpeechRecognition();
                     recognition.continuous = true;
-                    // enable interimResults for instant zero-lag feedback
                     recognition.interimResults = true;
                     recognition.lang = 'en-US';
                     recognition.onresult = (event: any) => {
                         const res = event.results[event.results.length - 1];
                         const transcript = res[0].transcript;
-                        const isFinal = res.isFinal;
 
                         setTurns(prev => {
                             const newTurns = [...prev];
@@ -149,19 +189,7 @@ export function LiveConversationTool() {
                             } else { newTurns.push({ role: 'user', text: transcript, id: Math.random() }); }
                             return newTurns;
                         });
-
-                        if (isFinal && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-                            const payload = {
-                                clientContent: {
-                                    turns: [{ role: "user", parts: [{ text: transcript }] }],
-                                    turnComplete: true
-                                }
-                            };
-                            console.log("[Live API] Sending Turn:", payload);
-                            wsRef.current.send(JSON.stringify(payload));
-                            // Ensure AI speaking lock is lifted since we successfully sent a new turn
-                            aiIsSpeakingRef.current = false;
-                        }
+                        // Notice: We NO LONGER send WS payloads here! The WebRTC mediaChunks handles AI input.
                     };
                     recognition.start();
                     recognitionRef.current = recognition;
@@ -180,23 +208,13 @@ export function LiveConversationTool() {
                     }
                     const response = JSON.parse(textData);
 
-                    // Verbose debug logging (ignoring huge audio chunks for readability)
-                    const debugResp = { ...response };
-                    if (debugResp.serverContent?.modelTurn?.parts) {
-                        debugResp.serverContent.modelTurn.parts = debugResp.serverContent.modelTurn.parts.map((p: any) => p.inlineData ? { inlineData: "[AUDIO BLOB]" } : p);
-                    }
-                    console.log("WebSocket Received:", debugResp);
-
                     if (response.setupComplete) {
-                        aiIsSpeakingRef.current = true; // AI will start generating greeting
                         setupCompleteRef.current = true;
                         setAppState('connected');
-                        ws.send(JSON.stringify({ clientContent: { turns: [{ role: "user", parts: [{ text: "Hello! I want to practice English. Let's talk!" }] }], turnComplete: true } }));
                         toast({ title: "연결 성공", description: "이제 자유롭게 영어로 대화해 보세요!" });
                     }
 
                     if (response.serverContent?.modelTurn) {
-                        aiIsSpeakingRef.current = true; // Lock mic while AI generates
                         const parts = response.serverContent.modelTurn.parts;
                         for (const part of parts) {
                             if (part.text) {
@@ -211,79 +229,47 @@ export function LiveConversationTool() {
                             }
 
                             if (part.inlineData && part.inlineData.data) {
-                                turnReceivedAudioRef.current = true;
                                 setAudioChunkCount(c => c + 1);
                                 // Play audio buffer
                                 try {
-                                    const binaryStr = atob(part.inlineData.data);
-                                    const len = binaryStr.length;
-                                    const bytes = new Uint8Array(len);
-                                    for (let i = 0; i < len; i++) { bytes[i] = binaryStr.charCodeAt(i); }
+                                    if (audioContextRef.current) {
+                                        const binaryString = atob(part.inlineData.data);
+                                        const len = binaryString.length;
+                                        const bytes = new Uint8Array(len);
+                                        for (let i = 0; i < len; i++) {
+                                            bytes[i] = binaryString.charCodeAt(i);
+                                        }
 
-                                    // Gemini returns 24kHz PCM for model audio out (Little Endian)
-                                    const float32Array = new Float32Array(len / 2);
-                                    const dataView = new DataView(bytes.buffer);
-                                    for (let i = 0; i < len / 2; i++) {
-                                        float32Array[i] = dataView.getInt16(i * 2, true) / 32768.0;
-                                    }
+                                        // The API returns 24kHz PCM Int16 raw data by default for Live streaming
+                                        const numSamples = bytes.length / 2;
+                                        const float32Data = new Float32Array(numSamples);
+                                        const dataView = new DataView(bytes.buffer);
+                                        for (let i = 0; i < numSamples; i++) {
+                                            const int16 = dataView.getInt16(i * 2, true);
+                                            float32Data[i] = int16 < 0 ? int16 / 0x8000 : int16 / 0x7FFF;
+                                        }
 
-                                    const audioCtx = audioContextRef.current;
-                                    if (audioCtx) {
-                                        const audioBuffer = audioCtx.createBuffer(1, float32Array.length, 24000);
-                                        audioBuffer.copyToChannel(float32Array, 0);
-                                        const source = audioCtx.createBufferSource();
+                                        const audioBuffer = audioContextRef.current.createBuffer(1, float32Data.length, 24000);
+                                        audioBuffer.getChannelData(0).set(float32Data);
+
+                                        const source = audioContextRef.current.createBufferSource();
                                         source.buffer = audioBuffer;
-                                        source.connect(audioCtx.destination);
-                                        const startTime = Math.max(audioCtx.currentTime, nextPlayTimeRef.current);
-                                        source.start(startTime);
-                                        nextPlayTimeRef.current = startTime + audioBuffer.duration;
+                                        source.connect(audioContextRef.current.destination);
+
+                                        const currentTime = audioContextRef.current.currentTime;
+                                        const scheduledTime = Math.max(currentTime, nextPlayTimeRef.current);
+                                        source.start(scheduledTime);
+                                        nextPlayTimeRef.current = scheduledTime + audioBuffer.duration;
                                     }
                                 } catch (e) {
-                                    console.error("Audio playback error:", e);
+                                    console.error("Audio playback error", e);
                                 }
                             }
                         }
                     }
 
                     if (response.serverContent?.turnComplete) {
-                        const finalTurnText = currentTurnText;
                         currentTurnText = ""; // reset for next turn
-
-                        if (!turnReceivedAudioRef.current && finalTurnText.trim() !== "") {
-                            // Fallback TTS generation if websocket stripped audio modality
-                            generateTtsByModelFlow({ text: finalTurnText, model: "googleai/gemini-3.1-flash-tts-preview" })
-                                .then(async (res) => {
-                                    if (audioContextRef.current) {
-                                        try {
-                                            const base64Data = res.audioDataUri.split(',')[1];
-                                            const binaryString = atob(base64Data);
-                                            const len = binaryString.length;
-                                            const bytes = new Uint8Array(len);
-                                            for (let i = 0; i < len; i++) {
-                                                bytes[i] = binaryString.charCodeAt(i);
-                                            }
-                                            const audioBuffer = await audioContextRef.current.decodeAudioData(bytes.buffer);
-                                            const source = audioContextRef.current.createBufferSource();
-                                            source.buffer = audioBuffer;
-                                            source.connect(audioContextRef.current.destination);
-                                            source.onended = () => { aiIsSpeakingRef.current = false; };
-                                            source.start(0);
-                                        } catch (e) {
-                                            console.error("Fallback TTS Decode/Play Error:", e);
-                                            aiIsSpeakingRef.current = false;
-                                        }
-                                    } else {
-                                        aiIsSpeakingRef.current = false;
-                                    }
-                                })
-                                .catch(e => {
-                                    console.error("Fallback TTS Generation Error:", e);
-                                    aiIsSpeakingRef.current = false;
-                                });
-                        } else {
-                            aiIsSpeakingRef.current = false; // Unlock mic immediately if native stream played
-                        }
-                        turnReceivedAudioRef.current = false;
                     }
 
                     // Handle Live API transcriptions
