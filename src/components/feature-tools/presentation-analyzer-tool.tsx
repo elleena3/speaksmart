@@ -13,6 +13,8 @@ import { analyzePresentationVideo, type AnalyzePresentationVideoOutput } from '@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { type EvaluationModel } from '@/lib/types';
 
 type AnalysisState = 'idle' | 'analyzing' | 'analyzed' | 'error';
 
@@ -48,6 +50,7 @@ export function PresentationAnalyzerTool() {
     const [videoFile, setVideoFile] = useState<File | null>(null);
     const [presentationFile, setPresentationFile] = useState<File | null>(null);
     const [customCriteria, setCustomCriteria] = useState('');
+    const [selectedModel, setSelectedModel] = useState<EvaluationModel>('googleai/gemini-3.6-flash');
     const [analysisResult, setAnalysisResult] = useState<AnalyzePresentationVideoOutput | null>(null);
     const [error, setError] = useState<string | null>(null);
     const { toast } = useToast();
@@ -102,6 +105,7 @@ export function PresentationAnalyzerTool() {
                 videoDataUri,
                 presentationFileUri,
                 customCriteria: customCriteria || undefined,
+                evaluationModel: selectedModel,
             });
 
             setAnalysisResult(result);
@@ -164,6 +168,18 @@ export function PresentationAnalyzerTool() {
                             rows={3}
                         />
                         <p className="text-xs text-muted-foreground">AI가 평가 시 추가적으로 참고할 내용을 입력합니다.</p>
+                    </div>
+                    <div>
+                        <Label htmlFor="model-select" className="text-sm font-medium">AI 평가 모델 선택</Label>
+                        <Select onValueChange={(value) => setSelectedModel(value as EvaluationModel)} value={selectedModel}>
+                            <SelectTrigger id="model-select">
+                                <SelectValue placeholder="모델을 선택하세요..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="googleai/gemini-3.6-flash">gemini-3.6-flash (기본/빠름)</SelectItem>
+                                <SelectItem value="googleai/gemini-3.1-pro-preview">gemini-3.1-pro-preview (고성능/정밀)</SelectItem>
+                            </SelectContent>
+                        </Select>
                     </div>
                     <div className="flex gap-2 pt-2">
                         <Button onClick={handleAnalyze} disabled={isAnalyzeButtonDisabled} className="w-full">

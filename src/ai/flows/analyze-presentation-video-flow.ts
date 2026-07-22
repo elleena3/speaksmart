@@ -12,6 +12,7 @@
 import { ai } from '@/ai/genkit';
 import { googleAI } from '@genkit-ai/google-genai';
 import { z } from 'zod';
+import { evaluationModels } from '@/lib/types';
 
 const FeedbackSchema = z.object({
   score: z.number().int().min(0).max(100).describe("The score for this category, from 0 to 100."),
@@ -28,6 +29,7 @@ const AnalyzePresentationVideoInputSchema = z.object({
   customCriteria: z.string().optional().describe(
     "Optional custom evaluation criteria provided by the teacher."
   ),
+  evaluationModel: z.enum(evaluationModels).optional().default('googleai/gemini-3.6-flash').describe("The evaluation model to use for analysis."),
 });
 export type AnalyzePresentationVideoInput = z.infer<typeof AnalyzePresentationVideoInputSchema>;
 
@@ -48,7 +50,6 @@ export async function analyzePresentationVideo(input: AnalyzePresentationVideoIn
 
 const presentationAnalysisPrompt = ai.definePrompt({
   name: 'presentationAnalysisPrompt',
-  model: googleAI.model('gemini-3.1-pro-preview'),
   input: { schema: AnalyzePresentationVideoInputSchema },
   output: { schema: AnalyzePresentationVideoOutputSchema },
   prompt: `You are an expert AI teacher evaluating a student's English presentation or conversation performance. Your task is to provide a comprehensive, multi-faceted evaluation based on a video, optional presentation materials, and specific criteria. All feedback must be in Korean.
@@ -120,7 +121,14 @@ const analyzePresentationVideoFlow = ai.defineFlow(
     outputSchema: AnalyzePresentationVideoOutputSchema,
   },
   async (input) => {
-    const { output } = await presentationAnalysisPrompt(input);
+    let modelName = input.evaluationModel || 'googleai/gemini-3.6-flash';
+    // Normalize if user provided un-prefixed name
+    if (!modelName.startsWith('googleai/') && !modelName.startsWith('openai/')) {
+      modelName = modelName.includes('pro') ? 'googleai/gemini-3.1-pro-preview' : 'googleai/gemini-3.6-flash';
+    }
+    const analysisModel = googleAI.model(modelName as any);
+
+    const { output } = await presentationAnalysisPrompt(input, { model: analysisModel });
     if (!output) {
       throw new Error("The AI model did not return a valid presentation analysis.");
     }
