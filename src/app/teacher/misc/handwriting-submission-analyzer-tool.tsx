@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Sparkles, RefreshCw, AlertTriangle, FileUp, Info } from 'lucide-react';
+import { Loader2, Sparkles, RefreshCw, AlertTriangle, FileUp, Info, Download, Printer } from 'lucide-react';
 import { analyzeHandwritingSubmission, type AnalyzeHandwritingSubmissionOutput } from '@/ai/flows/analyze-handwriting-submission-flow';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -178,6 +178,129 @@ export function HandwritingSubmissionAnalyzerTool() {
         if (analysisState === 'analyzing') return true;
         return false;
     }, [studentFiles, criteriaFile, criteriaText, analysisState]);
+
+    const handleExportCSV = () => {
+        const doneResults = batchResults.filter(r => r.status === 'done' && r.result);
+        if (doneResults.length === 0) {
+            toast({ title: '내보낼 결과가 없습니다.', variant: 'destructive' });
+            return;
+        }
+
+        // CSV Header
+        let csvContent = '학생 과제물명,원본 스캔(As-is),최종 교정본(Polished),발견된 오탈자 수,통합 피드백(학생용),교사용 지도 조언\n';
+
+        doneResults.forEach(item => {
+            if (!item.result) return;
+            const res = item.result;
+            const fileName = item.fileName.replace(/"/g, '""');
+            const raw = (res.rawTranscription || '').replace(/"/g, '""');
+            const polished = (res.polishedText || '').replace(/"/g, '""');
+            const errCount = res.errorAnalysis ? res.errorAnalysis.length : 0;
+            const studentFB = (res.studentFeedback || '').replace(/"/g, '""');
+            const teacherGuidance = (res.teacherGuidance || '').replace(/"/g, '""');
+
+            // Wrapping fields with quotes to handle multiline safely in Excel
+            csvContent += `"${fileName}","${raw}","${polished}","${errCount}","${studentFB}","${teacherGuidance}"\n`;
+        });
+
+        // Add BOM so Excel opens UTF-8 properly
+        const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute("download", `자필과제채점결과_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    const handlePrint = (item: IndividualResult) => {
+        if (!item.result) return;
+        const res = item.result;
+
+        const printWindow = window.open('', '_blank', 'width=800,height=800');
+        if (!printWindow) {
+            toast({ title: '팝업이 차단되었습니다. 팝업 차단을 해제해주세요.', variant: 'destructive' });
+            return;
+        }
+
+        let errorsHtml = '';
+        if (res.errorAnalysis && res.errorAnalysis.length > 0) {
+            const tableRows = res.errorAnalysis.map(err => `
+                <tr>
+                    <td style="color: red; text-decoration: line-through;">${err.original}</td>
+                    <td style="color: green; font-weight: bold;">${err.correction}</td>
+                    <td>${err.reason}</td>
+                </tr>
+            `).join('');
+
+            errorsHtml = `
+                <h3>🚨 오탈자 및 교정 분석</h3>
+                <table style="width: 100%; border-collapse: collapse; text-align: left; margin-bottom: 20px;" border="1">
+                    <thead>
+                        <tr style="background-color: #f1f5f9;">
+                            <th style="padding: 8px;">원본 (오타)</th>
+                            <th style="padding: 8px;">교정본</th>
+                            <th style="padding: 8px;">교정 이유</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${tableRows}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        const html = `
+            <!DOCTYPE html>
+            <html lang="ko">
+            <head>
+                <meta charset="UTF-8">
+                <title>${item.fileName} - 피드백 리포트</title>
+                <style>
+                    body { font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; line-height: 1.6; padding: 40px; color: #333; }
+                    h1 { border-bottom: 2px solid #2563eb; padding-bottom: 10px; color: #1e40af; }
+                    h3 { margin-top: 25px; color: #0f172a; }
+                    .box { background-color: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; white-space: pre-wrap; font-size: 14px; }
+                    .box-blue { background-color: #eff6ff; border-color: #bfdbfe; }
+                    .page-break { page-break-after: always; }
+                    @media print {
+                        body { padding: 0; }
+                    }
+                </style>
+            </head>
+            <body onload="window.print(); setTimeout(() => window.close(), 500);">
+                <h1>📝 ${item.fileName} 피드백 리포트</h1>
+                <p><strong>생성일자:</strong> ${new Date().toLocaleDateString()}</p>
+                
+                <h3>통합 피드백 (학생용)</h3>
+                <div class="box box-blue">${res.studentFeedback}</div>
+                
+                ${errorsHtml}
+                
+                <hr style="margin: 30px 0; border: 0; border-top: 1px dashed #cbd5e1;" />
+                
+                <h3>👩‍🏫 교사용 지도 조언 (참고용)</h3>
+                <div class="box">${res.teacherGuidance}</div>
+                
+                <h3>원본 스캔 / 교정본 대조</h3>
+                <div style="display: flex; gap: 20px;">
+                    <div style="flex: 1;">
+                        <h4 style="color: #64748b;">[ 원본 스캔 ]</h4>
+                        <div class="box" style="font-family: monospace;">${res.rawTranscription || '(추출된 내용 없음)'}</div>
+                    </div>
+                    <div style="flex: 1;">
+                        <h4 style="color: #64748b;">[ AI 최종 교정본 ]</h4>
+                        <div class="box box-blue">${res.polishedText || '(교정본 없음)'}</div>
+                    </div>
+                </div>
+            </body>
+            </html>
+        `;
+
+        printWindow.document.write(html);
+        printWindow.document.close();
+    };
 
     return (
         <div className="space-y-4">
@@ -356,7 +479,14 @@ export function HandwritingSubmissionAnalyzerTool() {
 
             {batchMode === 'individual' && batchResults.length > 0 && (
                 <div className="space-y-6">
-                    <h3 className="text-xl font-bold tracking-tight">개별 학생 분석 현황 ({batchResults.filter(r => r.status === 'done').length}/{batchResults.length})</h3>
+                    <div className="flex items-center justify-between">
+                        <h3 className="text-xl font-bold tracking-tight">개별 학생 분석 현황 ({batchResults.filter(r => r.status === 'done').length}/{batchResults.length})</h3>
+                        {batchResults.some(r => r.status === 'done') && (
+                            <Button variant="outline" onClick={handleExportCSV} className="gap-2 shrink-0 border-green-200 text-green-700 bg-green-50 hover:bg-green-100 hover:text-green-800">
+                                <Download className="h-4 w-4" /> CSV 엑셀 다운로드
+                            </Button>
+                        )}
+                    </div>
                     {batchResults.map((item, index) => (
                         <Card key={item.id} className={item.status === 'analyzing' ? 'border-primary ring-1 ring-primary/20 shadow-md transition-all' : ''}>
                             <CardHeader className="bg-slate-50 dark:bg-slate-900/50 border-b pb-3">
@@ -365,11 +495,21 @@ export function HandwritingSubmissionAnalyzerTool() {
                                         <span className="bg-primary/10 text-primary px-2 py-1 rounded-md text-sm font-mono">#{index + 1}</span>
                                         {item.fileName}
                                     </CardTitle>
-                                    <div>
+                                    <div className="flex items-center gap-4">
                                         {item.status === 'pending' && <span className="text-sm text-muted-foreground flex items-center gap-1">대기 중</span>}
                                         {item.status === 'analyzing' && <span className="text-sm text-primary font-medium flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> 분석 진행 중...</span>}
-                                        {item.status === 'done' && <span className="text-sm text-green-600 dark:text-green-400 font-medium flex items-center gap-1"><Sparkles className="h-4 w-4" /> 분석 완료</span>}
                                         {item.status === 'error' && <span className="text-sm text-destructive font-medium flex items-center gap-1"><AlertTriangle className="h-4 w-4" /> 오류 발생</span>}
+                                        {item.status === 'done' && (
+                                            <div className="flex items-center gap-3">
+                                                <span className="text-sm text-green-600 dark:text-green-400 font-medium flex items-center gap-1">
+                                                    <Sparkles className="h-4 w-4" /> 분석 완료
+                                                </span>
+                                                <div className="h-4 w-px bg-slate-300 dark:bg-slate-700"></div>
+                                                <Button size="sm" variant="ghost" onClick={() => handlePrint(item)} className="h-8 px-2 gap-1.5 text-muted-foreground hover:text-primary">
+                                                    <Printer className="h-3.5 w-3.5" /> 인쇄 (PDF)
+                                                </Button>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </CardHeader>
