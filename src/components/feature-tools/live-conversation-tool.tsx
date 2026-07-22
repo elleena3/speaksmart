@@ -103,7 +103,7 @@ export function LiveConversationTool() {
                 // Send setup message
                 const setupMessage = {
                     setup: {
-                        model: "models/gemini-3.1-flash-live-preview",
+                        model: "models/gemini-2.0-flash-exp",
                         generationConfig: {
                             responseModalities: ["AUDIO"],
                             speechConfig: {
@@ -285,8 +285,8 @@ export function LiveConversationTool() {
                         setTurns(prev => {
                             const newTurns = [...prev];
                             const last = newTurns[newTurns.length - 1];
-                            // The API sends incremental deltas for outputTranscription, so we MUST append (+=)
-                            if (last && last.role === 'model') { last.text += " " + outputTranscription.text; }
+                            // The API sends cumulative strings for outputTranscription
+                            if (last && last.role === 'model') { last.text = outputTranscription.text; }
                             else { newTurns.push({ role: 'model', text: outputTranscription.text, id: Math.random() }); }
                             return newTurns;
                         });
