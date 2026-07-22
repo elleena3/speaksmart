@@ -21,7 +21,7 @@ import { getAuth } from 'firebase-admin/auth';
 // 로컬 개발 환경과 배포 환경(예: Vercel, App Hosting) 모두에서 이 환경 변수 설정이 필요합니다.
 // ====================================================================
 
-function initializeAdminApp(): App {
+function getAdminApp(): App {
   if (getApps().some(app => app.name === 'admin')) {
     return getApps().find(app => app.name === 'admin')!;
   }
@@ -48,9 +48,18 @@ function initializeAdminApp(): App {
   }
 }
 
-const adminApp = initializeAdminApp();
-const adminDb = getFirestore(adminApp);
-const adminStorage = getStorage(adminApp);
-const adminAuth = getAuth(adminApp);
+// Export getter functions instead of static constants to ensure Lazy Initialization.
+// This prevents Next.js / Webpack from crashing the entire server chunk if the env var is missing
+// but the user only wants to execute a completely different Server Action.
 
-export { adminDb, adminStorage, adminAuth };
+export function getAdminDb() {
+  return getFirestore(getAdminApp());
+}
+
+export function getAdminStorage() {
+  return getStorage(getAdminApp());
+}
+
+export function getAdminAuth() {
+  return getAuth(getAdminApp());
+}

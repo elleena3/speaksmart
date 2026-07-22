@@ -2,7 +2,7 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
-import { adminStorage } from '@/lib/firebase-admin';
+import { getAdminStorage } from '@/lib/firebase-admin';
 import { googleAI } from '@genkit-ai/google-genai';
 
 const AnalyzePdfFromStorageInputSchema = z.object({
@@ -59,25 +59,26 @@ const analyzePdfFromStorageFlow = ai.defineFlow(
       console.log(`[PDF Flow] Starting analysis for file: ${filePath}`);
 
       // 1. Download the file from Firebase Storage into a buffer
+      const adminStorage = getAdminStorage();
       const bucket = adminStorage.bucket();
       const file = bucket.file(filePath);
       const [buffer] = await file.download();
-      
+
       console.log(`[PDF Flow] File downloaded successfully. Size: ${buffer.length} bytes.`);
 
       const pdfDataUri = `data:application/pdf;base64,${buffer.toString("base64")}`;
 
       // 2. Call the model with the Data URI, now wrapped in our retry logic.
-      const result = await withRetry(() => 
+      const result = await withRetry(() =>
         ai.generate({
           model: googleAI.model('gemini-3.1-pro-preview'),
           prompt: [
-              { text: prompt },
-              { media: { url: pdfDataUri } }
+            { text: prompt },
+            { media: { url: pdfDataUri } }
           ],
         })
       );
-      
+
       const analysisText = result.text;
       if (!analysisText) {
         throw new Error("AI model did not return a valid text analysis from the PDF.");
