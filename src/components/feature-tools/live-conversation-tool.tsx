@@ -191,10 +191,12 @@ export function LiveConversationTool() {
                                     const bytes = new Uint8Array(len);
                                     for (let i = 0; i < len; i++) { bytes[i] = binaryStr.charCodeAt(i); }
 
-                                    // Gemini returns 24kHz PCM for model audio out
-                                    const int16Array = new Int16Array(bytes.buffer);
-                                    const float32Array = new Float32Array(int16Array.length);
-                                    for (let i = 0; i < int16Array.length; i++) { float32Array[i] = int16Array[i] / 32768.0; }
+                                    // Gemini returns 24kHz PCM for model audio out (Little Endian)
+                                    const float32Array = new Float32Array(len / 2);
+                                    const dataView = new DataView(bytes.buffer);
+                                    for (let i = 0; i < len / 2; i++) {
+                                        float32Array[i] = dataView.getInt16(i * 2, true) / 32768.0;
+                                    }
 
                                     const audioCtx = audioContextRef.current;
                                     if (audioCtx) {
@@ -206,6 +208,8 @@ export function LiveConversationTool() {
                                         const startTime = Math.max(audioCtx.currentTime, nextPlayTimeRef.current);
                                         source.start(startTime);
                                         nextPlayTimeRef.current = startTime + audioBuffer.duration;
+
+                                        console.log(`[Audio] Scheduled ${audioBuffer.duration.toFixed(2)}s chunk at ${startTime.toFixed(2)} (Ctx time: ${audioCtx.currentTime.toFixed(2)})`);
                                     }
                                 } catch (e) {
                                     console.error("Audio playback error:", e);

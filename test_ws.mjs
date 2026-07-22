@@ -1,5 +1,6 @@
 import WebSocket from 'ws';
 import dotenv from 'dotenv';
+import fs from 'fs';
 dotenv.config({ path: '.env.local' });
 dotenv.config({ path: '.env' });
 
@@ -9,22 +10,33 @@ const url = `wss://${HOST}/ws/google.ai.generativelanguage.v1alpha.GenerativeSer
 
 const ws = new WebSocket(url);
 ws.on('open', () => {
-    const setup = {
+    console.log("Connected");
+    ws.send(JSON.stringify({
         setup: {
             model: "models/gemini-3.1-flash-live-preview",
-            generationConfig: {
-                responseModalities: ["AUDIO"],
-                speechConfig: {
-                    voiceConfig: { prebuiltVoiceConfig: { voiceName: "Aoede" } }
-                }
+            generationConfig: { responseModalities: ["AUDIO"] }
+        }
+    }));
+});
+let gotComplete = false;
+ws.on('message', (data) => {
+    const raw = String(data);
+    const obj = JSON.parse(raw);
+    if (obj.setupComplete) {
+        console.log("Setup complete, sending Hello");
+        ws.send(JSON.stringify({ clientContent: { turns: [{ role: "user", parts: [{ text: "Hello! Tell me a long story about a dog." }] }], turnComplete: true } }));
+    }
+    if (obj.serverContent?.modelTurn) {
+        for (let part of obj.serverContent.modelTurn.parts) {
+            if (part.inlineData?.data) {
+                const buf = Buffer.from(part.inlineData.data, 'base64');
+                console.log("Got audio buffer of length:", buf.length);
+                fs.appendFileSync('out.pcm', buf);
             }
         }
-    };
-    ws.send(JSON.stringify(setup));
+    }
+    if (obj.serverContent?.turnComplete) {
+        console.log("Turn complete");
+        process.exit(0);
+    }
 });
-ws.on('message', async (data) => {
-    console.log("Message received:", typeof data, data instanceof Buffer ? data.toString() : data);
-});
-ws.on('error', (err) => console.error("Error:", err));
-ws.on('close', (code, reason) => console.log("Closed:", code, String(reason)));
-setTimeout(() => process.exit(0), 3000);
