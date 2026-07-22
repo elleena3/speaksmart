@@ -34,8 +34,9 @@ export const evaluationModels = [
   "googleai/gemini-3.1-pro-preview",
   // OpenAI Models
   "openai/gpt-4o",
-  "openai/gpt-4-turbo",
-  "openai/gpt-3.5-turbo"
+  "openai/gpt-4o-mini",
+  "openai/o3-mini",
+  "openai/o1"
 ] as const;
 export type EvaluationModel = (typeof evaluationModels)[number];
 

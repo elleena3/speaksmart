@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { StandaloneDialogueTool } from "@/components/feature-tools/standalone-dialogue-tool";
 import { OpenAiTtsDialogueTool } from "@/components/feature-tools/openai-tts-dialogue-tool";
 import { LiveConversationTool } from "@/components/feature-tools/live-conversation-tool";
+import { OpenAiRealtimeConversationTool } from "@/components/feature-tools/openai-realtime-conversation-tool";
 
 
 export default function ConversationToolsPage() {
@@ -21,6 +22,13 @@ export default function ConversationToolsPage() {
                         <CardDescription>Gemini Live API를 사용한 WebSocket 실시간 영어 대화 연습 및 평가 도구입니다.</CardDescription>
                     </CardHeader>
                     <LiveConversationTool />
+                </Card>
+                <Card className="border-emerald-500 shadow-md">
+                    <CardHeader>
+                        <CardTitle className="text-emerald-600">실시간 원어민 대화 도구 (OpenAI Realtime API)</CardTitle>
+                        <CardDescription>WebRTC 음성 데이터 스트리밍 기반의 초저지연 OpenAI 실시간 영어 대화 연습 및 평가 도구입니다.</CardDescription>
+                    </CardHeader>
+                    <OpenAiRealtimeConversationTool />
                 </Card>
                 <Card>
                     <CardHeader>
