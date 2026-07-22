@@ -18,7 +18,6 @@ import { PdfMultiAnalyzerTool } from "./pdf-multi-analyzer-tool";
 import { FirestoreTestTool } from "@/components/feature-tools/firestore-test-tool";
 import { StorageUploaderTool } from "@/components/feature-tools/storage-uploader-tool";
 import { TtsModelTesterTool } from "@/components/feature-tools/tts-model-tester-tool";
-import { LiveConversationTool } from "@/components/feature-tools/live-conversation-tool";
 
 export default function MiscPage() {
     const { t } = useLanguage();
@@ -30,13 +29,6 @@ export default function MiscPage() {
                 <p className="text-muted-foreground">{t.teacherMisc.description}</p>
             </div>
             <div className="grid grid-cols-1 gap-6">
-                <Card className="border-blue-500 shadow-md">
-                    <CardHeader>
-                        <CardTitle className="text-blue-600">실시간 원어민 대화 도구 (Live API)</CardTitle>
-                        <CardDescription>Gemini Live API를 사용한 WebSocket 실시간 영어 대화 연습 및 평가 도구입니다.</CardDescription>
-                    </CardHeader>
-                    <LiveConversationTool />
-                </Card>
                 <Card>
                     <CardHeader>
                         <CardTitle>TTS 모델별 음성 테스트</CardTitle>
