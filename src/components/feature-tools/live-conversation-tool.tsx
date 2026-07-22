@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Mic, Square, Loader2, Play, CheckCircle2, User, Bot, AlertTriangle, RefreshCw } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { getLiveSessionToken } from "@/ai/flows/get-live-session-token";
+import { generateTtsByModelFlow } from "@/ai/flows/generate-tts-by-model-flow";
 import { analyzeLiveConversation, type AnalyzeLiveConversationOutput } from "@/ai/flows/analyze-live-conversation-flow";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -29,6 +30,7 @@ export function LiveConversationTool() {
     const recognitionRef = useRef<any>(null);
     const setupCompleteRef = useRef<boolean>(false);
     const aiIsSpeakingRef = useRef<boolean>(false);
+    const turnReceivedAudioRef = useRef<boolean>(false);
 
     // For AI audio playback queue
     const nextPlayTimeRef = useRef<number>(0);
@@ -148,13 +150,17 @@ export function LiveConversationTool() {
                             return newTurns;
                         });
 
-                        if (isFinal && wsRef.current && wsRef.current.readyState === WebSocket.OPEN && !aiIsSpeakingRef.current) {
-                            wsRef.current.send(JSON.stringify({
+                        if (isFinal && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                            const payload = {
                                 clientContent: {
                                     turns: [{ role: "user", parts: [{ text: transcript }] }],
                                     turnComplete: true
                                 }
-                            }));
+                            };
+                            console.log("[Live API] Sending Turn:", payload);
+                            wsRef.current.send(JSON.stringify(payload));
+                            // Ensure AI speaking lock is lifted since we successfully sent a new turn
+                            aiIsSpeakingRef.current = false;
                         }
                     };
                     recognition.start();
@@ -205,6 +211,7 @@ export function LiveConversationTool() {
                             }
 
                             if (part.inlineData && part.inlineData.data) {
+                                turnReceivedAudioRef.current = true;
                                 setAudioChunkCount(c => c + 1);
                                 // Play audio buffer
                                 try {
@@ -239,8 +246,28 @@ export function LiveConversationTool() {
                     }
 
                     if (response.serverContent?.turnComplete) {
+                        const finalTurnText = currentTurnText;
                         currentTurnText = ""; // reset for next turn
-                        aiIsSpeakingRef.current = false; // Unlock mic for user
+
+                        if (!turnReceivedAudioRef.current && finalTurnText.trim() !== "") {
+                            // Fallback TTS generation if websocket stripped audio modality
+                            generateTtsByModelFlow({ text: finalTurnText, model: "googleai/gemini-3.1-flash-tts-preview" })
+                                .then(res => {
+                                    const audio = new Audio(res.audioDataUri);
+                                    audio.onended = () => { aiIsSpeakingRef.current = false; };
+                                    audio.play().catch(e => {
+                                        console.error("Fallback TTS Playback Error:", e);
+                                        aiIsSpeakingRef.current = false;
+                                    });
+                                })
+                                .catch(e => {
+                                    console.error("Fallback TTS Generation Error:", e);
+                                    aiIsSpeakingRef.current = false;
+                                });
+                        } else {
+                            aiIsSpeakingRef.current = false; // Unlock mic immediately if native stream played
+                        }
+                        turnReceivedAudioRef.current = false;
                     }
 
                     // Handle Live API transcriptions
