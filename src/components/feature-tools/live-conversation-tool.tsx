@@ -24,7 +24,6 @@ export function LiveConversationTool() {
     const wsRef = useRef<WebSocket | null>(null);
     const audioContextRef = useRef<AudioContext | null>(null);
     const scriptProcessorRef = useRef<ScriptProcessorNode | null>(null);
-    const workletNodeRef = useRef<AudioWorkletNode | null>(null);
     const micStreamRef = useRef<MediaStream | null>(null);
     const recognitionRef = useRef<any>(null);
     const setupCompleteRef = useRef<boolean>(false);
@@ -45,10 +44,6 @@ export function LiveConversationTool() {
         if (micStreamRef.current) {
             micStreamRef.current.getTracks().forEach(t => t.stop());
             micStreamRef.current = null;
-        }
-        if (workletNodeRef.current) {
-            workletNodeRef.current.disconnect();
-            workletNodeRef.current = null;
         }
         if (audioContextRef.current) {
             audioContextRef.current.close().catch(console.warn);
@@ -91,32 +86,6 @@ export function LiveConversationTool() {
             if (audioCtx.state === 'suspended') {
                 await audioCtx.resume();
             }
-
-            // Unbreakable FIFO Audio Queue via inline Worklet
-            const workletCode = `
-                class PCMProcessor extends AudioWorkletProcessor {
-                    constructor() {
-                        super();
-                        this.buffer = [];
-                        this.port.onmessage = e => this.buffer.push(...e.data);
-                    }
-                    process(inputs, outputs) {
-                        const output = outputs[0][0];
-                        for (let i = 0; i < output.length; i++) {
-                            output[i] = this.buffer.length ? this.buffer.shift() : 0;
-                        }
-                        return true;
-                    }
-                }
-                registerProcessor("pcm-processor", PCMProcessor);
-            `;
-            const blob = new Blob([workletCode], { type: "application/javascript" });
-            const workletUrl = URL.createObjectURL(blob);
-            await audioCtx.audioWorklet.addModule(workletUrl);
-
-            const workletNode = new AudioWorkletNode(audioCtx, "pcm-processor");
-            workletNode.connect(audioCtx.destination);
-            workletNodeRef.current = workletNode;
 
             const token = await getLiveSessionToken();
             const HOST = "generativelanguage.googleapis.com";
@@ -199,7 +168,7 @@ export function LiveConversationTool() {
                         setTurns(prev => {
                             const newTurns = [...prev];
                             const last = newTurns[newTurns.length - 1];
-                            if (last && last.role === 'user') { last.text += " " + transcript; }
+                            if (last && last.role === 'user') { last.text = transcript; }
                             else { newTurns.push({ role: 'user', text: transcript, id: Math.random() }); }
                             return newTurns;
                         });
@@ -263,9 +232,16 @@ export function LiveConversationTool() {
                                         float32Array[i] = dataView.getInt16(i * 2, true) / 32768.0;
                                     }
 
-                                    if (workletNodeRef.current) {
-                                        workletNodeRef.current.port.postMessage(float32Array);
-                                        console.log(`[Audio] Pushed ${float32Array.length} samples to Worklet queue`);
+                                    const audioCtx = audioContextRef.current;
+                                    if (audioCtx) {
+                                        const audioBuffer = audioCtx.createBuffer(1, float32Array.length, 24000);
+                                        audioBuffer.copyToChannel(float32Array, 0);
+                                        const source = audioCtx.createBufferSource();
+                                        source.buffer = audioBuffer;
+                                        source.connect(audioCtx.destination);
+                                        const startTime = Math.max(audioCtx.currentTime, nextPlayTimeRef.current);
+                                        source.start(startTime);
+                                        nextPlayTimeRef.current = startTime + audioBuffer.duration;
                                     }
                                 } catch (e) {
                                     console.error("Audio playback error:", e);
@@ -284,7 +260,8 @@ export function LiveConversationTool() {
                         setTurns(prev => {
                             const newTurns = [...prev];
                             const last = newTurns[newTurns.length - 1];
-                            if (last && last.role === 'user') { last.text += " " + inputTranscription.text; }
+                            // The API sends the cumulative text for the turn, so we replace, we DO NOT append.
+                            if (last && last.role === 'user') { last.text = inputTranscription.text; }
                             else { newTurns.push({ role: 'user', text: inputTranscription.text, id: Math.random() }); }
                             return newTurns;
                         });
@@ -293,7 +270,8 @@ export function LiveConversationTool() {
                         setTurns(prev => {
                             const newTurns = [...prev];
                             const last = newTurns[newTurns.length - 1];
-                            if (last && last.role === 'model') { last.text += " " + outputTranscription.text; }
+                            // The API sends the cumulative text for the turn, so we replace, we DO NOT append.
+                            if (last && last.role === 'model') { last.text = outputTranscription.text; }
                             else { newTurns.push({ role: 'model', text: outputTranscription.text, id: Math.random() }); }
                             return newTurns;
                         });
