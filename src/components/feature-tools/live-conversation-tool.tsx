@@ -25,6 +25,7 @@ export function LiveConversationTool() {
     const audioContextRef = useRef<AudioContext | null>(null);
     const scriptProcessorRef = useRef<ScriptProcessorNode | null>(null);
     const micStreamRef = useRef<MediaStream | null>(null);
+    const setupCompleteRef = useRef<boolean>(false);
 
     // For AI audio playback queue
     const nextPlayTimeRef = useRef<number>(0);
@@ -82,6 +83,7 @@ export function LiveConversationTool() {
 
             const ws = new WebSocket(url);
             wsRef.current = ws;
+            setupCompleteRef.current = false;
 
             ws.onopen = async () => {
                 // Send setup message
@@ -110,7 +112,7 @@ export function LiveConversationTool() {
                 scriptProcessorRef.current = processor;
 
                 processor.onaudioprocess = (e) => {
-                    if (ws.readyState !== WebSocket.OPEN) return;
+                    if (ws.readyState !== WebSocket.OPEN || !setupCompleteRef.current) return;
                     const float32Data = e.inputBuffer.getChannelData(0);
                     // Convert Float32 to Int16 PCM
                     const pcmData = new Int16Array(float32Data.length);
@@ -128,10 +130,7 @@ export function LiveConversationTool() {
                 source.connect(processor);
                 processor.connect(audioCtx.destination);
 
-                // Client events
-                ws.send(JSON.stringify({ clientContent: { turns: [{ role: "user", parts: [{ text: "Hello! I want to practice English. Let's talk!" }] }] } }));
-                setAppState('connected');
-                toast({ title: "연결 성공", description: "이제 자유롭게 영어로 대화해보세요!" });
+                toast({ title: "소켓 연결됨", description: "원어민 강사 서버 설정 중..." });
             };
 
             let currentTurnText = "";
@@ -143,6 +142,13 @@ export function LiveConversationTool() {
                         textData = await textData.text();
                     }
                     const response = JSON.parse(textData);
+
+                    if (response.setupComplete) {
+                        setupCompleteRef.current = true;
+                        setAppState('connected');
+                        ws.send(JSON.stringify({ clientContent: { turns: [{ role: "user", parts: [{ text: "Hello! I want to practice English. Let's talk!" }] }] } }));
+                        toast({ title: "연결 성공", description: "이제 자유롭게 영어로 대화해 보세요!" });
+                    }
 
                     if (response.serverContent?.modelTurn) {
                         const parts = response.serverContent.modelTurn.parts;
