@@ -19,6 +19,7 @@ export function OpenAiRealtimeConversationTool() {
 
     // Defaulting to the cheaper "mini" model as requested
     const [selectedModel, setSelectedModel] = useState<string>("gpt-4o-mini-realtime-preview");
+    const [selectedVoice, setSelectedVoice] = useState<string>("alloy");
 
     const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
     const dataChannelRef = useRef<RTCDataChannel | null>(null);
@@ -46,7 +47,10 @@ export function OpenAiRealtimeConversationTool() {
 
         try {
             // 1. Get ephemeral token from backend
-            const tokenResponse = await getOpenAiLiveSessionToken();
+            const tokenResponse = await getOpenAiLiveSessionToken({
+                model: selectedModel === "gpt-4o-mini-realtime-preview" ? "gpt-4o-mini-realtime-preview-2024-12-17" : "gpt-4o-realtime-preview-2024-12-17",
+                voice: selectedVoice as any
+            });
             const ephemeralKey = tokenResponse.client_secret.value;
 
             // 2. Create Peer Connection
@@ -139,7 +143,22 @@ export function OpenAiRealtimeConversationTool() {
                             <Rss className={appState === 'connected' ? 'text-green-500 animate-pulse' : 'text-slate-400'} />
                             OpenAI 실시간 통화 대화
                         </div>
-                        <div className="w-72">
+                        <div className="w-[450px] flex gap-2">
+                            <Select value={selectedVoice} onValueChange={setSelectedVoice} disabled={appState !== 'idle'}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="목소리 선택" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="alloy">Alloy (여성-중립)</SelectItem>
+                                    <SelectItem value="echo">Echo (남성-부드러움)</SelectItem>
+                                    <SelectItem value="shimmer">Shimmer (여성-밝음)</SelectItem>
+                                    <SelectItem value="ash">Ash (남성-진지함)</SelectItem>
+                                    <SelectItem value="ballad">Ballad (남성-차분함)</SelectItem>
+                                    <SelectItem value="coral">Coral (여성-상쾌함)</SelectItem>
+                                    <SelectItem value="sage">Sage (여성-전문적)</SelectItem>
+                                    <SelectItem value="verse">Verse (남성-에너제틱)</SelectItem>
+                                </SelectContent>
+                            </Select>
                             <Select value={selectedModel} onValueChange={setSelectedModel} disabled={appState !== 'idle'}>
                                 <SelectTrigger>
                                     <SelectValue placeholder="AI 모델 선택" />

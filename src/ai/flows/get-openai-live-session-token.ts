@@ -3,7 +3,10 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 
-const GetOpenAiLiveSessionTokenInputSchema = z.object({});
+const GetOpenAiLiveSessionTokenInputSchema = z.object({
+    voice: z.enum(['alloy', 'ash', 'ballad', 'coral', 'echo', 'sage', 'shimmer', 'verse']).optional().default('alloy'),
+    model: z.string().optional().default('gpt-4o-mini-realtime-preview-2024-12-17')
+});
 export type GetOpenAiLiveSessionTokenInput = z.infer<typeof GetOpenAiLiveSessionTokenInputSchema>;
 
 const GetOpenAiLiveSessionTokenOutputSchema = z.object({
@@ -16,7 +19,7 @@ const GetOpenAiLiveSessionTokenOutputSchema = z.object({
 export type GetOpenAiLiveSessionTokenOutput = z.infer<typeof GetOpenAiLiveSessionTokenOutputSchema>;
 
 export async function getOpenAiLiveSessionToken(input?: GetOpenAiLiveSessionTokenInput): Promise<GetOpenAiLiveSessionTokenOutput> {
-    return getOpenAiLiveSessionTokenFlow(input || {});
+    return getOpenAiLiveSessionTokenFlow((input || {}) as GetOpenAiLiveSessionTokenInput);
 }
 
 const getOpenAiLiveSessionTokenFlow = ai.defineFlow(
@@ -25,10 +28,16 @@ const getOpenAiLiveSessionTokenFlow = ai.defineFlow(
         inputSchema: GetOpenAiLiveSessionTokenInputSchema,
         outputSchema: GetOpenAiLiveSessionTokenOutputSchema,
     },
-    async () => {
+    async ({ voice, model }) => {
         // Generate an ephemeral token from OpenAI using the stored backend API Key
         const apiKey = process.env.OPENAI_API_KEY;
         if (!apiKey) throw new Error("OPENAI_API_KEY is not configured on the server.");
+
+        const reqBody = {
+            "model": model,
+            "voice": voice,
+            "instructions": "You are a friendly native English tutor. Speak naturally and converse interactively with the user."
+        };
 
         const response = await fetch("https://api.openai.com/v1/realtime/sessions", {
             method: "POST",
@@ -36,11 +45,7 @@ const getOpenAiLiveSessionTokenFlow = ai.defineFlow(
                 "Authorization": `Bearer ${apiKey}`,
                 "Content-Type": "application/json",
             },
-            body: JSON.stringify({
-                "model": "gpt-4o-realtime-preview-2024-12-17",
-                "voice": "alloy",
-                "instructions": "You are a friendly native English tutor. Speak naturally and converse interactively with the user."
-            }),
+            body: JSON.stringify(reqBody),
         });
 
         if (!response.ok) {

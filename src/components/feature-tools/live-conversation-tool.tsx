@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import { Mic, Square, Loader2, Play, CheckCircle2, User, Bot, AlertTriangle, RefreshCw } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getLiveSessionToken } from "@/ai/flows/get-live-session-token";
 import { generateTtsByModelFlow } from "@/ai/flows/generate-tts-by-model-flow";
 import { analyzeLiveConversation, type AnalyzeLiveConversationOutput } from "@/ai/flows/analyze-live-conversation-flow";
@@ -22,6 +23,7 @@ export function LiveConversationTool() {
     const [turns, setTurns] = useState<Turn[]>([]);
     const [result, setResult] = useState<AnalyzeLiveConversationOutput | null>(null);
     const [audioChunkCount, setAudioChunkCount] = useState<number>(0);
+    const [selectedVoice, setSelectedVoice] = useState<string>("Aoede");
 
     const wsRef = useRef<WebSocket | null>(null);
     const audioContextRef = useRef<AudioContext | null>(null);
@@ -108,7 +110,14 @@ export function LiveConversationTool() {
                             parts: [{ text: "You are a friendly native English tutor. Speak naturally and converse interactively with the user." }]
                         },
                         generationConfig: {
-                            responseModalities: ["AUDIO"]
+                            responseModalities: ["AUDIO"],
+                            speechConfig: {
+                                voiceConfig: {
+                                    prebuiltVoiceConfig: {
+                                        voiceName: selectedVoice
+                                    }
+                                }
+                            }
                         }
                     }
                 };
@@ -357,9 +366,25 @@ export function LiveConversationTool() {
         <div className="space-y-4 max-w-4xl mx-auto">
             <Card>
                 <CardHeader>
-                    <CardTitle className="text-xl flex items-center gap-2">
-                        <Mic className={appState === 'connected' ? 'text-red-500 animate-pulse' : ''} />
-                        실시간 원어민 프리토킹 (Live API)
+                    <CardTitle className="text-xl flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <Mic className={appState === 'connected' ? 'text-red-500 animate-pulse' : ''} />
+                            실시간 원어민 프리토킹 (Live API)
+                        </div>
+                        <div className="w-[200px]">
+                            <Select value={selectedVoice} onValueChange={setSelectedVoice} disabled={appState !== 'idle' && appState !== 'finished'}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="목소리 선택" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="Aoede">Aoede (여성-기본)</SelectItem>
+                                    <SelectItem value="Kore">Kore (여성-단정한)</SelectItem>
+                                    <SelectItem value="Puck">Puck (남성-활기참)</SelectItem>
+                                    <SelectItem value="Charon">Charon (남성-진중함)</SelectItem>
+                                    <SelectItem value="Fenrir">Fenrir (남성-묵직함)</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
                     </CardTitle>
                     <CardDescription>
                         클릭 한 번으로 원어민 AI 강사와 딜레이 없는 실시간 대화를 나눌 수 있습니다. 대화가 끝나면 분석 리포트가 생성됩니다.
