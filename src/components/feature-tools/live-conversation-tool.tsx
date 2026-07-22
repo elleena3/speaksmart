@@ -79,7 +79,7 @@ export function LiveConversationTool() {
             const HOST = "generativelanguage.googleapis.com";
             // Important: Use model gemini-2.0-flash-exp for Live API over WS, or 3.1-flash-live-preview
             // Currently 2.0-flash-exp is universally supported for Live API. We will use gemini-2.0-flash-exp as per docs for WS endpoint.
-            const url = `wss://${HOST}/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${token}`;
+            const url = `wss://${HOST}/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${token}`;
 
             const ws = new WebSocket(url);
             wsRef.current = ws;
@@ -89,7 +89,7 @@ export function LiveConversationTool() {
                 // Send setup message
                 const setupMessage = {
                     setup: {
-                        model: "models/gemini-2.0-flash-exp",
+                        model: "models/gemini-3.1-flash-live-preview",
                         generationConfig: {
                             responseModalities: ["AUDIO"],
                             speechConfig: {
