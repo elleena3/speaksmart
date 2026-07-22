@@ -106,10 +106,7 @@ export function LiveConversationTool() {
                     setup: {
                         model: "models/gemini-3.1-flash-live-preview",
                         generationConfig: {
-                            responseModalities: ["AUDIO"],
-                            speechConfig: {
-                                voiceConfig: { prebuiltVoiceConfig: { voiceName: "Aoede" } }
-                            }
+                            responseModalities: ["AUDIO"]
                         }
                     }
                 };
@@ -121,53 +118,12 @@ export function LiveConversationTool() {
 
                 nextPlayTimeRef.current = 0;
 
+                // Delete ScriptProcessorNode completely, we will use Web Speech API to send Text-based turns perfectly
+                // Route mic stream through a muted gain node just to keep the track explicitly 'active' if needed by browser
                 const source = audioCtx.createMediaStreamSource(stream);
-                const processor = audioCtx.createScriptProcessor(4096, 1, 1);
-                scriptProcessorRef.current = processor;
-
-                processor.onaudioprocess = (e) => {
-                    if (!wsRef.current || !setupCompleteRef.current) return;
-                    if (aiIsSpeakingRef.current) return; // STRICTLY block microphone if AI is generating/speaking to prevent false barge-ins!
-
-                    const float32Data = e.inputBuffer.getChannelData(0);
-
-                    // Simple RMS Noise Gate to prevent background noise from interrupting the AI
-                    let rms = 0;
-                    for (let i = 0; i < float32Data.length; i++) {
-                        rms += float32Data[i] * float32Data[i];
-                    }
-                    rms = Math.sqrt(rms / float32Data.length);
-                    if (rms < 0.05) return; // Raised gate threshold significantly
-
-                    // Convert Float32 to Int16 PCM
-                    const pcmData = new Int16Array(float32Data.length);
-                    for (let i = 0; i < float32Data.length; i++) {
-                        let s = Math.max(-1, Math.min(1, float32Data[i]));
-                        pcmData[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
-                    }
-
-                    // Convert to base64
-                    const buf = new Uint8Array(pcmData.buffer);
-                    let binaryStr = '';
-                    for (let i = 0; i < buf.length; i++) { binaryStr += String.fromCharCode(buf[i]); }
-                    const base64Data = btoa(binaryStr);
-
-                    if (wsRef.current.readyState === WebSocket.OPEN) {
-                        wsRef.current.send(JSON.stringify({
-                            realtimeInput: {
-                                audio: { mimeType: "audio/pcm;rate=16000", data: base64Data }
-                            }
-                        }));
-                    }
-                };
-
-                source.connect(processor);
-
-                // Route through a muted gain node to prevent silent buffers from overriding the speaker out,
-                // while keeping the processor alive in WebKit browsers.
                 const dummyGain = audioCtx.createGain();
                 dummyGain.gain.value = 0;
-                processor.connect(dummyGain);
+                source.connect(dummyGain);
                 dummyGain.connect(audioCtx.destination);
 
                 // Setup local webkit Speech Recognition for instant user transcription fallback
@@ -179,9 +135,10 @@ export function LiveConversationTool() {
                     recognition.interimResults = true;
                     recognition.lang = 'en-US';
                     recognition.onresult = (event: any) => {
-                        const transcript = Array.from(event.results)
-                            .map((res: any) => res[0].transcript)
-                            .join('');
+                        const res = event.results[event.results.length - 1];
+                        const transcript = res[0].transcript;
+                        const isFinal = res.isFinal;
+
                         setTurns(prev => {
                             const newTurns = [...prev];
                             const last = newTurns[newTurns.length - 1];
@@ -190,6 +147,15 @@ export function LiveConversationTool() {
                             } else { newTurns.push({ role: 'user', text: transcript, id: Math.random() }); }
                             return newTurns;
                         });
+
+                        if (isFinal && wsRef.current && wsRef.current.readyState === WebSocket.OPEN && !aiIsSpeakingRef.current) {
+                            wsRef.current.send(JSON.stringify({
+                                clientContent: {
+                                    turns: [{ role: "user", parts: [{ text: transcript }] }],
+                                    turnComplete: true
+                                }
+                            }));
+                        }
                     };
                     recognition.start();
                     recognitionRef.current = recognition;
