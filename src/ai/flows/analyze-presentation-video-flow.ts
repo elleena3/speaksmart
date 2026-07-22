@@ -14,8 +14,8 @@ import { googleAI } from '@genkit-ai/google-genai';
 import { z } from 'zod';
 
 const FeedbackSchema = z.object({
-    score: z.number().int().min(0).max(100).describe("The score for this category, from 0 to 100."),
-    feedback: z.string().describe("Specific, constructive feedback for this category in Korean, including examples from the presentation."),
+  score: z.number().int().min(0).max(100).describe("The score for this category, from 0 to 100."),
+  feedback: z.string().describe("Specific, constructive feedback for this category in Korean, including examples from the presentation."),
 });
 
 const AnalyzePresentationVideoInputSchema = z.object({
@@ -47,11 +47,11 @@ export async function analyzePresentationVideo(input: AnalyzePresentationVideoIn
 }
 
 const presentationAnalysisPrompt = ai.definePrompt({
-    name: 'presentationAnalysisPrompt',
-    model: googleAI.model('gemini-3.1-pro-preview'),
-    input: { schema: AnalyzePresentationVideoInputSchema },
-    output: { schema: AnalyzePresentationVideoOutputSchema },
-    prompt: `You are an expert AI teacher evaluating a student's English presentation or conversation performance. Your task is to provide a comprehensive, multi-faceted evaluation based on a video, optional presentation materials, and specific criteria. All feedback must be in Korean.
+  name: 'presentationAnalysisPrompt',
+  model: googleAI.model('gemini-3.1-pro-preview'),
+  input: { schema: AnalyzePresentationVideoInputSchema },
+  output: { schema: AnalyzePresentationVideoOutputSchema },
+  prompt: `You are an expert AI teacher evaluating a student's English presentation or conversation performance. Your task is to provide a comprehensive, multi-faceted evaluation based on a video, optional presentation materials, and specific criteria. All feedback must be in Korean.
 
 ### Provided Materials for Evaluation:
 1.  **Student's Presentation Video:**
@@ -98,12 +98,18 @@ In addition to the core framework, pay special attention to the following criter
 ### IMPORTANT ANALYSIS INSTRUCTION:
 If the video appears to be a casual conversation, a non-standard activity, or does not fit a formal presentation structure, you MUST **prioritize the teacher's custom criteria** as the main evaluation framework. In this case, adapt your analysis of Content, Language, and Delivery to reflect the custom criteria. If no custom criteria are provided for such a video, evaluate based on general conversational abilities.
 
-### Your Task:
-1.  **Analyze and Score Each Category:** Carefully review all provided materials. For each of the three main categories (Content, Language Competence, Delivery), provide a score from 0 to 100.
-2.  **Write Detailed Feedback for Each Category:** For each category, write specific, constructive feedback in Korean. Justify the score you gave by providing concrete examples (what the student did well, what they did wrong) from the video and/or presentation materials.
-3.  **Calculate Overall Score:** Calculate a final weighted score. The weights are: Content (40%), Language Competence (40%), Delivery (20%).
-4.  **Write Overall Feedback:** Provide a holistic summary of the student's performance. Highlight their key strengths and suggest the most critical areas for improvement.
-5.  **Format the Output:** Return the complete analysis in the specified JSON format.
+### Your Output Formatting Tasks:
+1.  **Category Scoring:** Provide a base score (0-100) for Content, Language Competence, and Delivery.
+2.  **Category Feedback Writing (Markdown):** 
+    -   For **Content (내용)**: You MUST include an evaluation of the Opening (도입부) and Closing (마무리). Did they grab the audience's attention? Provide a concrete rewrite suggestion for a better opening or closing script.
+    -   For **Language Competence (언어)** & **Delivery (발표 태도)**: You MUST use **[MM:SS] timestamp format** to point out specific errors or excellent moments (e.g., "[00:45] - 말 속도가 너무 빨라짐"). Give actionable solutions for these timestamped issues.
+3.  **Overall Score:** Calculate a final weighted score: Content (40%), Language (40%), Delivery (20%).
+4.  **Overall Feedback (\`overallFeedback\`) (Markdown):** 
+    -   Must strictly follow this structure:
+        -   **[발표 종합 평가]**: Summarize exactly 2 strengths (강점 2가지) and 2 areas for improvement (개선점 2가지).
+        -   **[전달력 핵심 팁]**: Provide exactly 3 actionable, core advice points regarding voice tone, intonation, gestures, and speed.
+
+5.  **Return JSON:** Format the complete analysis strictly in the specified JSON format.
 `,
 });
 

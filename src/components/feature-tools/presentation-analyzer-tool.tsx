@@ -33,9 +33,11 @@ const FeedbackCard = ({ title, score, feedback }: { title: string; score: number
             <ScoreDisplay label="점수" value={score} />
         </CardHeader>
         <CardContent>
-            <p className="text-sm text-muted-foreground">상세 피드백:</p>
-            <div className="p-4 mt-2 bg-muted/50 rounded-lg whitespace-pre-wrap font-body text-sm leading-relaxed">
-                {feedback}
+            <p className="text-sm text-muted-foreground mb-2">상세 피드백:</p>
+            <div className="p-4 bg-muted/30 rounded-lg markdown-content font-body text-sm leading-relaxed">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {feedback}
+                </ReactMarkdown>
             </div>
         </CardContent>
     </Card>
@@ -56,21 +58,21 @@ export function PresentationAnalyzerTool() {
 
         const validVideoTypes = ['video/mp4', 'video/webm'];
         const validPresentationTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.presentationml.presentation'];
-        
+
         if (fileType === 'video' && !validVideoTypes.includes(file.type)) {
             toast({ title: "지원하지 않는 동영상 형식", description: "MP4 또는 WebM 형식의 동영상 파일을 선택해주세요.", variant: "destructive" });
             event.target.value = '';
             return;
         }
-        
+
         if (fileType === 'presentation' && !validPresentationTypes.includes(file.type)) {
             toast({ title: "지원하지 않는 발표 자료 형식", description: "PDF 또는 PPTX 형식의 파일을 선택해주세요.", variant: "destructive" });
             event.target.value = '';
             return;
         }
 
-        if(fileType === 'video') setVideoFile(file);
-        if(fileType === 'presentation') setPresentationFile(file);
+        if (fileType === 'video') setVideoFile(file);
+        if (fileType === 'presentation') setPresentationFile(file);
     };
 
     const fileToDataUri = (file: File): Promise<string> => {
@@ -95,13 +97,13 @@ export function PresentationAnalyzerTool() {
         try {
             const videoDataUri = await fileToDataUri(videoFile);
             const presentationFileUri = presentationFile ? await fileToDataUri(presentationFile) : undefined;
-            
+
             const result = await analyzePresentationVideo({
                 videoDataUri,
                 presentationFileUri,
                 customCriteria: customCriteria || undefined,
             });
-            
+
             setAnalysisResult(result);
             setAnalysisState('analyzed');
             toast({ title: "분석 완료", description: "AI 발표 분석이 완료되었습니다." });
@@ -112,7 +114,7 @@ export function PresentationAnalyzerTool() {
             toast({ title: "분석 실패", description: `AI 분석 중 오류가 발생했습니다: ${e.message}`, variant: "destructive" });
         }
     };
-    
+
     const handleReset = () => {
         setAnalysisState('idle');
         setVideoFile(null);
@@ -122,9 +124,9 @@ export function PresentationAnalyzerTool() {
         setError(null);
         // Reset file input fields visually
         const videoInput = document.getElementById('video-upload') as HTMLInputElement;
-        if(videoInput) videoInput.value = '';
+        if (videoInput) videoInput.value = '';
         const presInput = document.getElementById('presentation-upload') as HTMLInputElement;
-        if(presInput) presInput.value = '';
+        if (presInput) presInput.value = '';
     };
 
     const isAnalyzeButtonDisabled = useMemo(() => {
@@ -135,33 +137,33 @@ export function PresentationAnalyzerTool() {
         <div className="space-y-4">
             <Card>
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2"><FileUp/> 자료 업로드</CardTitle>
+                    <CardTitle className="flex items-center gap-2"><FileUp /> 자료 업로드</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <Label htmlFor="video-upload" className="flex items-center gap-1">
-                                <VideoIcon className="h-4 w-4"/> 동영상 파일 <span className="text-red-500">*</span>
+                                <VideoIcon className="h-4 w-4" /> 동영상 파일 <span className="text-red-500">*</span>
                             </Label>
                             <Input id="video-upload" type="file" accept="video/mp4,video/webm" onChange={(e) => handleFileChange(e, 'video')} />
                             <p className="text-xs text-muted-foreground">MP4, WebM 형식, 1080p 이하</p>
                         </div>
-                         <div className="space-y-2">
+                        <div className="space-y-2">
                             <Label htmlFor="presentation-upload">발표 자료 (선택)</Label>
                             <Input id="presentation-upload" type="file" accept=".pdf,.pptx" onChange={(e) => handleFileChange(e, 'presentation')} />
-                             <p className="text-xs text-muted-foreground">PDF, PPTX 형식</p>
+                            <p className="text-xs text-muted-foreground">PDF, PPTX 형식</p>
                         </div>
                     </div>
-                     <div className="space-y-2">
+                    <div className="space-y-2">
                         <Label htmlFor="custom-criteria">추가 평가 요소 (선택)</Label>
-                        <Textarea 
+                        <Textarea
                             id="custom-criteria"
                             placeholder="예: 특정 어휘('moreover', 'consequently')를 2회 이상 사용했는지 평가해주세요."
                             value={customCriteria}
                             onChange={(e) => setCustomCriteria(e.target.value)}
                             rows={3}
                         />
-                         <p className="text-xs text-muted-foreground">AI가 평가 시 추가적으로 참고할 내용을 입력합니다.</p>
+                        <p className="text-xs text-muted-foreground">AI가 평가 시 추가적으로 참고할 내용을 입력합니다.</p>
                     </div>
                     <div className="flex gap-2 pt-2">
                         <Button onClick={handleAnalyze} disabled={isAnalyzeButtonDisabled} className="w-full">
@@ -185,7 +187,7 @@ export function PresentationAnalyzerTool() {
             {analysisState === 'error' && (
                 <Card className="border-destructive">
                     <CardHeader className="flex-row items-center gap-4">
-                        <AlertTriangle className="h-8 w-8 text-destructive"/>
+                        <AlertTriangle className="h-8 w-8 text-destructive" />
                         <div>
                             <CardTitle className="text-destructive">분석 오류</CardTitle>
                             <CardDescription className="text-destructive-foreground">{error}</CardDescription>
@@ -200,7 +202,7 @@ export function PresentationAnalyzerTool() {
                         <CardTitle>AI 발표 분석 종합 결과</CardTitle>
                         <CardDescription>가중치가 적용된 최종 점수는 다음과 같습니다: 내용(40%), 언어(40%), 태도(20%)</CardDescription>
                         <div className="pt-4">
-                             <ScoreDisplay label="최종 점수" value={analysisResult.overallScore} />
+                            <ScoreDisplay label="최종 점수" value={analysisResult.overallScore} />
                         </div>
                     </CardHeader>
                     <CardContent className="space-y-6">
@@ -208,9 +210,9 @@ export function PresentationAnalyzerTool() {
                         <FeedbackCard title="2. 언어적 능력 (Language Competence)" score={analysisResult.languageCompetence.score} feedback={analysisResult.languageCompetence.feedback} />
                         <FeedbackCard title="3. 발표 태도 (Delivery)" score={analysisResult.delivery.score} feedback={analysisResult.delivery.feedback} />
 
-                         <Card>
+                        <Card>
                             <CardHeader>
-                                <CardTitle className="flex items-center gap-2"><Info/> 종합 총평</CardTitle>
+                                <CardTitle className="flex items-center gap-2"><Info /> 종합 총평</CardTitle>
                             </CardHeader>
                             <CardContent>
                                 <div className="p-4 bg-muted/50 rounded-lg whitespace-pre-wrap font-body text-sm leading-relaxed markdown-content">
