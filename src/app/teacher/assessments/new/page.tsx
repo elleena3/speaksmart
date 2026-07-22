@@ -55,7 +55,7 @@ const promptExamples = [
 function FilterCombobox({ label, options, value, onSelect }: { label: string, options: string[], value: string, onSelect: (value: string) => void }) {
   const [open, setOpen] = useState(false);
   const displayValue = value === 'all' ? `모든 ${label}` : `${value}${label.endsWith('반') ? '반' : '학년'}`;
-  
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -100,15 +100,15 @@ export default function NewAssessmentPage() {
   const [voicePopoverOpen, setVoicePopoverOpen] = useState(false);
   const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
   const [formData, setFormData] = useState<z.infer<typeof formSchema> | null>(null);
-  
+
   const [imagePrompt, setImagePrompt] = useState("");
   const [generatedImageDataUri, setGeneratedImageDataUri] = useState<string | null>(null);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
-  
+
   const [realStudents, setRealStudents] = useState<UserData[]>([]);
   const [isStudentListLoading, setIsStudentListLoading] = useState(true);
   const [studentFilter, setStudentFilter] = useState<{ grade: string, class: string }>({ grade: 'all', class: 'all' });
-  
+
   const [savedRubrics, setSavedRubrics] = useState<any[]>([]);
   const [isRubricListLoading, setIsRubricListLoading] = useState(false);
   const [loadedRubricName, setLoadedRubricName] = useState<string | null>(null);
@@ -128,11 +128,11 @@ export default function NewAssessmentPage() {
     targetStudentIds: z.union([z.literal('all'), z.array(z.string()).min(1, "한 명 이상의 학생을 선택해야 합니다.")]),
     scenario: z.enum(scenarios as [Scenario, ...Scenario[]]).optional(),
     recordingTimeLimit: z.coerce.number().int().min(0).optional(),
-    aiVoice: z.enum(allVoices as [AiVoice, ...AiVoice[]]).optional().default('algenib'),
-    evaluationModel: z.enum(evaluationModels as [EvaluationModel, ...EvaluationModel[]]).optional().default('googleai/gemini-3.6-flash'),
+    aiVoice: z.enum(allVoices as unknown as [AiVoice, ...AiVoice[]]).optional().default('algenib'),
+    evaluationModel: z.enum(evaluationModels as unknown as [EvaluationModel, ...EvaluationModel[]]).optional().default('googleai/gemini-3.6-flash'),
     useRubric: z.boolean().default(false),
     loadedRubricId: z.string().optional(),
-    imageGenerationModel: z.enum(imageGenerationModels as [ImageGenerationModel, ...ImageGenerationModel[]]).optional().default('googleai/gemini-3.1-flash-image'),
+    imageGenerationModel: z.enum(imageGenerationModels as unknown as [ImageGenerationModel, ...ImageGenerationModel[]]).optional().default('googleai/gemini-3.1-flash-lite-image'),
   }).superRefine((data, ctx) => {
     const isFreeTalkDialogue = data.assessmentType === 'dialogue' && data.scenario === 'free-talk';
 
@@ -147,27 +147,27 @@ export default function NewAssessmentPage() {
         ctx.addIssue({ code: z.ZodIssueCode.custom, message: t.teacherAssessmentForm.errors.promptRequired, path: ['prompt'] });
       }
     }
-    
+
     if ((data.assessmentType === 'monologue' && data.monologueType === 'image') && !generatedImageDataUri) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "이미지를 먼저 생성해주세요.", path: ['monologueType'] });
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "이미지를 먼저 생성해주세요.", path: ['monologueType'] });
     }
-    
+
     if ((data.assessmentType === 'monologue' && data.monologueType === 'comic') && !generatedImageDataUri) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "만화를 먼저 생성해주세요.", path: ['monologueType'] });
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "만화를 먼저 생성해주세요.", path: ['monologueType'] });
     }
 
     if (data.assessmentType === 'monologue' && data.monologueType === 'text' && !data.useRubric) {
-        if (!data.expectedFormat) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: "루브릭을 사용하지 않는 경우, AI 평가를 위한 채점 기준을 필수로 입력해야 합니다.",
-            path: ['expectedFormat'],
-          });
-        }
+      if (!data.expectedFormat) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "루브릭을 사용하지 않는 경우, AI 평가를 위한 채점 기준을 필수로 입력해야 합니다.",
+          path: ['expectedFormat'],
+        });
+      }
     }
 
     if (data.targetType === 'specific' && Array.isArray(data.targetStudentIds) && data.targetStudentIds.length === 0) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, message: t.teacherAssessmentForm.errors.studentRequired, path: ['targetStudentIds']});
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: t.teacherAssessmentForm.errors.studentRequired, path: ['targetStudentIds'] });
     }
 
     if (data.startDate && data.endDate && data.endDate < data.startDate) {
@@ -191,10 +191,10 @@ export default function NewAssessmentPage() {
       aiVoice: 'algenib',
       evaluationModel: 'googleai/gemini-3.6-flash',
       useRubric: false,
-      imageGenerationModel: 'googleai/gemini-3.1-flash-image',
+      imageGenerationModel: 'googleai/gemini-3.1-flash-lite-image',
     },
   });
-  
+
   const assessmentType = form.watch("assessmentType");
   const monologueType = form.watch("monologueType");
   const targetType = form.watch("targetType");
@@ -204,19 +204,19 @@ export default function NewAssessmentPage() {
 
   useEffect(() => {
     if (!authLoading && !user) {
-        router.push('/');
+      router.push('/');
     } else if (user && !isStudentListLoading) {
       // Do nothing, student list is loaded
     } else if (user) {
-        const fetchStudents = async () => {
-            setIsStudentListLoading(true);
-            const q = query(collection(db, "users"), where("role", "==", "student"));
-            const querySnapshot = await getDocs(q);
-            const studentList = querySnapshot.docs.map(doc => ({ ...doc.data(), docId: doc.id }) as UserData);
-            setRealStudents(studentList);
-            setIsStudentListLoading(false);
-        };
-        fetchStudents();
+      const fetchStudents = async () => {
+        setIsStudentListLoading(true);
+        const q = query(collection(db, "users"), where("role", "==", "student"));
+        const querySnapshot = await getDocs(q);
+        const studentList = querySnapshot.docs.map(doc => ({ ...doc.data(), docId: doc.id }) as UserData);
+        setRealStudents(studentList);
+        setIsStudentListLoading(false);
+      };
+      fetchStudents();
     }
   }, [user, authLoading, router, isStudentListLoading]);
 
@@ -236,24 +236,24 @@ export default function NewAssessmentPage() {
     const areAllSelected = studentsToSelect.every(s => currentSelection.has(s.docId!));
 
     if (areAllSelected) {
-        studentsToSelect.forEach(s => currentSelection.delete(s.docId!));
+      studentsToSelect.forEach(s => currentSelection.delete(s.docId!));
     } else {
-        studentsToSelect.forEach(s => currentSelection.add(s.docId!));
+      studentsToSelect.forEach(s => currentSelection.add(s.docId!));
     }
     field.onChange(Array.from(currentSelection));
   };
-  
+
   const handleSelectAllMock = (field: any) => {
-     const currentSelection = new Set(Array.isArray(field.value) ? field.value : []);
-     const allMockIds = new Set(mockStudents.map(s => s.uid));
-     const areAllSelected = mockStudents.every(s => currentSelection.has(s.uid));
-     
-     if(areAllSelected) {
-         mockStudents.forEach(s => currentSelection.delete(s.uid));
-     } else {
-         mockStudents.forEach(s => currentSelection.add(s.uid));
-     }
-     field.onChange(Array.from(currentSelection));
+    const currentSelection = new Set(Array.isArray(field.value) ? field.value : []);
+    const allMockIds = new Set(mockStudents.map(s => s.uid));
+    const areAllSelected = mockStudents.every(s => currentSelection.has(s.uid));
+
+    if (areAllSelected) {
+      mockStudents.forEach(s => currentSelection.delete(s.uid));
+    } else {
+      mockStudents.forEach(s => currentSelection.add(s.uid));
+    }
+    field.onChange(Array.from(currentSelection));
   }
 
 
@@ -262,39 +262,39 @@ export default function NewAssessmentPage() {
   }, [language, form]);
 
   const handleGenerateImage = async () => {
-      if (!imagePrompt) {
-          toast({ title: "프롬프트 입력 필요", description: "이미지를 생성할 프롬프트를 입력해주세요.", variant: "destructive" });
-          return;
-      }
-      setIsGeneratingImage(true);
-      setGeneratedImageDataUri(null);
-      try {
-          const imageModel = form.getValues('imageGenerationModel');
-          const result = await generateImage({ prompt: imagePrompt, imageModel });
-          setGeneratedImageDataUri(result.imageDataUri);
-          toast({ title: "이미지 생성 완료", description: "AI가 이미지를 성공적으로 그렸습니다." });
-      } catch (e) {
-          toast({ title: "이미지 생성 실패", description: "이미지 생성 중 오류가 발생했습니다.", variant: "destructive" });
-          console.error(e);
-      } finally {
-          setIsGeneratingImage(false);
-      }
+    if (!imagePrompt) {
+      toast({ title: "프롬프트 입력 필요", description: "이미지를 생성할 프롬프트를 입력해주세요.", variant: "destructive" });
+      return;
+    }
+    setIsGeneratingImage(true);
+    setGeneratedImageDataUri(null);
+    try {
+      const imageModel = form.getValues('imageGenerationModel');
+      const result = await generateImage({ prompt: imagePrompt, imageModel });
+      setGeneratedImageDataUri(result.imageDataUri);
+      toast({ title: "이미지 생성 완료", description: "AI가 이미지를 성공적으로 그렸습니다." });
+    } catch (e) {
+      toast({ title: "이미지 생성 실패", description: "이미지 생성 중 오류가 발생했습니다.", variant: "destructive" });
+      console.error(e);
+    } finally {
+      setIsGeneratingImage(false);
+    }
   };
 
   const fetchRubrics = useCallback(async () => {
     if (!user) return;
     setIsRubricListLoading(true);
     try {
-        const q = query(collection(db, "rubrics"), where("uid", "==", user.uid));
-        const querySnapshot = await getDocs(q);
-        const fetchedRubrics = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        fetchedRubrics.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-        setSavedRubrics(fetchedRubrics);
-    } catch(e) {
-        console.error("Error fetching rubrics:", e);
-        toast({ title: "오류", description: "저장된 루브릭을 불러오지 못했습니다.", variant: "destructive" });
+      const q = query(collection(db, "rubrics"), where("uid", "==", user.uid));
+      const querySnapshot = await getDocs(q);
+      const fetchedRubrics = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      fetchedRubrics.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      setSavedRubrics(fetchedRubrics);
+    } catch (e) {
+      console.error("Error fetching rubrics:", e);
+      toast({ title: "오류", description: "저장된 루브릭을 불러오지 못했습니다.", variant: "destructive" });
     } finally {
-        setIsRubricListLoading(false);
+      setIsRubricListLoading(false);
     }
   }, [user, toast]);
 
@@ -310,109 +310,109 @@ export default function NewAssessmentPage() {
     form.setValue('loadedRubricId', id);
     setLoadedRubricName(name);
     setLoadedRubricContent(criteria);
-    toast({ title: "루브릭 적용됨", description: `'${name}'의 채점 기준이 적용되었습니다.`});
+    toast({ title: "루브릭 적용됨", description: `'${name}'의 채점 기준이 적용되었습니다.` });
   }
 
 
   const proceedToSubmit = async (values: z.infer<typeof formSchema>) => {
     if (!user) return;
     setIsSubmitting(true);
-    
+
     try {
-        let imageUrl = "";
-        if ((values.monologueType === 'image' || values.monologueType === 'comic') && generatedImageDataUri) {
-            toast({title: "이미지 업로드 중..."});
-            const imageRef = ref(storage, `assessment-images/${user.uid}/${Date.now()}.png`);
-            const uploadResult = await uploadString(imageRef, generatedImageDataUri, 'data_url');
-            imageUrl = await getDownloadURL(uploadResult.ref);
-            toast({title: "이미지 업로드 완료!"});
-        }
-      
-        let submissionValues: any = { ...values, imageUrl: imageUrl || undefined };
+      let imageUrl = "";
+      if ((values.monologueType === 'image' || values.monologueType === 'comic') && generatedImageDataUri) {
+        toast({ title: "이미지 업로드 중..." });
+        const imageRef = ref(storage, `assessment-images/${user.uid}/${Date.now()}.png`);
+        const uploadResult = await uploadString(imageRef, generatedImageDataUri, 'data_url');
+        imageUrl = await getDownloadURL(uploadResult.ref);
+        toast({ title: "이미지 업로드 완료!" });
+      }
 
-        if (isFreeTalkDialogue) {
-            submissionValues.title = values.title || t.teacherAssessmentForm.scenarios.freeTalk;
-            submissionValues.topic = values.topic || t.teacherAssessmentForm.freeTalkDefaults.topic;
-            submissionValues.prompt = values.prompt || t.teacherAssessmentForm.freeTalkDefaults.prompt;
-        }
-        
-        if ((submissionValues.assessmentType === 'dialogue' || submissionValues.useRubric) && !submissionValues.expectedFormat) {
-            submissionValues.expectedFormat = "발음, 문법, 단어, 문장 등을 평가 주제에 맞게 종합적으로 판단.";
-        }
-        
-        const docData: Partial<Omit<TeacherAssessment, "id">> = {
-            ...submissionValues,
-            targetStudentIds: values.targetType === 'all' ? 'all' : values.targetStudentIds,
-            uid: user.uid,
-            averageScore: 0,
-            dateCreated: new Date().toISOString().split('T')[0],
-            createdAt: Date.now(),
-            submissionCount: 0,
-        };
-        
-        delete (docData as any).targetType;
+      let submissionValues: any = { ...values, imageUrl: imageUrl || undefined };
 
-        if (values.startDate) {
-            docData.startDate = values.startDate.toISOString();
-        }
-        if (values.endDate) {
-            docData.endDate = values.endDate.toISOString();
-        }
+      if (isFreeTalkDialogue) {
+        submissionValues.title = values.title || t.teacherAssessmentForm.scenarios.freeTalk;
+        submissionValues.topic = values.topic || t.teacherAssessmentForm.freeTalkDefaults.topic;
+        submissionValues.prompt = values.prompt || t.teacherAssessmentForm.freeTalkDefaults.prompt;
+      }
 
-        if (values.assessmentType === 'monologue') {
-            delete (docData as any).aiVoice;
-            delete (docData as any).scenario;
-        } else {
-             delete (docData as any).monologueType;
-        }
+      if ((submissionValues.assessmentType === 'dialogue' || submissionValues.useRubric) && !submissionValues.expectedFormat) {
+        submissionValues.expectedFormat = "발음, 문법, 단어, 문장 등을 평가 주제에 맞게 종합적으로 판단.";
+      }
 
-        Object.keys(docData).forEach(key => docData[key as keyof typeof docData] === undefined && delete docData[key as keyof typeof docData]);
+      const docData: Partial<Omit<TeacherAssessment, "id">> = {
+        ...submissionValues,
+        targetStudentIds: values.targetType === 'all' ? 'all' : values.targetStudentIds,
+        uid: user.uid,
+        averageScore: 0,
+        dateCreated: new Date().toISOString().split('T')[0],
+        createdAt: Date.now(),
+        submissionCount: 0,
+      };
 
-        await addDoc(collection(db, "assessments"), docData);
+      delete (docData as any).targetType;
 
-        toast({
-            title: t.teacherAssessmentForm.createSuccessToast.title,
-            description: t.teacherAssessmentForm.createSuccessToast.description.replace('{title}', submissionValues.title),
-        });
-        
-        router.push("/teacher/assessments");
+      if (values.startDate) {
+        docData.startDate = values.startDate.toISOString();
+      }
+      if (values.endDate) {
+        docData.endDate = values.endDate.toISOString();
+      }
+
+      if (values.assessmentType === 'monologue') {
+        delete (docData as any).aiVoice;
+        delete (docData as any).scenario;
+      } else {
+        delete (docData as any).monologueType;
+      }
+
+      Object.keys(docData).forEach(key => docData[key as keyof typeof docData] === undefined && delete docData[key as keyof typeof docData]);
+
+      await addDoc(collection(db, "assessments"), docData);
+
+      toast({
+        title: t.teacherAssessmentForm.createSuccessToast.title,
+        description: t.teacherAssessmentForm.createSuccessToast.description.replace('{title}', submissionValues.title),
+      });
+
+      router.push("/teacher/assessments");
 
     } catch (error) {
-        console.error("Error creating assessment: ", error);
-        toast({ title: "생성 오류", description: "평가를 생성하는 중 문제가 발생했습니다.", variant: "destructive" });
+      console.error("Error creating assessment: ", error);
+      toast({ title: "생성 오류", description: "평가를 생성하는 중 문제가 발생했습니다.", variant: "destructive" });
     } finally {
-        setIsSubmitting(false);
-        setShowDuplicateWarning(false);
+      setIsSubmitting(false);
+      setShowDuplicateWarning(false);
     }
   }
 
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     if (!user) {
-        toast({ title: "인증 오류", description: "로그인이 필요합니다.", variant: "destructive" });
-        return;
+      toast({ title: "인증 오류", description: "로그인이 필요합니다.", variant: "destructive" });
+      return;
     }
-    
+
     const titleToCheck = values.title || (isFreeTalkDialogue ? t.teacherAssessmentForm.scenarios.freeTalk : "");
     if (!titleToCheck) {
-        form.handleSubmit(proceedToSubmit)(values);
-        return;
+      form.handleSubmit(proceedToSubmit)(values);
+      return;
     }
-    
+
     setFormData(values);
 
     const assessmentsQuery = query(collection(db, "assessments"), where("uid", "==", user.uid), where("title", "==", titleToCheck));
     const querySnapshot = await getDocs(assessmentsQuery);
 
     if (!querySnapshot.empty) {
-        setShowDuplicateWarning(true);
+      setShowDuplicateWarning(true);
     } else {
-        await proceedToSubmit(values);
+      await proceedToSubmit(values);
     }
   }
 
   if (authLoading) {
-    return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin"/></div>
+    return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>
   }
 
   return (
@@ -424,39 +424,39 @@ export default function NewAssessmentPage() {
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-             <FormField
-                control={form.control}
-                name="targetType"
-                render={({ field }) => (
-                  <FormItem className="space-y-3">
-                    <FormLabel>{t.teacherAssessmentForm.targetLabel}</FormLabel>
-                    <FormControl>
-                      <RadioGroup
-                        onValueChange={(value) => {
-                            field.onChange(value);
-                            if (value === 'all') {
-                                form.setValue('targetStudentIds', 'all');
-                            } else {
-                                form.setValue('targetStudentIds', []);
-                            }
-                        }}
-                        defaultValue={field.value}
-                        className="flex items-center space-x-4"
-                      >
-                        <FormItem className="flex items-center space-x-2 space-y-0">
-                          <FormControl><RadioGroupItem value="all" /></FormControl>
-                          <FormLabel className="font-normal">{t.teacherAssessmentForm.targetAll}</FormLabel>
-                        </FormItem>
-                        <FormItem className="flex items-center space-x-2 space-y-0">
-                          <FormControl><RadioGroupItem value="specific" /></FormControl>
-                          <FormLabel className="font-normal">{t.teacherAssessmentForm.targetSpecific}</FormLabel>
-                        </FormItem>
-                      </RadioGroup>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+            <FormField
+              control={form.control}
+              name="targetType"
+              render={({ field }) => (
+                <FormItem className="space-y-3">
+                  <FormLabel>{t.teacherAssessmentForm.targetLabel}</FormLabel>
+                  <FormControl>
+                    <RadioGroup
+                      onValueChange={(value) => {
+                        field.onChange(value);
+                        if (value === 'all') {
+                          form.setValue('targetStudentIds', 'all');
+                        } else {
+                          form.setValue('targetStudentIds', []);
+                        }
+                      }}
+                      defaultValue={field.value}
+                      className="flex items-center space-x-4"
+                    >
+                      <FormItem className="flex items-center space-x-2 space-y-0">
+                        <FormControl><RadioGroupItem value="all" /></FormControl>
+                        <FormLabel className="font-normal">{t.teacherAssessmentForm.targetAll}</FormLabel>
+                      </FormItem>
+                      <FormItem className="flex items-center space-x-2 space-y-0">
+                        <FormControl><RadioGroupItem value="specific" /></FormControl>
+                        <FormLabel className="font-normal">{t.teacherAssessmentForm.targetSpecific}</FormLabel>
+                      </FormItem>
+                    </RadioGroup>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             {targetType === 'specific' && (
               <FormField
@@ -468,108 +468,136 @@ export default function NewAssessmentPage() {
                       <FormLabel className="text-base">{t.teacherAssessmentForm.selectStudentsLabel}</FormLabel>
                       <FormDescription>{t.teacherAssessmentForm.selectStudentsDescription}</FormDescription>
                     </div>
-                     <div className="space-y-4">
-                        <Card>
-                            <CardHeader className="flex flex-row items-center justify-between p-4">
-                                <CardTitle className="text-lg flex items-center gap-2"><Edit className="h-5 w-5"/>목업 계정</CardTitle>
-                                <div className="flex items-center space-x-2">
-                                    <Label htmlFor="select-all-mock">전체 선택</Label>
+                    <div className="space-y-4">
+                      <Card>
+                        <CardHeader className="flex flex-row items-center justify-between p-4">
+                          <CardTitle className="text-lg flex items-center gap-2"><Edit className="h-5 w-5" />목업 계정</CardTitle>
+                          <div className="flex items-center space-x-2">
+                            <Label htmlFor="select-all-mock">전체 선택</Label>
+                            <Checkbox
+                              id="select-all-mock"
+                              onCheckedChange={() => handleSelectAllMock(field)}
+                              checked={Array.isArray(field.value) && mockStudents.every(s => field.value.includes(s.uid))}
+                            />
+                          </div>
+                        </CardHeader>
+                        <CardContent className="p-4 grid grid-cols-2 md:grid-cols-4 gap-4">
+                          {mockStudents.map((item) => (
+                            <FormItem key={item.uid} className="flex flex-row items-start space-x-3 space-y-0">
+                              <FormControl>
+                                <Checkbox
+                                  checked={Array.isArray(field.value) && field.value.includes(item.uid)}
+                                  onCheckedChange={(checked) => {
+                                    const currentSelection = new Set(Array.isArray(field.value) ? field.value : []);
+                                    if (checked) {
+                                      currentSelection.add(item.uid);
+                                    } else {
+                                      currentSelection.delete(item.uid);
+                                    }
+                                    field.onChange(Array.from(currentSelection));
+                                  }}
+                                />
+                              </FormControl>
+                              <FormLabel className="font-normal">{item.displayName}</FormLabel>
+                            </FormItem>
+                          ))}
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardHeader className="flex flex-row items-center justify-between p-4">
+                          <CardTitle className="text-lg flex items-center gap-2"><Users className="h-5 w-5" />가입한 학생</CardTitle>
+                          <div className="flex items-center gap-2">
+                            <FilterCombobox label="학년" options={uniqueGrades} value={studentFilter.grade} onSelect={(value) => setStudentFilter({ grade: value, class: 'all' })} />
+                            <FilterCombobox label="반" options={uniqueClasses} value={studentFilter.class} onSelect={(value) => setStudentFilter({ ...studentFilter, class: value })} />
+                            <div className="flex items-center space-x-2">
+                              <Label htmlFor="select-all-real">전체 선택</Label>
+                              <Checkbox
+                                id="select-all-real"
+                                onCheckedChange={() => handleSelectAll(filteredRealStudents, field)}
+                                checked={Array.isArray(field.value) && filteredRealStudents.length > 0 && filteredRealStudents.every(s => field.value.includes(s.docId!))}
+                              />
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="p-4 grid grid-cols-2 md:grid-cols-4 gap-4">
+                          {isStudentListLoading ? <Loader2 className="animate-spin" /> :
+                            filteredRealStudents.length > 0 ? (
+                              filteredRealStudents.map((item) => (
+                                <FormItem key={item.docId} className="flex flex-row items-start space-x-3 space-y-0">
+                                  <FormControl>
                                     <Checkbox
-                                        id="select-all-mock"
-                                        onCheckedChange={() => handleSelectAllMock(field)}
-                                        checked={Array.isArray(field.value) && mockStudents.every(s => field.value.includes(s.uid))}
+                                      checked={Array.isArray(field.value) && field.value.includes(item.docId!)}
+                                      onCheckedChange={(checked) => {
+                                        const currentSelection = new Set(Array.isArray(field.value) ? field.value : []);
+                                        if (checked) {
+                                          currentSelection.add(item.docId!);
+                                        } else {
+                                          currentSelection.delete(item.docId!);
+                                        }
+                                        field.onChange(Array.from(currentSelection));
+                                      }}
                                     />
-                                </div>
-                            </CardHeader>
-                             <CardContent className="p-4 grid grid-cols-2 md:grid-cols-4 gap-4">
-                                {mockStudents.map((item) => (
-                                    <FormItem key={item.uid} className="flex flex-row items-start space-x-3 space-y-0">
-                                        <FormControl>
-                                            <Checkbox
-                                                checked={Array.isArray(field.value) && field.value.includes(item.uid)}
-                                                onCheckedChange={(checked) => {
-                                                    const currentSelection = new Set(Array.isArray(field.value) ? field.value : []);
-                                                    if(checked) {
-                                                        currentSelection.add(item.uid);
-                                                    } else {
-                                                        currentSelection.delete(item.uid);
-                                                    }
-                                                    field.onChange(Array.from(currentSelection));
-                                                }}
-                                            />
-                                        </FormControl>
-                                        <FormLabel className="font-normal">{item.displayName}</FormLabel>
-                                    </FormItem>
-                                ))}
-                            </CardContent>
-                        </Card>
-                        <Card>
-                           <CardHeader className="flex flex-row items-center justify-between p-4">
-                              <CardTitle className="text-lg flex items-center gap-2"><Users className="h-5 w-5"/>가입한 학생</CardTitle>
-                              <div className="flex items-center gap-2">
-                                <FilterCombobox label="학년" options={uniqueGrades} value={studentFilter.grade} onSelect={(value) => setStudentFilter({ grade: value, class: 'all' })} />
-                                <FilterCombobox label="반" options={uniqueClasses} value={studentFilter.class} onSelect={(value) => setStudentFilter({ ...studentFilter, class: value })} />
-                                <div className="flex items-center space-x-2">
-                                    <Label htmlFor="select-all-real">전체 선택</Label>
-                                    <Checkbox
-                                        id="select-all-real"
-                                        onCheckedChange={() => handleSelectAll(filteredRealStudents, field)}
-                                        checked={Array.isArray(field.value) && filteredRealStudents.length > 0 && filteredRealStudents.every(s => field.value.includes(s.docId!))}
-                                    />
-                                </div>
-                              </div>
-                           </CardHeader>
-                           <CardContent className="p-4 grid grid-cols-2 md:grid-cols-4 gap-4">
-                               {isStudentListLoading ? <Loader2 className="animate-spin"/> :
-                               filteredRealStudents.length > 0 ? (
-                                   filteredRealStudents.map((item) => (
-                                    <FormItem key={item.docId} className="flex flex-row items-start space-x-3 space-y-0">
-                                        <FormControl>
-                                            <Checkbox
-                                                checked={Array.isArray(field.value) && field.value.includes(item.docId!)}
-                                                onCheckedChange={(checked) => {
-                                                    const currentSelection = new Set(Array.isArray(field.value) ? field.value : []);
-                                                    if (checked) {
-                                                        currentSelection.add(item.docId!);
-                                                    } else {
-                                                        currentSelection.delete(item.docId!);
-                                                    }
-                                                    field.onChange(Array.from(currentSelection));
-                                                }}
-                                            />
-                                        </FormControl>
-                                        <FormLabel className="font-normal">{item.displayName}</FormLabel>
-                                    </FormItem>
-                                    ))
-                               ) : <p className="text-sm text-muted-foreground col-span-full text-center">해당 조건의 학생이 없습니다.</p>}
-                           </CardContent>
-                        </Card>
+                                  </FormControl>
+                                  <FormLabel className="font-normal">{item.displayName}</FormLabel>
+                                </FormItem>
+                              ))
+                            ) : <p className="text-sm text-muted-foreground col-span-full text-center">해당 조건의 학생이 없습니다.</p>}
+                        </CardContent>
+                      </Card>
                     </div>
                     <FormMessage />
                   </FormItem>
                 )}
               />
             )}
-            
+
             <FormField
+              control={form.control}
+              name="assessmentType"
+              render={({ field }) => (
+                <FormItem className="space-y-3">
+                  <FormLabel>{t.teacherAssessmentForm.typeLabel}</FormLabel>
+                  <FormControl>
+                    <RadioGroup
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                      className="flex items-center space-x-4"
+                    >
+                      <FormItem className="flex items-center space-x-2 space-y-0">
+                        <FormControl><RadioGroupItem value="monologue" /></FormControl>
+                        <FormLabel className="font-normal">{t.teacherAssessmentForm.typeMonologue}</FormLabel>
+                      </FormItem>
+                      <FormItem className="flex items-center space-x-2 space-y-0">
+                        <FormControl><RadioGroupItem value="dialogue" /></FormControl>
+                        <FormLabel className="font-normal">{t.teacherAssessmentForm.typeDialogue}</FormLabel>
+                      </FormItem>
+                    </RadioGroup>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {assessmentType === 'monologue' && (
+              <FormField
                 control={form.control}
-                name="assessmentType"
+                name="monologueType"
                 render={({ field }) => (
                   <FormItem className="space-y-3">
-                    <FormLabel>{t.teacherAssessmentForm.typeLabel}</FormLabel>
+                    <FormLabel>혼자 말하기 유형</FormLabel>
                     <FormControl>
-                      <RadioGroup
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                        className="flex items-center space-x-4"
-                      >
+                      <RadioGroup onValueChange={field.onChange} value={field.value} className="flex items-center space-x-4">
                         <FormItem className="flex items-center space-x-2 space-y-0">
-                          <FormControl><RadioGroupItem value="monologue" /></FormControl>
-                          <FormLabel className="font-normal">{t.teacherAssessmentForm.typeMonologue}</FormLabel>
+                          <FormControl><RadioGroupItem value="text" /></FormControl>
+                          <FormLabel className="font-normal flex items-center gap-2"><Type />주제/텍스트 제시</FormLabel>
                         </FormItem>
                         <FormItem className="flex items-center space-x-2 space-y-0">
-                          <FormControl><RadioGroupItem value="dialogue" /></FormControl>
-                          <FormLabel className="font-normal">{t.teacherAssessmentForm.typeDialogue}</FormLabel>
+                          <FormControl><RadioGroupItem value="image" /></FormControl>
+                          <FormLabel className="font-normal flex items-center gap-2"><ImageIcon />그림 묘사하기</FormLabel>
+                        </FormItem>
+                        <FormItem className="flex items-center space-x-2 space-y-0">
+                          <FormControl><RadioGroupItem value="comic" /></FormControl>
+                          <FormLabel className="font-normal flex items-center gap-2"><Film />네컷 만화 설명하기</FormLabel>
                         </FormItem>
                       </RadioGroup>
                     </FormControl>
@@ -577,124 +605,96 @@ export default function NewAssessmentPage() {
                   </FormItem>
                 )}
               />
+            )}
 
-            {assessmentType === 'monologue' && (
-                  <FormField
-                    control={form.control}
-                    name="monologueType"
-                    render={({ field }) => (
-                      <FormItem className="space-y-3">
-                        <FormLabel>혼자 말하기 유형</FormLabel>
-                         <FormControl>
-                           <RadioGroup onValueChange={field.onChange} value={field.value} className="flex items-center space-x-4">
-                                <FormItem className="flex items-center space-x-2 space-y-0">
-                                    <FormControl><RadioGroupItem value="text"/></FormControl>
-                                    <FormLabel className="font-normal flex items-center gap-2"><Type/>주제/텍스트 제시</FormLabel>
-                                </FormItem>
-                                <FormItem className="flex items-center space-x-2 space-y-0">
-                                    <FormControl><RadioGroupItem value="image"/></FormControl>
-                                    <FormLabel className="font-normal flex items-center gap-2"><ImageIcon/>그림 묘사하기</FormLabel>
-                                </FormItem>
-                                <FormItem className="flex items-center space-x-2 space-y-0">
-                                    <FormControl><RadioGroupItem value="comic"/></FormControl>
-                                    <FormLabel className="font-normal flex items-center gap-2"><Film/>네컷 만화 설명하기</FormLabel>
-                                </FormItem>
-                           </RadioGroup>
-                         </FormControl>
-                         <FormMessage/>
-                      </FormItem>
-                    )}
-                  />
-              )}
-            
             {(monologueType === 'image' || monologueType === 'comic') && assessmentType === 'monologue' && (
-                <Card>
-                    <CardHeader>
-                        <div className="flex justify-between items-center">
-                            <div>
-                                <CardTitle>AI 이미지 생성</CardTitle>
-                                <CardDescription>
-                                  {monologueType === 'image' ? "평가에 사용할 이미지를 AI에게 그려달라고 요청하세요." : "평가에 사용할 4컷 만화를 AI에게 그려달라고 요청하세요."}
-                                </CardDescription>
+              <Card>
+                <CardHeader>
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <CardTitle>AI 이미지 생성</CardTitle>
+                      <CardDescription>
+                        {monologueType === 'image' ? "평가에 사용할 이미지를 AI에게 그려달라고 요청하세요." : "평가에 사용할 4컷 만화를 AI에게 그려달라고 요청하세요."}
+                      </CardDescription>
+                    </div>
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button type="button" variant="outline"><BookOpen className="mr-2 h-4 w-4" /> 프롬프트 예시 보기</Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-4xl">
+                        <DialogHeader>
+                          <DialogTitle>이미지 생성 프롬프트 예시</DialogTitle>
+                          <DialogDescription>예시 이미지를 클릭하면 프롬프트가 자동으로 복사됩니다.</DialogDescription>
+                        </DialogHeader>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 py-4">
+                          {promptExamples.map((example, index) => (
+                            <div key={index} className="space-y-2 group cursor-pointer" onClick={() => {
+                              setImagePrompt(example.prompt);
+                              toast({ title: "프롬프트 복사됨", description: "이미지 생성 프롬프트가 입력창에 붙여넣기 되었습니다." });
+                            }}>
+                              <div className="border rounded-lg overflow-hidden group-hover:ring-2 group-hover:ring-primary transition-all">
+                                <Image src={example.image} alt={example.prompt} width={400} height={400} className="object-cover" data-ai-hint={example.hint} />
+                              </div>
+                              <div className="text-sm p-2 bg-muted rounded-md relative">
+                                <p className="pr-10">“{example.prompt}”</p>
+                              </div>
                             </div>
-                            <Dialog>
-                                <DialogTrigger asChild>
-                                    <Button type="button" variant="outline"><BookOpen className="mr-2 h-4 w-4"/> 프롬프트 예시 보기</Button>
-                                </DialogTrigger>
-                                <DialogContent className="max-w-4xl">
-                                    <DialogHeader>
-                                        <DialogTitle>이미지 생성 프롬프트 예시</DialogTitle>
-                                        <DialogDescription>예시 이미지를 클릭하면 프롬프트가 자동으로 복사됩니다.</DialogDescription>
-                                    </DialogHeader>
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 py-4">
-                                        {promptExamples.map((example, index) => (
-                                            <div key={index} className="space-y-2 group cursor-pointer" onClick={() => {
-                                                setImagePrompt(example.prompt);
-                                                toast({ title: "프롬프트 복사됨", description: "이미지 생성 프롬프트가 입력창에 붙여넣기 되었습니다." });
-                                            }}>
-                                                <div className="border rounded-lg overflow-hidden group-hover:ring-2 group-hover:ring-primary transition-all">
-                                                    <Image src={example.image} alt={example.prompt} width={400} height={400} className="object-cover" data-ai-hint={example.hint}/>
-                                                </div>
-                                                <div className="text-sm p-2 bg-muted rounded-md relative">
-                                                    <p className="pr-10">“{example.prompt}”</p>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </DialogContent>
-                            </Dialog>
+                          ))}
                         </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="image-prompt">이미지 생성 프롬프트</Label>
-                                <Textarea 
-                                    id="image-prompt"
-                                    placeholder={monologueType === 'comic' ? "예: 1. 아이가 넘어진다. 2. 친구가 와서 도와준다. 3. 둘이 함께 웃는다. 4. 같이 아이스크림을 먹는다. --style 4-panel comic" : "예: 부엌에서 함께 요리하는 가족, 따뜻하고 아늑한 분위기의 일러스트"}
-                                    value={imagePrompt}
-                                    onChange={(e) => setImagePrompt(e.target.value)}
-                                    rows={4}
-                                />
-                                <FormField
-                                  control={form.control}
-                                  name="imageGenerationModel"
-                                  render={({ field }) => (
-                                    <FormItem>
-                                      <FormLabel className="text-xs">이미지 생성 모델</FormLabel>
-                                      <Select onValueChange={field.onChange} value={field.value}>
-                                        <FormControl>
-                                          <SelectTrigger>
-                                            <SelectValue />
-                                          </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                          {imageGenerationModels.map(model => (
-                                            <SelectItem key={model} value={model}>{model}</SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
-                                      <FormMessage />
-                                    </FormItem>
-                                  )}
-                                />
-                                <Button type="button" onClick={handleGenerateImage} disabled={isGeneratingImage} className="w-full">
-                                    {isGeneratingImage ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Wand2 className="mr-2 h-4 w-4"/>}
-                                    {isGeneratingImage ? "이미지 생성 중..." : "AI로 이미지 그리기"}
-                                </Button>
-                            </div>
-                            <div className="flex items-center justify-center p-2 border rounded-lg bg-muted/50 min-h-[200px] aspect-square">
-                                {isGeneratingImage && <Loader2 className="h-8 w-8 animate-spin text-primary"/>}
-                                {generatedImageDataUri && !isGeneratingImage && (
-                                    <Image src={generatedImageDataUri} alt="Generated by AI" width={300} height={300} className="rounded-md object-contain"/>
-                                )}
-                                {!generatedImageDataUri && !isGeneratingImage && (
-                                    <p className="text-sm text-muted-foreground text-center">프롬프트를 입력하고 버튼을 누르면 여기에 이미지가 나타납니다.</p>
-                                )}
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="image-prompt">이미지 생성 프롬프트</Label>
+                      <Textarea
+                        id="image-prompt"
+                        placeholder={monologueType === 'comic' ? "예: 1. 아이가 넘어진다. 2. 친구가 와서 도와준다. 3. 둘이 함께 웃는다. 4. 같이 아이스크림을 먹는다. --style 4-panel comic" : "예: 부엌에서 함께 요리하는 가족, 따뜻하고 아늑한 분위기의 일러스트"}
+                        value={imagePrompt}
+                        onChange={(e) => setImagePrompt(e.target.value)}
+                        rows={4}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="imageGenerationModel"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs">이미지 생성 모델</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {imageGenerationModels.map(model => (
+                                  <SelectItem key={model} value={model}>{model}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <Button type="button" onClick={handleGenerateImage} disabled={isGeneratingImage} className="w-full">
+                        {isGeneratingImage ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
+                        {isGeneratingImage ? "이미지 생성 중..." : "AI로 이미지 그리기"}
+                      </Button>
+                    </div>
+                    <div className="flex items-center justify-center p-2 border rounded-lg bg-muted/50 min-h-[200px] aspect-square">
+                      {isGeneratingImage && <Loader2 className="h-8 w-8 animate-spin text-primary" />}
+                      {generatedImageDataUri && !isGeneratingImage && (
+                        <Image src={generatedImageDataUri} alt="Generated by AI" width={300} height={300} className="rounded-md object-contain" />
+                      )}
+                      {!generatedImageDataUri && !isGeneratingImage && (
+                        <p className="text-sm text-muted-foreground text-center">프롬프트를 입력하고 버튼을 누르면 여기에 이미지가 나타납니다.</p>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             )}
 
 
@@ -723,54 +723,54 @@ export default function NewAssessmentPage() {
                       </PopoverTrigger>
                       <PopoverContent className="w-[450px] p-0" align="start">
                         <div className="grid grid-cols-2 gap-2 p-2">
-                            <div>
-                                <p className="px-2 py-1.5 text-sm font-semibold">{t.teacherAssessmentForm.voices.female}</p>
-                                <div className="flex flex-col space-y-1">
-                                {femaleVoices.map((voice) => (
-                                    <Button
-                                        type="button"
-                                        key={voice}
-                                        variant="ghost"
-                                        className="w-full justify-start text-left h-auto"
-                                        onClick={() => {
-                                            form.setValue("aiVoice", voice);
-                                            setVoicePopoverOpen(false);
-                                        }}
-                                    >
-                                        <div className="flex items-center">
-                                            <Check className={cn("mr-2 h-4 w-4", field.value === voice ? "opacity-100" : "opacity-0")} />
-                                            <div>
-                                                <p className="font-medium">{voiceDescriptions[voice]}</p>
-                                            </div>
-                                        </div>
-                                    </Button>
-                                ))}
-                                </div>
+                          <div>
+                            <p className="px-2 py-1.5 text-sm font-semibold">{t.teacherAssessmentForm.voices.female}</p>
+                            <div className="flex flex-col space-y-1">
+                              {femaleVoices.map((voice) => (
+                                <Button
+                                  type="button"
+                                  key={voice}
+                                  variant="ghost"
+                                  className="w-full justify-start text-left h-auto"
+                                  onClick={() => {
+                                    form.setValue("aiVoice", voice);
+                                    setVoicePopoverOpen(false);
+                                  }}
+                                >
+                                  <div className="flex items-center">
+                                    <Check className={cn("mr-2 h-4 w-4", field.value === voice ? "opacity-100" : "opacity-0")} />
+                                    <div>
+                                      <p className="font-medium">{voiceDescriptions[voice]}</p>
+                                    </div>
+                                  </div>
+                                </Button>
+                              ))}
                             </div>
-                            <div>
-                               <p className="px-2 py-1.5 text-sm font-semibold">{t.teacherAssessmentForm.voices.male}</p>
-                               <div className="flex flex-col space-y-1">
-                                {maleVoices.map((voice) => (
-                                    <Button
-                                        type="button"
-                                        key={voice}
-                                        variant="ghost"
-                                        className="w-full justify-start text-left h-auto"
-                                        onClick={() => {
-                                            form.setValue("aiVoice", voice);
-                                            setVoicePopoverOpen(false);
-                                        }}
-                                    >
-                                        <div className="flex items-center">
-                                             <Check className={cn("mr-2 h-4 w-4", field.value === voice ? "opacity-100" : "opacity-0")} />
-                                             <div>
-                                                <p className="font-medium">{voiceDescriptions[voice]}</p>
-                                            </div>
-                                        </div>
-                                    </Button>
-                                ))}
-                                </div>
+                          </div>
+                          <div>
+                            <p className="px-2 py-1.5 text-sm font-semibold">{t.teacherAssessmentForm.voices.male}</p>
+                            <div className="flex flex-col space-y-1">
+                              {maleVoices.map((voice) => (
+                                <Button
+                                  type="button"
+                                  key={voice}
+                                  variant="ghost"
+                                  className="w-full justify-start text-left h-auto"
+                                  onClick={() => {
+                                    form.setValue("aiVoice", voice);
+                                    setVoicePopoverOpen(false);
+                                  }}
+                                >
+                                  <div className="flex items-center">
+                                    <Check className={cn("mr-2 h-4 w-4", field.value === voice ? "opacity-100" : "opacity-0")} />
+                                    <div>
+                                      <p className="font-medium">{voiceDescriptions[voice]}</p>
+                                    </div>
+                                  </div>
+                                </Button>
+                              ))}
                             </div>
+                          </div>
                         </div>
                       </PopoverContent>
                     </Popover>
@@ -780,7 +780,7 @@ export default function NewAssessmentPage() {
                 )}
               />
             )}
-            
+
             <FormField
               control={form.control}
               name="evaluationModel"
@@ -804,32 +804,32 @@ export default function NewAssessmentPage() {
                 </FormItem>
               )}
             />
-            
+
             {assessmentType === 'dialogue' && (
-               <FormField
-                  control={form.control}
-                  name="scenario"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t.teacherAssessmentForm.scenarioLabel}</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder={t.teacherAssessmentForm.scenarioPlaceholder} />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="free-talk">{t.teacherAssessmentForm.scenarios.freeTalk}</SelectItem>
-                          <SelectItem value="ordering-food">{t.teacherAssessmentForm.scenarios.orderingFood}</SelectItem>
-                          <SelectItem value="airport-check-in">{t.teacherAssessmentForm.scenarios.airportCheckIn}</SelectItem>
-                          <SelectItem value="shopping">{t.teacherAssessmentForm.scenarios.shopping}</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormDescription>{t.teacherAssessmentForm.scenarioDescription}</FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+              <FormField
+                control={form.control}
+                name="scenario"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t.teacherAssessmentForm.scenarioLabel}</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder={t.teacherAssessmentForm.scenarioPlaceholder} />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="free-talk">{t.teacherAssessmentForm.scenarios.freeTalk}</SelectItem>
+                        <SelectItem value="ordering-food">{t.teacherAssessmentForm.scenarios.orderingFood}</SelectItem>
+                        <SelectItem value="airport-check-in">{t.teacherAssessmentForm.scenarios.airportCheckIn}</SelectItem>
+                        <SelectItem value="shopping">{t.teacherAssessmentForm.scenarios.shopping}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>{t.teacherAssessmentForm.scenarioDescription}</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             )}
 
             <FormField
@@ -869,10 +869,10 @@ export default function NewAssessmentPage() {
                   <FormControl>
                     <Textarea
                       placeholder={
-                        isFreeTalkDialogue 
-                          ? t.teacherAssessmentForm.freeTalkDefaults.prompt 
-                          : assessmentType === 'monologue' 
-                            ? t.teacherAssessmentForm.promptPlaceholder 
+                        isFreeTalkDialogue
+                          ? t.teacherAssessmentForm.freeTalkDefaults.prompt
+                          : assessmentType === 'monologue'
+                            ? t.teacherAssessmentForm.promptPlaceholder
                             : t.teacherAssessmentForm.scenarioPromptPlaceholder
                       }
                       rows={4}
@@ -884,13 +884,13 @@ export default function NewAssessmentPage() {
                 </FormItem>
               )}
             />
-            
+
             <FormField
               control={form.control}
               name="expectedFormat"
               render={({ field }) => (
                 <FormItem>
-                   <FormLabel>{t.teacherAssessmentForm.expectedFormatLabel} {(assessmentType === 'dialogue' || useRubric) && `(${t.teacherAssessmentForm.optional})`}</FormLabel>
+                  <FormLabel>{t.teacherAssessmentForm.expectedFormatLabel} {(assessmentType === 'dialogue' || useRubric) && `(${t.teacherAssessmentForm.optional})`}</FormLabel>
                   <FormControl>
                     <Textarea
                       placeholder={assessmentType === 'dialogue' ? '발음, 문법, 단어, 문장 등을 평가 주제에 맞게 종합적으로 판단.' : t.teacherAssessmentForm.expectedFormatPlaceholder}
@@ -899,105 +899,105 @@ export default function NewAssessmentPage() {
                       disabled={useRubric}
                     />
                   </FormControl>
-                   <FormDescription>{t.teacherAssessmentForm.expectedFormatDescription}</FormDescription>
+                  <FormDescription>{t.teacherAssessmentForm.expectedFormatDescription}</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
             />
-            
+
             <div className="space-y-3">
-                 <Dialog>
-                    <DialogTrigger asChild>
-                        <Button type="button" variant="outline" className="w-full" onClick={fetchRubrics}>
-                            <FolderSearch className="mr-2 h-4 w-4"/> 저장된 루브릭 불러오기
-                        </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-xl">
-                        <DialogHeader>
-                            <DialogTitle>저장된 루브릭 불러오기</DialogTitle>
-                            <DialogDescription>
-                                적용할 루브릭을 선택하면 채점 기준이 자동으로 입력됩니다.
-                            </DialogDescription>
-                        </DialogHeader>
-                        {isRubricListLoading ? <Loader2 className="animate-spin" /> :
-                            <div className="max-h-96 overflow-y-auto space-y-2 p-1">
-                                {savedRubrics.map(rubric => (
-                                  <DialogClose key={rubric.id} asChild>
-                                      <Card className="cursor-pointer hover:bg-muted/50" onClick={() => handleApplyRubric(rubric)}>
-                                        <div className="p-3 flex items-center justify-between">
-                                            <div>
-                                                <p className="font-semibold">{rubric.name}</p>
-                                                <p className="text-sm text-muted-foreground">
-                                                    {rubric.criteria.length}개 항목 | 생성일: {format(new Date(rubric.createdAt), 'yyyy-MM-dd')}
-                                                </p>
-                                            </div>
-                                            <Dialog>
-                                                <DialogTrigger asChild>
-                                                    <Button variant="ghost" size="sm" onClick={(e) => e.stopPropagation()}>
-                                                        <Eye className="mr-2 h-4 w-4"/> 자세히 보기
-                                                    </Button>
-                                                </DialogTrigger>
-                                                <DialogContent className="max-w-4xl h-[600px] flex flex-col">
-                                                    <DialogHeader>
-                                                        <DialogTitle>{rubric.name}</DialogTitle>
-                                                    </DialogHeader>
-                                                    <iframe 
-                                                      srcDoc={`<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{font-family:sans-serif;margin:2em}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:8px;text-align:left}th{background-color:#f2f2f2}</style></head><body><h2>${rubric.name}</h2>${rubric.criteria.map((c:any) => `<h3>${c.name} (만점: ${c.maxScore}점)</h3><table><tr><th>점수</th><th>설명</th></tr>${c.details.map((d:any) => `<tr><td>${d.score}</td><td>${d.description}</td></tr>`).join('')}</table>`).join('')}</body></html>`}
-                                                      className="w-full flex-grow border-0"
-                                                      title={`${rubric.name} - 루브릭 미리보기`}
-                                                    />
-                                                </DialogContent>
-                                            </Dialog>
-                                        </div>
-                                      </Card>
-                                  </DialogClose>
-                                ))}
-                                {savedRubrics.length === 0 && <p className="text-center text-muted-foreground py-4">저장된 루브릭이 없습니다.</p>}
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button type="button" variant="outline" className="w-full" onClick={fetchRubrics}>
+                    <FolderSearch className="mr-2 h-4 w-4" /> 저장된 루브릭 불러오기
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-xl">
+                  <DialogHeader>
+                    <DialogTitle>저장된 루브릭 불러오기</DialogTitle>
+                    <DialogDescription>
+                      적용할 루브릭을 선택하면 채점 기준이 자동으로 입력됩니다.
+                    </DialogDescription>
+                  </DialogHeader>
+                  {isRubricListLoading ? <Loader2 className="animate-spin" /> :
+                    <div className="max-h-96 overflow-y-auto space-y-2 p-1">
+                      {savedRubrics.map(rubric => (
+                        <DialogClose key={rubric.id} asChild>
+                          <Card className="cursor-pointer hover:bg-muted/50" onClick={() => handleApplyRubric(rubric)}>
+                            <div className="p-3 flex items-center justify-between">
+                              <div>
+                                <p className="font-semibold">{rubric.name}</p>
+                                <p className="text-sm text-muted-foreground">
+                                  {rubric.criteria.length}개 항목 | 생성일: {format(new Date(rubric.createdAt), 'yyyy-MM-dd')}
+                                </p>
+                              </div>
+                              <Dialog>
+                                <DialogTrigger asChild>
+                                  <Button variant="ghost" size="sm" onClick={(e) => e.stopPropagation()}>
+                                    <Eye className="mr-2 h-4 w-4" /> 자세히 보기
+                                  </Button>
+                                </DialogTrigger>
+                                <DialogContent className="max-w-4xl h-[600px] flex flex-col">
+                                  <DialogHeader>
+                                    <DialogTitle>{rubric.name}</DialogTitle>
+                                  </DialogHeader>
+                                  <iframe
+                                    srcDoc={`<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{font-family:sans-serif;margin:2em}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:8px;text-align:left}th{background-color:#f2f2f2}</style></head><body><h2>${rubric.name}</h2>${rubric.criteria.map((c: any) => `<h3>${c.name} (만점: ${c.maxScore}점)</h3><table><tr><th>점수</th><th>설명</th></tr>${c.details.map((d: any) => `<tr><td>${d.score}</td><td>${d.description}</td></tr>`).join('')}</table>`).join('')}</body></html>`}
+                                    className="w-full flex-grow border-0"
+                                    title={`${rubric.name} - 루브릭 미리보기`}
+                                  />
+                                </DialogContent>
+                              </Dialog>
                             </div>
+                          </Card>
+                        </DialogClose>
+                      ))}
+                      {savedRubrics.length === 0 && <p className="text-center text-muted-foreground py-4">저장된 루브릭이 없습니다.</p>}
+                    </div>
+                  }
+                </DialogContent>
+              </Dialog>
+              <FormField
+                control={form.control}
+                name="useRubric"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                    <div className="space-y-0.5">
+                      <FormLabel className="text-base">루브릭 평가 적용</FormLabel>
+                      <FormDescription>
+                        {loadedRubricName
+                          ? <>적용된 루브릭: <span className="font-semibold text-primary">{loadedRubricName}</span></>
+                          : "AI가 루브릭 채점 기준에 맞춰 점수를 매기고 HTML 피드백을 생성합니다."
                         }
-                    </DialogContent>
-                </Dialog>
-                <FormField
-                  control={form.control}
-                  name="useRubric"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                      <div className="space-y-0.5">
-                         <FormLabel className="text-base">루브릭 평가 적용</FormLabel>
-                         <FormDescription>
-                           {loadedRubricName 
-                             ? <>적용된 루브릭: <span className="font-semibold text-primary">{loadedRubricName}</span></> 
-                             : "AI가 루브릭 채점 기준에 맞춰 점수를 매기고 HTML 피드백을 생성합니다."
-                           }
-                         </FormDescription>
-                      </div>
-                      <div className="flex items-center space-x-4">
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <Button type="button" variant="ghost" size="sm"><Info className="mr-2 h-4 w-4"/> 자세히 보기</Button>
-                          </DialogTrigger>
-                           <DialogContent className="max-w-4xl h-[600px] flex flex-col">
-                            <DialogHeader>
-                                <DialogTitle>{loadedRubricName || "표준 루브릭"}</DialogTitle>
-                            </DialogHeader>
-                            <iframe 
-                                srcDoc={loadedRubricContent ? `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{font-family:sans-serif;margin:2em}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:8px;text-align:left}th{background-color:#f2f2f2}</style></head><body><h2>${loadedRubricName}</h2>${loadedRubricContent.map((c:any) => `<h3>${c.name} (만점: ${c.maxScore}점)</h3><table><tr><th>점수</th><th>설명</th></tr>${c.details.map((d:any) => `<tr><td>${d.score}</td><td>${d.description}</td></tr>`).join('')}</table>`).join('')}</body></html>` : undefined}
-                                src={!loadedRubricContent ? "/rubric.html" : undefined}
-                                className="w-full flex-grow border-0" 
-                                title="루브릭 미리보기"
-                            />
-                          </DialogContent>
-                        </Dialog>
-                        <FormControl>
-                          <Checkbox
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
+                      </FormDescription>
+                    </div>
+                    <div className="flex items-center space-x-4">
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button type="button" variant="ghost" size="sm"><Info className="mr-2 h-4 w-4" /> 자세히 보기</Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-4xl h-[600px] flex flex-col">
+                          <DialogHeader>
+                            <DialogTitle>{loadedRubricName || "표준 루브릭"}</DialogTitle>
+                          </DialogHeader>
+                          <iframe
+                            srcDoc={loadedRubricContent ? `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{font-family:sans-serif;margin:2em}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:8px;text-align:left}th{background-color:#f2f2f2}</style></head><body><h2>${loadedRubricName}</h2>${loadedRubricContent.map((c: any) => `<h3>${c.name} (만점: ${c.maxScore}점)</h3><table><tr><th>점수</th><th>설명</th></tr>${c.details.map((d: any) => `<tr><td>${d.score}</td><td>${d.description}</td></tr>`).join('')}</table>`).join('')}</body></html>` : undefined}
+                            src={!loadedRubricContent ? "/rubric.html" : undefined}
+                            className="w-full flex-grow border-0"
+                            title="루브릭 미리보기"
                           />
-                        </FormControl>
-                      </div>
-                    </FormItem>
-                  )}
-                />
+                        </DialogContent>
+                      </Dialog>
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                    </div>
+                  </FormItem>
+                )}
+              />
             </div>
 
             {assessmentType === 'monologue' && (
@@ -1023,114 +1023,114 @@ export default function NewAssessmentPage() {
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                 <FormField
-                    control={form.control}
-                    name="startDate"
-                    render={({ field }) => (
-                        <FormItem className="flex flex-col">
-                        <FormLabel>{t.teacherAssessmentForm.startDateLabel}</FormLabel>
-                        <Popover>
-                            <PopoverTrigger asChild>
-                            <FormControl>
-                                <Button
-                                type="button"
-                                variant={"outline"}
-                                className={cn(
-                                    "w-full pl-3 text-left font-normal",
-                                    !field.value && "text-muted-foreground"
-                                )}
-                                >
-                                {field.value ? (
-                                    format(field.value, "PPP")
-                                ) : (
-                                    <span>{t.teacherAssessmentForm.datePlaceholder}</span>
-                                )}
-                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                </Button>
-                            </FormControl>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                            <Calendar
-                                mode="single"
-                                selected={field.value}
-                                onSelect={field.onChange}
-                                initialFocus
-                            />
-                            </PopoverContent>
-                        </Popover>
-                        <FormDescription>
-                            {t.teacherAssessmentForm.startDateDescription}
-                        </FormDescription>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                />
-                 <FormField
-                    control={form.control}
-                    name="endDate"
-                    render={({ field }) => (
-                        <FormItem className="flex flex-col">
-                        <FormLabel>{t.teacherAssessmentForm.endDateLabel}</FormLabel>
-                        <Popover>
-                            <PopoverTrigger asChild>
-                            <FormControl>
-                                <Button
-                                type="button"
-                                variant={"outline"}
-                                className={cn(
-                                    "w-full pl-3 text-left font-normal",
-                                    !field.value && "text-muted-foreground"
-                                )}
-                                >
-                                {field.value ? (
-                                    format(field.value, "PPP")
-                                ) : (
-                                    <span>{t.teacherAssessmentForm.datePlaceholder}</span>
-                                )}
-                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                </Button>
-                            </FormControl>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                            <Calendar
-                                mode="single"
-                                selected={field.value}
-                                onSelect={field.onChange}
-                                disabled={(date) =>
-                                    form.getValues("startDate") ? date < form.getValues("startDate")! : false
-                                }
-                                initialFocus
-                            />
-                            </PopoverContent>
-                        </Popover>
-                        <FormDescription>
-                           {t.teacherAssessmentForm.endDateDescription}
-                        </FormDescription>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                />
+              <FormField
+                control={form.control}
+                name="startDate"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>{t.teacherAssessmentForm.startDateLabel}</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            type="button"
+                            variant={"outline"}
+                            className={cn(
+                              "w-full pl-3 text-left font-normal",
+                              !field.value && "text-muted-foreground"
+                            )}
+                          >
+                            {field.value ? (
+                              format(field.value, "PPP")
+                            ) : (
+                              <span>{t.teacherAssessmentForm.datePlaceholder}</span>
+                            )}
+                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value}
+                          onSelect={field.onChange}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <FormDescription>
+                      {t.teacherAssessmentForm.startDateDescription}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="endDate"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>{t.teacherAssessmentForm.endDateLabel}</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            type="button"
+                            variant={"outline"}
+                            className={cn(
+                              "w-full pl-3 text-left font-normal",
+                              !field.value && "text-muted-foreground"
+                            )}
+                          >
+                            {field.value ? (
+                              format(field.value, "PPP")
+                            ) : (
+                              <span>{t.teacherAssessmentForm.datePlaceholder}</span>
+                            )}
+                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value}
+                          onSelect={field.onChange}
+                          disabled={(date) =>
+                            form.getValues("startDate") ? date < form.getValues("startDate")! : false
+                          }
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <FormDescription>
+                      {t.teacherAssessmentForm.endDateDescription}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </div>
-            
-            <div className="flex justify-end gap-2">
-                <AlertDialog open={showDuplicateWarning} onOpenChange={setShowDuplicateWarning}>
-                    <AlertDialogContent>
-                        <AlertDialogHeader>
-                        <AlertDialogTitle>중복된 평가 제목</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            이미 같은 이름의 평가가 존재합니다. 그래도 계속해서 생성하시겠습니까?
-                        </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                        <AlertDialogCancel>취소</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => { if(formData) proceedToSubmit(formData) }}>
-                            계속
-                        </AlertDialogAction>
-                        </AlertDialogFooter>
-                    </AlertDialogContent>
-                </AlertDialog>
 
-               <Button type="button" variant="outline" onClick={() => router.back()}>{t.teacherAssessmentForm.cancelButton}</Button>
+            <div className="flex justify-end gap-2">
+              <AlertDialog open={showDuplicateWarning} onOpenChange={setShowDuplicateWarning}>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>중복된 평가 제목</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      이미 같은 이름의 평가가 존재합니다. 그래도 계속해서 생성하시겠습니까?
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>취소</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => { if (formData) proceedToSubmit(formData) }}>
+                      계속
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+
+              <Button type="button" variant="outline" onClick={() => router.back()}>{t.teacherAssessmentForm.cancelButton}</Button>
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {isSubmitting ? t.teacherAssessmentForm.creatingButton : t.teacherAssessmentForm.createButton}

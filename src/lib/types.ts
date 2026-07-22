@@ -39,7 +39,10 @@ export const evaluationModels = [
 ] as const;
 export type EvaluationModel = (typeof evaluationModels)[number];
 
-export const imageGenerationModels = ["googleai/gemini-3.1-flash-image"] as const;
+export const imageGenerationModels = [
+  "googleai/gemini-3.1-flash-lite-image",
+  "googleai/gemini-3-pro-image"
+] as const;
 export type ImageGenerationModel = (typeof imageGenerationModels)[number];
 
 

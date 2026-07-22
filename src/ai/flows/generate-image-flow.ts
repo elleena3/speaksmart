@@ -14,7 +14,7 @@ import { imageGenerationModels } from '@/lib/types';
 
 const GenerateImageInputSchema = z.object({
   prompt: z.string().describe('A text prompt describing the image to generate.'),
-  imageModel: z.enum(imageGenerationModels).optional().default('googleai/gemini-3.1-flash-image'),
+  imageModel: z.enum(imageGenerationModels).optional().default('googleai/gemini-3.1-flash-lite-image'),
 });
 export type GenerateImageInput = z.infer<typeof GenerateImageInputSchema>;
 
@@ -34,8 +34,8 @@ const generateImageFlow = ai.defineFlow(
     outputSchema: GenerateImageOutputSchema,
   },
   async ({ prompt, imageModel }) => {
-    
-    const modelToUse = imageModel || 'googleai/gemini-3.1-flash-image';
+
+    const modelToUse = imageModel || 'googleai/gemini-3.1-flash-lite-image';
 
     const { media } = await ai.generate({
       model: googleAI.model(modelToUse as any),
