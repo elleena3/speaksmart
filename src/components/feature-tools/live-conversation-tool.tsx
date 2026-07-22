@@ -231,10 +231,22 @@ export function LiveConversationTool() {
                     // Handle Live API transcriptions
                     const { inputTranscription, outputTranscription } = response.serverContent || {};
                     if (inputTranscription?.text) {
-                        setTurns(prev => [...prev, { role: 'user', text: inputTranscription.text, id: Date.now() }]);
+                        setTurns(prev => {
+                            const newTurns = [...prev];
+                            const last = newTurns[newTurns.length - 1];
+                            if (last && last.role === 'user') { last.text += " " + inputTranscription.text; }
+                            else { newTurns.push({ role: 'user', text: inputTranscription.text, id: Math.random() }); }
+                            return newTurns;
+                        });
                     }
                     if (outputTranscription?.text) {
-                        setTurns(prev => [...prev, { role: 'model', text: outputTranscription.text, id: Date.now() }]);
+                        setTurns(prev => {
+                            const newTurns = [...prev];
+                            const last = newTurns[newTurns.length - 1];
+                            if (last && last.role === 'model') { last.text += " " + outputTranscription.text; }
+                            else { newTurns.push({ role: 'model', text: outputTranscription.text, id: Math.random() }); }
+                            return newTurns;
+                        });
                     }
                 } catch (err) {
                     console.error("WebSocket Message Parse Error:", err);
