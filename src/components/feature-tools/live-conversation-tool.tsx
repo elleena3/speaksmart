@@ -252,13 +252,29 @@ export function LiveConversationTool() {
                         if (!turnReceivedAudioRef.current && finalTurnText.trim() !== "") {
                             // Fallback TTS generation if websocket stripped audio modality
                             generateTtsByModelFlow({ text: finalTurnText, model: "googleai/gemini-3.1-flash-tts-preview" })
-                                .then(res => {
-                                    const audio = new Audio(res.audioDataUri);
-                                    audio.onended = () => { aiIsSpeakingRef.current = false; };
-                                    audio.play().catch(e => {
-                                        console.error("Fallback TTS Playback Error:", e);
+                                .then(async (res) => {
+                                    if (audioContextRef.current) {
+                                        try {
+                                            const base64Data = res.audioDataUri.split(',')[1];
+                                            const binaryString = atob(base64Data);
+                                            const len = binaryString.length;
+                                            const bytes = new Uint8Array(len);
+                                            for (let i = 0; i < len; i++) {
+                                                bytes[i] = binaryString.charCodeAt(i);
+                                            }
+                                            const audioBuffer = await audioContextRef.current.decodeAudioData(bytes.buffer);
+                                            const source = audioContextRef.current.createBufferSource();
+                                            source.buffer = audioBuffer;
+                                            source.connect(audioContextRef.current.destination);
+                                            source.onended = () => { aiIsSpeakingRef.current = false; };
+                                            source.start(0);
+                                        } catch (e) {
+                                            console.error("Fallback TTS Decode/Play Error:", e);
+                                            aiIsSpeakingRef.current = false;
+                                        }
+                                    } else {
                                         aiIsSpeakingRef.current = false;
-                                    });
+                                    }
                                 })
                                 .catch(e => {
                                     console.error("Fallback TTS Generation Error:", e);
