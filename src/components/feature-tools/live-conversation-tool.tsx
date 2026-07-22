@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Mic, Square, Loader2, Play, CheckCircle2, User, Bot, AlertTriangle, RefreshCw } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { getLiveSessionToken } from "@/ai/flows/get-live-session-token";
+import { generateTtsByModelFlow } from "@/ai/flows/generate-tts-by-model-flow";
 import { analyzeLiveConversation, type AnalyzeLiveConversationOutput } from "@/ai/flows/analyze-live-conversation-flow";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -28,6 +29,7 @@ export function LiveConversationTool() {
     const micStreamRef = useRef<MediaStream | null>(null);
     const recognitionRef = useRef<any>(null);
     const setupCompleteRef = useRef<boolean>(false);
+    const turnReceivedAudioRef = useRef<boolean>(false);
 
     // For AI audio playback queue
     const nextPlayTimeRef = useRef<number>(0);
@@ -101,19 +103,12 @@ export function LiveConversationTool() {
                 // Send setup message
                 const setupMessage = {
                     setup: {
-                        model: "models/gemini-2.0-flash-exp",
+                        model: "models/gemini-3.1-flash-live-preview",
                         systemInstruction: {
                             parts: [{ text: "You are a friendly native English tutor. Speak naturally and converse interactively with the user." }]
                         },
                         generationConfig: {
-                            responseModalities: ["AUDIO"],
-                            speechConfig: {
-                                voiceConfig: {
-                                    prebuiltVoiceConfig: {
-                                        voiceName: "Puck"
-                                    }
-                                }
-                            }
+                            responseModalities: ["AUDIO"]
                         }
                     }
                 };
@@ -229,6 +224,7 @@ export function LiveConversationTool() {
                             }
 
                             if (part.inlineData && part.inlineData.data) {
+                                turnReceivedAudioRef.current = true;
                                 setAudioChunkCount(c => c + 1);
                                 // Play audio buffer
                                 try {
@@ -269,7 +265,38 @@ export function LiveConversationTool() {
                     }
 
                     if (response.serverContent?.turnComplete) {
+                        const finalTurnText = currentTurnText;
                         currentTurnText = ""; // reset for next turn
+
+                        // Execute seamless TTS Fallback if native Audio was suppressed
+                        if (!turnReceivedAudioRef.current && finalTurnText.trim() !== "") {
+                            generateTtsByModelFlow({ text: finalTurnText, model: "googleai/gemini-3.1-flash-tts-preview" })
+                                .then(async (res) => {
+                                    if (audioContextRef.current) {
+                                        try {
+                                            const base64Data = res.audioDataUri.split(',')[1];
+                                            const binaryString = atob(base64Data);
+                                            const len = binaryString.length;
+                                            const bytes = new Uint8Array(len);
+                                            for (let i = 0; i < len; i++) {
+                                                bytes[i] = binaryString.charCodeAt(i);
+                                            }
+                                            const audioBuffer = await audioContextRef.current.decodeAudioData(bytes.buffer);
+                                            const source = audioContextRef.current.createBufferSource();
+                                            source.buffer = audioBuffer;
+                                            source.connect(audioContextRef.current.destination);
+                                            source.start(0);
+                                        } catch (e) {
+                                            console.error("Fallback TTS Decode/Play Error:", e);
+                                        }
+                                    }
+                                })
+                                .catch(e => {
+                                    console.error("Fallback TTS Generation Error:", e);
+                                });
+                        }
+
+                        turnReceivedAudioRef.current = false;
                     }
 
                     // Handle Live API transcriptions
