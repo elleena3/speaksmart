@@ -103,7 +103,7 @@ export function LiveConversationTool() {
                 // Send setup message
                 const setupMessage = {
                     setup: {
-                        model: "models/gemini-2.0-flash-exp",
+                        model: "models/gemini-3.1-flash-live-preview",
                         generationConfig: {
                             responseModalities: ["AUDIO"],
                             speechConfig: {
@@ -125,26 +125,39 @@ export function LiveConversationTool() {
                 scriptProcessorRef.current = processor;
 
                 processor.onaudioprocess = (e) => {
-                    if (ws.readyState !== WebSocket.OPEN || !setupCompleteRef.current) return;
+                    if (!wsRef.current || !setupCompleteRef.current) return;
+
                     const float32Data = e.inputBuffer.getChannelData(0);
+
+                    // Simple RMS Noise Gate to prevent background noise from interrupting the AI (false barge-in)
+                    let rms = 0;
+                    for (let i = 0; i < float32Data.length; i++) {
+                        rms += float32Data[i] * float32Data[i];
+                    }
+                    rms = Math.sqrt(rms / float32Data.length);
+                    // Standard background noise is usually around 0.001 to 0.005. 0.01 is a safe speaking threshold.
+                    if (rms < 0.01) return;
+
                     // Convert Float32 to Int16 PCM
                     const pcmData = new Int16Array(float32Data.length);
                     for (let i = 0; i < float32Data.length; i++) {
                         let s = Math.max(-1, Math.min(1, float32Data[i]));
                         pcmData[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
                     }
-                    // Safe Base64 encoding without spread operator to avoid stack size limits
-                    const uint8 = new Uint8Array(pcmData.buffer);
+
+                    // Convert to base64
+                    const buf = new Uint8Array(pcmData.buffer);
                     let binaryStr = '';
-                    for (let i = 0; i < uint8.length; i++) {
-                        binaryStr += String.fromCharCode(uint8[i]);
-                    }
+                    for (let i = 0; i < buf.length; i++) { binaryStr += String.fromCharCode(buf[i]); }
                     const base64Data = btoa(binaryStr);
-                    ws.send(JSON.stringify({
-                        realtimeInput: {
-                            audio: { mimeType: "audio/pcm;rate=16000", data: base64Data }
-                        }
-                    }));
+
+                    if (wsRef.current.readyState === WebSocket.OPEN) {
+                        wsRef.current.send(JSON.stringify({
+                            realtimeInput: {
+                                audio: { mimeType: "audio/pcm;rate=16000", data: base64Data }
+                            }
+                        }));
+                    }
                 };
 
                 source.connect(processor);
