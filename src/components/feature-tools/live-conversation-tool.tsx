@@ -145,12 +145,10 @@ export function LiveConversationTool() {
                     if (wsRef.current.readyState === WebSocket.OPEN) {
                         const audioMessage = {
                             realtimeInput: {
-                                mediaChunks: [
-                                    {
-                                        mimeType: "audio/pcm;rate=16000",
-                                        data: base64Data
-                                    }
-                                ]
+                                audio: {
+                                    mimeType: "audio/pcm;rate=16000",
+                                    data: base64Data
+                                }
                             }
                         };
                         wsRef.current.send(JSON.stringify(audioMessage));
