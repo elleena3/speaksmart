@@ -177,7 +177,7 @@ export function LiveConversationTool() {
                                     return newTurns;
                                 });
                             }
-                            if (part.inlineData && part.inlineData.mimeType.startsWith("audio/pcm")) {
+                            if (part.inlineData && part.inlineData.data) {
                                 // Play audio buffer
                                 try {
                                     const binaryStr = atob(part.inlineData.data);
