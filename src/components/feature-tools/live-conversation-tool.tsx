@@ -24,7 +24,9 @@ export function LiveConversationTool() {
     const wsRef = useRef<WebSocket | null>(null);
     const audioContextRef = useRef<AudioContext | null>(null);
     const scriptProcessorRef = useRef<ScriptProcessorNode | null>(null);
+    const workletNodeRef = useRef<AudioWorkletNode | null>(null);
     const micStreamRef = useRef<MediaStream | null>(null);
+    const recognitionRef = useRef<any>(null);
     const setupCompleteRef = useRef<boolean>(false);
 
     // For AI audio playback queue
@@ -44,9 +46,17 @@ export function LiveConversationTool() {
             micStreamRef.current.getTracks().forEach(t => t.stop());
             micStreamRef.current = null;
         }
+        if (workletNodeRef.current) {
+            workletNodeRef.current.disconnect();
+            workletNodeRef.current = null;
+        }
         if (audioContextRef.current) {
             audioContextRef.current.close().catch(console.warn);
             audioContextRef.current = null;
+        }
+        if (recognitionRef.current) {
+            recognitionRef.current.stop();
+            recognitionRef.current = null;
         }
 
         setAppState('analyzing');
@@ -81,6 +91,32 @@ export function LiveConversationTool() {
             if (audioCtx.state === 'suspended') {
                 await audioCtx.resume();
             }
+
+            // Unbreakable FIFO Audio Queue via inline Worklet
+            const workletCode = `
+                class PCMProcessor extends AudioWorkletProcessor {
+                    constructor() {
+                        super();
+                        this.buffer = [];
+                        this.port.onmessage = e => this.buffer.push(...e.data);
+                    }
+                    process(inputs, outputs) {
+                        const output = outputs[0][0];
+                        for (let i = 0; i < output.length; i++) {
+                            output[i] = this.buffer.length ? this.buffer.shift() : 0;
+                        }
+                        return true;
+                    }
+                }
+                registerProcessor("pcm-processor", PCMProcessor);
+            `;
+            const blob = new Blob([workletCode], { type: "application/javascript" });
+            const workletUrl = URL.createObjectURL(blob);
+            await audioCtx.audioWorklet.addModule(workletUrl);
+
+            const workletNode = new AudioWorkletNode(audioCtx, "pcm-processor");
+            workletNode.connect(audioCtx.destination);
+            workletNodeRef.current = workletNode;
 
             const token = await getLiveSessionToken();
             const HOST = "generativelanguage.googleapis.com";
@@ -149,6 +185,29 @@ export function LiveConversationTool() {
                 processor.connect(dummyGain);
                 dummyGain.connect(audioCtx.destination);
 
+                // Setup local webkit Speech Recognition for instant user transcription fallback
+                const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+                if (SpeechRecognition) {
+                    const recognition = new SpeechRecognition();
+                    recognition.continuous = true;
+                    recognition.interimResults = false;
+                    recognition.lang = 'en-US';
+                    recognition.onresult = (event: any) => {
+                        const transcript = Array.from(event.results)
+                            .map((res: any) => res[0].transcript)
+                            .join('');
+                        setTurns(prev => {
+                            const newTurns = [...prev];
+                            const last = newTurns[newTurns.length - 1];
+                            if (last && last.role === 'user') { last.text += " " + transcript; }
+                            else { newTurns.push({ role: 'user', text: transcript, id: Math.random() }); }
+                            return newTurns;
+                        });
+                    };
+                    recognition.start();
+                    recognitionRef.current = recognition;
+                }
+
                 toast({ title: "소켓 연결됨", description: "원어민 강사 서버 설정 중..." });
             };
 
@@ -204,18 +263,9 @@ export function LiveConversationTool() {
                                         float32Array[i] = dataView.getInt16(i * 2, true) / 32768.0;
                                     }
 
-                                    const audioCtx = audioContextRef.current;
-                                    if (audioCtx) {
-                                        const audioBuffer = audioCtx.createBuffer(1, float32Array.length, 24000);
-                                        audioBuffer.copyToChannel(float32Array, 0);
-                                        const source = audioCtx.createBufferSource();
-                                        source.buffer = audioBuffer;
-                                        source.connect(audioCtx.destination);
-                                        const startTime = Math.max(audioCtx.currentTime, nextPlayTimeRef.current);
-                                        source.start(startTime);
-                                        nextPlayTimeRef.current = startTime + audioBuffer.duration;
-
-                                        console.log(`[Audio] Scheduled ${audioBuffer.duration.toFixed(2)}s chunk at ${startTime.toFixed(2)} (Ctx time: ${audioCtx.currentTime.toFixed(2)})`);
+                                    if (workletNodeRef.current) {
+                                        workletNodeRef.current.port.postMessage(float32Array);
+                                        console.log(`[Audio] Pushed ${float32Array.length} samples to Worklet queue`);
                                     }
                                 } catch (e) {
                                     console.error("Audio playback error:", e);
