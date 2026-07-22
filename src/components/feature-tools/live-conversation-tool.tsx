@@ -136,55 +136,63 @@ export function LiveConversationTool() {
 
             let currentTurnText = "";
 
-            ws.onmessage = (event) => {
-                const response = JSON.parse(event.data);
+            ws.onmessage = async (event) => {
+                try {
+                    let textData = event.data;
+                    if (textData instanceof Blob) {
+                        textData = await textData.text();
+                    }
+                    const response = JSON.parse(textData);
 
-                if (response.serverContent?.modelTurn) {
-                    const parts = response.serverContent.modelTurn.parts;
-                    for (const part of parts) {
-                        if (part.text) {
-                            currentTurnText += part.text;
-                            setTurns(prev => {
-                                const newTurns = [...prev];
-                                const last = newTurns[newTurns.length - 1];
-                                if (last && last.role === 'model') { last.text = currentTurnText; }
-                                else { newTurns.push({ role: 'model', text: currentTurnText, id: Date.now() }); }
-                                return newTurns;
-                            });
-                        }
-                        if (part.inlineData && part.inlineData.mimeType.startsWith("audio/pcm")) {
-                            // Play audio buffer
-                            try {
-                                const binaryStr = atob(part.inlineData.data);
-                                const len = binaryStr.length;
-                                const bytes = new Uint8Array(len);
-                                for (let i = 0; i < len; i++) { bytes[i] = binaryStr.charCodeAt(i); }
+                    if (response.serverContent?.modelTurn) {
+                        const parts = response.serverContent.modelTurn.parts;
+                        for (const part of parts) {
+                            if (part.text) {
+                                currentTurnText += part.text;
+                                setTurns(prev => {
+                                    const newTurns = [...prev];
+                                    const last = newTurns[newTurns.length - 1];
+                                    if (last && last.role === 'model') { last.text = currentTurnText; }
+                                    else { newTurns.push({ role: 'model', text: currentTurnText, id: Date.now() }); }
+                                    return newTurns;
+                                });
+                            }
+                            if (part.inlineData && part.inlineData.mimeType.startsWith("audio/pcm")) {
+                                // Play audio buffer
+                                try {
+                                    const binaryStr = atob(part.inlineData.data);
+                                    const len = binaryStr.length;
+                                    const bytes = new Uint8Array(len);
+                                    for (let i = 0; i < len; i++) { bytes[i] = binaryStr.charCodeAt(i); }
 
-                                // Gemini returns 24kHz PCM for model audio out
-                                const int16Array = new Int16Array(bytes.buffer);
-                                const float32Array = new Float32Array(int16Array.length);
-                                for (let i = 0; i < int16Array.length; i++) { float32Array[i] = int16Array[i] / 32768.0; }
+                                    // Gemini returns 24kHz PCM for model audio out
+                                    const int16Array = new Int16Array(bytes.buffer);
+                                    const float32Array = new Float32Array(int16Array.length);
+                                    for (let i = 0; i < int16Array.length; i++) { float32Array[i] = int16Array[i] / 32768.0; }
 
-                                const audioCtx = audioContextRef.current;
-                                if (audioCtx) {
-                                    const audioBuffer = audioCtx.createBuffer(1, float32Array.length, 24000);
-                                    audioBuffer.copyToChannel(float32Array, 0);
-                                    const source = audioCtx.createBufferSource();
-                                    source.buffer = audioBuffer;
-                                    source.connect(audioCtx.destination);
-                                    const startTime = Math.max(audioCtx.currentTime, nextPlayTimeRef.current);
-                                    source.start(startTime);
-                                    nextPlayTimeRef.current = startTime + audioBuffer.duration;
+                                    const audioCtx = audioContextRef.current;
+                                    if (audioCtx) {
+                                        const audioBuffer = audioCtx.createBuffer(1, float32Array.length, 24000);
+                                        audioBuffer.copyToChannel(float32Array, 0);
+                                        const source = audioCtx.createBufferSource();
+                                        source.buffer = audioBuffer;
+                                        source.connect(audioCtx.destination);
+                                        const startTime = Math.max(audioCtx.currentTime, nextPlayTimeRef.current);
+                                        source.start(startTime);
+                                        nextPlayTimeRef.current = startTime + audioBuffer.duration;
+                                    }
+                                } catch (e) {
+                                    console.error("Audio playback error:", e);
                                 }
-                            } catch (e) {
-                                console.error("Audio playback error:", e);
                             }
                         }
                     }
-                }
 
-                if (response.serverContent?.turnComplete) {
-                    currentTurnText = ""; // reset for next turn
+                    if (response.serverContent?.turnComplete) {
+                        currentTurnText = ""; // reset for next turn
+                    }
+                } catch (err) {
+                    console.error("WebSocket Message Parse Error:", err);
                 }
             };
 
