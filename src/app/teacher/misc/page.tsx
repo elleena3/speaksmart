@@ -18,7 +18,7 @@ import { PdfMultiAnalyzerTool } from "./pdf-multi-analyzer-tool";
 import { FirestoreTestTool } from "@/components/feature-tools/firestore-test-tool";
 import { StorageUploaderTool } from "@/components/feature-tools/storage-uploader-tool";
 import { TtsModelTesterTool } from "@/components/feature-tools/tts-model-tester-tool";
-
+import { LiveConversationTool } from "@/components/feature-tools/live-conversation-tool";
 
 export default function MiscPage() {
     const { t } = useLanguage();
@@ -30,6 +30,13 @@ export default function MiscPage() {
                 <p className="text-muted-foreground">{t.teacherMisc.description}</p>
             </div>
             <div className="grid grid-cols-1 gap-6">
+                <Card className="border-blue-500 shadow-md">
+                    <CardHeader>
+                        <CardTitle className="text-blue-600">실시간 원어민 대화 도구 (Live API)</CardTitle>
+                        <CardDescription>Gemini Live API를 사용한 WebSocket 실시간 영어 대화 연습 및 평가 도구입니다.</CardDescription>
+                    </CardHeader>
+                    <LiveConversationTool />
+                </Card>
                 <Card>
                     <CardHeader>
                         <CardTitle>TTS 모델별 음성 테스트</CardTitle>
@@ -46,7 +53,7 @@ export default function MiscPage() {
                     </CardHeader>
                     <FirestoreTestTool />
                 </Card>
-                 <Card>
+                <Card>
                     <CardHeader>
                         <CardTitle>Firebase Storage 파일 업로드 도구</CardTitle>
                         <CardDescription>파일을 직접 Firebase Storage에 업로드하고 진행 상태와 결과 URL을 확인하여 파일 저장소 기능이 정상 작동하는지 테스트합니다.</CardDescription>
@@ -74,7 +81,7 @@ export default function MiscPage() {
                     </CardHeader>
                     <PronunciationAnalyzerTool />
                 </Card>
-                 <Card>
+                <Card>
                     <CardHeader>
                         <CardTitle>{t.teacherMisc.readAloudTool.title}</CardTitle>
                         <CardDescription>{t.teacherMisc.readAloudTool.description}</CardDescription>
@@ -92,7 +99,7 @@ export default function MiscPage() {
                         <InteractiveTextAnalyzer />
                     </CardContent>
                 </Card>
-                 <Card>
+                <Card>
                     <CardHeader>
                         <CardTitle>{t.teacherMisc.handwritingAnalyzerTool.title}</CardTitle>
                         <CardDescription>{t.teacherMisc.handwritingAnalyzerTool.description}</CardDescription>
@@ -101,16 +108,16 @@ export default function MiscPage() {
                         <HandwritingAnalyzerTool />
                     </CardContent>
                 </Card>
-                 <Card>
+                <Card>
                     <CardHeader>
                         <CardTitle>자필 과제 채점 도구 (Beta)</CardTitle>
                         <CardDescription>학생의 손글씨 과제물(이미지, PDF)과 채점 기준(텍스트, 파일)을 함께 업로드하여 AI 자동 채점 및 피드백을 받아보세요.</CardDescription>
                     </CardHeader>
                     <CardContent>
-                       <HandwritingSubmissionAnalyzerTool />
+                        <HandwritingSubmissionAnalyzerTool />
                     </CardContent>
                 </Card>
-                 <Card>
+                <Card>
                     <CardHeader>
                         <CardTitle>{t.teacherMisc.presentationAnalyzerTool.title}</CardTitle>
                         <CardDescription>{t.teacherMisc.presentationAnalyzerTool.description}</CardDescription>
@@ -119,7 +126,7 @@ export default function MiscPage() {
                         <PresentationAnalyzerTool />
                     </CardContent>
                 </Card>
-                 <Card>
+                <Card>
                     <CardHeader>
                         <CardTitle>다중 PDF 동시 분석기 (병렬 처리)</CardTitle>
                         <CardDescription>여러 개의 PDF 파일을 동시에 업로드하고 동일한 프롬프트를 적용하여 모든 파일의 분석 결과를 한 번에 받아봅니다.</CardDescription>
@@ -140,7 +147,7 @@ export default function MiscPage() {
                     </CardHeader>
                     <PdfGradingTool />
                 </Card>
-                 <Card>
+                <Card>
                     <CardHeader>
                         <CardTitle>클라우드 저장소 PDF 분석 도구</CardTitle>
                         <CardDescription>Firebase Storage에 업로드된 PDF 파일을 서버에서 직접 분석합니다. (서버 사이드 처리)</CardDescription>
