@@ -214,15 +214,9 @@ export function HandwritingSubmissionAnalyzerTool() {
         document.body.removeChild(link);
     };
 
-    const handlePrint = (item: IndividualResult) => {
-        if (!item.result) return;
+    const generateReportHtml = (item: IndividualResult, index?: number): string => {
+        if (!item.result) return '';
         const res = item.result;
-
-        const printWindow = window.open('', '_blank', 'width=800,height=800');
-        if (!printWindow) {
-            toast({ title: '팝업이 차단되었습니다. 팝업 차단을 해제해주세요.', variant: 'destructive' });
-            return;
-        }
 
         let errorsHtml = '';
         if (res.errorAnalysis && res.errorAnalysis.length > 0) {
@@ -251,26 +245,11 @@ export function HandwritingSubmissionAnalyzerTool() {
             `;
         }
 
-        const html = `
-            <!DOCTYPE html>
-            <html lang="ko">
-            <head>
-                <meta charset="UTF-8">
-                <title>${item.fileName} - 피드백 리포트</title>
-                <style>
-                    body { font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; line-height: 1.6; padding: 40px; color: #333; }
-                    h1 { border-bottom: 2px solid #2563eb; padding-bottom: 10px; color: #1e40af; }
-                    h3 { margin-top: 25px; color: #0f172a; }
-                    .box { background-color: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; white-space: pre-wrap; font-size: 14px; }
-                    .box-blue { background-color: #eff6ff; border-color: #bfdbfe; }
-                    .page-break { page-break-after: always; }
-                    @media print {
-                        body { padding: 0; }
-                    }
-                </style>
-            </head>
-            <body onload="window.print(); setTimeout(() => window.close(), 500);">
-                <h1>📝 ${item.fileName} 피드백 리포트</h1>
+        const titlePrefix = index !== undefined ? `#${index + 1} ` : '';
+
+        return `
+            <div class="report-container">
+                <h1>📝 ${titlePrefix}${item.fileName} 피드백 리포트</h1>
                 <p><strong>생성일자:</strong> ${new Date().toLocaleDateString()}</p>
                 
                 <h3>통합 피드백 (학생용)</h3>
@@ -294,11 +273,66 @@ export function HandwritingSubmissionAnalyzerTool() {
                         <div class="box box-blue">${res.polishedText || '(교정본 없음)'}</div>
                     </div>
                 </div>
-            </body>
-            </html>
+            </div>
         `;
+    };
 
-        printWindow.document.write(html);
+    const getBaseHtmlWrapper = (title: string, bodyContent: string) => `
+        <!DOCTYPE html>
+        <html lang="ko">
+        <head>
+            <meta charset="UTF-8">
+            <title>${title}</title>
+            <style>
+                body { font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; line-height: 1.6; padding: 40px; color: #333; }
+                h1 { border-bottom: 2px solid #2563eb; padding-bottom: 10px; color: #1e40af; }
+                h3 { margin-top: 25px; color: #0f172a; }
+                .box { background-color: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; white-space: pre-wrap; font-size: 14px; }
+                .box-blue { background-color: #eff6ff; border-color: #bfdbfe; }
+                .page-break { page-break-after: always; }
+                .report-container:last-child .page-break { display: none; }
+                @media print {
+                    body { padding: 0; margin: 0; }
+                    .page-break { page-break-after: always; }
+                }
+            </style>
+        </head>
+        <body onload="window.print(); setTimeout(() => window.close(), 500);">
+            ${bodyContent}
+        </body>
+        </html>
+    `;
+
+    const handlePrint = (item: IndividualResult) => {
+        if (!item.result) return;
+        const printWindow = window.open('', '_blank', 'width=800,height=800');
+        if (!printWindow) {
+            toast({ title: '팝업이 차단되었습니다.', variant: 'destructive' });
+            return;
+        }
+
+        const content = generateReportHtml(item);
+        printWindow.document.write(getBaseHtmlWrapper(`${item.fileName} 리포트`, content));
+        printWindow.document.close();
+    };
+
+    const handlePrintAll = () => {
+        const doneResults = batchResults.filter(r => r.status === 'done' && r.result);
+        if (doneResults.length === 0) {
+            toast({ title: '인쇄할 결과가 없습니다.', variant: 'destructive' });
+            return;
+        }
+
+        const printWindow = window.open('', '_blank', 'width=800,height=800');
+        if (!printWindow) {
+            toast({ title: '팝업이 차단되었습니다.', variant: 'destructive' });
+            return;
+        }
+
+        const allHtml = doneResults.map((item, idx) => generateReportHtml(item, idx))
+            .join('<div class="page-break"></div>');
+
+        printWindow.document.write(getBaseHtmlWrapper(`전체 학생 피드백 리포트 (${doneResults.length}명)`, allHtml));
         printWindow.document.close();
     };
 
@@ -482,9 +516,14 @@ export function HandwritingSubmissionAnalyzerTool() {
                     <div className="flex items-center justify-between">
                         <h3 className="text-xl font-bold tracking-tight">개별 학생 분석 현황 ({batchResults.filter(r => r.status === 'done').length}/{batchResults.length})</h3>
                         {batchResults.some(r => r.status === 'done') && (
-                            <Button variant="outline" onClick={handleExportCSV} className="gap-2 shrink-0 border-green-200 text-green-700 bg-green-50 hover:bg-green-100 hover:text-green-800">
-                                <Download className="h-4 w-4" /> CSV 엑셀 다운로드
-                            </Button>
+                            <div className="flex items-center gap-3">
+                                <Button variant="outline" onClick={handlePrintAll} className="gap-2 shrink-0 border-slate-200 text-slate-700 bg-white hover:bg-slate-100">
+                                    <Printer className="h-4 w-4" /> 전체 인쇄 (PDF)
+                                </Button>
+                                <Button variant="outline" onClick={handleExportCSV} className="gap-2 shrink-0 border-green-200 text-green-700 bg-green-50 hover:bg-green-100 hover:text-green-800">
+                                    <Download className="h-4 w-4" /> CSV 엑셀 다운로드
+                                </Button>
+                            </div>
                         )}
                     </div>
                     {batchResults.map((item, index) => (
