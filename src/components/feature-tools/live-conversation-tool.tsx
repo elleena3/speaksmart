@@ -162,6 +162,7 @@ export function LiveConversationTool() {
                 dummyGain.gain.value = 0;
                 processor.connect(dummyGain);
                 dummyGain.connect(audioCtx.destination);
+                (window as any)._dummyGainRef = dummyGain; // Prevent Garbage Collection!
 
                 // Setup local webkit Speech Recognition for instant user transcription fallback (UI purposes ONLY)
                 const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -184,7 +185,16 @@ export function LiveConversationTool() {
                         });
                         // Notice: We NO LONGER send WS payloads here! The WebRTC mediaChunks handles AI input.
                     };
-                    recognition.start();
+
+                    // CRITICAL FIX: Chrome's SpeechRecognition silently terminates after brief silence or errors.
+                    // We MUST auto-restart it if the app is still connected.
+                    recognition.onend = () => {
+                        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                            try { recognition.start(); } catch (e) { } // Ignore already started errors
+                        }
+                    };
+
+                    try { recognition.start(); } catch (e) { }
                     recognitionRef.current = recognition;
                 }
 
