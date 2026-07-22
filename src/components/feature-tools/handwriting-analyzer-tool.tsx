@@ -24,7 +24,7 @@ export function HandwritingAnalyzerTool() {
     const [imageDataUri, setImageDataUri] = useState<string | null>(null);
     const [analysisResult, setAnalysisResult] = useState<AnalyzeHandwritingOutput | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const [selectedModel, setSelectedModel] = useState<EvaluationModel>('googleai/gemini-3.5-flash');
+    const [selectedModel, setSelectedModel] = useState<EvaluationModel>('googleai/gemini-3.6-flash');
     const { toast } = useToast();
 
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -94,7 +94,7 @@ export function HandwritingAnalyzerTool() {
                                 <SelectValue placeholder="모델을 선택하세요..." />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="googleai/gemini-3.5-flash">gemini-3.5-flash (빠름)</SelectItem>
+                                <SelectItem value="googleai/gemini-3.6-flash">gemini-3.6-flash (빠름)</SelectItem>
                                 <SelectItem value="googleai/gemini-3.1-pro-preview">gemini-3.1-pro-preview (고성능)</SelectItem>
                             </SelectContent>
                         </Select>

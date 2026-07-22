@@ -44,7 +44,7 @@ export async function converseWithConcurrentTeacher(
 
 export async function transcribeUserAudio(audioDataUri: string): Promise<string> {
   const sttResponse = await ai.generate({
-    model: googleAI.model('gemini-3.5-flash'),
+    model: googleAI.model('gemini-3.6-flash'),
     prompt: [
       { text: 'Transcribe this English audio.' },
       { media: { url: audioDataUri } },
@@ -61,7 +61,7 @@ export async function transcribeUserAudio(audioDataUri: string): Promise<string>
 
 const conversationalPrompt = ai.definePrompt({
   name: 'concurrentTeacherConversationalPrompt',
-  model: googleAI.model('gemini-3.1-flash-lite'),
+  model: googleAI.model('gemini-3.5-flash-lite'),
   input: {
     schema: z.object({
       studentTranscript: z.string().optional(),

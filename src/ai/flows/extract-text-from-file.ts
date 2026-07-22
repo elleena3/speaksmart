@@ -38,7 +38,7 @@ export async function extractTextFromFile(input: ExtractTextFromFileInput): Prom
 
 const extractTextWithAIPrompt = ai.definePrompt({
     name: 'extractTextWithAIPrompt',
-    model: googleAI.model('gemini-3.5-flash'),
+    model: googleAI.model('gemini-3.6-flash'),
     input: { schema: ExtractTextFromFileInputSchema },
     output: { schema: ExtractTextFromFileOutputSchema },
     prompt: `You are an Optical Character Recognition (OCR) specialist. Your task is to extract all the text content from the provided file (image or PDF).

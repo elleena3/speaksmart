@@ -40,7 +40,7 @@ export async function summarizeStudentFeedback(
 
 const summarizeStudentFeedbackPrompt = ai.definePrompt({
   name: 'summarizeStudentFeedbackPrompt',
-  model: googleAI.model('gemini-3.5-flash'),
+  model: googleAI.model('gemini-3.6-flash'),
   input: {schema: SummarizeStudentFeedbackInputSchema},
   output: {schema: SummarizeStudentFeedbackOutputSchema},
   prompt: `You are an AI assistant helping teachers improve their assessment activities.

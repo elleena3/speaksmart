@@ -60,7 +60,7 @@ export const seedInitialData = async () => {
     averageScore: 0,
     submissionCount: 0,
     expectedFormat: "1. 인사말 2. 이름 및 기본 정보 3. 취미/관심사 설명 4. 맺음말",
-    evaluationModel: "googleai/gemini-3.5-flash",
+    evaluationModel: "googleai/gemini-3.6-flash",
     createdAt: Date.now(),
     dateCreated: new Date().toISOString().split('T')[0]
   });

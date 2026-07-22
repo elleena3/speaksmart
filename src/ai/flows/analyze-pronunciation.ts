@@ -9,8 +9,8 @@ import { z } from 'zod';
 
 export async function analyzePronunciation(audioDataUri: string): Promise<any[]> {
   const modelsToCompare = [
-    'googleai/gemini-3.5-flash',
-    'googleai/gemini-3.5-flash',
+    'googleai/gemini-3.6-flash',
+    'googleai/gemini-3.6-flash',
     'googleai/gemini-3.1-pro-preview'
   ];
 

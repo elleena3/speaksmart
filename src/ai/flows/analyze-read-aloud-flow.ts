@@ -47,7 +47,7 @@ export async function analyzeReadAloud(input: AnalyzeReadAloudInput): Promise<An
 
 const readAloudAnalysisPrompt = ai.definePrompt({
     name: 'readAloudAnalysisPrompt',
-    model: googleAI.model('gemini-3.5-flash'),
+    model: googleAI.model('gemini-3.6-flash'),
     input: { schema: AnalyzeReadAloudInputSchema },
     output: { schema: AnalyzeReadAloudOutputSchema },
     prompt: `You are an expert English reading and pronunciation coach. Your task is to evaluate a user's spoken English as they read a provided text aloud. Provide all feedback in Korean.

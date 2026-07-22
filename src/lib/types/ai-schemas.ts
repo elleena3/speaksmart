@@ -25,7 +25,7 @@ export const ConverseWithStudentInputSchema = z.object({
   scenario: z.enum(scenarios).optional().describe('The role-playing scenario for the conversation.'),
   scenarioPrompt: z.string().optional().describe('The teacher-provided prompt for the role-playing scenario.'),
   aiVoice: z.enum(allVoices).optional().describe("The voice for the AI to use for text-to-speech."),
-  evaluationModel: z.enum(evaluationModels).optional().default('googleai/gemini-3.5-flash').describe("The AI model to use for generating responses."),
+  evaluationModel: z.enum(evaluationModels).optional().default('googleai/gemini-3.6-flash').describe("The AI model to use for generating responses."),
 });
 export type ConverseWithStudentInput = z.infer<typeof ConverseWithStudentInputSchema>;
 

@@ -19,7 +19,7 @@ const SummarizeConversationHistoryOutputSchema = z.object({
 
 const summarizationPrompt = ai.definePrompt({
     name: 'conversationSummarizationPrompt',
-    model: googleAI.model('gemini-3.1-flash-lite'),
+    model: googleAI.model('gemini-3.5-flash-lite'),
     input: { schema: SummarizeConversationHistoryInputSchema },
     output: { schema: SummarizeConversationHistoryOutputSchema },
     prompt: `You are a conversation summarizer. Your task is to create a concise, third-person summary of the provided conversation history. Focus on the key facts, decisions, and topics discussed.

@@ -20,7 +20,7 @@ export async function enhanceSelectedText(input: EnhanceSelectedTextInput): Prom
 
 const enhanceTextPrompt = ai.definePrompt({
     name: 'enhanceTextPrompt',
-    model: googleAI.model('gemini-3.5-flash'),
+    model: googleAI.model('gemini-3.6-flash'),
     input: { schema: EnhanceSelectedTextInputSchema },
     output: { schema: EnhanceSelectedTextOutputSchema },
     prompt: `You are an expert English language teaching assistant. A user has selected a snippet of text from a larger sentence to get help. Your task is to first determine the user's true intended selection, and then perform a requested action on that corrected text. All output text for the user must be in Korean.

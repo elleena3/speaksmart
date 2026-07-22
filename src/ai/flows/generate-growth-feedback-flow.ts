@@ -19,7 +19,7 @@ export async function generateGrowthFeedback(
 
 const growthFeedbackPrompt = ai.definePrompt({
   name: 'growthFeedbackPrompt',
-  model: googleAI.model('gemini-3.5-flash'),
+  model: googleAI.model('gemini-3.6-flash'),
   input: { schema: GenerateGrowthFeedbackInputSchema.extend({ hasValidCurricularRemarks: z.boolean() }) },
   output: { schema: GenerateGrowthFeedbackOutputSchema },
   prompt: `You are an expert AI English teacher. Your task is to provide a comprehensive growth analysis for a student by comparing all of their attempts of the same speaking assessment. Your entire response must be in Korean.

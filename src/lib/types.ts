@@ -30,7 +30,7 @@ export const voiceDescriptions: Record<AiVoice, string> = {
 
 export const evaluationModels = [
   // Google AI Models
-  "googleai/gemini-3.5-flash",
+  "googleai/gemini-3.6-flash",
   "googleai/gemini-3.1-pro-preview",
   // OpenAI Models
   "openai/gpt-4o",

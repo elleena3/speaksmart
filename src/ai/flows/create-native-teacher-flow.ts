@@ -49,7 +49,7 @@ export async function converseWithNativeTeacher(
 
 const conversationalPrompt = ai.definePrompt({
   name: 'nativeTeacherConversationalPrompt',
-  model: googleAI.model('gemini-3.1-flash-lite'),
+  model: googleAI.model('gemini-3.5-flash-lite'),
   input: {
     schema: z.object({
       studentTranscript: z.string().optional(),
@@ -187,7 +187,7 @@ const converseWithNativeTeacherFlow = ai.defineFlow(
 
     if (studentRecordingDataUri) {
       const sttResponse = await ai.generate({
-        model: googleAI.model('gemini-3.5-flash'),
+        model: googleAI.model('gemini-3.6-flash'),
         prompt: [
           { text: 'Transcribe this English audio.' },
           { media: { url: studentRecordingDataUri } },

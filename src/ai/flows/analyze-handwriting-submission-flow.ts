@@ -25,7 +25,7 @@ const AnalyzeHandwritingSubmissionInputSchema = z.object({
   criteriaFileUri: z.string().optional().describe(
     "The evaluation criteria as a file data URI (image or PDF)."
   ),
-  model: z.enum(evaluationModels).optional().default('googleai/gemini-3.5-flash'),
+  model: z.enum(evaluationModels).optional().default('googleai/gemini-3.6-flash'),
 }).refine(data => data.criteriaText || data.criteriaFileUri, {
     message: "At least one of criteriaText or criteriaFileUri must be provided.",
     path: ["criteriaText"], // you can pick any path for the error message
@@ -113,7 +113,7 @@ const analyzeHandwritingSubmissionFlow = ai.defineFlow(
   },
   async ({ model, ...input }) => {
     
-    const analysisModel = googleAI.model(model || 'googleai/gemini-3.5-flash');
+    const analysisModel = googleAI.model(model || 'googleai/gemini-3.6-flash');
 
     const { output } = await handwritingSubmissionPrompt(input, { model: analysisModel });
 

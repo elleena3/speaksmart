@@ -45,7 +45,7 @@ export async function converseWithParallelTeacher(
 
 const conversationalPrompt = ai.definePrompt({
   name: 'parallelTeacherConversationalPrompt',
-  model: googleAI.model('gemini-3.1-flash-lite'),
+  model: googleAI.model('gemini-3.5-flash-lite'),
   input: {
     schema: z.object({
       studentTranscript: z.string().optional(),
@@ -168,7 +168,7 @@ const converseWithParallelTeacherFlow = ai.defineFlow(
     // Step 1: Transcribe student's audio if it exists.
     if (studentRecordingDataUri) {
       const sttResponse = await ai.generate({
-        model: googleAI.model('gemini-3.5-flash'),
+        model: googleAI.model('gemini-3.6-flash'),
         prompt: [
           { text: 'Transcribe this English audio.' },
           { media: { url: studentRecordingDataUri } },
