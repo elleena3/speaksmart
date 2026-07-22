@@ -98,7 +98,7 @@ export function LiveConversationTool() {
                     setup: {
                         model: "models/gemini-3.1-flash-live-preview",
                         generationConfig: {
-                            responseModalities: ["TEXT", "AUDIO"],
+                            responseModalities: ["AUDIO"],
                             speechConfig: {
                                 voiceConfig: { prebuiltVoiceConfig: { voiceName: "Aoede" } }
                             }
