@@ -20,6 +20,7 @@ export function LiveConversationTool() {
     const [appState, setAppState] = useState<AppState>('idle');
     const [turns, setTurns] = useState<Turn[]>([]);
     const [result, setResult] = useState<AnalyzeLiveConversationOutput | null>(null);
+    const [audioChunkCount, setAudioChunkCount] = useState<number>(0);
 
     const wsRef = useRef<WebSocket | null>(null);
     const audioContextRef = useRef<AudioContext | null>(null);
@@ -79,6 +80,7 @@ export function LiveConversationTool() {
         setAppState('connecting');
         setTurns([]);
         setResult(null);
+        setAudioChunkCount(0);
         try {
             // Must create AudioContext BEFORE 'await' to guarantee user-gesture token in Chrome
             const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
@@ -103,7 +105,10 @@ export function LiveConversationTool() {
                     setup: {
                         model: "models/gemini-3.1-flash-live-preview",
                         generationConfig: {
-                            responseModalities: ["AUDIO"]
+                            responseModalities: ["AUDIO"],
+                            speechConfig: {
+                                voiceConfig: { prebuiltVoiceConfig: { voiceName: "Aoede" } }
+                            }
                         }
                     }
                 };
@@ -227,6 +232,7 @@ export function LiveConversationTool() {
                             }
 
                             if (part.inlineData && part.inlineData.data) {
+                                setAudioChunkCount(c => c + 1);
                                 // Play audio buffer
                                 try {
                                     const binaryStr = atob(part.inlineData.data);
@@ -356,6 +362,11 @@ export function LiveConversationTool() {
                         ))}
                     </ScrollArea>
                 </CardContent>
+                {appState === 'connected' && (
+                    <div className="px-6 pb-4 text-xs text-muted-foreground flex justify-between items-center">
+                        <span>수신된 오디오 청크: {audioChunkCount}</span>
+                    </div>
+                )}
             </Card>
 
             {appState === 'finished' && result && (
