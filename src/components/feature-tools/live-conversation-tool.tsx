@@ -103,10 +103,7 @@ export function LiveConversationTool() {
                     setup: {
                         model: "models/gemini-3.1-flash-live-preview",
                         generationConfig: {
-                            responseModalities: ["AUDIO"],
-                            speechConfig: {
-                                voiceConfig: { prebuiltVoiceConfig: { voiceName: "Aoede" } }
-                            }
+                            responseModalities: ["AUDIO"]
                         }
                     }
                 };
@@ -159,7 +156,8 @@ export function LiveConversationTool() {
                 if (SpeechRecognition) {
                     const recognition = new SpeechRecognition();
                     recognition.continuous = true;
-                    recognition.interimResults = false;
+                    // enable interimResults for instant zero-lag feedback
+                    recognition.interimResults = true;
                     recognition.lang = 'en-US';
                     recognition.onresult = (event: any) => {
                         const transcript = Array.from(event.results)
@@ -217,6 +215,17 @@ export function LiveConversationTool() {
                                     return newTurns;
                                 });
                             }
+                            // Check if API sent text backup instead of audio
+                            if (part.text) {
+                                setTurns(prev => {
+                                    const newTurns = [...prev];
+                                    const last = newTurns[newTurns.length - 1];
+                                    if (last && last.role === 'model') { last.text += " " + part.text; }
+                                    else { newTurns.push({ role: 'model', text: part.text, id: Math.random() }); }
+                                    return newTurns;
+                                });
+                            }
+
                             if (part.inlineData && part.inlineData.data) {
                                 // Play audio buffer
                                 try {
@@ -270,8 +279,8 @@ export function LiveConversationTool() {
                         setTurns(prev => {
                             const newTurns = [...prev];
                             const last = newTurns[newTurns.length - 1];
-                            // The API sends the cumulative text for the turn, so we replace, we DO NOT append.
-                            if (last && last.role === 'model') { last.text = outputTranscription.text; }
+                            // The API sends incremental deltas for outputTranscription, so we MUST append (+=)
+                            if (last && last.role === 'model') { last.text += " " + outputTranscription.text; }
                             else { newTurns.push({ role: 'model', text: outputTranscription.text, id: Math.random() }); }
                             return newTurns;
                         });
