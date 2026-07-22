@@ -37,9 +37,46 @@ const generateImageFlow = ai.defineFlow(
 
     const modelToUse = imageModel || 'googleai/gemini-3.1-flash-lite-image';
 
+    let finalPrompt = `A high-quality, clear, simple illustration suitable for an English speaking test. The image should be in a square aspect ratio. Prompt: ${prompt}`;
+
+    if (modelToUse.startsWith('openai/')) {
+      const rawModelName = modelToUse.replace('openai/', '');
+      const apiKey = process.env.OPENAI_API_KEY;
+      if (!apiKey) throw new Error("OPENAI API KEY missing from server configuration.");
+
+      const res = await fetch('https://api.openai.com/v1/images/generations', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: rawModelName,
+          prompt: finalPrompt,
+          n: 1,
+          size: "1024x1024",
+          response_format: "b64_json"
+        })
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        console.error("OpenAI Image Error", err);
+        throw new Error(`OpenAI image generation failed: ${res.statusText}`);
+      }
+
+      const data = await res.json();
+      const b64 = data.data?.[0]?.b64_json;
+      if (!b64) throw new Error('OpenAI image generation returned empty data');
+
+      return { imageDataUri: `data:image/png;base64,${b64}` };
+    }
+
+    // Google AI Path
+    const rawGoogleModel = modelToUse.replace('googleai/', '');
     const { media } = await ai.generate({
-      model: googleAI.model(modelToUse as any),
-      prompt: `A high-quality, clear, simple illustration suitable for an English speaking test. The image should be in a square aspect ratio. Prompt: ${prompt}`,
+      model: googleAI.model(rawGoogleModel as any),
+      prompt: finalPrompt,
       config: {
         responseModalities: ['TEXT', 'IMAGE'],
       },
