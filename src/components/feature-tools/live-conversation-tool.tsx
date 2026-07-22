@@ -128,7 +128,9 @@ export function LiveConversationTool() {
                     }
                     const base64Data = btoa(binaryStr);
                     ws.send(JSON.stringify({
-                        realtimeInput: { mediaChunks: [{ mimeType: "audio/pcm;rate=16000", data: base64Data }] }
+                        realtimeInput: {
+                            audio: { mimeType: "audio/pcm;rate=16000", data: base64Data }
+                        }
                     }));
                 };
 
