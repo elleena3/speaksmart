@@ -47,18 +47,36 @@ type Notification = {
 };
 
 const initialNotifications: Notification[] = [
-    { id: 1, type: 'submission', title: "새로운 제출", description: "일학생님이 '취미와 관심사' 평가를 완료했습니다." },
-    { id: 2, type: 'feedback', title: "피드백 수신", description: "이학생님이 '음식 주문하기' 평가에 대한 피드백을 남겼습니다." },
+  { id: 1, type: 'submission', title: "새로운 제출", description: "일학생님이 '취미와 관심사' 평가를 완료했습니다." },
+  { id: 2, type: 'feedback', title: "피드백 수신", description: "이학생님이 '음식 주문하기' 평가에 대한 피드백을 남겼습니다." },
 ];
 
 
 export function AppLayout({ children, navItems, titleKey }: AppLayoutProps) {
   const pathname = usePathname()
   const router = useRouter()
-  const { user, logout } = useAuth()
+  const { user, logout, loading } = useAuth()
   const { t } = useLanguage()
   const { toast } = useToast()
   const [notifications, setNotifications] = useState<Notification[]>(initialNotifications);
+
+  React.useEffect(() => {
+    if (loading) return; // Wait for auth to resolve
+
+    if (!user) {
+      toast({ title: "접근 거부", description: "먼저 로그인 해주세요.", variant: "destructive" });
+      router.push('/');
+      return;
+    }
+
+    if (pathname.startsWith('/teacher') && user.role !== 'teacher') {
+      toast({ title: "권한 없음", description: "교사 권한이 필요합니다.", variant: "destructive" });
+      router.push('/');
+    } else if (pathname.startsWith('/student') && user.role !== 'student') {
+      toast({ title: "권한 없음", description: "학생 권한이 필요합니다.", variant: "destructive" });
+      router.push('/');
+    }
+  }, [user, loading, pathname, router, toast]);
 
   const handleLogout = async () => {
     await logout();
@@ -98,17 +116,17 @@ export function AppLayout({ children, navItems, titleKey }: AppLayoutProps) {
         </SidebarContent>
         <SidebarFooter>
           <div className="flex items-center gap-3 p-2">
-             <Avatar className="h-8 w-8">
-                <AvatarImage src={user?.photoURL || undefined} alt={user?.displayName || "User"}/>
-                <AvatarFallback>{user?.displayName?.charAt(0) || "U"}</AvatarFallback>
+            <Avatar className="h-8 w-8">
+              <AvatarImage src={user?.photoURL || undefined} alt={user?.displayName || "User"} />
+              <AvatarFallback>{user?.displayName?.charAt(0) || "U"}</AvatarFallback>
             </Avatar>
             <div className="flex flex-col overflow-hidden">
-                <span className="text-sm font-medium truncate">{user?.displayName}</span>
-                <span className="text-xs text-muted-foreground truncate">{user?.email}</span>
+              <span className="text-sm font-medium truncate">{user?.displayName}</span>
+              <span className="text-xs text-muted-foreground truncate">{user?.email}</span>
             </div>
           </div>
           <SidebarMenuButton onClick={handleLogout}>
-            <LogOut/>
+            <LogOut />
             <span>{t.nav.logout}</span>
           </SidebarMenuButton>
         </SidebarFooter>
@@ -117,66 +135,66 @@ export function AppLayout({ children, navItems, titleKey }: AppLayoutProps) {
         <header className="flex items-center justify-between p-4 border-b bg-card md:bg-transparent">
           <div className="flex items-center gap-4">
             <div className="md:hidden">
-               <SidebarTrigger />
+              <SidebarTrigger />
             </div>
             <h2 className="text-xl font-semibold font-headline">{t.titles[titleKey]}</h2>
           </div>
           <div className="flex items-center gap-4">
-             {user && (
-                <div className="flex items-center gap-2">
-                    <Avatar className="h-7 w-7">
-                        <AvatarImage src={user.photoURL || undefined} alt={user.displayName || "User"}/>
-                        <AvatarFallback>{user.displayName?.charAt(0) || "U"}</AvatarFallback>
-                    </Avatar>
-                    <span className="text-sm font-semibold text-muted-foreground hidden sm:inline-block">
-                      {user.displayName}
-                    </span>
-                    {user.isMock && <Badge variant="outline">테스트 계정</Badge>}
-                </div>
+            {user && (
+              <div className="flex items-center gap-2">
+                <Avatar className="h-7 w-7">
+                  <AvatarImage src={user.photoURL || undefined} alt={user.displayName || "User"} />
+                  <AvatarFallback>{user.displayName?.charAt(0) || "U"}</AvatarFallback>
+                </Avatar>
+                <span className="text-sm font-semibold text-muted-foreground hidden sm:inline-block">
+                  {user.displayName}
+                </span>
+                {user.isMock && <Badge variant="outline">테스트 계정</Badge>}
+              </div>
             )}
             {user?.role === 'teacher' && (
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="relative">
-                            <Bell className="h-5 w-5" />
-                            {notifications.length > 0 && (
-                                <span className="absolute top-1 right-1 flex h-2 w-2">
-                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-                                </span>
-                            )}
-                            <span className="sr-only">알림 보기</span>
-                        </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-80">
-                        <DropdownMenuLabel>알림</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        {notifications.length > 0 ? (
-                           notifications.map((notification, index) => (
-                               <React.Fragment key={notification.id}>
-                                    <DropdownMenuItem className="flex items-start gap-3" onSelect={() => handleNotificationClick(notification.id)}>
-                                        {notification.type === 'submission' ? (
-                                            <CheckCircle className="h-5 w-5 mt-1 text-green-500 flex-shrink-0" />
-                                        ) : (
-                                            <CircleDot className="h-5 w-5 mt-1 text-blue-500 flex-shrink-0" />
-                                        )}
-                                        <div>
-                                            <p className="font-semibold">{notification.title}</p>
-                                            <p className="text-xs text-muted-foreground">
-                                                {notification.description}
-                                            </p>
-                                        </div>
-                                    </DropdownMenuItem>
-                                    {index < notifications.length - 1 && <DropdownMenuSeparator />}
-                               </React.Fragment>
-                           ))
-                        ) : (
-                            <div className="px-2 py-4 text-center text-sm text-muted-foreground">
-                                새로운 알림이 없습니다.
-                            </div>
-                        )}
-                    </DropdownMenuContent>
-                </DropdownMenu>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="relative">
+                    <Bell className="h-5 w-5" />
+                    {notifications.length > 0 && (
+                      <span className="absolute top-1 right-1 flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                      </span>
+                    )}
+                    <span className="sr-only">알림 보기</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-80">
+                  <DropdownMenuLabel>알림</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {notifications.length > 0 ? (
+                    notifications.map((notification, index) => (
+                      <React.Fragment key={notification.id}>
+                        <DropdownMenuItem className="flex items-start gap-3" onSelect={() => handleNotificationClick(notification.id)}>
+                          {notification.type === 'submission' ? (
+                            <CheckCircle className="h-5 w-5 mt-1 text-green-500 flex-shrink-0" />
+                          ) : (
+                            <CircleDot className="h-5 w-5 mt-1 text-blue-500 flex-shrink-0" />
+                          )}
+                          <div>
+                            <p className="font-semibold">{notification.title}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {notification.description}
+                            </p>
+                          </div>
+                        </DropdownMenuItem>
+                        {index < notifications.length - 1 && <DropdownMenuSeparator />}
+                      </React.Fragment>
+                    ))
+                  ) : (
+                    <div className="px-2 py-4 text-center text-sm text-muted-foreground">
+                      새로운 알림이 없습니다.
+                    </div>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
             <div className="hidden md:block">
               <SidebarTrigger />

@@ -1,0 +1,34 @@
+diff --git a/node_modules/genkitx-anthropic/lib/claude.js b/node_modules/genkitx-anthropic/lib/claude.js
+index 53c1fd8..8f13d58 100644
+--- a/node_modules/genkitx-anthropic/lib/claude.js
++++ b/node_modules/genkitx-anthropic/lib/claude.js
+@@ -59,6 +59,10 @@ var claude_exports = {};
+ __export(claude_exports, {
+   AnthropicConfigSchema: () => AnthropicConfigSchema,
+   SUPPORTED_CLAUDE_MODELS: () => SUPPORTED_CLAUDE_MODELS,
++  claudeFable5: () => claudeFable5,
++  claudeOpus48: () => claudeOpus48,
++  claudeSonnet5: () => claudeSonnet5,
++  claudeHaiku45: () => claudeHaiku45,
+   claude35Haiku: () => claude35Haiku,
+   claude35Sonnet: () => claude35Sonnet,
+   claude37Sonnet: () => claude37Sonnet,
+@@ -295,7 +299,18 @@ const claude45Opus = (0, import_model.modelRef)({
+   configSchema: AnthropicConfigSchema,
+   version: "claude-opus-4-5-20251101"
+ });
++
++const claudeFable5 = (0, import_model.modelRef)({ name: "anthropic/claude-fable-5", info: { label: "Claude Fable 5", versions: ["claude-fable-5"]}, version: "claude-fable-5" });
++const claudeOpus48 = (0, import_model.modelRef)({ name: "anthropic/claude-opus-4-8", info: { label: "Claude Opus 4.8", versions: ["claude-opus-4-8"]}, version: "claude-opus-4-8" });
++const claudeSonnet5 = (0, import_model.modelRef)({ name: "anthropic/claude-sonnet-5", info: { label: "Claude Sonnet 5", versions: ["claude-sonnet-5"]}, version: "claude-sonnet-5" });
++const claudeHaiku45 = (0, import_model.modelRef)({ name: "anthropic/claude-haiku-4-5", info: { label: "Claude Haiku 4.5", versions: ["claude-haiku-4-5-20251001", "claude-haiku-4-5"]}, version: "claude-haiku-4-5-20251001" });
++
+ const SUPPORTED_CLAUDE_MODELS = {
++  "claude-fable-5": claudeFable5,
++  "claude-opus-4-8": claudeOpus48,
++  "claude-sonnet-5": claudeSonnet5,
++  "claude-haiku-4-5": claudeHaiku45,
++
+   "claude-3-7-sonnet": claude37Sonnet,
+   "claude-3-5-sonnet": claude35Sonnet,
+   "claude-3-opus": claude3Opus,

@@ -70,7 +70,7 @@ const analyzeHandwritingFlow = ai.defineFlow(
     outputSchema: AnalyzeHandwritingOutputSchema,
   },
   async ({ imageDataUri, model }) => {
-    const analysisModel = googleAI.model(model || 'googleai/gemini-3.6-flash');
+    const analysisModel = model || 'googleai/gemini-3.6-flash';
 
     const { output } = await handwritingAnalysisPrompt(
       { imageDataUri, model },

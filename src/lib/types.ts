@@ -36,7 +36,15 @@ export const evaluationModels = [
   "openai/gpt-4o",
   "openai/gpt-4o-mini",
   "openai/o3-mini",
-  "openai/o1"
+  "openai/o1",
+  "openai/gpt-5.6-sol",
+  "openai/gpt-5.6-terra",
+  "openai/gpt-5.6-luna",
+  // Anthropic Models
+  "anthropic/claude-fable-5",
+  "anthropic/claude-opus-4-8",
+  "anthropic/claude-sonnet-5",
+  "anthropic/claude-haiku-4-5"
 ] as const;
 export type EvaluationModel = (typeof evaluationModels)[number];
 

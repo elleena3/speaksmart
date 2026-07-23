@@ -71,7 +71,7 @@ const analyzePdfFromStorageFlow = ai.defineFlow(
       // 2. Call the model with the Data URI, now wrapped in our retry logic.
       const result = await withRetry(() =>
         ai.generate({
-          model: googleAI.model('gemini-3.1-pro-preview'),
+          model: 'gemini-3.1-pro-preview',
           prompt: [
             { text: prompt },
             { media: { url: pdfDataUri } }

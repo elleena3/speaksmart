@@ -49,7 +49,7 @@ export async function converseWithNativeTeacher(
 
 const conversationalPrompt = ai.definePrompt({
   name: 'nativeTeacherConversationalPrompt',
-  model: googleAI.model('gemini-3.5-flash-lite'),
+  model: 'gemini-3.5-flash-lite',
   input: {
     schema: z.object({
       studentTranscript: z.string().optional(),
@@ -146,7 +146,7 @@ async function textToSpeech(text: string): Promise<string> {
     let ttsResponse;
     try {
         ttsResponse = await ai.generate({
-            model: googleAI.model('gemini-3.1-flash-tts-preview'),
+            model: 'gemini-3.1-flash-tts-preview',
             ...ttsRequestPayload,
         });
     } catch (error: any) {
@@ -154,7 +154,7 @@ async function textToSpeech(text: string): Promise<string> {
         if (errorMessage.includes('429') || errorMessage.includes('500') || errorMessage.includes('503') || errorMessage.includes('overloaded')) {
             console.warn("TTS Flash model failed, falling back to Pro model.", error);
             ttsResponse = await ai.generate({
-                model: googleAI.model('gemini-3.1-flash-tts-preview'),
+                model: 'gemini-3.1-flash-tts-preview',
                 ...ttsRequestPayload,
             });
         } else {
@@ -187,7 +187,7 @@ const converseWithNativeTeacherFlow = ai.defineFlow(
 
     if (studentRecordingDataUri) {
       const sttResponse = await ai.generate({
-        model: googleAI.model('gemini-3.6-flash'),
+        model: 'gemini-3.6-flash',
         prompt: [
           { text: 'Transcribe this English audio.' },
           { media: { url: studentRecordingDataUri } },

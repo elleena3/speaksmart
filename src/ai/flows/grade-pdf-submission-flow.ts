@@ -34,7 +34,7 @@ export type GradePdfSubmissionOutput = z.infer<typeof GradePdfSubmissionOutputSc
 export async function gradePdfSubmission(input: GradePdfSubmissionInput): Promise<GradePdfSubmissionOutput> {
   try {
     const { text } = await ai.generate({
-      model: googleAI.model('gemini-3.1-pro-preview'),
+      model: 'gemini-3.1-pro-preview',
       prompt: [
         {
           text: `You are an expert teacher grading an assignment. Your task is to evaluate the student's submission based *strictly* on the provided grading criteria document. Provide a detailed analysis, including strengths, weaknesses, and a final score or grade if applicable from the criteria.

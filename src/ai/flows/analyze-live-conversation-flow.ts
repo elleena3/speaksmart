@@ -6,6 +6,7 @@ import { z } from 'zod';
 
 const AnalyzeLiveConversationInputSchema = z.object({
     transcript: z.string().describe("The full transcript of the real-time conversation between User and AI."),
+    evaluationModel: z.string().optional().describe("Dynamic model to use for scoring (e.g., openai/gpt-5.6-sol or googleai/gemini-3.1-pro-preview)."),
 });
 export type AnalyzeLiveConversationInput = z.infer<typeof AnalyzeLiveConversationInputSchema>;
 
@@ -24,7 +25,7 @@ export async function analyzeLiveConversation(input: AnalyzeLiveConversationInpu
 
 const liveConversationAnalysisPrompt = ai.definePrompt({
     name: 'liveConversationAnalysisPrompt',
-    model: googleAI.model('gemini-3.6-flash'),
+    model: 'gemini-3.6-flash',
     input: { schema: AnalyzeLiveConversationInputSchema },
     output: { schema: AnalyzeLiveConversationOutputSchema },
     prompt: `You are an expert native English AI tutor evaluating a recent real-time conversation you had with a student.
@@ -49,7 +50,9 @@ const analyzeLiveConversationFlow = ai.defineFlow(
         outputSchema: AnalyzeLiveConversationOutputSchema,
     },
     async (input) => {
-        const { output } = await liveConversationAnalysisPrompt(input);
+        const modelToUse = input.evaluationModel || 'googleai/gemini-3.6-flash';
+        console.log(`Analyzing conversational feedback using model: ${modelToUse}`);
+        const { output } = await liveConversationAnalysisPrompt(input, { model: modelToUse });
         if (!output) throw new Error("AI failed to evaluate live conversation.");
         return output;
     }

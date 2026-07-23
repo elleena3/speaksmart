@@ -44,7 +44,7 @@ export async function converseWithConcurrentTeacher(
 
 export async function transcribeUserAudio(audioDataUri: string): Promise<string> {
   const sttResponse = await ai.generate({
-    model: googleAI.model('gemini-3.6-flash'),
+    model: 'gemini-3.6-flash',
     prompt: [
       { text: 'Transcribe this English audio.' },
       { media: { url: audioDataUri } },
@@ -61,7 +61,7 @@ export async function transcribeUserAudio(audioDataUri: string): Promise<string>
 
 const conversationalPrompt = ai.definePrompt({
   name: 'concurrentTeacherConversationalPrompt',
-  model: googleAI.model('gemini-3.5-flash-lite'),
+  model: 'gemini-3.5-flash-lite',
   input: {
     schema: z.object({
       studentTranscript: z.string().optional(),
@@ -141,7 +141,7 @@ async function textToSpeech(text: string): Promise<string> {
     try {
         // 1. Try the faster, but lower-quota model first.
         ttsResponse = await ai.generate({
-            model: googleAI.model('gemini-3.1-flash-tts-preview'),
+            model: 'gemini-3.1-flash-tts-preview',
             ...ttsRequestPayload,
         });
     } catch (error: any) {
@@ -150,7 +150,7 @@ async function textToSpeech(text: string): Promise<string> {
         if (errorMessage.includes('429') || errorMessage.includes('500') || errorMessage.includes('503') || errorMessage.includes('overloaded')) {
             console.warn("TTS Flash model failed, falling back to Pro model.", error);
             ttsResponse = await ai.generate({
-                model: googleAI.model('gemini-3.1-flash-tts-preview'), // Fallback model
+                model: 'gemini-3.1-flash-tts-preview', // Fallback model
                 ...ttsRequestPayload,
             });
         } else {

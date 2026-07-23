@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Mic, Square, Loader2, Play, CheckCircle2, User, Bot, AlertTriangle, RefreshCw } from "lucide-react";
+import { Mic, Square, Loader2, Play, CheckCircle2, User, Bot, AlertTriangle, RefreshCw, AudioLines, Download, FileText } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getLiveSessionToken } from "@/ai/flows/get-live-session-token";
@@ -24,6 +24,15 @@ export function LiveConversationTool() {
     const [result, setResult] = useState<AnalyzeLiveConversationOutput | null>(null);
     const [audioChunkCount, setAudioChunkCount] = useState<number>(0);
     const [selectedVoice, setSelectedVoice] = useState<string>("Aoede");
+    const [recordingUrl, setRecordingUrl] = useState<string | null>(null);
+
+    // FIX: Using mutable refs to avoid stale closures in event listeners
+    const appStateRef = useRef<AppState>('idle');
+    const turnsRef = useRef<Turn[]>([]);
+
+    // Sync React states with refs
+    useEffect(() => { appStateRef.current = appState; }, [appState]);
+    useEffect(() => { turnsRef.current = turns; }, [turns]);
 
     const wsRef = useRef<WebSocket | null>(null);
     const audioContextRef = useRef<AudioContext | null>(null);
@@ -33,11 +42,21 @@ export function LiveConversationTool() {
     const setupCompleteRef = useRef<boolean>(false);
     const turnReceivedAudioRef = useRef<boolean>(false);
 
-    // For AI audio playback queue
+    // Audio recording logic
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const audioChunksRef = useRef<Blob[]>([]);
+    const mixDestinationRef = useRef<MediaStreamAudioDestinationNode | null>(null);
+
     const nextPlayTimeRef = useRef<number>(0);
 
     const endConversation = useCallback(async () => {
-        // Cleanup all media and sockets
+        if (appStateRef.current === 'finished' || appStateRef.current === 'analyzing') return;
+
+        // Stop the recorder
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+            mediaRecorderRef.current.stop();
+        }
+
         if (wsRef.current) {
             wsRef.current.close();
             wsRef.current = null;
@@ -62,10 +81,14 @@ export function LiveConversationTool() {
         setAppState('analyzing');
 
         try {
-            // Build full transcript
-            const fullTranscript = turns.map(t => `${t.role === 'user' ? 'Student' : 'AI'}: ${t.text}`).join('\n');
+            const currentTurns = turnsRef.current;
+            const fullTranscript = currentTurns.map(t => `${t.role === 'user' ? 'Student' : 'AI'}: ${t.text}`).join('\n');
             if (fullTranscript.trim().length > 10) {
-                const res = await analyzeLiveConversation({ transcript: fullTranscript });
+                // Gemini app uses Gemini 3.1 Pro for high fidelity evaluation
+                const res = await analyzeLiveConversation({
+                    transcript: fullTranscript,
+                    evaluationModel: "googleai/gemini-3.1-pro-preview"
+                });
                 setResult(res);
                 setAppState('finished');
             } else {
@@ -77,21 +100,40 @@ export function LiveConversationTool() {
             toast({ title: "분석 실패", description: err.message, variant: "destructive" });
             setAppState('error');
         }
-    }, [turns, toast]);
-
+    }, [toast]);
 
     const startConversation = async () => {
+        if (appStateRef.current !== 'idle' && appStateRef.current !== 'finished' && appStateRef.current !== 'error') return;
+
         setAppState('connecting');
         setTurns([]);
         setResult(null);
         setAudioChunkCount(0);
+        setRecordingUrl(null);
+        audioChunksRef.current = [];
+
         try {
-            // Must create AudioContext BEFORE 'await' to guarantee user-gesture token in Chrome
             const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
             audioContextRef.current = audioCtx;
             if (audioCtx.state === 'suspended') {
                 await audioCtx.resume();
             }
+
+            // Create Audio Destination Node to record both mic + AI output
+            const mixDest = audioCtx.createMediaStreamDestination();
+            mixDestinationRef.current = mixDest;
+
+            // Setup Media Recorder for the mixed stream
+            // @ts-ignore
+            const recorder = new MediaRecorder(mixDest.stream, { mimeType: 'audio/webm' });
+            recorder.ondataavailable = e => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
+            recorder.onstop = () => {
+                const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+                const url = URL.createObjectURL(blob);
+                setRecordingUrl(url);
+            };
+            mediaRecorderRef.current = recorder;
+            recorder.start();
 
             const token = await getLiveSessionToken();
             const HOST = "generativelanguage.googleapis.com";
@@ -102,7 +144,6 @@ export function LiveConversationTool() {
             setupCompleteRef.current = false;
 
             ws.onopen = async () => {
-                // Send setup message
                 const setupMessage = {
                     setup: {
                         model: "models/gemini-3.1-flash-live-preview",
@@ -123,7 +164,6 @@ export function LiveConversationTool() {
                 };
                 ws.send(JSON.stringify(setupMessage));
 
-                // Initialize Web Audio stream
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, sampleRate: 16000 } });
                 micStreamRef.current = stream;
 
@@ -133,19 +173,17 @@ export function LiveConversationTool() {
                 const processor = audioCtx.createScriptProcessor(4096, 1, 1);
                 scriptProcessorRef.current = processor;
 
+                // Send user mic to mixDest for recording
+                source.connect(mixDest);
+
                 processor.onaudioprocess = (e) => {
                     if (!wsRef.current || !setupCompleteRef.current) return;
-
                     const float32Data = e.inputBuffer.getChannelData(0);
-
-                    // Convert Float32 to Int16 PCM
                     const pcmData = new Int16Array(float32Data.length);
                     for (let i = 0; i < float32Data.length; i++) {
                         let s = Math.max(-1, Math.min(1, float32Data[i]));
                         pcmData[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
                     }
-
-                    // Convert to base64
                     const buf = new Uint8Array(pcmData.buffer);
                     let binaryStr = '';
                     for (let i = 0; i < buf.length; i++) { binaryStr += String.fromCharCode(buf[i]); }
@@ -165,15 +203,12 @@ export function LiveConversationTool() {
                 };
 
                 source.connect(processor);
-
-                // Route mic stream through a muted gain node just to keep the track explicitly 'active' if needed by browser
                 const dummyGain = audioCtx.createGain();
                 dummyGain.gain.value = 0;
                 processor.connect(dummyGain);
                 dummyGain.connect(audioCtx.destination);
-                (window as any)._dummyGainRef = dummyGain; // Prevent Garbage Collection!
+                (window as any)._dummyGainRef = dummyGain;
 
-                // Setup local webkit Speech Recognition for instant user transcription fallback (UI purposes ONLY)
                 const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
                 if (SpeechRecognition) {
                     const recognition = new SpeechRecognition();
@@ -192,14 +227,11 @@ export function LiveConversationTool() {
                             } else { newTurns.push({ role: 'user', text: transcript, id: Math.random() }); }
                             return newTurns;
                         });
-                        // Notice: We NO LONGER send WS payloads here! The WebRTC mediaChunks handles AI input.
                     };
 
-                    // CRITICAL FIX: Chrome's SpeechRecognition silently terminates after brief silence or errors.
-                    // We MUST auto-restart it if the app is still connected.
                     recognition.onend = () => {
                         if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-                            try { recognition.start(); } catch (e) { } // Ignore already started errors
+                            try { recognition.start(); } catch (e) { }
                         }
                     };
 
@@ -243,7 +275,6 @@ export function LiveConversationTool() {
                             if (part.inlineData && part.inlineData.data) {
                                 turnReceivedAudioRef.current = true;
                                 setAudioChunkCount(c => c + 1);
-                                // Play audio buffer
                                 try {
                                     if (audioContextRef.current) {
                                         const binaryString = atob(part.inlineData.data);
@@ -253,7 +284,6 @@ export function LiveConversationTool() {
                                             bytes[i] = binaryString.charCodeAt(i);
                                         }
 
-                                        // The API returns 24kHz PCM Int16 raw data by default for Live streaming
                                         const numSamples = bytes.length / 2;
                                         const float32Data = new Float32Array(numSamples);
                                         const dataView = new DataView(bytes.buffer);
@@ -267,7 +297,10 @@ export function LiveConversationTool() {
 
                                         const source = audioContextRef.current.createBufferSource();
                                         source.buffer = audioBuffer;
+
+                                        // Output AI to speakers AND to recorder!
                                         source.connect(audioContextRef.current.destination);
+                                        if (mixDestinationRef.current) source.connect(mixDestinationRef.current);
 
                                         const currentTime = audioContextRef.current.currentTime;
                                         const scheduledTime = Math.max(currentTime, nextPlayTimeRef.current);
@@ -283,9 +316,8 @@ export function LiveConversationTool() {
 
                     if (response.serverContent?.turnComplete) {
                         const finalTurnText = currentTurnText;
-                        currentTurnText = ""; // reset for next turn
+                        currentTurnText = "";
 
-                        // Execute seamless TTS Fallback if native Audio was suppressed
                         if (!turnReceivedAudioRef.current && finalTurnText.trim() !== "") {
                             generateTtsByModelFlow({ text: finalTurnText, model: "googleai/gemini-3.1-flash-tts-preview" })
                                 .then(async (res) => {
@@ -295,34 +327,31 @@ export function LiveConversationTool() {
                                             const binaryString = atob(base64Data);
                                             const len = binaryString.length;
                                             const bytes = new Uint8Array(len);
-                                            for (let i = 0; i < len; i++) {
-                                                bytes[i] = binaryString.charCodeAt(i);
-                                            }
+                                            for (let i = 0; i < len; i++) { bytes[i] = binaryString.charCodeAt(i); }
                                             const audioBuffer = await audioContextRef.current.decodeAudioData(bytes.buffer);
                                             const source = audioContextRef.current.createBufferSource();
                                             source.buffer = audioBuffer;
+
+                                            // Output AI TTS to speakers AND to recorder
                                             source.connect(audioContextRef.current.destination);
+                                            if (mixDestinationRef.current) source.connect(mixDestinationRef.current);
+
                                             source.start(0);
                                         } catch (e) {
                                             console.error("Fallback TTS Decode/Play Error:", e);
                                         }
                                     }
                                 })
-                                .catch(e => {
-                                    console.error("Fallback TTS Generation Error:", e);
-                                });
+                                .catch(e => console.error("Fallback TTS Generation Error:", e));
                         }
-
                         turnReceivedAudioRef.current = false;
                     }
 
-                    // Handle Live API transcriptions
                     const { inputTranscription, outputTranscription } = response.serverContent || {};
                     if (inputTranscription?.text) {
                         setTurns(prev => {
                             const newTurns = [...prev];
                             const last = newTurns[newTurns.length - 1];
-                            // The API sends the cumulative text for the turn, so we replace, we DO NOT append.
                             if (last && last.role === 'user') {
                                 newTurns[newTurns.length - 1] = { ...last, text: inputTranscription.text };
                             } else { newTurns.push({ role: 'user', text: inputTranscription.text, id: Math.random() }); }
@@ -333,7 +362,6 @@ export function LiveConversationTool() {
                         setTurns(prev => {
                             const newTurns = [...prev];
                             const last = newTurns[newTurns.length - 1];
-                            // The API sends incremental deltas for outputTranscription, so we MUST append immutable
                             if (last && last.role === 'model') {
                                 newTurns[newTurns.length - 1] = { ...last, text: last.text + " " + outputTranscription.text };
                             } else { newTurns.push({ role: 'model', text: outputTranscription.text, id: Math.random() }); }
@@ -347,7 +375,10 @@ export function LiveConversationTool() {
 
             ws.onclose = (e) => {
                 console.log("WebSocket Closed:", e.code, e.reason);
-                if (appState === 'connected') endConversation();
+                // FIX: Checking the ref, not the stale closure value!
+                if (appStateRef.current === 'connected') {
+                    endConversation();
+                }
             };
 
             ws.onerror = (err) => {
@@ -362,6 +393,41 @@ export function LiveConversationTool() {
         }
     };
 
+    const handleSavePDF = () => {
+        if (!result) return;
+        const printWindow = window.open('', '_blank');
+        if (printWindow) {
+            printWindow.document.write(`
+                <html>
+                    <head>
+                        <title>원어민 대화 리포트</title>
+                        <style>
+                            body { font-family: 'Malgun Gothic', sans-serif; line-height: 1.6; padding: 20px; color: #333; }
+                            h1, h2, h3 { color: #111; }
+                        </style>
+                    </head>
+                    <body>
+                        <h1>대화 피드백 리포트</h1>
+                        <p><strong>총점:</strong> ${result.overallScore} / 100</p>
+                        <h3>문법 및 어휘 (Grammar)</h3>
+                        <p>${result.grammarFeedback}</p>
+                        <h3>유창성 (Fluency)</h3>
+                        <p>${result.fluencyFeedback}</p>
+                        <h3>총평 (Overall)</h3>
+                        <div class="markdown-body">
+                            ${result.overallFeedback}
+                        </div>
+                        <br/>
+                         <h3>전체 대화 스크립트</h3>
+                        <pre>${turns.map(t => `${t.role === 'user' ? 'Student' : 'AI'}: ${t.text}`).join('\n')}</pre>
+                        <script>window.print(); window.close();</script>
+                    </body>
+                </html>
+            `);
+            printWindow.document.close();
+        }
+    };
+
     return (
         <div className="space-y-4 max-w-4xl mx-auto">
             <Card>
@@ -369,7 +435,7 @@ export function LiveConversationTool() {
                     <CardTitle className="text-xl flex items-center justify-between">
                         <div className="flex items-center gap-2">
                             <Mic className={appState === 'connected' ? 'text-red-500 animate-pulse' : ''} />
-                            실시간 원어민 프리토킹 (Live API)
+                            Google AI 원어민 프리토킹 (Live API)
                         </div>
                         <div className="w-[200px]">
                             <Select value={selectedVoice} onValueChange={setSelectedVoice} disabled={appState !== 'idle' && appState !== 'finished'}>
@@ -386,8 +452,9 @@ export function LiveConversationTool() {
                             </Select>
                         </div>
                     </CardTitle>
-                    <CardDescription>
-                        클릭 한 번으로 원어민 AI 강사와 딜레이 없는 실시간 대화를 나눌 수 있습니다. 대화가 끝나면 분석 리포트가 생성됩니다.
+                    <CardDescription className="flex items-center gap-4 text-sm mt-2 font-medium">
+                        <span className="bg-blue-100 text-blue-800 px-2 flex items-center gap-1 rounded">🗣 통화엔진: gemini-3.1-flash-live</span>
+                        <span className="bg-emerald-100 flex items-center gap-1 text-emerald-800 px-2 rounded">📝 평가엔진: gemini-3.1-pro-preview</span>
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -401,11 +468,11 @@ export function LiveConversationTool() {
                         </Button>
                     ) : appState === 'connected' ? (
                         <Button size="lg" variant="destructive" className="w-full text-lg h-16 animate-pulse shadow-lg" onClick={endConversation}>
-                            <Square className="mr-2 h-6 w-6" /> 대화 종료 및 분석 받기
+                            <Square className="mr-2 h-6 w-6" /> 대화 종료 및 평가 받기
                         </Button>
                     ) : (
-                        <Button size="lg" disabled className="w-full text-lg h-16">
-                            <Loader2 className="mr-2 h-6 w-6 animate-spin" /> 대화 기록 분석 중...
+                        <Button size="lg" disabled className="w-full text-lg h-16 bg-emerald-600 font-bold opacity-100">
+                            <Loader2 className="mr-2 h-6 w-6 animate-spin" /> 선생님이 대화 분석 리포트를 작성중입니다!
                         </Button>
                     )}
 
@@ -427,20 +494,29 @@ export function LiveConversationTool() {
                         ))}
                     </ScrollArea>
                 </CardContent>
-                {appState === 'connected' && (
-                    <div className="px-6 pb-4 text-xs text-muted-foreground flex justify-between items-center">
-                        <span>수신된 오디오 청크: {audioChunkCount}</span>
-                    </div>
-                )}
             </Card>
 
             {appState === 'finished' && result && (
                 <div className="grid gap-4 mt-6 animate-in slide-in-from-bottom-4 fade-in">
+
+                    <div className="flex justify-end gap-2 mb-2">
+                        {recordingUrl && (
+                            <a href={recordingUrl} download="live-conversation-recording.webm" className="flex items-center">
+                                <Button size="sm" variant="outline" className="border-blue-200">
+                                    <Download className="h-4 w-4 mr-2" /> 음성 녹음본 다운로드 (WebM)
+                                </Button>
+                            </a>
+                        )}
+                        <Button size="sm" variant="outline" className="border-blue-200" onClick={handleSavePDF}>
+                            <FileText className="h-4 w-4 mr-2" /> 평가 리포트 PDF 저장
+                        </Button>
+                    </div>
+
                     <Card>
-                        <CardHeader className="bg-primary/5 pb-4 border-b">
+                        <CardHeader className="bg-emerald-500/10 pb-4 border-b">
                             <CardTitle className="flex justify-between items-center text-lg">
-                                <span>종합 대화 점수</span>
-                                <span className="text-2xl font-bold text-primary">{result.overallScore} / 100</span>
+                                <span>종합 프리토킹 점수</span>
+                                <span className="text-2xl font-bold text-emerald-600">{result.overallScore} / 100</span>
                             </CardTitle>
                             <Progress value={result.overallScore} className="h-3 mt-2" />
                         </CardHeader>

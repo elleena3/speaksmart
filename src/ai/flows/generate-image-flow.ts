@@ -75,7 +75,7 @@ const generateImageFlow = ai.defineFlow(
     // Google AI Path
     const rawGoogleModel = modelToUse.replace('googleai/', '');
     const { media } = await ai.generate({
-      model: googleAI.model(rawGoogleModel as any),
+      model: rawGoogleModel as any,
       prompt: finalPrompt,
       config: {
         responseModalities: ['TEXT', 'IMAGE'],

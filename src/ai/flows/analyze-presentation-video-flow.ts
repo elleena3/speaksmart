@@ -126,7 +126,7 @@ const analyzePresentationVideoFlow = ai.defineFlow(
     if (!modelName.startsWith('googleai/') && !modelName.startsWith('openai/')) {
       modelName = modelName.includes('pro') ? 'googleai/gemini-3.1-pro-preview' : 'googleai/gemini-3.6-flash';
     }
-    const analysisModel = googleAI.model(modelName as any);
+    const analysisModel = modelName as any;
 
     const { output } = await presentationAnalysisPrompt(input, { model: analysisModel });
     if (!output) {

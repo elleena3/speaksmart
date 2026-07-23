@@ -1,0 +1,20 @@
+diff --git a/node_modules/@genkit-ai/compat-oai/lib/openai/gpt.js b/node_modules/@genkit-ai/compat-oai/lib/openai/gpt.js
+index d40be0a..66be23f 100644
+--- a/node_modules/@genkit-ai/compat-oai/lib/openai/gpt.js
++++ b/node_modules/@genkit-ai/compat-oai/lib/openai/gpt.js
+@@ -237,7 +237,15 @@ const gpt5_1 = openAIModelRef({
+   name: "gpt-5.1",
+   info: GPT_5_MODEL_INFO
+ });
++
++const gpt56Sol = openAIModelRef({ name: "gpt-5.6-sol", info: MULTIMODAL_MODEL_INFO });
++const gpt56Terra = openAIModelRef({ name: "gpt-5.6-terra", info: MULTIMODAL_MODEL_INFO });
++const gpt56Luna = openAIModelRef({ name: "gpt-5.6-luna", info: MULTIMODAL_MODEL_INFO });
+ const SUPPORTED_GPT_MODELS = {
++  "gpt-5.6-sol": gpt56Sol,
++  "gpt-5.6-terra": gpt56Terra,
++  "gpt-5.6-luna": gpt56Luna,
++
+   "gpt-4.5": gpt45,
+   "gpt-4.5-preview": gpt45Preview,
+   "gpt-4o": gpt4o,

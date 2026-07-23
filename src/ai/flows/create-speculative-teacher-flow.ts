@@ -92,7 +92,7 @@ async function textToSpeech(text: string): Promise<string> {
     try {
         // 1. Try the faster, but lower-quota model first.
         ttsResponse = await withRetry(() => ai.generate({
-            model: googleAI.model('gemini-3.1-flash-tts-preview'),
+            model: 'gemini-3.1-flash-tts-preview',
             ...ttsRequestPayload,
         }));
     } catch (error: any) {
@@ -101,7 +101,7 @@ async function textToSpeech(text: string): Promise<string> {
         if (errorMessage.includes('429') || errorMessage.includes('500') || errorMessage.includes('503') || errorMessage.includes('overloaded')) {
             console.warn("TTS Flash model failed, falling back to Pro model.", error);
             ttsResponse = await withRetry(() => ai.generate({
-                model: googleAI.model('gemini-3.1-flash-tts-preview'), // Fallback model
+                model: 'gemini-3.1-flash-tts-preview', // Fallback model
                 ...ttsRequestPayload,
             }));
         } else {
@@ -120,14 +120,14 @@ async function textToSpeech(text: string): Promise<string> {
 // Prompts
 const sttPrompt = ai.definePrompt({
     name: 'speculativeSttPrompt',
-    model: googleAI.model('gemini-3.6-flash'),
+    model: 'gemini-3.6-flash',
     input: { schema: z.object({ audioDataUri: z.string() })},
     prompt: 'Transcribe this English audio. If there is no discernible speech, return an empty string.\nAudio: {{media url=audioDataUri}}',
 });
 
 const conversationalPrompt = ai.definePrompt({
   name: 'speculativeConversationalPrompt',
-  model: googleAI.model('gemini-3.5-flash-lite'),
+  model: 'gemini-3.5-flash-lite',
   input: {
     schema: z.object({
       studentTranscript: z.string().optional(),

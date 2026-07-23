@@ -70,7 +70,7 @@ export function HandwritingAnalyzerTool() {
             toast({ title: "분석 실패", description: "AI 분석 중 오류가 발생했습니다.", variant: "destructive" });
         }
     };
-    
+
     const handleReset = () => {
         setAnalysisState('idle');
         setImagePreview(null);
@@ -87,7 +87,7 @@ export function HandwritingAnalyzerTool() {
                         <Label htmlFor="image-upload" className="text-sm font-medium">자필 이미지 업로드</Label>
                         <Input id="image-upload" type="file" accept="image/*" onChange={handleFileChange} />
                     </div>
-                     <div>
+                    <div>
                         <Label htmlFor="model-select" className="text-sm font-medium">AI 평가 모델 선택</Label>
                         <Select onValueChange={(value) => setSelectedModel(value as EvaluationModel)} value={selectedModel}>
                             <SelectTrigger id="model-select">
@@ -96,14 +96,18 @@ export function HandwritingAnalyzerTool() {
                             <SelectContent>
                                 <SelectItem value="googleai/gemini-3.6-flash">gemini-3.6-flash (빠름)</SelectItem>
                                 <SelectItem value="googleai/gemini-3.1-pro-preview">gemini-3.1-pro-preview (고성능)</SelectItem>
+                                <SelectItem value="anthropic/claude-fable-5">claude-fable-5 (장시간 실행)</SelectItem>
+                                <SelectItem value="anthropic/claude-opus-4-8">claude-opus-4-8 (엔터프라이즈)</SelectItem>
+                                <SelectItem value="anthropic/claude-sonnet-5">claude-sonnet-5 (속도/지능 최상)</SelectItem>
+                                <SelectItem value="anthropic/claude-haiku-4-5">claude-haiku-4-5 (가장 빠름)</SelectItem>
                             </SelectContent>
                         </Select>
-                     </div>
+                    </div>
                     <Button onClick={handleAnalyze} disabled={!imageDataUri || analysisState === 'analyzing'} className="w-full mt-2">
                         {analysisState === 'analyzing' ? <Loader2 className="mr-2 animate-spin" /> : <Sparkles className="mr-2" />}
                         {analysisState === 'analyzing' ? "분석 중..." : "자필 분석하기"}
                     </Button>
-                     {(analysisState === 'analyzed' || analysisState === 'error') && (
+                    {(analysisState === 'analyzed' || analysisState === 'error') && (
                         <Button onClick={handleReset} variant="outline" className="w-full">
                             <RefreshCw className="mr-2" /> 새로 시작하기
                         </Button>
@@ -142,7 +146,7 @@ export function HandwritingAnalyzerTool() {
                     <CardContent className="space-y-6">
                         <div>
                             <h3 className="text-lg font-semibold mb-2">AI 판독 텍스트</h3>
-                             <TooltipProvider>
+                            <TooltipProvider>
                                 <div className="p-4 bg-muted/50 rounded-lg whitespace-pre-wrap font-serif text-lg leading-relaxed">
                                     {analysisResult.wordAnalysis.map((item, index) => {
                                         const wordClass = cn({
@@ -170,9 +174,9 @@ export function HandwritingAnalyzerTool() {
                                 </div>
                             </TooltipProvider>
                         </div>
-                         <div>
+                        <div>
                             <h3 className="text-lg font-semibold mb-2">종합 피드백</h3>
-                             <div className="p-4 bg-muted/50 rounded-lg whitespace-pre-wrap font-body text-sm leading-relaxed">
+                            <div className="p-4 bg-muted/50 rounded-lg whitespace-pre-wrap font-body text-sm leading-relaxed">
                                 {analysisResult.overallFeedback}
                             </div>
                         </div>

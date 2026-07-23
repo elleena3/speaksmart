@@ -178,6 +178,10 @@ export function PresentationAnalyzerTool() {
                             <SelectContent>
                                 <SelectItem value="googleai/gemini-3.6-flash">gemini-3.6-flash (기본/빠름)</SelectItem>
                                 <SelectItem value="googleai/gemini-3.1-pro-preview">gemini-3.1-pro-preview (고성능/정밀)</SelectItem>
+                                <SelectItem value="anthropic/claude-fable-5">claude-fable-5 (장시간 실행)</SelectItem>
+                                <SelectItem value="anthropic/claude-opus-4-8">claude-opus-4-8 (엔터프라이즈)</SelectItem>
+                                <SelectItem value="anthropic/claude-sonnet-5">claude-sonnet-5 (속도/지능 최상)</SelectItem>
+                                <SelectItem value="anthropic/claude-haiku-4-5">claude-haiku-4-5 (가장 빠름)</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>

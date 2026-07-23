@@ -124,7 +124,7 @@ const analyzeHandwritingSubmissionFlow = ai.defineFlow(
   },
   async ({ model, ...input }) => {
 
-    const analysisModel = googleAI.model(model || 'googleai/gemini-3.6-flash');
+    const analysisModel = model || 'googleai/gemini-3.6-flash';
 
     const { output } = await handwritingSubmissionPrompt(input, { model: analysisModel });
 
