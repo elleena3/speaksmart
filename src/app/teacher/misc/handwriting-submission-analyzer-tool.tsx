@@ -9,7 +9,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Sparkles, RefreshCw, AlertTriangle, FileUp, Info, Download, Printer } from 'lucide-react';
 import { analyzeHandwritingSubmission, type AnalyzeHandwritingSubmissionOutput } from '@/ai/flows/analyze-handwriting-submission-flow';
-import { getPreviousGradingResult, saveGradingResult } from '@/app/teacher/misc/handwriting-actions';
+import { checkGradingHistoryBatch, getPreviousGradingResult, saveGradingResult } from '@/app/teacher/misc/handwriting-actions';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Label } from '@/components/ui/label';
@@ -46,6 +47,11 @@ export function HandwritingSubmissionAnalyzerTool() {
     const [batchResults, setBatchResults] = useState<IndividualResult[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [selectedModel, setSelectedModel] = useState<EvaluationModel>('googleai/gemini-3.6-flash');
+
+    // History Pre-scan Dialog State
+    const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
+    const [filesWithHistory, setFilesWithHistory] = useState<string[]>([]);
+
     const { toast } = useToast();
 
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>, fileType: 'student' | 'criteria') => {
@@ -107,6 +113,22 @@ export function HandwritingSubmissionAnalyzerTool() {
         }
 
         setAnalysisState('analyzing');
+
+        const fileNames = studentFiles.map(f => f.name);
+        const foundHistories = await checkGradingHistoryBatch(fileNames);
+
+        if (foundHistories.length > 0) {
+            setFilesWithHistory(foundHistories);
+            setHistoryDialogOpen(true);
+            setAnalysisState('idle');
+        } else {
+            proceedWithAnalysis(false);
+        }
+    };
+
+    const proceedWithAnalysis = async (useHistory: boolean) => {
+        setHistoryDialogOpen(false);
+        setAnalysisState('analyzing');
         setError(null);
         setAnalysisResult(null);
         setBatchResults([]);
@@ -126,12 +148,12 @@ export function HandwritingSubmissionAnalyzerTool() {
             try {
                 const studentSubmissionUris = await Promise.all(studentFiles.map(fileToDataUri));
 
-                // 1. Fetch DB auto-context if single file is uploaded
+                // 1. Fetch DB auto-context if single file is uploaded and useHistory is true
                 let combinedContext = uploadedHistoryContext;
-                if (studentFiles.length === 1) {
+                if (studentFiles.length === 1 && useHistory) {
                     const dbRecord = await getPreviousGradingResult(studentFiles[0].name);
                     if (dbRecord) {
-                        toast({ title: "과거 채점 내역 발견", description: "데이터베이스에서 이 학생의 과거 채점 내역을 발견하여 자동으로 2차 채점을 진행합니다." });
+                        toast({ title: "과거 채점 내역 적용", description: "데이터베이스에서 이 학생의 과거 채점 내역을 기반으로 2차 채점을 진행합니다." });
                         combinedContext += (combinedContext ? "\n" : "") + dbRecord;
                     }
                 }
@@ -194,12 +216,12 @@ export function HandwritingSubmissionAnalyzerTool() {
                     try {
                         const uri = await fileToDataUri(file);
 
-                        // NEW LOGIC: Fetch previous record from DB automatically
-                        const previousRecordStr = await getPreviousGradingResult(file.name);
-
                         let combinedContext = previousGradingContext;
-                        if (previousRecordStr) {
-                            combinedContext += (combinedContext ? "\n" : "") + `[자동 연동된 ${file.name}의 기록]\n${previousRecordStr}`;
+                        if (useHistory) {
+                            const previousRecordStr = await getPreviousGradingResult(file.name);
+                            if (previousRecordStr) {
+                                combinedContext += (combinedContext ? "\n" : "") + `[자동 연동된 ${file.name}의 기록]\n${previousRecordStr}`;
+                            }
                         }
 
                         const result = await analyzeHandwritingSubmission({
@@ -539,6 +561,34 @@ export function HandwritingSubmissionAnalyzerTool() {
                     </div>
                 </CardContent>
             </Card>
+
+            <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2 text-primary">
+                            <Sparkles className="h-5 w-5" />
+                            과거 채점 기록 발견!
+                        </DialogTitle>
+                        <DialogDescription className="pt-2">
+                            업로드하신 자료 중 {filesWithHistory.length}개의 파일이 예전에 이미 채점되었던 데이터베이스 기록과 일치합니다.
+                            (예: <span className="font-semibold text-foreground">{filesWithHistory[0]}</span> {filesWithHistory.length > 1 && '등'})
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="text-sm bg-muted p-4 rounded-md mt-2 space-y-2">
+                        <p>🔹 <b>2차 비교 채점:</b> 과거 점수/오탈자 내역을 가져와서 새로 제출한 것과 비교, 증감 분석을 진행합니다.</p>
+                        <p>🔹 <b>새로 1차 채점:</b> 과거 기록을 초기화(무시)하고 처음부터 새롭게 채점합니다.</p>
+                    </div>
+
+                    <DialogFooter className="mt-4 flex sm:justify-end gap-2">
+                        <Button variant="outline" onClick={() => setHistoryDialogOpen(false)}>취소</Button>
+                        <Button variant="secondary" onClick={() => proceedWithAnalysis(false)}>새로 1차 채점</Button>
+                        <Button onClick={() => proceedWithAnalysis(true)} className="gap-2">
+                            <Sparkles className="h-4 w-4" /> 2차 비교 채점 시작
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             {analysisState === 'analyzing' && (
                 <div className="text-center p-8">

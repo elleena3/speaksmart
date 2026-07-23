@@ -9,6 +9,21 @@ function generateDocId(fileName: string) {
     return crypto.createHash('sha256').update(fileName).digest('hex');
 }
 
+export async function checkGradingHistoryBatch(fileNames: string[]): Promise<string[]> {
+    try {
+        const db = getAdminDb();
+        const foundFiles: string[] = [];
+        for (const f of fileNames) {
+            const docId = generateDocId(f);
+            const snap = await db.collection('handwriting_gradings').doc(docId).get();
+            if (snap.exists) foundFiles.push(f);
+        }
+        return foundFiles;
+    } catch {
+        return [];
+    }
+}
+
 export async function getPreviousGradingResult(fileName: string): Promise<string | null> {
     try {
         const db = getAdminDb();
