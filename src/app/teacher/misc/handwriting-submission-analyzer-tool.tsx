@@ -9,6 +9,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Sparkles, RefreshCw, AlertTriangle, FileUp, Info, Download, Printer } from 'lucide-react';
 import { analyzeHandwritingSubmission, type AnalyzeHandwritingSubmissionOutput } from '@/ai/flows/analyze-handwriting-submission-flow';
+import { extractHandwritingOcr } from '@/ai/flows/extract-handwriting-ocr-flow';
+import { gradeHandwritingBatch } from '@/ai/flows/grade-handwriting-batch-flow';
 import { checkGradingHistoryBatch, getPreviousGradingResult, saveGradingResult } from '@/app/teacher/misc/handwriting-actions';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import ReactMarkdown from 'react-markdown';
@@ -25,7 +27,7 @@ type BatchMode = 'single' | 'individual';
 export type IndividualResult = {
     id: string;
     fileName: string;
-    status: 'pending' | 'analyzing' | 'done' | 'error';
+    status: 'pending' | 'extracting' | 'grading' | 'done' | 'error';
     result: AnalyzeHandwritingSubmissionOutput | null;
     error?: string;
 };
@@ -182,9 +184,8 @@ export function HandwritingSubmissionAnalyzerTool() {
             }
         }
         else if (batchMode === 'individual') {
-            toast({ title: "AI 개별 일괄 분석 시작", description: `[${selectedModel}] 모델로 ${studentFiles.length}명의 과제물을 5명씩 병렬로 빠르게 분석합니다.` });
+            toast({ title: "AI 개별 일괄 분석 시작", description: `[${selectedModel}] 모델로 ${studentFiles.length}명의 과제물을 2단계(고속 추출 -> 묶음 채점) 파이프라인으로 빠르게 분석합니다.` });
 
-            // Initialize states for all files
             const initialResults: IndividualResult[] = studentFiles.map(f => ({
                 id: Math.random().toString(36).substr(2, 9),
                 fileName: f.name,
@@ -194,68 +195,86 @@ export function HandwritingSubmissionAnalyzerTool() {
             setBatchResults(initialResults);
 
             let hasError = false;
+
+            // Phase 1: Concurrent OCR Extraction
+            setBatchResults(prev => prev.map(r => ({ ...r, status: 'extracting' })));
+            type Extracted = { id: string, fileName: string, rawText: string, file: File };
+            const extractedFiles: Extracted[] = [];
+
+            await Promise.all(studentFiles.map(async (file, idx) => {
+                const currentId = initialResults[idx].id;
+                try {
+                    const uri = await fileToDataUri(file);
+                    // Force the multimodal model for Stage 1 (OCR)
+                    const rawText = await extractHandwritingOcr({ studentSubmissionUri: uri, model: selectedModel });
+                    extractedFiles.push({ id: currentId, fileName: file.name, rawText, file });
+                } catch (e: any) {
+                    console.error(`OCR failed for ${file.name}:`, e);
+                    hasError = true;
+                    setBatchResults(prev => prev.map(r => r.id === currentId ? { ...r, status: 'error', error: 'OCR 추출 오류: ' + e.message } : r));
+                }
+            }));
+
+            // Phase 2: Batch Grading in Chunks of 5
+            const validFiles = extractedFiles.filter(f => batchResults.find(r => r.id === f.id)?.status !== 'error');
             const CONCURRENT_BATCH_SIZE = 5;
             let previousGradingContext = uploadedHistoryContext;
 
-            // Process in batches of 5 to speed up the process while avoiding severe API Rate Limits
-            for (let i = 0; i < studentFiles.length; i += CONCURRENT_BATCH_SIZE) {
-                const batchFiles = studentFiles.slice(i, i + CONCURRENT_BATCH_SIZE);
-                const batchIndices = Array.from({ length: batchFiles.length }, (_, idx) => i + idx);
+            for (let i = 0; i < validFiles.length; i += CONCURRENT_BATCH_SIZE) {
+                const chunk = validFiles.slice(i, i + CONCURRENT_BATCH_SIZE);
+                const chunkIds = chunk.map(c => c.id);
 
-                // 1. Mark current batch as analyzing
-                setBatchResults(prev => prev.map(r => {
-                    const isCurrentBatch = batchIndices.some(idx => initialResults[idx].id === r.id);
-                    return isCurrentBatch ? { ...r, status: 'analyzing' } : r;
-                }));
+                setBatchResults(prev => prev.map(r => chunkIds.includes(r.id) ? { ...r, status: 'grading' } : r));
 
-                // 2. Process current batch concurrently
-                const processedResults = await Promise.all(batchFiles.map(async (file, batchIndex) => {
-                    const globalIndex = i + batchIndex;
-                    const currentId = initialResults[globalIndex].id;
-
-                    try {
-                        const uri = await fileToDataUri(file);
-
-                        let combinedContext = previousGradingContext;
+                try {
+                    // Gather context for each student if using history
+                    const studentSubmissionsForBatch = await Promise.all(chunk.map(async (c) => {
+                        let context = previousGradingContext;
                         if (useHistory) {
-                            const previousRecordStr = await getPreviousGradingResult(file.name);
+                            const previousRecordStr = await getPreviousGradingResult(c.fileName);
                             if (previousRecordStr) {
-                                combinedContext += (combinedContext ? "\n" : "") + `[자동 연동된 ${file.name}의 기록]\n${previousRecordStr}`;
+                                context += (context ? "\n" : "") + `[자동 연동된 ${c.fileName}의 기록]\n${previousRecordStr}`;
                             }
                         }
+                        return { id: c.id, fileName: c.fileName, rawText: c.rawText, previousHistoryContext: context || undefined };
+                    }));
 
-                        const result = await analyzeHandwritingSubmission({
-                            studentSubmissionUris: [uri], // Array of 1 URi
-                            criteriaFileUri,
-                            criteriaText: criteriaText || undefined,
-                            model: selectedModel,
-                            previousGradingContext: combinedContext || undefined
-                        });
+                    const batchOutput = await gradeHandwritingBatch({
+                        studentSubmissions: studentSubmissionsForBatch,
+                        criteriaFileUri,
+                        criteriaText: criteriaText || undefined,
+                        model: selectedModel, // Model gets adapted to Text inside flow
+                    });
 
-                        // NEW LOGIC: Save this result back to DB 
-                        await saveGradingResult(file.name, result);
+                    // Merge results
+                    for (const gradedStudent of batchOutput.results) {
+                        const originalStudent = chunk.find(c => c.id === gradedStudent.id);
+                        if (!originalStudent) continue;
 
-                        setBatchResults(prev => prev.map(r => r.id === currentId ? { ...r, status: 'done', result } : r));
-                        return { status: 'done' as const, result };
-                    } catch (e: any) {
-                        console.error(`Individual Analysis failed for ${file.name}:`, e);
-                        hasError = true;
-                        setBatchResults(prev => prev.map(r => r.id === currentId ? { ...r, status: 'error', error: e.message } : r));
-                        return { status: 'error' as const, result: null };
+                        const fullResult: AnalyzeHandwritingSubmissionOutput = {
+                            rawTranscription: originalStudent.rawText,
+                            errorAnalysis: gradedStudent.errorAnalysis,
+                            polishedText: gradedStudent.polishedText,
+                            score: gradedStudent.score,
+                            scoringDetails: gradedStudent.scoringDetails,
+                            studentFeedback: gradedStudent.studentFeedback,
+                            teacherGuidance: gradedStudent.teacherGuidance
+                        };
+
+                        await saveGradingResult(originalStudent.fileName, fullResult);
+                        setBatchResults(prev => prev.map(r => r.id === originalStudent.id ? { ...r, status: 'done', result: fullResult } : r));
+
+                        // Accumulate context to ensure objective grading consistency across batches
+                        const batchSummary = `[과거 학생 표본] 부여 점수: ${fullResult.score}. 감점 사유: ${fullResult.scoringDetails}`;
+                        previousGradingContext += (previousGradingContext ? "\n" : "") + batchSummary;
                     }
-                }));
-
-                // 3. Accumulate context to ensure objective grading consistency
-                const successfulResults = processedResults.filter(r => r.status === 'done' && r.result);
-                if (successfulResults.length > 0) {
-                    const batchSummary = successfulResults
-                        .map(r => `[과거 학생 표본] 부여 점수: ${r.result?.score}. 감점 사유: ${r.result?.scoringDetails}`)
-                        .join("\n");
-
-                    previousGradingContext += (previousGradingContext ? "\n" : "") + batchSummary;
-                    if (previousGradingContext.length > 3000) {
-                        previousGradingContext = previousGradingContext.slice(-3000);
+                    if (previousGradingContext.length > 5000) {
+                        previousGradingContext = previousGradingContext.slice(-5000);
                     }
+                } catch (e: any) {
+                    console.error(`Batch Grading failed for chunk:`, e);
+                    hasError = true;
+                    setBatchResults(prev => prev.map(r => chunkIds.includes(r.id) ? { ...r, status: 'error', error: 'AI 묶음 채점 오류: ' + e.message } : r));
                 }
             }
 
@@ -263,7 +282,7 @@ export function HandwritingSubmissionAnalyzerTool() {
             if (hasError) {
                 toast({ title: "일괄 분석 완료 (오류 포함)", description: "분석이 완료되었으나 일부 파일에서 오류가 발생했습니다.", variant: "destructive" });
             } else {
-                toast({ title: "일괄 분석 완료", description: `${studentFiles.length}명의 과제물 분석이 모두 완료되었습니다.` });
+                toast({ title: "일괄 분석 완료", description: `${studentFiles.length}명의 과제물 분석이 2단계(고속 추출 -> 묶음 채점) 파이프라인으로 모두 완료되었습니다.` });
             }
         }
     };
@@ -709,7 +728,7 @@ export function HandwritingSubmissionAnalyzerTool() {
                         )}
                     </div>
                     {batchResults.map((item, index) => (
-                        <Card key={item.id} className={item.status === 'analyzing' ? 'border-primary ring-1 ring-primary/20 shadow-md transition-all' : ''}>
+                        <Card key={item.id} className={(item.status === 'extracting' || item.status === 'grading') ? 'border-primary ring-1 ring-primary/20 shadow-md transition-all' : ''}>
                             <CardHeader className="bg-slate-50 dark:bg-slate-900/50 border-b pb-3">
                                 <div className="flex items-center justify-between">
                                     <CardTitle className="text-lg flex items-center gap-2">
@@ -718,7 +737,8 @@ export function HandwritingSubmissionAnalyzerTool() {
                                     </CardTitle>
                                     <div className="flex items-center gap-4">
                                         {item.status === 'pending' && <span className="text-sm text-muted-foreground flex items-center gap-1">대기 중</span>}
-                                        {item.status === 'analyzing' && <span className="text-sm text-primary font-medium flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> 분석 진행 중...</span>}
+                                        {item.status === 'extracting' && <span className="text-sm text-blue-500 font-medium flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> 텍스트 OCR 추출 중...</span>}
+                                        {item.status === 'grading' && <span className="text-sm text-primary font-medium flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> AI 묶음 채점 중 (속도↑비용↓)...</span>}
                                         {item.status === 'error' && <span className="text-sm text-destructive font-medium flex items-center gap-1"><AlertTriangle className="h-4 w-4" /> 오류 발생</span>}
                                         {item.status === 'done' && (
                                             <div className="flex items-center gap-3">
