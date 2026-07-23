@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Sparkles, RefreshCw, AlertTriangle, FileUp, Info, Download, Printer } from 'lucide-react';
 import { analyzeHandwritingSubmission, type AnalyzeHandwritingSubmissionOutput } from '@/ai/flows/analyze-handwriting-submission-flow';
+import { getPreviousGradingResult, saveGradingResult } from '@/app/teacher/misc/handwriting-actions';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Label } from '@/components/ui/label';
@@ -124,13 +125,30 @@ export function HandwritingSubmissionAnalyzerTool() {
             toast({ title: "AI 통합 분석 시작", description: `[${selectedModel}] 모델로 ${studentFiles.length}개의 파일을 1명의 과제물로 통합하여 분석합니다.` });
             try {
                 const studentSubmissionUris = await Promise.all(studentFiles.map(fileToDataUri));
+
+                // 1. Fetch DB auto-context if single file is uploaded
+                let combinedContext = uploadedHistoryContext;
+                if (studentFiles.length === 1) {
+                    const dbRecord = await getPreviousGradingResult(studentFiles[0].name);
+                    if (dbRecord) {
+                        toast({ title: "과거 채점 내역 발견", description: "데이터베이스에서 이 학생의 과거 채점 내역을 발견하여 자동으로 2차 채점을 진행합니다." });
+                        combinedContext += (combinedContext ? "\n" : "") + dbRecord;
+                    }
+                }
+
                 const result = await analyzeHandwritingSubmission({
                     studentSubmissionUris,
                     criteriaFileUri,
                     criteriaText: criteriaText || undefined,
                     model: selectedModel,
-                    previousGradingContext: uploadedHistoryContext || undefined
+                    previousGradingContext: combinedContext || undefined
                 });
+
+                // 2. Save DB auto-context (only if 1 file)
+                if (studentFiles.length === 1) {
+                    await saveGradingResult(studentFiles[0].name, result);
+                }
+
                 setAnalysisResult(result);
                 setAnalysisState('analyzed');
                 toast({ title: "분석 완료", description: "AI 과제물 분석이 완료되었습니다." });
@@ -175,13 +193,25 @@ export function HandwritingSubmissionAnalyzerTool() {
 
                     try {
                         const uri = await fileToDataUri(file);
+
+                        // NEW LOGIC: Fetch previous record from DB automatically
+                        const previousRecordStr = await getPreviousGradingResult(file.name);
+
+                        let combinedContext = previousGradingContext;
+                        if (previousRecordStr) {
+                            combinedContext += (combinedContext ? "\n" : "") + `[자동 연동된 ${file.name}의 기록]\n${previousRecordStr}`;
+                        }
+
                         const result = await analyzeHandwritingSubmission({
                             studentSubmissionUris: [uri], // Array of 1 URi
                             criteriaFileUri,
                             criteriaText: criteriaText || undefined,
                             model: selectedModel,
-                            previousGradingContext: previousGradingContext || undefined
+                            previousGradingContext: combinedContext || undefined
                         });
+
+                        // NEW LOGIC: Save this result back to DB 
+                        await saveGradingResult(file.name, result);
 
                         setBatchResults(prev => prev.map(r => r.id === currentId ? { ...r, status: 'done', result } : r));
                         return { status: 'done' as const, result };
