@@ -113,7 +113,7 @@ export function HandwritingSubmissionAnalyzerTool() {
             }
         }
         else if (batchMode === 'individual') {
-            toast({ title: "AI 개별 일괄 분석 시작", description: `[${selectedModel}] 모델로 ${studentFiles.length}명의 과제물을 순차적으로 분석합니다.` });
+            toast({ title: "AI 개별 일괄 분석 시작", description: `[${selectedModel}] 모델로 ${studentFiles.length}명의 과제물을 5명씩 병렬로 빠르게 분석합니다.` });
 
             // Initialize states for all files
             const initialResults: IndividualResult[] = studentFiles.map(f => ({
@@ -125,28 +125,40 @@ export function HandwritingSubmissionAnalyzerTool() {
             setBatchResults(initialResults);
 
             let hasError = false;
-            // Process sequentially to avoid API Rate Limits (429)
-            for (let i = 0; i < studentFiles.length; i++) {
-                const file = studentFiles[i];
-                const currentId = initialResults[i].id;
+            const CONCURRENT_BATCH_SIZE = 5;
 
-                setBatchResults(prev => prev.map(r => r.id === currentId ? { ...r, status: 'analyzing' } : r));
+            // Process in batches of 5 to speed up the process while avoiding severe API Rate Limits
+            for (let i = 0; i < studentFiles.length; i += CONCURRENT_BATCH_SIZE) {
+                const batchFiles = studentFiles.slice(i, i + CONCURRENT_BATCH_SIZE);
+                const batchIndices = Array.from({ length: batchFiles.length }, (_, idx) => i + idx);
 
-                try {
-                    const uri = await fileToDataUri(file);
-                    const result = await analyzeHandwritingSubmission({
-                        studentSubmissionUris: [uri], // Array of 1 URi
-                        criteriaFileUri,
-                        criteriaText: criteriaText || undefined,
-                        model: selectedModel,
-                    });
+                // 1. Mark current batch as analyzing
+                setBatchResults(prev => prev.map(r => {
+                    const isCurrentBatch = batchIndices.some(idx => initialResults[idx].id === r.id);
+                    return isCurrentBatch ? { ...r, status: 'analyzing' } : r;
+                }));
 
-                    setBatchResults(prev => prev.map(r => r.id === currentId ? { ...r, status: 'done', result } : r));
-                } catch (e: any) {
-                    console.error(`Individual Analysis failed for ${file.name}:`, e);
-                    hasError = true;
-                    setBatchResults(prev => prev.map(r => r.id === currentId ? { ...r, status: 'error', error: e.message } : r));
-                }
+                // 2. Process current batch concurrently
+                await Promise.all(batchFiles.map(async (file, batchIndex) => {
+                    const globalIndex = i + batchIndex;
+                    const currentId = initialResults[globalIndex].id;
+
+                    try {
+                        const uri = await fileToDataUri(file);
+                        const result = await analyzeHandwritingSubmission({
+                            studentSubmissionUris: [uri], // Array of 1 URi
+                            criteriaFileUri,
+                            criteriaText: criteriaText || undefined,
+                            model: selectedModel,
+                        });
+
+                        setBatchResults(prev => prev.map(r => r.id === currentId ? { ...r, status: 'done', result } : r));
+                    } catch (e: any) {
+                        console.error(`Individual Analysis failed for ${file.name}:`, e);
+                        hasError = true;
+                        setBatchResults(prev => prev.map(r => r.id === currentId ? { ...r, status: 'error', error: e.message } : r));
+                    }
+                }));
             }
 
             setAnalysisState('analyzed');
