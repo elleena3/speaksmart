@@ -35,6 +35,7 @@ export function HandwritingSubmissionAnalyzerTool() {
     const [batchMode, setBatchMode] = useState<BatchMode>('single');
     const [studentFiles, setStudentFiles] = useState<File[]>([]);
     const [criteriaFile, setCriteriaFile] = useState<File | null>(null);
+    const [previousHistoryFile, setPreviousHistoryFile] = useState<File | null>(null);
     const [criteriaText, setCriteriaText] = useState('');
 
     // Global single result (for single mode)
@@ -75,6 +76,15 @@ export function HandwritingSubmissionAnalyzerTool() {
         });
     };
 
+    const fileToText = (file: File): Promise<string> => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsText(file);
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = error => reject(error);
+        });
+    };
+
     const handleAnalyze = async () => {
         if (studentFiles.length === 0) {
             toast({ title: "학생 과제물 없음", description: "분석할 학생의 과제물 파일을 하나 이상 업로드해주세요.", variant: "destructive" });
@@ -101,6 +111,14 @@ export function HandwritingSubmissionAnalyzerTool() {
         setBatchResults([]);
 
         const criteriaFileUri = criteriaFile ? await fileToDataUri(criteriaFile) : undefined;
+        let uploadedHistoryContext = "";
+        if (previousHistoryFile) {
+            try {
+                uploadedHistoryContext = await fileToText(previousHistoryFile);
+            } catch (err) {
+                console.error("Failed to read history CSV:", err);
+            }
+        }
 
         if (batchMode === 'single') {
             toast({ title: "AI 통합 분석 시작", description: `[${selectedModel}] 모델로 ${studentFiles.length}개의 파일을 1명의 과제물로 통합하여 분석합니다.` });
@@ -111,6 +129,7 @@ export function HandwritingSubmissionAnalyzerTool() {
                     criteriaFileUri,
                     criteriaText: criteriaText || undefined,
                     model: selectedModel,
+                    previousGradingContext: uploadedHistoryContext || undefined
                 });
                 setAnalysisResult(result);
                 setAnalysisState('analyzed');
@@ -136,7 +155,7 @@ export function HandwritingSubmissionAnalyzerTool() {
 
             let hasError = false;
             const CONCURRENT_BATCH_SIZE = 5;
-            let previousGradingContext = "";
+            let previousGradingContext = uploadedHistoryContext;
 
             // Process in batches of 5 to speed up the process while avoiding severe API Rate Limits
             for (let i = 0; i < studentFiles.length; i += CONCURRENT_BATCH_SIZE) {
@@ -201,6 +220,7 @@ export function HandwritingSubmissionAnalyzerTool() {
         setAnalysisState('idle');
         setStudentFiles([]);
         setCriteriaFile(null);
+        setPreviousHistoryFile(null);
         setCriteriaText('');
         setAnalysisResult(null);
         setError(null);
@@ -209,6 +229,8 @@ export function HandwritingSubmissionAnalyzerTool() {
         if (studentInput) studentInput.value = '';
         const criteriaInput = document.getElementById('criteria-upload') as HTMLInputElement;
         if (criteriaInput) criteriaInput.value = '';
+        const historyInput = document.getElementById('history-upload') as HTMLInputElement;
+        if (historyInput) historyInput.value = '';
     };
 
     const isAnalyzeButtonDisabled = useMemo(() => {
@@ -438,6 +460,22 @@ export function HandwritingSubmissionAnalyzerTool() {
                         />
                         <p className="text-xs text-muted-foreground">채점 기준은 파일 또는 텍스트 중 하나 이상을 반드시 입력해야 합니다.</p>
                     </div>
+
+                    <div className="space-y-2 p-4 bg-muted/30 rounded-lg border border-dashed">
+                        <Label htmlFor="history-upload" className="text-primary font-semibold flex items-center gap-2">
+                            <Sparkles className="h-4 w-4" /> 기존 채점 기록 연동 (CSV) - 일관성 및 2차 채점용
+                        </Label>
+                        <Input
+                            id="history-upload"
+                            type="file"
+                            accept=".csv,.txt"
+                            onChange={(e) => setPreviousHistoryFile(e.target.files?.[0] || null)}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                            이전에 다운로드한 채점 결과(CSV 형식)를 업로드하면, AI가 이전 채점 내역과 비교 분석하여 <b>일관성 있는 2차 채점 피드백</b>과 점수 변화 내역을 제공합니다.
+                        </p>
+                    </div>
+
                     <div>
                         <Label htmlFor="model-select" className="text-sm font-medium">AI 평가 모델 선택</Label>
                         <Select onValueChange={(value) => setSelectedModel(value as EvaluationModel)} value={selectedModel}>
@@ -448,14 +486,17 @@ export function HandwritingSubmissionAnalyzerTool() {
                                 <SelectItem value="openai/gpt-5.6-sol">gpt-5.6-sol (최고 성능)</SelectItem>
                                 <SelectItem value="openai/gpt-5.6-terra">gpt-5.6-terra (균형)</SelectItem>
                                 <SelectItem value="openai/gpt-5.6-luna">gpt-5.6-luna (가장 빠름)</SelectItem>
-                                <SelectItem value="googleai/gemini-3.6-flash">gemini-3.6-flash (빠름)</SelectItem>
-                                <SelectItem value="googleai/gemini-3.1-pro-preview">gemini-3.1-pro-preview (고성능)</SelectItem>
+                                <SelectItem value="googleai/gemini-3.6-flash">gemini-3.6-flash (빠름* / PDF 특화)</SelectItem>
+                                <SelectItem value="googleai/gemini-3.1-pro-preview">gemini-3.1-pro-preview (고성능* / PDF 특화)</SelectItem>
                                 <SelectItem value="anthropic/claude-fable-5">claude-fable-5 (장시간 실행)</SelectItem>
                                 <SelectItem value="anthropic/claude-opus-4-8">claude-opus-4-8 (엔터프라이즈)</SelectItem>
                                 <SelectItem value="anthropic/claude-sonnet-5">claude-sonnet-5 (속도/지능 최상)</SelectItem>
                                 <SelectItem value="anthropic/claude-haiku-4-5">claude-haiku-4-5 (가장 빠름)</SelectItem>
                             </SelectContent>
                         </Select>
+                        <p className="text-xs text-amber-600/80 dark:text-amber-400/80 mt-2">
+                            ※ PDF 형식은 기본적으로 제미나이(Google AI) 모델에서 최적으로 구동됩니다. GPT/Claude 모델 선택 시, PDF 대신 캡처된 이미지(JPG/PNG/WebP)로 업로드하셔야 정상 분석됩니다.
+                        </p>
                     </div>
                     <div className="flex gap-2 pt-2">
                         <Button onClick={handleAnalyze} disabled={isAnalyzeButtonDisabled} className="w-full">

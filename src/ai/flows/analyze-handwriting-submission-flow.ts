@@ -88,8 +88,9 @@ All Korean feedback and explanations must use polite and encouraging language.
     {{/if}}
 
 {{#if previousGradingContext}}
-3.  **Historical Grading Context (Precedents):**
-    You must maintain strict consistency with how previous students were graded. Do NOT grade from scratch. Anchor your strictness to these precedents.
+3.  **Historical Grading Context (Precedents & 2nd-Stage Grading):**
+    - You must maintain strict scoring consistency with how previous students were graded.
+    - **CRITICAL (2nd-Stage Grading):** If the current submission belongs to a student who is ALREADY in this historical context (meaning this is a re-submission or revision), you MUST perform a comparative 2nd-stage grading. Explicitly compare the new submission with their past record. Mention what errors they fixed, what new/remaining errors exist, and heavily reflect this delta in both the final score and the feedback.
     {{{previousGradingContext}}}
 {{/if}}
 
@@ -110,16 +111,17 @@ Follow these steps exactly:
     - Provide a fully corrected, naturally polished version.
 
 4.  **Strict Scoring & Justification (\`score\` & \`scoringDetails\`)**
-    - If evaluation criteria defines a maximum score (e.g., 100), calculate the final \`score\` deductively.
-    - Identify every single error, penalize exactly as the rubric dictates. Do NOT give subjective leniency.
-    - If \`previousGradingContext\` is provided, ensure you apply the exact same deduction rules to avoid varying strictness.
-    - In \`scoringDetails\`, write the mathematical calculation (e.g., "Max 100, -5 for 'wented', -3 for typo. Result: 92") and explain why it is fair compared to precedents.
+    - Calculate the final \`score\` deductively based on the criteria. Do not be subjectively lenient.
+    - If doing a **2nd-Stage Grading**, explicitly mention the previous score and mathematically justify the score change based on the fixed/remaining errors.
+    - In \`scoringDetails\`, write the mathematical calculation and explain why it is fair compared to precedents.
 
 5.  **Student Feedback (\`studentFeedback\`)**
-    - Write markdown feedback for the student. Start with praise, discuss areas for improvement based on criteria.
+    - Write markdown feedback for the student. 
+    - If this is a 2nd-Stage Grading, include a "과거 제출물과의 비교 (Comparison)" section comparing this submission to their last one, praising improvements and noting remaining issues.
 
 6.  **Teacher Guidance (\`teacherGuidance\`)**
     - Plain text summary of performance, highlighting specific weaknesses.
+    - For 2nd-Stage Grading, inform the teacher exactly how the student's work evolved since the last submission.
 
 Please generate the structured response matching the JSON schema.
 `,
