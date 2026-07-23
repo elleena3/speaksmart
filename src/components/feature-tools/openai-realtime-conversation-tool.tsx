@@ -331,20 +331,6 @@ export function OpenAiRealtimeConversationTool() {
 
             {appState === 'finished' && result && (
                 <div className="grid gap-4 mt-6 animate-in slide-in-from-bottom-4 fade-in">
-
-                    <div className="flex justify-end gap-2 mb-2">
-                        {recordingUrl && (
-                            <a href={recordingUrl} download="openai-live-conversation.webm" className="flex items-center">
-                                <Button size="sm" variant="outline" className="border-blue-200">
-                                    <Download className="h-4 w-4 mr-2" /> 음성 녹음 다운로드 (WebM)
-                                </Button>
-                            </a>
-                        )}
-                        <Button size="sm" variant="outline" className="border-blue-200" onClick={handleSavePDF}>
-                            <FileText className="h-4 w-4 mr-2" /> 종합 리포트 PDF 저장
-                        </Button>
-                    </div>
-
                     <Card>
                         <CardHeader className="bg-primary/5 pb-4 border-b">
                             <CardTitle className="flex justify-between items-center text-lg">
@@ -384,6 +370,19 @@ export function OpenAiRealtimeConversationTool() {
                             </ReactMarkdown>
                         </CardContent>
                     </Card>
+
+                    <div className="flex justify-end gap-2 mt-2 border-t pt-4">
+                        {recordingUrl && (
+                            <Button size="sm" variant="outline" className="border-blue-200 bg-blue-50 hover:bg-blue-100" asChild>
+                                <a href={recordingUrl} download="openai-live-conversation.webm" className="flex items-center">
+                                    <Download className="h-4 w-4 mr-2" /> 음성 파일 다운로드
+                                </a>
+                            </Button>
+                        )}
+                        <Button size="sm" variant="outline" className="border-emerald-200 bg-emerald-50 hover:bg-emerald-100" onClick={handleSavePDF}>
+                            <FileText className="h-4 w-4 mr-2" /> 종합 리포트 PDF 저장
+                        </Button>
+                    </div>
                 </div>
             )}
         </div>
