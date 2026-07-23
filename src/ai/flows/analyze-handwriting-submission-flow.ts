@@ -25,6 +25,9 @@ const AnalyzeHandwritingSubmissionInputSchema = z.object({
   criteriaFileUri: z.string().optional().describe(
     "The evaluation criteria as a file data URI (image or PDF)."
   ),
+  previousGradingContext: z.string().optional().describe(
+    "A summary of previously graded students to maintain consistent scoring and strictness across the batch."
+  ),
   model: z.enum(evaluationModels).optional().default('googleai/gemini-3.6-flash'),
 }).refine(data => data.criteriaText || data.criteriaFileUri, {
   message: "At least one of criteriaText or criteriaFileUri must be provided.",
@@ -41,22 +44,18 @@ const AnalyzeHandwritingSubmissionOutputSchema = z.object({
     reason: z.string().describe('Explanation for the correction in Korean.')
   })).describe('List of misspelled words or typos and their contextual corrections.'),
   polishedText: z.string().describe('The fully corrected and naturally polished version of the student text.'),
+  score: z.number().optional().describe('The precise numeric score calculated strictly according to the evaluation criteria (e.g. 100).'),
+  scoringDetails: z.string().describe('Step-by-step mathematical deduction and justification for the final score, referencing the criteria and previous grading context.'),
   studentFeedback: z.string().describe('Constructive and encouraging feedback for the student in Korean, based on evaluation criteria, presented in Markdown format.'),
   teacherGuidance: z.string().describe('Actionable guidance for the teacher on how to support the student, written in Korean.'),
 });
 export type AnalyzeHandwritingSubmissionOutput = z.infer<typeof AnalyzeHandwritingSubmissionOutputSchema>;
 
-// Define a separate schema for the prompt's input, excluding the 'model' field.
 const PromptInputSchema = z.object({
-  studentSubmissionUris: z.array(z.string()).min(1).describe(
-    "The student's handwritten work as an array of data URIs (images or PDFs)."
-  ),
-  criteriaText: z.string().optional().describe(
-    "The evaluation criteria as a text string."
-  ),
-  criteriaFileUri: z.string().optional().describe(
-    "The evaluation criteria as a file data URI (image or PDF)."
-  ),
+  studentSubmissionUris: z.array(z.string()).min(1),
+  criteriaText: z.string().optional(),
+  criteriaFileUri: z.string().optional(),
+  previousGradingContext: z.string().optional(),
 });
 
 export async function analyzeHandwritingSubmission(input: AnalyzeHandwritingSubmissionInput): Promise<AnalyzeHandwritingSubmissionOutput> {
@@ -68,7 +67,10 @@ const handwritingSubmissionPrompt = ai.definePrompt({
   name: 'handwritingSubmissionPrompt',
   input: { schema: PromptInputSchema }, // Use the schema without the model field
   output: { schema: AnalyzeHandwritingSubmissionOutputSchema },
-  prompt: `You are an expert teacher grading a handwritten assignment. Your task is to extract text, analyze errors, and provide detailed, constructive feedback for both the student and the teacher based on the provided submission and evaluation criteria. All Korean feedback and explanations must use polite and encouraging language.
+  prompt: `You are a strict and objective expert teacher grading a handwritten assignment. 
+Your primary goal is absolute consistency and rigor. You must extract text, analyze errors, calculate a strict numeric score based on the criteria, and provide detailed feedback.
+  
+All Korean feedback and explanations must use polite and encouraging language.
 
 ### Submission Materials
 
@@ -85,34 +87,41 @@ const handwritingSubmissionPrompt = ai.definePrompt({
     -   **File-Based Criteria:** {{media url=criteriaFileUri}}
     {{/if}}
 
+{{#if previousGradingContext}}
+3.  **Historical Grading Context (Precedents):**
+    You must maintain strict consistency with how previous students were graded. Do NOT grade from scratch. Anchor your strictness to these precedents.
+    {{{previousGradingContext}}}
+{{/if}}
+
 ---
 
 ### Your Tasks & Output Structure
 
-Follow these steps exactly to fulfill the output schema:
+Follow these steps exactly:
 
 1.  **Raw Transcription (\`rawTranscription\`)**
-    - Extract text exactly as written in the image.
-    - IMPORTANT: Do NOT auto-correct typos based on context. Recognize typos, misspellings, and illegible words exactly as they are (As-is).
+    - Extract text exactly as written in the image. Do NOT auto-correct typos based on context.
 
 2.  **Spelling Error Analysis (\`errorAnalysis\`)**
     - Identify words from the raw transcription that are misspelled or written incorrectly.
-    - For each error, provide the \`original\` word, the \`correction\` (the contextually correct recommended word), and a brief \`reason\` in Korean explaining why it was corrected.
+    - Provide the \`original\`, \`correction\`, and a brief \`reason\` in Korean.
 
 3.  **Polished Version (\`polishedText\`)**
-    - Provide a fully corrected, naturally polished version of the raw text where all spelling and grammatical errors are fixed.
+    - Provide a fully corrected, naturally polished version.
 
-4.  **Student Feedback (\`studentFeedback\`)**
-    - Compare the polished submission against the Evaluation Criteria (if provided).
-    - Format: Use Markdown.
-    - Tone: Very encouraging, positive, and constructive.
-    - Content: Start with praise for what they did well based on the criteria. Discuss overall areas for improvement. Give actionable advice on how they can improve for next time.
+4.  **Strict Scoring & Justification (\`score\` & \`scoringDetails\`)**
+    - If evaluation criteria defines a maximum score (e.g., 100), calculate the final \`score\` deductively.
+    - Identify every single error, penalize exactly as the rubric dictates. Do NOT give subjective leniency.
+    - If \`previousGradingContext\` is provided, ensure you apply the exact same deduction rules to avoid varying strictness.
+    - In \`scoringDetails\`, write the mathematical calculation (e.g., "Max 100, -5 for 'wented', -3 for typo. Result: 92") and explain why it is fair compared to precedents.
 
-5.  **Teacher Guidance (\`teacherGuidance\`)**
-    - Format: Plain text, professional tone.
-    - Content: Provide a concise summary of the student's performance. Highlight key strengths and persistent fundamental errors (distinguishing between simple mistakes and potential misunderstandings). Suggest specific teaching strategies or follow-up activities.
+5.  **Student Feedback (\`studentFeedback\`)**
+    - Write markdown feedback for the student. Start with praise, discuss areas for improvement based on criteria.
 
-Please now generate the structured response in the required JSON format.
+6.  **Teacher Guidance (\`teacherGuidance\`)**
+    - Plain text summary of performance, highlighting specific weaknesses.
+
+Please generate the structured response matching the JSON schema.
 `,
 });
 

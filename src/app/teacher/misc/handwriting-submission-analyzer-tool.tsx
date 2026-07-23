@@ -85,6 +85,16 @@ export function HandwritingSubmissionAnalyzerTool() {
             return;
         }
 
+        const hasPdf = studentFiles.some(f => f.type === 'application/pdf');
+        if (hasPdf && !selectedModel.includes('gemini')) {
+            toast({
+                title: "오류: 지원하지 않는 파일 형식",
+                description: "현재 선택하신 오픈AI(GPT) 또는 클로드(Claude) 모델은 PDF 파일 내부 분석을 지원하지 않습니다. 캡처 이미지(JPG/PNG)로 업로드하시거나, 최고급 모델인 제미나이(Google AI)를 선택해주세요.",
+                variant: "destructive"
+            });
+            return;
+        }
+
         setAnalysisState('analyzing');
         setError(null);
         setAnalysisResult(null);
@@ -126,6 +136,7 @@ export function HandwritingSubmissionAnalyzerTool() {
 
             let hasError = false;
             const CONCURRENT_BATCH_SIZE = 5;
+            let previousGradingContext = "";
 
             // Process in batches of 5 to speed up the process while avoiding severe API Rate Limits
             for (let i = 0; i < studentFiles.length; i += CONCURRENT_BATCH_SIZE) {
@@ -139,7 +150,7 @@ export function HandwritingSubmissionAnalyzerTool() {
                 }));
 
                 // 2. Process current batch concurrently
-                await Promise.all(batchFiles.map(async (file, batchIndex) => {
+                const processedResults = await Promise.all(batchFiles.map(async (file, batchIndex) => {
                     const globalIndex = i + batchIndex;
                     const currentId = initialResults[globalIndex].id;
 
@@ -150,15 +161,31 @@ export function HandwritingSubmissionAnalyzerTool() {
                             criteriaFileUri,
                             criteriaText: criteriaText || undefined,
                             model: selectedModel,
+                            previousGradingContext: previousGradingContext || undefined
                         });
 
                         setBatchResults(prev => prev.map(r => r.id === currentId ? { ...r, status: 'done', result } : r));
+                        return { status: 'done' as const, result };
                     } catch (e: any) {
                         console.error(`Individual Analysis failed for ${file.name}:`, e);
                         hasError = true;
                         setBatchResults(prev => prev.map(r => r.id === currentId ? { ...r, status: 'error', error: e.message } : r));
+                        return { status: 'error' as const, result: null };
                     }
                 }));
+
+                // 3. Accumulate context to ensure objective grading consistency
+                const successfulResults = processedResults.filter(r => r.status === 'done' && r.result);
+                if (successfulResults.length > 0) {
+                    const batchSummary = successfulResults
+                        .map(r => `[과거 학생 표본] 부여 점수: ${r.result?.score}. 감점 사유: ${r.result?.scoringDetails}`)
+                        .join("\n");
+
+                    previousGradingContext += (previousGradingContext ? "\n" : "") + batchSummary;
+                    if (previousGradingContext.length > 3000) {
+                        previousGradingContext = previousGradingContext.slice(-3000);
+                    }
+                }
             }
 
             setAnalysisState('analyzed');
@@ -199,20 +226,22 @@ export function HandwritingSubmissionAnalyzerTool() {
         }
 
         // CSV Header
-        let csvContent = '학생 과제물명,원본 스캔(As-is),최종 교정본(Polished),발견된 오탈자 수,통합 피드백(학생용),교사용 지도 조언\n';
+        let csvContent = '학생 과제물명,부여 점수,원본 스캔(As-is),최종 교정본(Polished),발견된 오탈자 수,통합 피드백(학생용),교사용 지도 조언,산출 근거\n';
 
         doneResults.forEach(item => {
             if (!item.result) return;
             const res = item.result;
             const fileName = item.fileName.replace(/"/g, '""');
+            const score = res.score !== undefined ? res.score : '';
             const raw = (res.rawTranscription || '').replace(/"/g, '""');
             const polished = (res.polishedText || '').replace(/"/g, '""');
             const errCount = res.errorAnalysis ? res.errorAnalysis.length : 0;
             const studentFB = (res.studentFeedback || '').replace(/"/g, '""');
             const teacherGuidance = (res.teacherGuidance || '').replace(/"/g, '""');
+            const scoringDetails = (res.scoringDetails || '').replace(/"/g, '""');
 
             // Wrapping fields with quotes to handle multiline safely in Excel
-            csvContent += `"${fileName}","${raw}","${polished}","${errCount}","${studentFB}","${teacherGuidance}"\n`;
+            csvContent += `"${fileName}","${score}","${raw}","${polished}","${errCount}","${studentFB}","${teacherGuidance}","${scoringDetails}"\n`;
         });
 
         // Add BOM so Excel opens UTF-8 properly
@@ -271,6 +300,12 @@ export function HandwritingSubmissionAnalyzerTool() {
                 
                 <hr style="margin: 30px 0; border: 0; border-top: 1px dashed #cbd5e1;" />
                 
+                <h3>✅ 종합 점수 및 채점 기준</h3>
+                <div class="box">
+                    <p style="font-size: 18px; font-weight: bold; color: #1e40af; margin-bottom: 8px;">최종 점수: ${res.score !== undefined ? res.score : 'N/A'}</p>
+                    <p>${res.scoringDetails || '채점 기준 내역이 없습니다.'}</p>
+                </div>
+
                 <h3>👩‍🏫 교사용 지도 조언 (참고용)</h3>
                 <div class="box">${res.teacherGuidance}</div>
                 
@@ -459,6 +494,13 @@ export function HandwritingSubmissionAnalyzerTool() {
                         <CardTitle>AI 자필 과제 분석 결과</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-6">
+                        <div className="flex justify-between items-center bg-primary/10 p-4 rounded-lg border border-primary/20">
+                            <div>
+                                <h3 className="text-lg font-bold text-primary">부여된 최종 점수</h3>
+                                <p className="text-sm text-primary/80 mt-1 whitespace-pre-wrap">{analysisResult.scoringDetails}</p>
+                            </div>
+                            <div className="text-4xl font-extrabold text-primary shrink-0 ml-4">{analysisResult.score !== undefined ? analysisResult.score : 'N/A'}</div>
+                        </div>
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                             <Card className="bg-slate-50 dark:bg-slate-900 border-dashed">
                                 <CardHeader className="pb-2">
@@ -595,6 +637,14 @@ export function HandwritingSubmissionAnalyzerTool() {
                                             </div>
                                         </div>
 
+                                        <div className="flex justify-between items-center bg-emerald-50 dark:bg-emerald-950/30 p-4 rounded-lg border border-emerald-200 dark:border-emerald-900">
+                                            <div>
+                                                <h3 className="text-sm font-bold text-emerald-800 dark:text-emerald-400">부여 점수 및 산출 근거</h3>
+                                                <p className="text-xs text-emerald-700/80 dark:text-emerald-300/80 mt-1 whitespace-pre-wrap">{item.result.scoringDetails}</p>
+                                            </div>
+                                            <div className="text-3xl font-extrabold text-emerald-600 dark:text-emerald-400 shrink-0 ml-4">{item.result.score !== undefined ? item.result.score : 'N/A'}</div>
+                                        </div>
+
                                         {item.result.errorAnalysis && item.result.errorAnalysis.length > 0 && (
                                             <div className="space-y-2">
                                                 <Label className="text-xs text-orange-500 font-semibold uppercase tracking-wider">오탈자 및 교정 분석</Label>
@@ -643,7 +693,8 @@ export function HandwritingSubmissionAnalyzerTool() {
                         </Card>
                     ))}
                 </div>
-            )}
-        </div>
+            )
+            }
+        </div >
     );
 }
