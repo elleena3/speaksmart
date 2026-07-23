@@ -22,7 +22,7 @@ export function OpenAiRealtimeConversationTool() {
     const [turns, setTurns] = useState<Turn[]>([]);
     const [result, setResult] = useState<AnalyzeLiveConversationOutput | null>(null);
 
-    const [selectedModel, setSelectedModel] = useState<string>("gpt-4o-mini-realtime-preview");
+    const [selectedModel, setSelectedModel] = useState<string>("gpt-realtime-2.1-mini");
     const [selectedVoice, setSelectedVoice] = useState<string>("alloy");
     const [recordingUrl, setRecordingUrl] = useState<string | null>(null);
 
@@ -120,7 +120,7 @@ export function OpenAiRealtimeConversationTool() {
 
             // 1. Get ephemeral token from backend
             const tokenResponse = await getOpenAiLiveSessionToken({
-                model: selectedModel === "gpt-4o-mini-realtime-preview" ? "gpt-4o-mini-realtime-preview-2024-12-17" : "gpt-4o-realtime-preview-2024-12-17",
+                model: selectedModel,
                 voice: selectedVoice as any
             });
             const ephemeralKey = tokenResponse.client_secret.value;
@@ -182,7 +182,7 @@ export function OpenAiRealtimeConversationTool() {
             await pc.setLocalDescription(offer);
 
             const baseUrl = "https://api.openai.com/v1/realtime";
-            const realModelName = selectedModel === "gpt-4o-mini-realtime-preview" ? "gpt-4o-mini-realtime-preview-2024-12-17" : "gpt-4o-realtime-preview-2024-12-17";
+            const realModelName = selectedModel;
 
             const sdpResponse = await fetch(`${baseUrl}?model=${realModelName}`, {
                 method: "POST",
@@ -279,8 +279,8 @@ export function OpenAiRealtimeConversationTool() {
                                     <SelectValue placeholder="AI 모델 선택" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="gpt-4o-mini-realtime-preview">gpt-realtime-2.1-mini</SelectItem>
-                                    <SelectItem value="gpt-4o-realtime-preview">gpt-realtime-2.1</SelectItem>
+                                    <SelectItem value="gpt-realtime-2.1-mini">gpt-realtime-2.1-mini</SelectItem>
+                                    <SelectItem value="gpt-realtime-2.1">gpt-realtime-2.1</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
