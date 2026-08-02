@@ -1,5 +1,5 @@
 diff --git a/node_modules/genkitx-anthropic/lib/claude.js b/node_modules/genkitx-anthropic/lib/claude.js
-index 53c1fd8..8f13d58 100644
+index 53c1fd8..51a7b7b 100644
 --- a/node_modules/genkitx-anthropic/lib/claude.js
 +++ b/node_modules/genkitx-anthropic/lib/claude.js
 @@ -59,6 +59,10 @@ var claude_exports = {};
@@ -18,10 +18,10 @@ index 53c1fd8..8f13d58 100644
    version: "claude-opus-4-5-20251101"
  });
 +
-+const claudeFable5 = (0, import_model.modelRef)({ name: "anthropic/claude-fable-5", info: { label: "Claude Fable 5", versions: ["claude-fable-5"]}, version: "claude-fable-5" });
-+const claudeOpus48 = (0, import_model.modelRef)({ name: "anthropic/claude-opus-4-8", info: { label: "Claude Opus 4.8", versions: ["claude-opus-4-8"]}, version: "claude-opus-4-8" });
-+const claudeSonnet5 = (0, import_model.modelRef)({ name: "anthropic/claude-sonnet-5", info: { label: "Claude Sonnet 5", versions: ["claude-sonnet-5"]}, version: "claude-sonnet-5" });
-+const claudeHaiku45 = (0, import_model.modelRef)({ name: "anthropic/claude-haiku-4-5", info: { label: "Claude Haiku 4.5", versions: ["claude-haiku-4-5-20251001", "claude-haiku-4-5"]}, version: "claude-haiku-4-5-20251001" });
++const claudeFable5 = (0, import_model.modelRef)({ name: "claude-fable-5", namespace: "anthropic", info: { label: "Claude Fable 5", versions: ["claude-fable-5"], supports: { multiturn: true, tools: true, media: true, systemRole: true, output: ["text"] } }, configSchema: AnthropicConfigSchema, version: "claude-fable-5" });
++const claudeOpus48 = (0, import_model.modelRef)({ name: "claude-opus-4-8", namespace: "anthropic", info: { label: "Claude Opus 4.8", versions: ["claude-opus-4-8"], supports: { multiturn: true, tools: true, media: true, systemRole: true, output: ["text"] } }, configSchema: AnthropicConfigSchema, version: "claude-opus-4-8" });
++const claudeSonnet5 = (0, import_model.modelRef)({ name: "claude-sonnet-5", namespace: "anthropic", info: { label: "Claude Sonnet 5", versions: ["claude-sonnet-5"], supports: { multiturn: true, tools: true, media: true, systemRole: true, output: ["text"] } }, configSchema: AnthropicConfigSchema, version: "claude-sonnet-5" });
++const claudeHaiku45 = (0, import_model.modelRef)({ name: "claude-haiku-4-5", namespace: "anthropic", info: { label: "Claude Haiku 4.5", versions: ["claude-haiku-4-5-20251001", "claude-haiku-4-5"], supports: { multiturn: true, tools: true, media: true, systemRole: true, output: ["text"] } }, configSchema: AnthropicConfigSchema, version: "claude-haiku-4-5-20251001" });
 +
  const SUPPORTED_CLAUDE_MODELS = {
 +  "claude-fable-5": claudeFable5,

@@ -9,6 +9,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "postinstall": "patch-package",
     "typecheck": "tsc --noEmit",
     "genkit:test": "tsx src/ai/test-connect.ts",
     "all-dev": "concurrently \"firebase emulators:start --only functions,firestore --import=./firebase.json\" \"npm run dev\""
