@@ -163,15 +163,19 @@ export function OpenAiRealtimeConversationTool() {
             let hasTriggeredGreeting = false;
 
             dc.addEventListener("open", () => {
-                // GA API requires sending session.update to configure the session
+                // GA API requires the new session format
                 const sessionUpdate = {
                     type: "session.update",
                     session: {
                         modalities: ["audio", "text"],
                         instructions: "You are a friendly native English tutor. Speak naturally and converse interactively with the user. Keep your responses concise and encourage the student to speak more.",
                         voice: selectedVoice,
-                        input_audio_transcription: {
-                            model: "gpt-live-transcribe"
+                        audio: {
+                            input: {
+                                transcription: {
+                                    model: "gpt-4o-mini-transcribe"
+                                }
+                            }
                         },
                         turn_detection: {
                             type: "server_vad",
@@ -182,12 +186,18 @@ export function OpenAiRealtimeConversationTool() {
                     }
                 };
                 dc.send(JSON.stringify(sessionUpdate));
-                console.log("Sent session.update to configure Realtime session");
+                console.log("Sent GA session.update to configure Realtime session");
             });
 
             dc.addEventListener("message", (e) => {
                 try {
                     const event = JSON.parse(e.data);
+                    console.log("Realtime Event:", event.type, event);
+
+                    if (event.type === "error") {
+                        console.error("OpenAI Realtime Error:", event.error);
+                        toast({ title: "서버 에러 발생", description: event.error?.message || "알 수 없는 에러가 발생했습니다.", variant: "destructive" });
+                    }
 
                     if (event.type === "session.updated" || event.type === "session.created") {
                         if (!hasTriggeredGreeting) {
@@ -196,19 +206,21 @@ export function OpenAiRealtimeConversationTool() {
                                 dc.send(JSON.stringify({
                                     type: "response.create",
                                     response: {
-                                        instructions: "Introduce yourself briefly and ask how you can help the student today."
+                                        instructions: "Introduce yourself briefly and say hello to the student."
                                     }
                                 }));
                                 console.log("Triggered AI greeting via response.create");
-                            }, 500); // Small delay to ensure WebRTC audio pipeline is ready
+                            }, 300);
                         }
                     }
 
+                    // Input transcription (User)
                     if (event.type === "conversation.item.input_audio_transcription.completed") {
                         setTurns(prev => [...prev, { role: 'user', text: event.transcript, id: Math.random() }]);
                     }
 
-                    if (event.type === "response.audio_transcript.done") {
+                    // Output transcription (Model) - GA naming
+                    if (event.type === "response.output_audio_transcript.done" || event.type === "response.audio_transcript.done") {
                         setTurns(prev => [...prev, { role: 'model', text: event.transcript, id: Math.random() }]);
                     }
 
