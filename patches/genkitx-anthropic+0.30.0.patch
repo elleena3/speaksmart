@@ -32,3 +32,24 @@ index 53c1fd8..51a7b7b 100644
    "claude-3-7-sonnet": claude37Sonnet,
    "claude-3-5-sonnet": claude35Sonnet,
    "claude-3-opus": claude3Opus,
+diff --git a/node_modules/genkitx-anthropic/lib/claude.mjs b/node_modules/genkitx-anthropic/lib/claude.mjs
+index 80eae08..f0c9aba 100644
+--- a/node_modules/genkitx-anthropic/lib/claude.mjs
++++ b/node_modules/genkitx-anthropic/lib/claude.mjs
+@@ -216,7 +216,16 @@ const claude45Opus = modelRef({
+   configSchema: AnthropicConfigSchema,
+   version: "claude-opus-4-5-20251101"
+ });
++const claudeFable5 = modelRef({ name: "claude-fable-5", namespace: "anthropic", info: { label: "Claude Fable 5", versions: ["claude-fable-5"], supports: { multiturn: true, tools: true, media: true, systemRole: true, output: ["text"] } }, configSchema: AnthropicConfigSchema, version: "claude-fable-5" });
++const claudeOpus48 = modelRef({ name: "claude-opus-4-8", namespace: "anthropic", info: { label: "Claude Opus 4.8", versions: ["claude-opus-4-8"], supports: { multiturn: true, tools: true, media: true, systemRole: true, output: ["text"] } }, configSchema: AnthropicConfigSchema, version: "claude-opus-4-8" });
++const claudeSonnet5 = modelRef({ name: "claude-sonnet-5", namespace: "anthropic", info: { label: "Claude Sonnet 5", versions: ["claude-sonnet-5"], supports: { multiturn: true, tools: true, media: true, systemRole: true, output: ["text"] } }, configSchema: AnthropicConfigSchema, version: "claude-sonnet-5" });
++const claudeHaiku45 = modelRef({ name: "claude-haiku-4-5", namespace: "anthropic", info: { label: "Claude Haiku 4.5", versions: ["claude-haiku-4-5-20251001", "claude-haiku-4-5"], supports: { multiturn: true, tools: true, media: true, systemRole: true, output: ["text"] } }, configSchema: AnthropicConfigSchema, version: "claude-haiku-4-5-20251001" });
++
+ const SUPPORTED_CLAUDE_MODELS = {
++  "claude-fable-5": claudeFable5,
++  "claude-opus-4-8": claudeOpus48,
++  "claude-sonnet-5": claudeSonnet5,
++  "claude-haiku-4-5": claudeHaiku45,
+   "claude-3-7-sonnet": claude37Sonnet,
+   "claude-3-5-sonnet": claude35Sonnet,
+   "claude-3-opus": claude3Opus,

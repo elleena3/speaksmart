@@ -44,6 +44,10 @@ export function OpenAiRealtimeConversationTool() {
     // UI hack to avoid garaging collection of streams
     const keepaliveStreamRef = useRef<MediaStream | null>(null);
 
+    // Chrome은 WebRTC 원격 스트림을 <audio> 엘리먼트에 붙이지 않으면
+    // WebAudio 쪽으로 오디오를 흘려보내지 않습니다. 실제 재생은 이 엘리먼트가 담당합니다.
+    const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
+
     const endConversation = useCallback(async () => {
         if (appStateRef.current === 'finished' || appStateRef.current === 'analyzing') return;
 
@@ -64,6 +68,13 @@ export function OpenAiRealtimeConversationTool() {
         if (keepaliveStreamRef.current) {
             keepaliveStreamRef.current.getTracks().forEach(t => t.stop());
             keepaliveStreamRef.current = null;
+        }
+
+        if (remoteAudioRef.current) {
+            remoteAudioRef.current.pause();
+            remoteAudioRef.current.srcObject = null;
+            remoteAudioRef.current.remove();
+            remoteAudioRef.current = null;
         }
 
         setAppState('analyzing');
@@ -140,11 +151,28 @@ export function OpenAiRealtimeConversationTool() {
             };
 
             // 3. Play audio received from AI + Record it
+            const remoteAudio = document.createElement('audio');
+            remoteAudio.autoplay = true;
+            remoteAudio.style.display = 'none';
+            document.body.appendChild(remoteAudio);
+            remoteAudioRef.current = remoteAudio;
+
             pc.ontrack = e => {
+                // 재생은 <audio> 엘리먼트가 담당합니다.
+                // WebAudio 그래프만으로 스피커에 연결하면 Chrome에서 무음이 됩니다.
+                remoteAudio.srcObject = e.streams[0];
+                remoteAudio.play().catch(err => {
+                    console.error('AI 음성 재생 실패:', err);
+                    toast({
+                        title: "소리 재생 차단됨",
+                        description: "브라우저가 자동 재생을 막았습니다. 페이지를 클릭한 뒤 다시 시도해주세요.",
+                        variant: "destructive",
+                    });
+                });
+
+                // 녹음용으로만 WebAudio 에 연결합니다.
+                // audioCtx.destination 에는 연결하지 않아야 소리가 두 번 겹치지 않습니다.
                 const aiNode = audioCtx.createMediaStreamSource(e.streams[0]);
-                // AI audio goes to speakers
-                aiNode.connect(audioCtx.destination);
-                // And AI audio goes to recorder
                 aiNode.connect(mixDest);
             };
 
