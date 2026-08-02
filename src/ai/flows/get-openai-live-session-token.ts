@@ -2,12 +2,10 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
+// 'use server' 파일은 async 함수만 export 할 수 있으므로 상수는 별도 모듈에 둡니다.
+import { REALTIME_INSTRUCTIONS } from '@/lib/realtime-config';
 
 const OPENAI_VOICES = ['alloy', 'ash', 'ballad', 'coral', 'echo', 'sage', 'shimmer', 'verse', 'marin', 'cedar'] as const;
-
-export const REALTIME_INSTRUCTIONS =
-    'You are a friendly native English tutor. Speak naturally and converse interactively with the user. ' +
-    'Keep your responses concise and encourage the student to speak more.';
 
 const GetOpenAiLiveSessionTokenInputSchema = z.object({
     voice: z.enum(OPENAI_VOICES).optional().default('alloy'),
