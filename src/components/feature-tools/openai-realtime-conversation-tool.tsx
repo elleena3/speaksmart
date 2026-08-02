@@ -181,7 +181,7 @@ export function OpenAiRealtimeConversationTool() {
             const offer = await pc.createOffer();
             await pc.setLocalDescription(offer);
 
-            const baseUrl = "https://api.openai.com/v1/realtime";
+            const baseUrl = "https://api.openai.com/v1/realtime/calls";
             const realModelName = selectedModel;
 
             const sdpResponse = await fetch(`${baseUrl}?model=${realModelName}`, {
