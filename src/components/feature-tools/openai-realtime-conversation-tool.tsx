@@ -169,7 +169,7 @@ export function OpenAiRealtimeConversationTool() {
                         instructions: "You are a friendly native English tutor. Speak naturally and converse interactively with the user. Keep your responses concise and encourage the student to speak more.",
                         voice: selectedVoice,
                         input_audio_transcription: {
-                            model: "gpt-4o-mini-transcribe"
+                            model: "gpt-live-transcribe"
                         },
                         turn_detection: {
                             type: "server_vad",
@@ -181,6 +181,14 @@ export function OpenAiRealtimeConversationTool() {
                 };
                 dc.send(JSON.stringify(sessionUpdate));
                 console.log("Sent session.update to configure Realtime session");
+
+                // Trigger AI to speak first after connecting
+                dc.send(JSON.stringify({
+                    type: "response.create",
+                    response: {
+                        instructions: "Introduce yourself briefly and ask how you can help the student today."
+                    }
+                }));
             });
 
             dc.addEventListener("message", (e) => {
