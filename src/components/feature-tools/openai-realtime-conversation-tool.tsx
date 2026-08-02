@@ -160,6 +160,8 @@ export function OpenAiRealtimeConversationTool() {
             const dc = pc.createDataChannel("oai-events");
             dataChannelRef.current = dc;
 
+            let hasTriggeredGreeting = false;
+
             dc.addEventListener("open", () => {
                 // GA API requires sending session.update to configure the session
                 const sessionUpdate = {
@@ -181,19 +183,26 @@ export function OpenAiRealtimeConversationTool() {
                 };
                 dc.send(JSON.stringify(sessionUpdate));
                 console.log("Sent session.update to configure Realtime session");
-
-                // Trigger AI to speak first after connecting
-                dc.send(JSON.stringify({
-                    type: "response.create",
-                    response: {
-                        instructions: "Introduce yourself briefly and ask how you can help the student today."
-                    }
-                }));
             });
 
             dc.addEventListener("message", (e) => {
                 try {
                     const event = JSON.parse(e.data);
+
+                    if (event.type === "session.updated" || event.type === "session.created") {
+                        if (!hasTriggeredGreeting) {
+                            hasTriggeredGreeting = true;
+                            setTimeout(() => {
+                                dc.send(JSON.stringify({
+                                    type: "response.create",
+                                    response: {
+                                        instructions: "Introduce yourself briefly and ask how you can help the student today."
+                                    }
+                                }));
+                                console.log("Triggered AI greeting via response.create");
+                            }, 500); // Small delay to ensure WebRTC audio pipeline is ready
+                        }
+                    }
 
                     if (event.type === "conversation.item.input_audio_transcription.completed") {
                         setTurns(prev => [...prev, { role: 'user', text: event.transcript, id: Math.random() }]);
