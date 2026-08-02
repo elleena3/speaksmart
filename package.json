@@ -12,6 +12,8 @@
     "postinstall": "patch-package",
     "typecheck": "tsc --noEmit",
     "genkit:test": "tsx src/ai/test-connect.ts",
+    "seed": "tsx scripts/seed.ts",
+    "migrate:auth": "tsx scripts/migrate-auth.ts",
     "all-dev": "concurrently \"firebase emulators:start --only functions,firestore --import=./firebase.json\" \"npm run dev\""
   },
   "dependencies": {

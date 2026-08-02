@@ -3,17 +3,23 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 
+const OPENAI_VOICES = ['alloy', 'ash', 'ballad', 'coral', 'echo', 'sage', 'shimmer', 'verse', 'marin', 'cedar'] as const;
+
+export const REALTIME_INSTRUCTIONS =
+    'You are a friendly native English tutor. Speak naturally and converse interactively with the user. ' +
+    'Keep your responses concise and encourage the student to speak more.';
+
 const GetOpenAiLiveSessionTokenInputSchema = z.object({
-    voice: z.enum(['alloy', 'ash', 'ballad', 'coral', 'echo', 'sage', 'shimmer', 'verse']).optional().default('alloy'),
-    model: z.string().optional().default('gpt-4o-mini-realtime-preview-2024-12-17')
+    voice: z.enum(OPENAI_VOICES).optional().default('alloy'),
+    model: z.string().optional().default('gpt-realtime-2.1-mini'),
 });
 export type GetOpenAiLiveSessionTokenInput = z.infer<typeof GetOpenAiLiveSessionTokenInputSchema>;
 
+// GA 엔드포인트는 { value, expires_at, session } 을 평평하게 돌려줍니다.
+// (베타에서는 client_secret 으로 한 번 감싸져 있었습니다.)
 const GetOpenAiLiveSessionTokenOutputSchema = z.object({
-    client_secret: z.object({
-        value: z.string(),
-        expires_at: z.number()
-    })
+    value: z.string(),
+    expires_at: z.number(),
 });
 
 export type GetOpenAiLiveSessionTokenOutput = z.infer<typeof GetOpenAiLiveSessionTokenOutputSchema>;
@@ -33,12 +39,8 @@ const getOpenAiLiveSessionTokenFlow = ai.defineFlow(
         const apiKey = process.env.OPENAI_API_KEY;
         if (!apiKey) throw new Error("OPENAI_API_KEY is not configured on the server.");
 
-        const reqBody = {
-            "model": model,
-            "voice": voice,
-            "instructions": "You are a friendly native English tutor. Speak naturally and converse interactively with the user."
-        };
-
+        // GA 형식: 설정은 모두 session 안에 들어가고 type: 'realtime' 이 필요합니다.
+        // 음성은 audio.output.voice 로 지정합니다.
         const response = await fetch("https://api.openai.com/v1/realtime/client_secrets", {
             method: "POST",
             headers: {
@@ -46,44 +48,26 @@ const getOpenAiLiveSessionTokenFlow = ai.defineFlow(
                 "Content-Type": "application/json",
             },
             body: JSON.stringify({
-                model: model,
-                modalities: ["audio", "text"],
-                instructions: "You are a friendly native English tutor. Speak naturally and converse interactively with the user.",
+                expires_after: { anchor: 'created_at', seconds: 600 },
+                session: {
+                    type: 'realtime',
+                    model,
+                    instructions: REALTIME_INSTRUCTIONS,
+                    audio: {
+                        output: { voice },
+                    },
+                },
             }),
         });
 
         if (!response.ok) {
-            // Note: The OpenAI realtime endpoints might reject invalid configurations. 
-            // We can fallback to an empty payload `{}` if we receive a 400.
-            const errObj = await response.json().catch(() => ({}));
-
-            if (response.status === 400) {
-                console.warn("OpenAI API rejected session config, attempting empty payload fallback.", errObj);
-                const retryResponse = await fetch("https://api.openai.com/v1/realtime/client_secrets", {
-                    method: "POST",
-                    headers: {
-                        "Authorization": `Bearer ${apiKey}`,
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({}),
-                });
-
-                if (retryResponse.ok) {
-                    const data = await retryResponse.json();
-                    return { client_secret: data }; // Map so client receives expected format
-                }
-            }
-
-            console.error("OpenAI Realtime Session Auth Error:", errObj);
-            throw new Error(`Failed to generate OpenAI ephemeral token: ${response.status} ${response.statusText}`);
+            // 원문을 그대로 남겨야 어떤 필드가 거부됐는지 알 수 있습니다.
+            const detail = await response.text().catch(() => '');
+            console.error("OpenAI Realtime Session Auth Error:", response.status, detail);
+            throw new Error(`Failed to generate OpenAI ephemeral token: ${response.status} ${response.statusText} ${detail}`);
         }
 
         const data = await response.json();
-        // The new client_secrets endpoint returns { value, expires_at } directly.
-        // If the 'client_secret' field doesn't exist, we wrap it to ensure backwards compatibility with our Zod schema.
-        if (!data.client_secret) {
-            return { client_secret: { value: data.client_secret?.value || data.value, expires_at: data.client_secret?.expires_at || data.expires_at } };
-        }
-        return data;
+        return { value: data.value, expires_at: data.expires_at };
     }
 );

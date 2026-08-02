@@ -71,7 +71,7 @@ export type UserData = {
   grade?: string;
   class?: string;
   number?: string;
-  password?: string;
+  // 비밀번호는 Firebase Auth가 보관합니다. Firestore에 저장하지 않습니다.
   isMock?: boolean; // To identify mock users
   createdAt: number;
 };

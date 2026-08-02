@@ -12,8 +12,10 @@ import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { doc, updateDoc, getDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { EmailAuthProvider, reauthenticateWithCredential, updatePassword } from 'firebase/auth';
+import { FirebaseError } from 'firebase/app';
+import { auth } from '@/lib/firebase';
+import { deriveAuthEmail } from '@/lib/auth-email';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -33,7 +35,7 @@ const passwordFormSchema = z.object({
 
 export default function ProfilePage() {
   const { t } = useLanguage();
-  const { user, loading, manualLogin } = useAuth();
+  const { user, loading } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
 
@@ -64,30 +66,40 @@ export default function ProfilePage() {
 
 
   async function onPasswordChangeSubmit(values: z.infer<typeof passwordFormSchema>) {
-    if (!user || !user.docId || isMockUser) return;
-    
+    const currentUser = auth.currentUser;
+    if (!user || !currentUser || isMockUser) return;
+
     setIsChangingPassword(true);
 
     try {
-        const userRef = doc(db, "users", user.docId);
-        const userSnap = await getDoc(userRef);
-        
-        if (!userSnap.exists() || userSnap.data().password !== values.currentPassword) {
-            toast({ title: "오류", description: "현재 비밀번호가 올바르지 않습니다.", variant: "destructive" });
-            setIsChangingPassword(false);
-            return;
-        }
+        // Firebase Auth는 비밀번호 변경 전에 최근 인증을 요구합니다.
+        // 현재 비밀번호 검증도 이 재인증 과정에서 함께 이루어집니다.
+        const credential = EmailAuthProvider.credential(
+            deriveAuthEmail(user.displayName),
+            values.currentPassword
+        );
+        await reauthenticateWithCredential(currentUser, credential);
 
-        await updateDoc(userRef, {
-            password: values.newPassword
-        });
+        await updatePassword(currentUser, values.newPassword);
 
         toast({ title: "성공", description: "비밀번호가 성공적으로 변경되었습니다." });
         passwordForm.reset();
 
     } catch (error) {
          console.error("Error changing password:", error);
-         toast({ title: "오류", description: "비밀번호 변경 중 문제가 발생했습니다.", variant: "destructive" });
+
+         const code = error instanceof FirebaseError ? error.code : undefined;
+         const isWrongPassword =
+            code === 'auth/invalid-credential' ||
+            code === 'auth/wrong-password';
+
+         toast({
+            title: "오류",
+            description: isWrongPassword
+                ? "현재 비밀번호가 올바르지 않습니다."
+                : "비밀번호 변경 중 문제가 발생했습니다.",
+            variant: "destructive",
+         });
     } finally {
         setIsChangingPassword(false);
     }

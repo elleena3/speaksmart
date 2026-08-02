@@ -480,10 +480,12 @@ export default function TeacherStudentResultView() {
     }
     
     try {
+      // teacherUid 조건은 보안 규칙과 짝을 이룹니다. (규칙: 내 담당 결과만 읽기)
       const resultsQuery = query(
         collection(db, "results"),
         where("assessmentId", "==", assessmentId),
-        where("studentId", "==", studentUid)
+        where("studentId", "==", studentUid),
+        where("teacherUid", "==", user.uid)
       );
       const querySnapshot = await getDocs(resultsQuery);
 

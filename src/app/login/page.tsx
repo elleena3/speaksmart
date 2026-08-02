@@ -27,9 +27,7 @@ import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/auth-context";
 import { Loader2 } from "lucide-react";
-import { db } from "@/lib/firebase";
-import { collection, query, where, getDocs } from "firebase/firestore";
-import { type UserData } from "@/lib/types";
+import { FirebaseError } from "firebase/app";
 
 const formSchema = z.object({
   name: z.string().min(1, "이름을 입력해주세요."),
@@ -39,7 +37,7 @@ const formSchema = z.object({
 export default function LoginPage() {
     const router = useRouter();
     const { toast } = useToast();
-    const { manualLogin } = useAuth();
+    const { login } = useAuth();
     const [isLoading, setIsLoading] = useState(false);
 
     const form = useForm<z.infer<typeof formSchema>>({
@@ -52,44 +50,15 @@ export default function LoginPage() {
 
     async function onSubmit(values: z.infer<typeof formSchema>) {
         setIsLoading(true);
-        if (!db) {
-            toast({
-                title: "설정 오류",
-                description: "Firebase 데이터베이스가 설정되지 않았습니다. 관리자에게 문의하세요.",
-                variant: "destructive",
-            });
-            setIsLoading(false);
-            return;
-        }
 
         try {
-            const usersRef = collection(db, "users");
-            const q = query(usersRef, where("displayName", "==", values.name), where("password", "==", values.password));
-            
-            const querySnapshot = await getDocs(q);
-
-            if (querySnapshot.empty) {
-                toast({
-                    title: "로그인 실패",
-                    description: "이름(아이디) 또는 비밀번호가 일치하지 않습니다.",
-                    variant: "destructive",
-                });
-                setIsLoading(false);
-                return;
-            }
-            
-            // Login successful
-            const userDoc = querySnapshot.docs[0];
-            // Include the document ID in the user data object
-            const userData = { uid: userDoc.id, docId: userDoc.id, ...userDoc.data() } as UserData;
-            
-            manualLogin(userData);
+            const userData = await login(values.name, values.password);
 
             toast({
                 title: "로그인 성공!",
                 description: `${userData.displayName}님, 환영합니다.`,
             });
-            
+
             if (userData.role === 'teacher') {
                 router.push('/teacher/dashboard');
             } else {
@@ -98,9 +67,23 @@ export default function LoginPage() {
 
         } catch (error) {
             console.error("Error logging in:", error);
+
+            // 아이디 없음/비밀번호 틀림을 구분해서 알려주면 계정 존재 여부가 노출되므로
+            // 인증 실패는 모두 같은 메시지로 처리합니다.
+            const isAuthFailure =
+                error instanceof FirebaseError &&
+                [
+                    'auth/invalid-credential',
+                    'auth/user-not-found',
+                    'auth/wrong-password',
+                    'auth/invalid-email',
+                ].includes(error.code);
+
             toast({
-                title: "로그인 오류",
-                description: "알 수 없는 오류가 발생했습니다.",
+                title: isAuthFailure ? "로그인 실패" : "로그인 오류",
+                description: isAuthFailure
+                    ? "이름(아이디) 또는 비밀번호가 일치하지 않습니다."
+                    : "알 수 없는 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
                 variant: "destructive",
             });
         } finally {

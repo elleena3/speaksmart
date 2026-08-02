@@ -251,16 +251,16 @@ export default function HistoryPage() {
                                           └ {index + 1}차 시도
                                         </TableCell>
                                         <TableCell className="text-center">
-                                            <Badge variant="ghost" className="whitespace-nowrap">{getAssessmentTypeText(attempt.assessmentType)}</Badge>
+                                            <Badge variant="outline" className="whitespace-nowrap">{getAssessmentTypeText(attempt.assessmentType)}</Badge>
                                         </TableCell>
                                         <TableCell className="text-center text-muted-foreground whitespace-nowrap">
                                             {attempt.createdAt ? format(new Date(attempt.createdAt), 'yyyy-MM-dd') : 'N/A'}
                                         </TableCell>
                                         <TableCell className="text-center">
-                                            <Badge variant="ghost" className="whitespace-nowrap">{attempt.contentScore ?? 0}%</Badge>
+                                            <Badge variant="outline" className="whitespace-nowrap">{attempt.contentScore ?? 0}%</Badge>
                                         </TableCell>
                                         <TableCell className="text-center">
-                                            <Badge variant="ghost" className="whitespace-nowrap">{attempt.pronunciationScore ?? 0}%</Badge>
+                                            <Badge variant="outline" className="whitespace-nowrap">{attempt.pronunciationScore ?? 0}%</Badge>
                                         </TableCell>
                                         <TableCell className="text-center pr-4">
                                             <Link href={getResultLink(attempt, false, group.totalAttempts)}>

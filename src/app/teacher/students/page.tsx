@@ -4,8 +4,9 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import { collection, getDocs, query, where, doc, updateDoc, deleteDoc, writeBatch } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { useAuth } from '@/context/auth-context';
+import { resetStudentPassword, deleteStudentAuthAccount } from './actions';
 import { type UserData } from "@/lib/types";
 import { Loader2, ChevronsUpDown, Check, Edit, KeyRound, Search, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -96,6 +97,8 @@ function StudentManagementPage() {
     setIsEditDialogOpen(true);
   };
   
+  const RESET_PASSWORD = '1234567890';
+
   const handlePasswordReset = async (student: UserData) => {
     if (!student.docId || student.isMock) {
         toast({
@@ -107,14 +110,18 @@ function StudentManagementPage() {
     }
 
     try {
-        const studentRef = doc(db, "users", student.docId);
-        await updateDoc(studentRef, {
-            password: '1234567890'
-        });
+        // 다른 사용자의 비밀번호는 Admin SDK로만 바꿀 수 있으므로 서버 액션에 위임합니다.
+        const idToken = await auth.currentUser?.getIdToken();
+        const result = await resetStudentPassword(idToken ?? '', student.docId, RESET_PASSWORD);
+
+        if (!result.success) {
+            toast({ title: "오류", description: result.message, variant: "destructive" });
+            return;
+        }
 
         toast({
             title: "비밀번호 초기화 완료",
-            description: `${student.displayName} 학생의 비밀번호가 '1234567890'으로 초기화되었습니다.`,
+            description: `${student.displayName} 학생의 비밀번호가 '${RESET_PASSWORD}'으로 초기화되었습니다.`,
         });
     } catch (error) {
         console.error("Error resetting password:", error);
@@ -128,22 +135,32 @@ function StudentManagementPage() {
 
   const handleDeleteStudent = async (studentToDelete: UserData) => {
     if (!studentToDelete.docId || !studentToDelete.uid || !db) return;
-    
+
     try {
+        // 1. Auth 계정을 먼저 삭제합니다. 여기서 실패하면 Firestore 문서는 그대로 두어
+        //    로그인은 되는데 프로필이 없는 상태가 생기지 않도록 합니다.
+        const idToken = await auth.currentUser?.getIdToken();
+        const authResult = await deleteStudentAuthAccount(idToken ?? '', studentToDelete.docId);
+
+        if (!authResult.success) {
+            toast({ title: "오류", description: authResult.message, variant: "destructive" });
+            return;
+        }
+
         const batch = writeBatch(db);
 
-        // 1. Delete the student's user document
+        // 2. Delete the student's user document
         const studentRef = doc(db, "users", studentToDelete.docId);
         batch.delete(studentRef);
 
-        // 2. Find and delete all of the student's results
+        // 3. Find and delete all of the student's results
         const resultsQuery = query(collection(db, "results"), where("studentId", "==", studentToDelete.uid));
         const resultsSnapshot = await getDocs(resultsQuery);
         resultsSnapshot.forEach((resultDoc) => {
             batch.delete(resultDoc.ref);
         });
 
-        // 3. Commit the batch
+        // 4. Commit the batch
         await batch.commit();
 
         setStudents(prev => prev.filter(s => s.uid !== studentToDelete.uid));

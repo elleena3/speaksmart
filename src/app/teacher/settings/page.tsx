@@ -13,13 +13,13 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Loader2, Info } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { doc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export default function SettingsPage() {
     const { t } = useLanguage();
-    const { user, loading, manualLogin } = useAuth();
+    const { user, loading, refreshUser } = useAuth();
     const router = useRouter();
     const { toast } = useToast();
 
@@ -44,35 +44,21 @@ export default function SettingsPage() {
             return;
         }
         
-        if (!displayName.trim() || !email.trim()) {
-            toast({ title: "오류", description: "이름과 이메일은 비워둘 수 없습니다.", variant: "destructive" });
+        if (!email.trim()) {
+            toast({ title: "오류", description: "이메일은 비워둘 수 없습니다.", variant: "destructive" });
             return;
         }
 
         setIsUpdating(true);
         try {
-            if (email !== user.email) {
-                const usersRef = collection(db, "users");
-                const q = query(usersRef, where("email", "==", email));
-                const querySnapshot = await getDocs(q);
-                
-                const isTaken = querySnapshot.docs.some(doc => doc.id !== user.docId);
-
-                if (isTaken) {
-                    toast({ title: "오류", description: "이미 사용 중인 이메일입니다.", variant: "destructive" });
-                    setIsUpdating(false);
-                    return;
-                }
-            }
-
+            // 이름(displayName)은 로그인 아이디로 쓰이므로 여기서 변경하지 않습니다.
+            // 연락용 이메일만 갱신합니다.
             const userRef = doc(db, "users", user.docId);
             await updateDoc(userRef, {
-                displayName: displayName,
                 email: email,
             });
 
-            const updatedUser = { ...user, displayName, email };
-            manualLogin(updatedUser);
+            await refreshUser();
 
             toast({ title: "성공", description: "프로필이 성공적으로 업데이트되었습니다." });
         } catch (error) {
@@ -112,7 +98,10 @@ export default function SettingsPage() {
                 )}
                 <div className="grid gap-2">
                     <Label htmlFor="name">{t.teacherSettings.account.nameLabel}</Label>
-                    <Input id="name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} readOnly={isMockUser} />
+                    <Input id="name" value={displayName} readOnly />
+                    <p className="text-sm text-muted-foreground">
+                        이름은 로그인 아이디로 사용되므로 이 화면에서는 변경할 수 없습니다.
+                    </p>
                 </div>
                 <div className="grid gap-2">
                     <Label htmlFor="email">{t.teacherSettings.account.emailLabel}</Label>

@@ -13,8 +13,7 @@ import {
   CombinedAnalysisOutputSchema,
 } from '@/lib/types/ai-schemas';
 import { type RubricScores, type StudentResult } from '@/lib/types';
-import { doc, updateDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { resultRef } from '@/lib/server-store';
 
 async function withRetry<T>(fn: () => Promise<T>, retries = 2, delay = 1500): Promise<T> {
   let lastError: any;
@@ -87,7 +86,7 @@ const dialogueTeacherGuidanceFromRubricPrompt = ai.definePrompt({
 // --- Main Function ---
 
 export async function generateDialogueAnalysis(input: any): Promise<void> {
-  const resultDocRef = doc(db, "results", input.resultId);
+  const resultDocRef = resultRef(input.resultId);
   let model = input.evaluationModel || 'googleai/gemini-3.6-flash';
   if (model.includes('1.5') || model.includes('2.5')) {
       model = model.includes('pro') ? 'googleai/gemini-3.1-pro-preview' : 'googleai/gemini-3.6-flash';
@@ -153,7 +152,7 @@ export async function generateDialogueAnalysis(input: any): Promise<void> {
           };
       }
       
-      await updateDoc(resultDocRef, {
+      await resultDocRef.update({
           ...finalResult,
           status: "채점 완료",
           teacherUid: input.teacherUid,
@@ -161,7 +160,7 @@ export async function generateDialogueAnalysis(input: any): Promise<void> {
           assessmentType: "dialogue",
       });
   } catch (e: any) {
-      await updateDoc(resultDocRef, {
+      await resultDocRef.update({
           status: "오류",
           aiFeedback: e.message,
           studentRecordingUrl: input.studentRecordingUrl,

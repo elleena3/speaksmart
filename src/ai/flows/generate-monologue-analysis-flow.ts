@@ -15,9 +15,7 @@ import {
   CombinedAnalysisOutputSchema,
 } from '@/lib/types/ai-schemas';
 import { evaluationModels, type RubricScores, type StudentResult } from '@/lib/types';
-import { ref, uploadString, getDownloadURL } from "firebase/storage";
-import { db, storage } from "@/lib/firebase";
-import { doc, updateDoc } from 'firebase/firestore';
+import { resultRef, uploadDataUrl } from "@/lib/server-store";
 
 // Helper function for retrying API calls on overload
 async function withRetry<T>(fn: () => Promise<T>, retries = 2, delay = 1500): Promise<T> {
@@ -134,27 +132,25 @@ export const generateMonologueAnalysisFlow = ai.defineFlow(
   } else if (!model.includes('/')) {
       model = 'googleai/' + model;
   }
-    const resultDocRef = doc(db, "results", input.resultId);
+    const resultDocRef = resultRef(input.resultId);
     let downloadURL = "";
 
     try {
-      await updateDoc(resultDocRef, { status: "분석 중: upload", assessmentType: "monologue" });
+      await resultDocRef.update({ status: "분석 중: upload", assessmentType: "monologue" });
       const uploadPath = `recordings/${input.studentName}_${Date.now()}.webm`;
-      const storageRef = ref(storage, uploadPath);
-      const uploadTask = uploadString(storageRef, input.studentRecordingDataUri, 'data_url');
-      
-      await updateDoc(resultDocRef, { status: "분석 중: transcribe" });
+      const uploadTask = uploadDataUrl(uploadPath, input.studentRecordingDataUri);
+
+      await resultDocRef.update({ status: "분석 중: transcribe" });
       const transcriptionResult = await withRetry(() => monologueTranscriptionPrompt({ studentRecordingUrl: input.studentRecordingDataUri }, { model }));
       const studentTranscript = transcriptionResult.text;
 
       if (!studentTranscript || studentTranscript.trim() === "") {
           throw new Error('학생 답변을 인식하지 못했습니다.');
       }
-      
-      const uploadSnapshot = await uploadTask;
-      downloadURL = await getDownloadURL(uploadSnapshot.ref);
 
-      await updateDoc(resultDocRef, { status: "분석 중: analyze" });
+      downloadURL = await uploadTask;
+
+      await resultDocRef.update({ status: "분석 중: analyze" });
       
       let finalResult: any;
 
@@ -216,7 +212,7 @@ export const generateMonologueAnalysisFlow = ai.defineFlow(
           };
       }
       
-      await updateDoc(resultDocRef, {
+      await resultDocRef.update({
           ...finalResult,
           studentRecordingUrl: downloadURL,
           status: "채점 완료",
@@ -224,8 +220,8 @@ export const generateMonologueAnalysisFlow = ai.defineFlow(
           assessmentType: "monologue",
       });
     } catch(e) {
-       await updateDoc(resultDocRef, { 
-          status: '오류', 
+       await resultDocRef.update({
+          status: '오류',
           aiFeedback: (e as Error).message,
           studentRecordingUrl: downloadURL || ""
        });

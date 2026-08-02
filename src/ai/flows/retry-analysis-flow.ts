@@ -9,12 +9,10 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
-import { db, storage } from '@/lib/firebase';
+import { resultRef, assessmentRef, downloadBytes } from '@/lib/server-store';
 import { generateMonologueAnalysisFlow } from './generate-monologue-analysis-flow';
 import { generateDialogueAnalysis } from './generate-dialogue-analysis-flow';
 import { type TeacherAssessment, type StudentResult } from '@/lib/types';
-import { ref, getBytes } from "firebase/storage";
 import { RetryAnalysisInputSchema, type RetryAnalysisInput } from '@/lib/types/ai-schemas';
 
 export async function retryAnalysis(input: RetryAnalysisInput): Promise<{ success: boolean; message: string }> {
@@ -31,10 +29,10 @@ const retryAnalysisFlow = ai.defineFlow(
   async ({ resultId }) => {
     try {
         console.log(`[Retry Flow] Starting retry for result ID: ${resultId}`);
-        const resultRef = doc(db, 'results', resultId);
-        const resultSnap = await getDoc(resultRef);
+        const resultDocRef = resultRef(resultId);
+        const resultSnap = await resultDocRef.get();
 
-        if (!resultSnap.exists()) {
+        if (!resultSnap.exists) {
             throw new Error(`Result document with ID ${resultId} not found.`);
         }
 
@@ -47,15 +45,14 @@ const retryAnalysisFlow = ai.defineFlow(
             throw new Error('Recording URL is missing, cannot retry analysis.');
         }
 
-        const assessmentRef = doc(db, 'assessments', resultData.assessmentId);
-        const assessmentSnap = await getDoc(assessmentRef);
-        if (!assessmentSnap.exists()) {
+        const assessmentSnap = await assessmentRef(resultData.assessmentId).get();
+        if (!assessmentSnap.exists) {
             throw new Error(`Parent assessment with ID ${resultData.assessmentId} not found.`);
         }
         const assessmentData = assessmentSnap.data() as TeacherAssessment;
 
         // Reset status to show it's processing again
-        await updateDoc(resultRef, { status: "분석 중" });
+        await resultDocRef.update({ status: "분석 중" });
         
         // Determine which analysis flow to call based on assessment type
         if (assessmentData.assessmentType === 'dialogue') {
@@ -81,9 +78,7 @@ const retryAnalysisFlow = ai.defineFlow(
 
         } else { // Handle Monologue
             // 1. Download the file from the URL
-            const storageRef = ref(storage, resultData.studentRecordingUrl);
-            const audioBytes = await getBytes(storageRef);
-            const audioBuffer = Buffer.from(audioBytes);
+            const audioBuffer = await downloadBytes(resultData.studentRecordingUrl);
 
             // 2. Convert to Data URI
             const mimeType = 'audio/webm;codecs=opus'; // Assuming webm format
@@ -109,7 +104,7 @@ const retryAnalysisFlow = ai.defineFlow(
     } catch (e: any) {
         console.error(`[Retry Flow] An error occurred during retry for ${resultId}:`, e);
         // Set back to error state if retry fails
-        await updateDoc(doc(db, 'results', resultId), {
+        await resultRef(resultId).update({
             status: '오류',
             aiFeedback: `재시도 실패: ${(e as Error).message || '알 수 없는 오류'}`,
         });

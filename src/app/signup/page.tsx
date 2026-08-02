@@ -26,8 +26,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
-import { db } from "@/lib/firebase";
-import { collection, addDoc, query, where, getDocs } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
+import { doc, setDoc } from "firebase/firestore";
+import { createUserWithEmailAndPassword, deleteUser } from "firebase/auth";
+import { FirebaseError } from "firebase/app";
+import { deriveAuthEmail, normalizeLoginName } from "@/lib/auth-email";
 
 const formSchema = z.object({
     displayName: z.string().min(2, "이름은 2글자 이상이어야 합니다."),
@@ -57,72 +60,61 @@ export default function SignupPage() {
 
     async function onSubmit(values: z.infer<typeof formSchema>) {
         setIsLoading(true);
-        if (!db) {
-            toast({
-                title: "설정 오류",
-                description: "Firebase 데이터베이스가 설정되지 않았습니다. 관리자에게 문의하세요.",
-                variant: "destructive",
-            });
-            setIsLoading(false);
-            return;
-        }
+
+        const displayName = normalizeLoginName(values.displayName);
 
         try {
-            // Check for duplicate displayName or email
-            const usersRef = collection(db, "users");
-            const nameQuery = query(usersRef, where("displayName", "==", values.displayName));
-            const emailQuery = query(usersRef, where("email", "==", values.email));
-            
-            const [nameSnapshot, emailSnapshot] = await Promise.all([
-                getDocs(nameQuery),
-                getDocs(emailQuery)
-            ]);
+            // 이름 중복 검사는 Firestore 조회 대신 Auth가 대신합니다.
+            // 같은 이름은 항상 같은 로그인 주소로 변환되므로,
+            // 이미 존재하면 auth/email-already-in-use가 발생합니다.
+            const credential = await createUserWithEmailAndPassword(
+                auth,
+                deriveAuthEmail(displayName),
+                values.password
+            );
 
-            if (!nameSnapshot.empty) {
-                toast({
-                    title: "회원가입 오류",
-                    description: "이미 사용 중인 이름(아이디)입니다.",
-                    variant: "destructive",
+            try {
+                // 문서 ID를 Auth UID와 동일하게 맞춰야 보안 규칙에서 본인 확인이 가능합니다.
+                await setDoc(doc(db, "users", credential.user.uid), {
+                    uid: credential.user.uid,
+                    displayName,
+                    email: values.email,
+                    grade: values.grade,
+                    class: values.class,
+                    number: values.number,
+                    role: "student",
+                    createdAt: Date.now(),
+                    photoURL: `https://placehold.co/40x40.png?text=${displayName.charAt(0)}`,
                 });
-                setIsLoading(false);
-                return;
+            } catch (profileError) {
+                // 프로필 문서 없이 Auth 계정만 남으면 로그인은 되는데 역할을 알 수 없는
+                // 좀비 계정이 됩니다. 방금 만든 계정이므로 되돌립니다.
+                await deleteUser(credential.user).catch(() => undefined);
+                throw profileError;
             }
 
-            if (!emailSnapshot.empty) {
-                toast({
-                    title: "회원가입 오류",
-                    description: "이미 사용 중인 이메일입니다.",
-                    variant: "destructive",
-                });
-                setIsLoading(false);
-                return;
-            }
-
-            // Add new user to 'users' collection
-            await addDoc(usersRef, {
-                displayName: values.displayName,
-                email: values.email,
-                password: values.password, // In a real app, hash this password!
-                grade: values.grade,
-                class: values.class,
-                number: values.number,
-                role: "student",
-                createdAt: Date.now(),
-                photoURL: `https://placehold.co/40x40.png?text=${values.displayName.charAt(0)}`,
-            });
-            
             toast({
                 title: "회원가입 성공",
-                description: "로그인 페이지로 이동합니다.",
+                description: `${displayName}님, 환영합니다.`,
             });
 
-            router.push("/login");
+            // createUserWithEmailAndPassword가 이미 로그인 상태를 만들어 줍니다.
+            router.push("/student/dashboard");
 
         } catch (error) {
             console.error("Error signing up:", error);
+
+            const code = error instanceof FirebaseError ? error.code : undefined;
+            const description =
+                code === 'auth/email-already-in-use'
+                    ? "이미 사용 중인 이름(아이디)입니다."
+                    : code === 'auth/weak-password'
+                        ? "비밀번호가 너무 단순합니다. 6자리 이상으로 입력해주세요."
+                        : "알 수 없는 오류가 발생했습니다. 다시 시도해주세요.";
+
             toast({
                 title: "회원가입 오류",
-                description: "알 수 없는 오류가 발생했습니다. 다시 시도해주세요.",
+                description,
                 variant: "destructive",
             });
         } finally {

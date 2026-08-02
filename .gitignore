@@ -43,3 +43,10 @@ next-env.d.ts
 # firebase
 firebase-debug.log
 firestore-debug.log
+
+# 일회성 디버깅 실험 스크립트 (scripts/experiments/README.md 참고)
+/scripts/experiments/*
+!/scripts/experiments/README.md
+
+# 오디오 덤프 등 디버깅 산출물
+*.pcm

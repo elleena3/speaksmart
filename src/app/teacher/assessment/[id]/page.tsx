@@ -62,9 +62,13 @@ export default function AssessmentSubmissionsPage() {
         const assessmentData = { id: assessmentSnap.id, ...assessmentSnap.data() } as TeacherAssessment;
         setAssessment(assessmentData);
         
+        // teacherUid 조건은 보안 규칙과 짝을 이룹니다.
+        // 규칙이 '내 담당 결과만 읽기'를 요구하므로 쿼리도 같은 조건을 걸어야
+        // Firestore가 목록 조회를 허용합니다.
         const resultsQuery = query(
             collection(db, "results"),
-            where("assessmentId", "==", assessmentId)
+            where("assessmentId", "==", assessmentId),
+            where("teacherUid", "==", user.uid)
         );
         const resultsSnapshot = await getDocs(resultsQuery);
         

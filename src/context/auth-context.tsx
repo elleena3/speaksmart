@@ -1,19 +1,26 @@
 
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo, useCallback } from 'react';
 import { Loader2 } from 'lucide-react';
+import { onAuthStateChanged, signInWithEmailAndPassword, signOut, type User as FirebaseUser } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
+import { auth, db } from '@/lib/firebase';
+import { deriveAuthEmail } from '@/lib/auth-email';
 import { type UserData } from '@/lib/types';
 
-// Mock data remains for quick testing via the main page
+// 시드 계정 목록. Firestore 문서 ID와 Firebase Auth UID를 동일하게 유지하므로
+// 여기 적힌 uid 값은 seed-data.ts가 만드는 계정과 정확히 일치해야 합니다.
+export const SEED_TEACHER_NAME = 'Great Teacher';
+
 const mockTeacher: UserData = {
     uid: 'teacher-mock-uid',
     docId: 'teacher-mock-uid',
-    displayName: 'Great Teacher',
-    email: 'elleena3@gmail.com',
+    displayName: SEED_TEACHER_NAME,
+    email: 'teacher@speaksmart.edu',
     photoURL: `https://placehold.co/40x40.png?text=G`,
     role: 'teacher',
-    createdAt: Date.now(),
+    createdAt: 0,
     isMock: true, // Flag to identify mock users
 };
 
@@ -24,7 +31,7 @@ const mockStudent1: UserData = {
     email: 'student1@example.com',
     photoURL: `https://placehold.co/40x40.png?text=일`,
     role: 'student',
-    createdAt: Date.now(),
+    createdAt: 0,
     isMock: true,
 };
 
@@ -35,7 +42,7 @@ const mockStudent2: UserData = {
     email: 'student2@example.com',
     photoURL: `https://placehold.co/40x40.png?text=이`,
     role: 'student',
-    createdAt: Date.now(),
+    createdAt: 0,
     isMock: true,
 };
 
@@ -46,81 +53,114 @@ const mockStudent3: UserData = {
     email: 'student3@example.com',
     photoURL: `https://placehold.co/40x40.png?text=삼`,
     role: 'student',
-    createdAt: Date.now(),
+    createdAt: 0,
     isMock: true,
 };
 
 export const mockStudents = [mockStudent1, mockStudent2, mockStudent3];
 
+// 시드 계정의 기본 비밀번호. seed-data.ts와 값이 일치해야 데모 로그인이 동작합니다.
+const SEED_CREDENTIALS: Record<'teacher' | 'student1' | 'student2' | 'student3', { name: string; password: string }> = {
+  teacher: { name: mockTeacher.displayName, password: '29182918' },
+  student1: { name: mockStudent1.displayName, password: '123456' },
+  student2: { name: mockStudent2.displayName, password: '123456' },
+  student3: { name: mockStudent3.displayName, password: '123456' },
+};
+
 interface AuthContextType {
   user: UserData | null;
   loading: boolean;
-  loginAs: (role: 'teacher' | 'student1' | 'student2' | 'student3') => void;
-  manualLogin: (userData: UserData) => void;
-  logout: () => void;
+  /** 이름(아이디) + 비밀번호로 로그인. 성공 시 users 문서를 읽어 반환합니다. */
+  login: (name: string, password: string) => Promise<UserData>;
+  /** 데모용 시드 계정 로그인. 실제 Firebase Auth 로그인을 수행합니다. */
+  loginAs: (role: 'teacher' | 'student1' | 'student2' | 'student3') => Promise<UserData>;
+  /** 프로필 수정 후 users 문서를 다시 읽어 컨텍스트를 갱신합니다. */
+  refreshUser: () => Promise<void>;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const USER_SESSION_KEY = 'speaksmart_user_session';
+/** users/{uid} 문서를 읽어 UserData로 변환. 문서가 없으면 null. */
+async function loadUserDoc(firebaseUser: FirebaseUser): Promise<UserData | null> {
+  const snap = await getDoc(doc(db, 'users', firebaseUser.uid));
+  if (!snap.exists()) return null;
+  // uid/docId는 항상 Auth UID(= Firestore 문서 ID)로 통일합니다.
+  return { ...snap.data(), uid: firebaseUser.uid, docId: firebaseUser.uid } as UserData;
+}
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    try {
-      const savedUser = sessionStorage.getItem(USER_SESSION_KEY);
-      if (savedUser) {
-        setUser(JSON.parse(savedUser));
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (!firebaseUser) {
+        setUser(null);
+        setLoading(false);
+        return;
       }
-    } catch (error) {
-        console.error("Failed to parse user session from storage", error);
-        sessionStorage.removeItem(USER_SESSION_KEY);
-    }
-    setLoading(false);
+
+      try {
+        const userData = await loadUserDoc(firebaseUser);
+        if (!userData) {
+          // Auth 계정은 있으나 프로필 문서가 없는 상태. 로그인 상태로 두면
+          // 역할을 알 수 없어 화면이 깨지므로 로그아웃 처리합니다.
+          console.error('Auth 계정에 대응하는 users 문서가 없습니다:', firebaseUser.uid);
+          await signOut(auth);
+          setUser(null);
+        } else {
+          setUser(userData);
+        }
+      } catch (error) {
+        console.error('사용자 프로필을 불러오지 못했습니다.', error);
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
+    });
+
+    return () => unsubscribe();
   }, []);
 
-  const manualLogin = (userData: UserData) => {
-    const userToSave = { ...userData, docId: userData.docId || userData.uid };
-    setUser(userToSave);
-    sessionStorage.setItem(USER_SESSION_KEY, JSON.stringify(userToSave));
-  };
-  
-  const loginAs = (role: 'teacher' | 'student1' | 'student2' | 'student3') => {
-      let mockUserToLogin: UserData;
-      if (role === 'teacher') {
-          mockUserToLogin = mockTeacher;
-      } else if (role === 'student1') {
-          mockUserToLogin = mockStudent1;
-      } else if (role === 'student2') {
-          mockUserToLogin = mockStudent2;
-      } else {
-          mockUserToLogin = mockStudent3;
-      }
-      manualLogin(mockUserToLogin);
-  };
+  const login = useCallback(async (name: string, password: string): Promise<UserData> => {
+    const credential = await signInWithEmailAndPassword(auth, deriveAuthEmail(name), password);
+    const userData = await loadUserDoc(credential.user);
+    if (!userData) {
+      await signOut(auth);
+      throw new Error('사용자 프로필 문서를 찾을 수 없습니다.');
+    }
+    setUser(userData);
+    return userData;
+  }, []);
 
-  const logout = () => {
+  const loginAs = useCallback(
+    (role: 'teacher' | 'student1' | 'student2' | 'student3') => {
+      const { name, password } = SEED_CREDENTIALS[role];
+      return login(name, password);
+    },
+    [login]
+  );
+
+  const refreshUser = useCallback(async () => {
+    if (!auth.currentUser) return;
+    const userData = await loadUserDoc(auth.currentUser);
+    if (userData) setUser(userData);
+  }, []);
+
+  const logout = useCallback(async () => {
+    await signOut(auth);
     setUser(null);
-    sessionStorage.removeItem(USER_SESSION_KEY);
-  };
+  }, []);
 
   const value = useMemo(() => ({
     user,
     loading,
+    login,
     loginAs,
-    manualLogin,
+    refreshUser,
     logout,
-  }), [user, loading]);
-
-  if (typeof window === 'undefined') {
-    return (
-      <div className="flex h-screen w-screen items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    );
-  }
+  }), [user, loading, login, loginAs, refreshUser, logout]);
 
   return (
     <AuthContext.Provider value={value}>

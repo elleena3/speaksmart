@@ -72,7 +72,9 @@ const regenerateCurricularRemarksFlow = ai.defineFlow(
         const isRemarkInvalid = !remarks || remarks.includes('오류') || remarks.includes('실패') || remarks.includes('없음') || remarks.includes('불가능');
         return {
           ...attempt,
-          curricularRemarks: isRemarkInvalid ? null : remarks,
+          // 스키마가 z.string() 이므로 null 을 넣으면 Zod 검증에서 실패합니다.
+          // 빈 문자열도 Handlebars의 {{#if}} 에서 거짓으로 처리되어 의도한 동작이 유지됩니다.
+          curricularRemarks: isRemarkInvalid ? "" : remarks,
         };
       });
 

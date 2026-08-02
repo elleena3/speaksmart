@@ -7,7 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Mic, Square, Loader2, Play, User, Bot, Rss, Download, FileText, CheckCircle2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { getOpenAiLiveSessionToken } from "@/ai/flows/get-openai-live-session-token";
+import { getOpenAiLiveSessionToken, REALTIME_INSTRUCTIONS } from "@/ai/flows/get-openai-live-session-token";
 import { analyzeLiveConversation, type AnalyzeLiveConversationOutput } from "@/ai/flows/analyze-live-conversation-flow";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -123,7 +123,7 @@ export function OpenAiRealtimeConversationTool() {
                 model: selectedModel,
                 voice: selectedVoice as any
             });
-            const ephemeralKey = tokenResponse.client_secret.value;
+            const ephemeralKey = tokenResponse.value;
 
             // 2. Create Peer Connection
             const pc = new RTCPeerConnection();
@@ -161,32 +161,49 @@ export function OpenAiRealtimeConversationTool() {
             dataChannelRef.current = dc;
 
             let hasTriggeredGreeting = false;
+            const triggerGreeting = () => {
+                if (hasTriggeredGreeting || dc.readyState !== 'open') return;
+                hasTriggeredGreeting = true;
+                dc.send(JSON.stringify({
+                    type: "response.create",
+                    response: {
+                        instructions: "Introduce yourself briefly and say hello to the student."
+                    }
+                }));
+                console.log("Triggered AI greeting via response.create");
+            };
 
             dc.addEventListener("open", () => {
-                // GA API requires the new session format
+                // GA 형식. 베타와 달리 session.type 이 필요하고,
+                // modalities -> output_modalities,
+                // voice -> audio.output.voice,
+                // turn_detection -> audio.input.turn_detection 으로 옮겨졌습니다.
+                // 예전 형식으로 보내면 세션 설정이 통째로 거부되어 AI가 응답하지 않습니다.
                 const sessionUpdate = {
                     type: "session.update",
                     session: {
-                        modalities: ["audio", "text"],
-                        instructions: "You are a friendly native English tutor. Speak naturally and converse interactively with the user. Keep your responses concise and encourage the student to speak more.",
-                        voice: selectedVoice,
+                        type: "realtime",
+                        output_modalities: ["audio"],
+                        instructions: REALTIME_INSTRUCTIONS,
                         audio: {
                             input: {
-                                transcription: {
-                                    model: "gpt-4o-mini-transcribe"
+                                transcription: { model: "gpt-4o-mini-transcribe" },
+                                turn_detection: {
+                                    type: "server_vad",
+                                    threshold: 0.5,
+                                    prefix_padding_ms: 300,
+                                    silence_duration_ms: 500
                                 }
-                            }
-                        },
-                        turn_detection: {
-                            type: "server_vad",
-                            threshold: 0.5,
-                            prefix_padding_ms: 300,
-                            silence_duration_ms: 500
+                            },
+                            output: { voice: selectedVoice }
                         }
                     }
                 };
                 dc.send(JSON.stringify(sessionUpdate));
                 console.log("Sent GA session.update to configure Realtime session");
+
+                // session.updated 가 오지 않는 경우에도 대화가 멈추지 않도록 하는 보험입니다.
+                setTimeout(triggerGreeting, 2000);
             });
 
             dc.addEventListener("message", (e) => {
@@ -199,19 +216,11 @@ export function OpenAiRealtimeConversationTool() {
                         toast({ title: "서버 에러 발생", description: event.error?.message || "알 수 없는 에러가 발생했습니다.", variant: "destructive" });
                     }
 
-                    if (event.type === "session.updated" || event.type === "session.created") {
-                        if (!hasTriggeredGreeting) {
-                            hasTriggeredGreeting = true;
-                            setTimeout(() => {
-                                dc.send(JSON.stringify({
-                                    type: "response.create",
-                                    response: {
-                                        instructions: "Introduce yourself briefly and say hello to the student."
-                                    }
-                                }));
-                                console.log("Triggered AI greeting via response.create");
-                            }, 300);
-                        }
+                    // 인사말은 session.updated 를 받은 뒤에 보냅니다.
+                    // session.created 는 우리 설정이 반영되기 전에 도착하므로,
+                    // 그때 인사를 시키면 목소리·지시문이 적용되지 않은 채로 말하기 시작합니다.
+                    if (event.type === "session.updated") {
+                        triggerGreeting();
                     }
 
                     // Input transcription (User)
@@ -246,7 +255,11 @@ export function OpenAiRealtimeConversationTool() {
             });
 
             if (!sdpResponse.ok) {
-                throw new Error("Failed to connect to OpenAI WebRTC");
+                // 서버가 무엇을 거부했는지 원문을 남깁니다.
+                // 이게 없어서 그동안 추측으로 스키마를 고쳐야 했습니다.
+                const detail = await sdpResponse.text().catch(() => '');
+                console.error("OpenAI WebRTC SDP error:", sdpResponse.status, detail);
+                throw new Error(`OpenAI WebRTC 연결 실패 (${sdpResponse.status}): ${detail || sdpResponse.statusText}`);
             }
 
             const answer = {
