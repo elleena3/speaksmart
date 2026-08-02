@@ -160,6 +160,29 @@ export function OpenAiRealtimeConversationTool() {
             const dc = pc.createDataChannel("oai-events");
             dataChannelRef.current = dc;
 
+            dc.addEventListener("open", () => {
+                // GA API requires sending session.update to configure the session
+                const sessionUpdate = {
+                    type: "session.update",
+                    session: {
+                        modalities: ["audio", "text"],
+                        instructions: "You are a friendly native English tutor. Speak naturally and converse interactively with the user. Keep your responses concise and encourage the student to speak more.",
+                        voice: selectedVoice,
+                        input_audio_transcription: {
+                            model: "gpt-4o-mini-transcribe"
+                        },
+                        turn_detection: {
+                            type: "server_vad",
+                            threshold: 0.5,
+                            prefix_padding_ms: 300,
+                            silence_duration_ms: 500
+                        }
+                    }
+                };
+                dc.send(JSON.stringify(sessionUpdate));
+                console.log("Sent session.update to configure Realtime session");
+            });
+
             dc.addEventListener("message", (e) => {
                 try {
                     const event = JSON.parse(e.data);
