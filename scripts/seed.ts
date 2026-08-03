@@ -6,8 +6,9 @@
  * 클라이언트가 아닌 Admin SDK로 실행합니다.
  *
  * 실행:
- *   npm run seed                      # 교사 + 목업 학생 3명 + 샘플 평가
- *   npm run seed -- --teacher-only    # 교사 계정만 (이미 실제 데이터가 있는 환경)
+ *   npm run seed                      # 교사 + 테스트 학생 3명 + 샘플 평가
+ *   npm run seed -- --skip-sample     # 계정만 (샘플 평가 제외)
+ *   npm run seed -- --teacher-only    # 교사 계정만
  *
  * 사전 조건: .env 에 FIREBASE_SERVICE_ACCOUNT_KEY 설정
  * (설정 방법은 src/lib/firebase-admin.ts 상단 주석 참고)
@@ -26,12 +27,15 @@ config({ path: '.env.local' });
 config();
 
 // Firebase Auth 는 6자 이상을 요구하므로 예전 4자리 '2918' 을 그대로 쓸 수 없습니다.
-// 값을 바꿀 때는 src/context/auth-context.tsx 의 SEED_CREDENTIALS 도 함께 맞춰야 합니다.
-const TEACHER_PASSWORD = '29182918';
+// 값은 환경 변수로 덮어쓸 수 있습니다. 학생 비밀번호는
+// src/context/auth-context.tsx 의 SEED_CREDENTIALS 와 일치해야 데모 버튼이 동작합니다.
+const TEACHER_PASSWORD = process.env.SEED_TEACHER_PASSWORD || '29182918';
 const STUDENT_PASSWORD = '123456';
 
 // 이미 실제 학급 데이터가 들어 있는 환경에서는 목업 학생과 샘플 평가를 넣지 않습니다.
 const TEACHER_ONLY = process.argv.includes('--teacher-only');
+// 계정만 만들고 샘플 평가 문서는 만들지 않습니다.
+const SKIP_SAMPLE = process.argv.includes('--skip-sample');
 
 type SeedUser = {
   uid: string;
@@ -114,8 +118,8 @@ async function main() {
     console.log(`  [완료] ${user.displayName} (${user.uid}) — 로그인 아이디: ${user.displayName} / 비밀번호: ${user.password}`);
   }
 
-  if (TEACHER_ONLY) {
-    console.log('\n교사 계정 생성 완료!');
+  if (TEACHER_ONLY || SKIP_SAMPLE) {
+    console.log('\n계정 생성 완료! (샘플 평가는 만들지 않았습니다)');
     return;
   }
 
