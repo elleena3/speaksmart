@@ -15,6 +15,8 @@ export type ConversationReport = {
   fluencyFeedback: string;
   overallFeedback: string;
   transcript: string;
+  /** Storage 에 보관된 녹음 주소. PDF 에서 눌러 들을 수 있도록 넣습니다. */
+  recordingUrl?: string | null;
 };
 
 function escapeHtml(value: string): string {
@@ -83,6 +85,13 @@ export function buildConversationReportHtml(report: ConversationReport): string 
 
     <h3>총평 (Overall)</h3>
     <div class="body-text">${renderMarkdown(report.overallFeedback)}</div>
+
+    ${report.recordingUrl ? `
+    <h3>대화 녹음</h3>
+    <p class="body-text">
+      아래 주소에서 이 대화의 음성을 들을 수 있습니다.<br/>
+      <a href="${escapeHtml(report.recordingUrl)}">${escapeHtml(report.recordingUrl)}</a>
+    </p>` : ''}
 
     <h3>전체 대화 스크립트</h3>
     <pre>${escapeHtml(report.transcript)}</pre>

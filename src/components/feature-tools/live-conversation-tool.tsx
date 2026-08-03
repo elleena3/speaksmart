@@ -17,6 +17,7 @@ import { GOOGLE_EVALUATION_MODELS, DEFAULT_GOOGLE_EVALUATION_MODEL, shortModelNa
 import { type EvaluationModel } from "@/lib/types";
 import { RecordingPlayback } from "./recording-playback";
 import { printConversationReport } from "@/lib/conversation-report";
+import { uploadConversationRecording, type UploadState } from "@/lib/upload-recording";
 
 type AppState = 'idle' | 'connecting' | 'connected' | 'analyzing' | 'finished' | 'error';
 type Turn = { role: 'user' | 'model'; text: string; id: number };
@@ -29,6 +30,11 @@ export function LiveConversationTool() {
     const [audioChunkCount, setAudioChunkCount] = useState<number>(0);
     const [selectedVoice, setSelectedVoice] = useState<string>("Aoede");
     const [recordingUrl, setRecordingUrl] = useState<string | null>(null);
+    const [storedRecordingUrl, setStoredRecordingUrl] = useState<string | null>(null);
+    const [uploadState, setUploadState] = useState<UploadState>('idle');
+    const [uploadError, setUploadError] = useState<string | null>(null);
+    // 업로드는 리포트 생성보다 늦게 끝날 수 있어 ref 로도 들고 있습니다.
+    const storedRecordingUrlRef = useRef<string | null>(null);
     // 평가엔진은 통화엔진과 별개입니다. flash 가 훨씬 저렴해 기본값으로 둡니다.
     const [evaluationModel, setEvaluationModel] = useState<EvaluationModel>(DEFAULT_GOOGLE_EVALUATION_MODEL);
 
@@ -145,8 +151,22 @@ export function LiveConversationTool() {
             recorder.ondataavailable = e => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
             recorder.onstop = () => {
                 const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-                const url = URL.createObjectURL(blob);
-                setRecordingUrl(url);
+                // blob URL 은 즉시 재생용입니다. 탭을 닫으면 사라지므로 별도로 보관합니다.
+                setRecordingUrl(URL.createObjectURL(blob));
+
+                setUploadState('uploading');
+                setUploadError(null);
+                uploadConversationRecording(blob, 'gemini-live')
+                    .then(url => {
+                        storedRecordingUrlRef.current = url;
+                        setStoredRecordingUrl(url);
+                        setUploadState('done');
+                    })
+                    .catch(err => {
+                        console.error('녹음 보관 실패:', err);
+                        setUploadError(err instanceof Error ? err.message : '알 수 없는 오류');
+                        setUploadState('error');
+                    });
             };
             mediaRecorderRef.current = recorder;
             recorder.start();
@@ -420,6 +440,7 @@ export function LiveConversationTool() {
             fluencyFeedback: result.fluencyFeedback,
             overallFeedback: result.overallFeedback,
             transcript: turns.map(t => `${t.role === 'user' ? 'Student' : 'AI'}: ${t.text}`).join('\n'),
+            recordingUrl: storedRecordingUrl,
         });
 
         if (!opened) {
@@ -509,7 +530,13 @@ export function LiveConversationTool() {
 
                     {/* 분석 성공 여부와 무관하게, 녹음이 있으면 바로 듣고 받을 수 있어야 합니다. */}
                     {recordingUrl && (
-                        <RecordingPlayback url={recordingUrl} fileName="live-conversation-recording.webm" />
+                        <RecordingPlayback
+                            url={recordingUrl}
+                            fileName="live-conversation-recording.webm"
+                            storedUrl={storedRecordingUrl}
+                            uploadState={uploadState}
+                            uploadError={uploadError}
+                        />
                     )}
                 </CardContent>
             </Card>
