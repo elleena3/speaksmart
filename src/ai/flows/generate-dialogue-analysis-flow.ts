@@ -14,6 +14,7 @@ import {
 } from '@/lib/types/ai-schemas';
 import { type RubricScores, type StudentResult } from '@/lib/types';
 import { resultRef } from '@/lib/server-store';
+import { describeAiError } from '@/lib/ai-error-message';
 
 async function withRetry<T>(fn: () => Promise<T>, retries = 2, delay = 1500): Promise<T> {
   let lastError: any;
@@ -160,9 +161,12 @@ export async function generateDialogueAnalysis(input: any): Promise<void> {
           assessmentType: "dialogue",
       });
   } catch (e: any) {
+      // 크레딧 소진 같은 원인은 원문만 보면 알 수 없어 교사가 조치할 수 없습니다.
+      const info = describeAiError(e, model);
+      console.error('dialogue 분석 실패:', info.kind, info.detail);
       await resultDocRef.update({
           status: "오류",
-          aiFeedback: e.message,
+          aiFeedback: info.message,
           studentRecordingUrl: input.studentRecordingUrl,
           assessmentType: "dialogue",
       });

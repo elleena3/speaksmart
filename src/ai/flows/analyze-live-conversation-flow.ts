@@ -3,6 +3,7 @@
 import { ai } from '@/ai/genkit';
 import { googleAI } from '@genkit-ai/google-genai';
 import { z } from 'zod';
+import { describeAiError } from '@/lib/ai-error-message';
 
 const AnalyzeLiveConversationInputSchema = z.object({
     transcript: z.string().describe("The full transcript of the real-time conversation between User and AI."),
@@ -33,9 +34,9 @@ export async function analyzeLiveConversation(input: AnalyzeLiveConversationInpu
         const data = await analyzeLiveConversationFlow(input);
         return { ok: true, data };
     } catch (e) {
-        const detail = e instanceof Error ? e.message : String(e);
-        console.error('analyzeLiveConversation 실패:', detail);
-        return { ok: false, error: detail };
+        const info = describeAiError(e, input.evaluationModel);
+        console.error('analyzeLiveConversation 실패:', info.kind, info.detail);
+        return { ok: false, error: info.message };
     }
 }
 
