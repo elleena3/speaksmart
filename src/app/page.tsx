@@ -11,7 +11,7 @@ import { useRouter } from "next/navigation";
 import { useAuth, SEED_TEACHER_NAME } from "@/context/auth-context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -23,6 +23,11 @@ export default function Home() {
   const [loadingRole, setLoadingRole] = useState<string | null>(null);
   const [teacherPassword, setTeacherPassword] = useState('');
   const [passwordError, setPasswordError] = useState('');
+  // 목업 계정 메뉴는 비밀번호를 확인한 뒤에만 열립니다.
+  const [unlocked, setUnlocked] = useState(false);
+  const [gateOpen, setGateOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [isUnlocking, setIsUnlocking] = useState(false);
 
   const handleMockLogin = async (role: string) => {
     setLoadingRole(role);
@@ -37,28 +42,45 @@ export default function Home() {
     }
   };
 
-  const handleTeacherLoginAttempt = async (e: React.MouseEvent) => {
-    e.preventDefault();
-    // 비밀번호를 코드에 두고 문자열로 비교하면 클라이언트 번들에서 그대로 읽힙니다.
-    // 입력값을 그대로 Firebase Auth 에 넘겨 서버가 검증하도록 합니다.
+  /**
+   * 목업 계정 메뉴를 열기 전 비밀번호를 확인합니다.
+   *
+   * 비밀번호를 코드에 두고 문자열로 비교하면 클라이언트 번들에서 그대로 읽힙니다.
+   * 입력값으로 교사 계정 로그인을 시도해 Firebase Auth 가 대신 검증하게 하면,
+   * 앱 어디에도 비밀번호를 두지 않고 같은 값을 쓸 수 있습니다.
+   */
+  const handleUnlock = async () => {
     setPasswordError('');
-    setLoadingRole('teacher');
+    setIsUnlocking(true);
     try {
-      const userData = await login(SEED_TEACHER_NAME, teacherPassword);
-      document.getElementById('teacher-login-dialog-close')?.click();
-      router.push(userData.role === 'teacher' ? '/teacher/dashboard' : '/student/dashboard');
+      await login(SEED_TEACHER_NAME, teacherPassword);
+      setUnlocked(true);
+      setGateOpen(false);
+      setTeacherPassword('');
+      setMenuOpen(true);
     } catch (error) {
       setPasswordError('비밀번호가 올바르지 않습니다.');
-      setLoadingRole(null);
+    } finally {
+      setIsUnlocking(false);
     }
   };
 
-  const onTeacherDialogChange = (open: boolean) => {
-    if (!open) {
-        setTeacherPassword('');
-        setPasswordError('');
+  // 잠금이 풀리기 전에는 메뉴 대신 비밀번호 창을 띄웁니다.
+  const handleMenuOpenChange = (open: boolean) => {
+    if (open && !unlocked) {
+      setGateOpen(true);
+      return;
     }
-  }
+    setMenuOpen(open);
+  };
+
+  const onGateOpenChange = (open: boolean) => {
+    setGateOpen(open);
+    if (!open) {
+      setTeacherPassword('');
+      setPasswordError('');
+    }
+  };
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-saebyeol-beige p-4 md:p-8 relative space-y-8">
@@ -80,8 +102,8 @@ export default function Home() {
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <Dialog onOpenChange={onTeacherDialogChange}>
-            <DropdownMenu>
+        <Dialog open={gateOpen} onOpenChange={onGateOpenChange}>
+            <DropdownMenu open={menuOpen} onOpenChange={handleMenuOpenChange}>
             <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" className="bg-white/70">
                 <Users className="mr-2 h-4 w-4" />
@@ -90,12 +112,11 @@ export default function Home() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
                 <DropdownMenuLabel>교사</DropdownMenuLabel>
-                 <DialogTrigger asChild>
-                    <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                        <School className="mr-2 h-4 w-4" />
-                        교사로 로그인
-                    </DropdownMenuItem>
-                 </DialogTrigger>
+                {/* 잠금 해제 과정에서 이미 교사로 로그인된 상태이므로 바로 이동합니다. */}
+                <DropdownMenuItem onClick={() => router.push('/teacher/dashboard')}>
+                    <School className="mr-2 h-4 w-4" />
+                    교사로 로그인
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuLabel>학생</DropdownMenuLabel>
                 <DropdownMenuItem onClick={() => handleMockLogin('student1')} disabled={!!loadingRole}>
@@ -114,9 +135,9 @@ export default function Home() {
             </DropdownMenu>
             <DialogContent className="sm:max-w-md">
                  <DialogHeader>
-                    <DialogTitle>교사 로그인</DialogTitle>
+                    <DialogTitle>빠른 테스트 계정</DialogTitle>
                     <DialogDescription>
-                        교사 계정 비밀번호를 입력하세요.
+                        테스트 계정을 사용하려면 교사 계정 비밀번호를 입력하세요.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
@@ -130,7 +151,7 @@ export default function Home() {
                             onKeyDown={(e) => {
                                 if (e.key === 'Enter') {
                                     e.preventDefault();
-                                    handleTeacherLoginAttempt(e as any);
+                                    void handleUnlock();
                                 }
                             }}
                             autoFocus
@@ -145,10 +166,11 @@ export default function Home() {
                 </div>
                 <DialogFooter>
                     <DialogClose asChild>
-                        <Button type="button" variant="secondary" id="teacher-login-dialog-close">취소</Button>
+                        <Button type="button" variant="secondary">취소</Button>
                     </DialogClose>
-                    <Button type="button" onClick={handleTeacherLoginAttempt}>
-                        로그인
+                    <Button type="button" onClick={handleUnlock} disabled={isUnlocking || !teacherPassword}>
+                        {isUnlocking && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        확인
                     </Button>
                 </DialogFooter>
             </DialogContent>
