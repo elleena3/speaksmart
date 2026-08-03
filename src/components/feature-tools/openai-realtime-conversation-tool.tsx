@@ -9,6 +9,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getOpenAiLiveSessionToken } from "@/ai/flows/get-openai-live-session-token";
 import { REALTIME_INSTRUCTIONS } from "@/lib/realtime-config";
+import { OPENAI_EVALUATION_MODELS, DEFAULT_OPENAI_EVALUATION_MODEL, shortModelName } from "@/lib/evaluation-models";
+import { type EvaluationModel } from "@/lib/types";
 import { analyzeLiveConversation, type AnalyzeLiveConversationOutput } from "@/ai/flows/analyze-live-conversation-flow";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -25,13 +27,17 @@ export function OpenAiRealtimeConversationTool() {
 
     const [selectedModel, setSelectedModel] = useState<string>("gpt-realtime-2.1-mini");
     const [selectedVoice, setSelectedVoice] = useState<string>("alloy");
+    // 평가엔진은 통화엔진과 별개입니다. 비용 차이가 커서 기본값은 중간 등급으로 둡니다.
+    const [evaluationModel, setEvaluationModel] = useState<EvaluationModel>(DEFAULT_OPENAI_EVALUATION_MODEL);
     const [recordingUrl, setRecordingUrl] = useState<string | null>(null);
 
     // FIX: Using mutable refs to avoid stale closures in event listeners
     const appStateRef = useRef<AppState>('idle');
     const turnsRef = useRef<Turn[]>([]);
+    const evaluationModelRef = useRef<EvaluationModel>(DEFAULT_OPENAI_EVALUATION_MODEL);
     useEffect(() => { appStateRef.current = appState; }, [appState]);
     useEffect(() => { turnsRef.current = turns; }, [turns]);
+    useEffect(() => { evaluationModelRef.current = evaluationModel; }, [evaluationModel]);
 
     const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
     const dataChannelRef = useRef<RTCDataChannel | null>(null);
@@ -83,10 +89,10 @@ export function OpenAiRealtimeConversationTool() {
             const currentTurns = turnsRef.current;
             const fullTranscript = currentTurns.map(t => `${t.role === 'user' ? 'Student' : 'AI'}: ${t.text}`).join('\n');
             if (fullTranscript.trim().length > 10) {
-                // USER REQUEST: Use gpt-5.6-sol for OpenAI rating
                 const res = await analyzeLiveConversation({
                     transcript: fullTranscript,
-                    evaluationModel: "openai/gpt-5.6-sol"
+                    // 이 콜백은 연결 시점에 캡처되므로 ref 로 최신 선택값을 읽습니다.
+                    evaluationModel: evaluationModelRef.current
                 });
 
                 if (!res.ok) {
@@ -329,7 +335,7 @@ export function OpenAiRealtimeConversationTool() {
                         </style>
                     </head>
                     <body>
-                        <h1>대화 피드백 리포트 (Powered by GPT-5.6-Sol)</h1>
+                        <h1>대화 피드백 리포트 (Powered by ${shortModelName(evaluationModel)})</h1>
                         <p><strong>총점:</strong> ${result.overallScore} / 100</p>
                         <h3>문법 및 어휘 (Grammar)</h3>
                         <p>${result.grammarFeedback}</p>
@@ -384,11 +390,21 @@ export function OpenAiRealtimeConversationTool() {
                                     <SelectItem value="gpt-realtime-2.1">gpt-realtime-2.1</SelectItem>
                                 </SelectContent>
                             </Select>
+                            <Select value={evaluationModel} onValueChange={(v) => setEvaluationModel(v as EvaluationModel)} disabled={appState !== 'idle' && appState !== 'finished'}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="평가 모델 선택" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {OPENAI_EVALUATION_MODELS.map(m => (
+                                        <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                         </div>
                     </CardTitle>
                     <CardDescription className="flex items-center gap-4 text-sm mt-2 font-medium">
                         <span className="bg-blue-100 text-blue-800 px-2 flex items-center gap-1 rounded">🗣 통화엔진: {selectedModel}</span>
-                        <span className="bg-emerald-100 flex items-center gap-1 text-emerald-800 px-2 rounded">📝 평가엔진: gpt-5.6-sol</span>
+                        <span className="bg-emerald-100 flex items-center gap-1 text-emerald-800 px-2 rounded">📝 평가엔진: {shortModelName(evaluationModel)}</span>
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">

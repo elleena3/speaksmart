@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { evaluationModels, type EvaluationModel } from '@/lib/types';
+import { OPENAI_EVALUATION_MODELS } from '@/lib/evaluation-models';
 import { Label } from '../ui/label';
 
 
@@ -94,9 +95,9 @@ export function HandwritingAnalyzerTool() {
                                 <SelectValue placeholder="모델을 선택하세요..." />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="openai/gpt-5.6-sol">gpt-5.6-sol (최고 성능)</SelectItem>
-                                <SelectItem value="openai/gpt-5.6-terra">gpt-5.6-terra (균형)</SelectItem>
-                                <SelectItem value="openai/gpt-5.6-luna">gpt-5.6-luna (가장 빠름)</SelectItem>
+                                {OPENAI_EVALUATION_MODELS.map(m => (
+                                    <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                                ))}
                                 <SelectItem value="googleai/gemini-3.6-flash">gemini-3.6-flash (빠름)</SelectItem>
                                 <SelectItem value="googleai/gemini-3.1-pro-preview">gemini-3.1-pro-preview (고성능)</SelectItem>
                                 <SelectItem value="anthropic/claude-fable-5">claude-fable-5 (장시간 실행)</SelectItem>

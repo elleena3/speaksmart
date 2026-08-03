@@ -33,13 +33,14 @@ export const evaluationModels = [
   "googleai/gemini-3.6-flash",
   "googleai/gemini-3.1-pro-preview",
   // OpenAI Models
+  // 비용 차이가 커서(sol 이 luna 의 5배) 권장 기본값인 terra 를 앞에 둡니다.
+  "openai/gpt-5.6-terra",
+  "openai/gpt-5.6-luna",
+  "openai/gpt-5.6-sol",
   "openai/gpt-4o",
   "openai/gpt-4o-mini",
   "openai/o3-mini",
   "openai/o1",
-  "openai/gpt-5.6-sol",
-  "openai/gpt-5.6-terra",
-  "openai/gpt-5.6-luna",
   // Anthropic Models
   "anthropic/claude-fable-5",
   "anthropic/claude-opus-4-8",
