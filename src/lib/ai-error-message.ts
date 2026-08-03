@@ -40,7 +40,7 @@ function billingHint(model?: string): string {
   return '';
 }
 
-export function describeAiError(error: unknown, model?: string): AiErrorInfo {
+export function describeAiError(error: unknown, model?: string, task = '분석'): AiErrorInfo {
   const detail = error instanceof Error ? error.message : String(error);
   const lower = detail.toLowerCase();
   const provider = providerLabel(model);
@@ -57,7 +57,7 @@ export function describeAiError(error: unknown, model?: string): AiErrorInfo {
   if (quotaSigns.some((s) => lower.includes(s))) {
     return {
       kind: 'quota',
-      message: `${provider} API 크레딧이 부족하여 분석하지 못했습니다.${billingHint(model)}`,
+      message: `${provider} API 크레딧이 부족하여 ${task}하지 못했습니다.${billingHint(model)}`,
       detail,
     };
   }
@@ -93,5 +93,5 @@ export function describeAiError(error: unknown, model?: string): AiErrorInfo {
     };
   }
 
-  return { kind: 'unknown', message: `분석 중 오류가 발생했습니다: ${detail}`, detail };
+  return { kind: 'unknown', message: `${task} 중 오류가 발생했습니다: ${detail}`, detail };
 }

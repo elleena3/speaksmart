@@ -11,10 +11,11 @@ import { ai } from '@/ai/genkit';
 import { googleAI } from '@genkit-ai/google-genai';
 import { z } from 'zod';
 import { imageGenerationModels } from '@/lib/types';
+import { describeAiError } from '@/lib/ai-error-message';
 
 const GenerateImageInputSchema = z.object({
   prompt: z.string().describe('A text prompt describing the image to generate.'),
-  imageModel: z.enum(imageGenerationModels).optional().default('googleai/gemini-3.1-flash-lite-image'),
+  imageModel: z.enum(imageGenerationModels).optional().default('googleai/gemini-3.1-flash-image'),
 });
 export type GenerateImageInput = z.infer<typeof GenerateImageInputSchema>;
 
@@ -23,8 +24,23 @@ const GenerateImageOutputSchema = z.object({
 });
 export type GenerateImageOutput = z.infer<typeof GenerateImageOutputSchema>;
 
-export async function generateImage(input: GenerateImageInput): Promise<GenerateImageOutput> {
-  return generateImageFlow(input);
+/**
+ * 서버 액션에서 예외를 던지면 Next.js 가 프로덕션에서 메시지를 지우고 digest 만 남깁니다.
+ * 화면에서 원인을 알 수 있도록 실패를 값으로 돌려줍니다.
+ */
+export type GenerateImageResult =
+  | { ok: true; data: GenerateImageOutput }
+  | { ok: false; error: string };
+
+export async function generateImage(input: GenerateImageInput): Promise<GenerateImageResult> {
+  try {
+    const data = await generateImageFlow(input);
+    return { ok: true, data };
+  } catch (e) {
+    const info = describeAiError(e, input.imageModel, '이미지 생성');
+    console.error('generateImage 실패:', info.kind, info.detail);
+    return { ok: false, error: info.message };
+  }
 }
 
 const generateImageFlow = ai.defineFlow(
@@ -35,7 +51,7 @@ const generateImageFlow = ai.defineFlow(
   },
   async ({ prompt, imageModel }) => {
 
-    const modelToUse = imageModel || 'googleai/gemini-3.1-flash-lite-image';
+    const modelToUse = imageModel || 'googleai/gemini-3.1-flash-image';
 
     let finalPrompt = `A high-quality, clear, simple illustration suitable for an English speaking test. The image should be in a square aspect ratio. Prompt: ${prompt}`;
 
@@ -50,19 +66,21 @@ const generateImageFlow = ai.defineFlow(
           'Authorization': `Bearer ${apiKey}`,
           'Content-Type': 'application/json'
         },
+        // gpt-image 계열은 response_format 을 받지 않습니다.
+        // 넣으면 400 Unknown parameter 로 거부되고, 빼면 b64_json 이 기본으로 옵니다.
         body: JSON.stringify({
           model: rawModelName,
           prompt: finalPrompt,
           n: 1,
-          size: "1024x1024",
-          response_format: "b64_json"
+          size: "1024x1024"
         })
       });
 
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        console.error("OpenAI Image Error", err);
-        throw new Error(`OpenAI image generation failed: ${res.statusText}`);
+        // 원문을 남겨야 어떤 파라미터가 거부됐는지 알 수 있습니다.
+        const detail = await res.text().catch(() => '');
+        console.error("OpenAI Image Error", res.status, detail);
+        throw new Error(`OpenAI image generation failed (${res.status}): ${detail}`);
       }
 
       const data = await res.json();
@@ -73,9 +91,9 @@ const generateImageFlow = ai.defineFlow(
     }
 
     // Google AI Path
-    const rawGoogleModel = modelToUse.replace('googleai/', '');
+    // 'googleai/' 접두사를 떼면 레지스트리에서 찾지 못해 NOT_FOUND 가 납니다. 그대로 넘깁니다.
     const { media } = await ai.generate({
-      model: rawGoogleModel as any,
+      model: modelToUse as any,
       prompt: finalPrompt,
       config: {
         responseModalities: ['TEXT', 'IMAGE'],

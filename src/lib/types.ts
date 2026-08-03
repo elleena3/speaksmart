@@ -50,7 +50,9 @@ export const evaluationModels = [
 export type EvaluationModel = (typeof evaluationModels)[number];
 
 export const imageGenerationModels = [
-  "googleai/gemini-3.1-flash-lite-image",
+  // 이름이 정확해야 합니다. 예전 값 'gemini-3.1-flash-lite-image' 는 존재하지 않는 모델이라
+  // 이미지 생성이 NOT_FOUND 로 실패했습니다.
+  "googleai/gemini-3.1-flash-image",
   "googleai/gemini-3-pro-image",
   "openai/gpt-image-2"
 ] as const;

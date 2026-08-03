@@ -132,7 +132,7 @@ export default function NewAssessmentPage() {
     evaluationModel: z.enum(evaluationModels as unknown as [EvaluationModel, ...EvaluationModel[]]).optional().default('googleai/gemini-3.6-flash'),
     useRubric: z.boolean().default(false),
     loadedRubricId: z.string().optional(),
-    imageGenerationModel: z.enum(imageGenerationModels as unknown as [ImageGenerationModel, ...ImageGenerationModel[]]).optional().default('googleai/gemini-3.1-flash-lite-image'),
+    imageGenerationModel: z.enum(imageGenerationModels as unknown as [ImageGenerationModel, ...ImageGenerationModel[]]).optional().default('googleai/gemini-3.1-flash-image'),
   }).superRefine((data, ctx) => {
     const isFreeTalkDialogue = data.assessmentType === 'dialogue' && data.scenario === 'free-talk';
 
@@ -191,7 +191,7 @@ export default function NewAssessmentPage() {
       aiVoice: 'algenib',
       evaluationModel: 'googleai/gemini-3.6-flash',
       useRubric: false,
-      imageGenerationModel: 'googleai/gemini-3.1-flash-lite-image',
+      imageGenerationModel: 'googleai/gemini-3.1-flash-image',
     },
   });
 
@@ -271,7 +271,13 @@ export default function NewAssessmentPage() {
     try {
       const imageModel = form.getValues('imageGenerationModel');
       const result = await generateImage({ prompt: imagePrompt, imageModel });
-      setGeneratedImageDataUri(result.imageDataUri);
+
+      if (!result.ok) {
+        toast({ title: "이미지 생성 실패", description: result.error, variant: "destructive" });
+        return;
+      }
+
+      setGeneratedImageDataUri(result.data.imageDataUri);
       toast({ title: "이미지 생성 완료", description: "AI가 이미지를 성공적으로 그렸습니다." });
     } catch (e) {
       toast({ title: "이미지 생성 실패", description: "이미지 생성 중 오류가 발생했습니다.", variant: "destructive" });
