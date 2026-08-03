@@ -89,7 +89,14 @@ export function LiveConversationTool() {
                     transcript: fullTranscript,
                     evaluationModel: "googleai/gemini-3.1-pro-preview"
                 });
-                setResult(res);
+
+                if (!res.ok) {
+                    toast({ title: "분석 실패", description: res.error, variant: "destructive" });
+                    setAppState('error');
+                    return;
+                }
+
+                setResult(res.data);
                 setAppState('finished');
             } else {
                 toast({ title: "대화 내용이 너무 짧습니다.", description: "분석할 내용이 부족하여 바로 종료합니다." });

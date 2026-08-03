@@ -18,9 +18,25 @@ const AnalyzeLiveConversationOutputSchema = z.object({
 });
 export type AnalyzeLiveConversationOutput = z.infer<typeof AnalyzeLiveConversationOutputSchema>;
 
-export async function analyzeLiveConversation(input: AnalyzeLiveConversationInput): Promise<AnalyzeLiveConversationOutput> {
-    const result = await analyzeLiveConversationFlow(input);
-    return result;
+/**
+ * 서버 액션에서 예외를 던지면 Next.js가 프로덕션에서 메시지를 지우고 digest만 남깁니다.
+ * 그러면 화면에는 "An error occurred in the Server Components render..." 만 뜨고
+ * 원인을 알 수 없어 매번 서버 로그를 뒤져야 합니다.
+ * 그래서 실패를 예외가 아니라 값으로 돌려줍니다.
+ */
+export type AnalyzeLiveConversationResult =
+    | { ok: true; data: AnalyzeLiveConversationOutput }
+    | { ok: false; error: string };
+
+export async function analyzeLiveConversation(input: AnalyzeLiveConversationInput): Promise<AnalyzeLiveConversationResult> {
+    try {
+        const data = await analyzeLiveConversationFlow(input);
+        return { ok: true, data };
+    } catch (e) {
+        const detail = e instanceof Error ? e.message : String(e);
+        console.error('analyzeLiveConversation 실패:', detail);
+        return { ok: false, error: detail };
+    }
 }
 
 const liveConversationAnalysisPrompt = ai.definePrompt({
