@@ -13,6 +13,9 @@ import { analyzeLiveConversation, type AnalyzeLiveConversationOutput } from "@/a
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Progress } from "@/components/ui/progress";
+import { GOOGLE_EVALUATION_MODELS, DEFAULT_GOOGLE_EVALUATION_MODEL, shortModelName } from "@/lib/evaluation-models";
+import { type EvaluationModel } from "@/lib/types";
+import { RecordingPlayback } from "./recording-playback";
 
 type AppState = 'idle' | 'connecting' | 'connected' | 'analyzing' | 'finished' | 'error';
 type Turn = { role: 'user' | 'model'; text: string; id: number };
@@ -25,14 +28,18 @@ export function LiveConversationTool() {
     const [audioChunkCount, setAudioChunkCount] = useState<number>(0);
     const [selectedVoice, setSelectedVoice] = useState<string>("Aoede");
     const [recordingUrl, setRecordingUrl] = useState<string | null>(null);
+    // 평가엔진은 통화엔진과 별개입니다. flash 가 훨씬 저렴해 기본값으로 둡니다.
+    const [evaluationModel, setEvaluationModel] = useState<EvaluationModel>(DEFAULT_GOOGLE_EVALUATION_MODEL);
 
     // FIX: Using mutable refs to avoid stale closures in event listeners
     const appStateRef = useRef<AppState>('idle');
     const turnsRef = useRef<Turn[]>([]);
+    const evaluationModelRef = useRef<EvaluationModel>(DEFAULT_GOOGLE_EVALUATION_MODEL);
 
     // Sync React states with refs
     useEffect(() => { appStateRef.current = appState; }, [appState]);
     useEffect(() => { turnsRef.current = turns; }, [turns]);
+    useEffect(() => { evaluationModelRef.current = evaluationModel; }, [evaluationModel]);
 
     const wsRef = useRef<WebSocket | null>(null);
     const audioContextRef = useRef<AudioContext | null>(null);
@@ -87,7 +94,8 @@ export function LiveConversationTool() {
                 // Gemini app uses Gemini 3.1 Pro for high fidelity evaluation
                 const res = await analyzeLiveConversation({
                     transcript: fullTranscript,
-                    evaluationModel: "googleai/gemini-3.1-pro-preview"
+                    // 이 콜백은 연결 시점에 캡처되므로 ref 로 최신 선택값을 읽습니다.
+                    evaluationModel: evaluationModelRef.current
                 });
 
                 if (!res.ok) {
@@ -457,11 +465,21 @@ export function LiveConversationTool() {
                                     <SelectItem value="Fenrir">Fenrir (남성-묵직함)</SelectItem>
                                 </SelectContent>
                             </Select>
+                            <Select value={evaluationModel} onValueChange={(v) => setEvaluationModel(v as EvaluationModel)} disabled={appState !== 'idle' && appState !== 'finished'}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="평가 모델 선택" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {GOOGLE_EVALUATION_MODELS.map(m => (
+                                        <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                         </div>
                     </CardTitle>
                     <CardDescription className="flex items-center gap-4 text-sm mt-2 font-medium">
                         <span className="bg-blue-100 text-blue-800 px-2 flex items-center gap-1 rounded">🗣 통화엔진: gemini-3.1-flash-live</span>
-                        <span className="bg-emerald-100 flex items-center gap-1 text-emerald-800 px-2 rounded">📝 평가엔진: gemini-3.1-pro-preview</span>
+                        <span className="bg-emerald-100 flex items-center gap-1 text-emerald-800 px-2 rounded">📝 평가엔진: {shortModelName(evaluationModel)}</span>
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -500,6 +518,11 @@ export function LiveConversationTool() {
                             </div>
                         ))}
                     </ScrollArea>
+
+                    {/* 분석 성공 여부와 무관하게, 녹음이 있으면 바로 듣고 받을 수 있어야 합니다. */}
+                    {recordingUrl && (
+                        <RecordingPlayback url={recordingUrl} fileName="live-conversation-recording.webm" />
+                    )}
                 </CardContent>
             </Card>
 
@@ -546,13 +569,6 @@ export function LiveConversationTool() {
                     </Card>
 
                     <div className="flex justify-end gap-2 mt-2 border-t pt-4">
-                        {recordingUrl && (
-                            <Button size="sm" variant="outline" className="border-blue-200 bg-blue-50 hover:bg-blue-100" asChild>
-                                <a href={recordingUrl} download="live-conversation-recording.webm" className="flex items-center">
-                                    <Download className="h-4 w-4 mr-2" /> 음성 파일 다운로드
-                                </a>
-                            </Button>
-                        )}
                         <Button size="sm" variant="outline" className="border-emerald-200 bg-emerald-50 hover:bg-emerald-100" onClick={handleSavePDF}>
                             <FileText className="h-4 w-4 mr-2" /> 평가 리포트 PDF 저장
                         </Button>

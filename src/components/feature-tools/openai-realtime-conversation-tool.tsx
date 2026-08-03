@@ -11,6 +11,7 @@ import { getOpenAiLiveSessionToken } from "@/ai/flows/get-openai-live-session-to
 import { REALTIME_INSTRUCTIONS } from "@/lib/realtime-config";
 import { OPENAI_EVALUATION_MODELS, DEFAULT_OPENAI_EVALUATION_MODEL, shortModelName } from "@/lib/evaluation-models";
 import { type EvaluationModel } from "@/lib/types";
+import { RecordingPlayback } from "./recording-playback";
 import { analyzeLiveConversation, type AnalyzeLiveConversationOutput } from "@/ai/flows/analyze-live-conversation-flow";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -443,6 +444,11 @@ export function OpenAiRealtimeConversationTool() {
                             </div>
                         ))}
                     </ScrollArea>
+
+                    {/* 분석 성공 여부와 무관하게, 녹음이 있으면 바로 듣고 받을 수 있어야 합니다. */}
+                    {recordingUrl && (
+                        <RecordingPlayback url={recordingUrl} fileName="openai-live-conversation.webm" />
+                    )}
                 </CardContent>
             </Card>
 
@@ -489,13 +495,6 @@ export function OpenAiRealtimeConversationTool() {
                     </Card>
 
                     <div className="flex justify-end gap-2 mt-2 border-t pt-4">
-                        {recordingUrl && (
-                            <Button size="sm" variant="outline" className="border-blue-200 bg-blue-50 hover:bg-blue-100" asChild>
-                                <a href={recordingUrl} download="openai-live-conversation.webm" className="flex items-center">
-                                    <Download className="h-4 w-4 mr-2" /> 음성 파일 다운로드
-                                </a>
-                            </Button>
-                        )}
                         <Button size="sm" variant="outline" className="border-emerald-200 bg-emerald-50 hover:bg-emerald-100" onClick={handleSavePDF}>
                             <FileText className="h-4 w-4 mr-2" /> 종합 리포트 PDF 저장
                         </Button>
