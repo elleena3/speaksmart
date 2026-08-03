@@ -59,9 +59,10 @@ const mockStudent3: UserData = {
 
 export const mockStudents = [mockStudent1, mockStudent2, mockStudent3];
 
-// 시드 계정의 기본 비밀번호. seed-data.ts와 값이 일치해야 데모 로그인이 동작합니다.
-const SEED_CREDENTIALS: Record<'teacher' | 'student1' | 'student2' | 'student3', { name: string; password: string }> = {
-  teacher: { name: mockTeacher.displayName, password: '29182918' },
+// 데모 학생 계정의 기본 비밀번호. scripts/seed.ts 의 값과 일치해야 동작합니다.
+// 교사 계정은 여기 두지 않습니다. 클라이언트 번들에 들어가면 누구나 꺼내 볼 수 있어,
+// 교사 로그인은 입력받은 비밀번호를 Firebase Auth 가 직접 검증하도록 했습니다.
+const SEED_CREDENTIALS: Record<'student1' | 'student2' | 'student3', { name: string; password: string }> = {
   student1: { name: mockStudent1.displayName, password: '123456' },
   student2: { name: mockStudent2.displayName, password: '123456' },
   student3: { name: mockStudent3.displayName, password: '123456' },
@@ -72,8 +73,8 @@ interface AuthContextType {
   loading: boolean;
   /** 이름(아이디) + 비밀번호로 로그인. 성공 시 users 문서를 읽어 반환합니다. */
   login: (name: string, password: string) => Promise<UserData>;
-  /** 데모용 시드 계정 로그인. 실제 Firebase Auth 로그인을 수행합니다. */
-  loginAs: (role: 'teacher' | 'student1' | 'student2' | 'student3') => Promise<UserData>;
+  /** 데모용 학생 시드 계정 로그인. 실제 Firebase Auth 로그인을 수행합니다. */
+  loginAs: (role: 'student1' | 'student2' | 'student3') => Promise<UserData>;
   /** 프로필 수정 후 users 문서를 다시 읽어 컨텍스트를 갱신합니다. */
   refreshUser: () => Promise<void>;
   logout: () => Promise<void>;
@@ -135,7 +136,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const loginAs = useCallback(
-    (role: 'teacher' | 'student1' | 'student2' | 'student3') => {
+    (role: 'student1' | 'student2' | 'student3') => {
       const { name, password } = SEED_CREDENTIALS[role];
       return login(name, password);
     },

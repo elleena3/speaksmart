@@ -8,7 +8,7 @@ import { Logo } from "@/components/icons";
 import { useLanguage } from "@/context/language-context";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/context/auth-context";
+import { useAuth, SEED_TEACHER_NAME } from "@/context/auth-context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
@@ -18,7 +18,7 @@ import { Label } from "@/components/ui/label";
 
 export default function Home() {
   const { language, setLanguage, t } = useLanguage();
-  const { loginAs, loading } = useAuth();
+  const { loginAs, login, loading } = useAuth();
   const router = useRouter();
   const [loadingRole, setLoadingRole] = useState<string | null>(null);
   const [teacherPassword, setTeacherPassword] = useState('');
@@ -27,32 +27,29 @@ export default function Home() {
   const handleMockLogin = async (role: string) => {
     setLoadingRole(role);
     try {
-      // 시드 계정으로 실제 Firebase Auth 로그인을 수행합니다.
-      // 계정이 없으면 교사 설정 화면에서 초기 데이터 생성을 먼저 실행해야 합니다.
+      // 시드 학생 계정으로 실제 Firebase Auth 로그인을 수행합니다.
       await loginAs(role as any);
-      if (role === 'teacher') {
-        router.push(`/teacher/dashboard`);
-      } else {
-        router.push(`/student/dashboard`);
-      }
+      router.push(`/student/dashboard`);
     } catch (error) {
       console.error('시드 계정 로그인 실패:', error);
-      setPasswordError('시드 계정이 아직 생성되지 않았습니다. 초기 데이터 생성을 먼저 실행하세요.');
+      setPasswordError('시드 계정이 아직 생성되지 않았습니다. npm run seed 를 먼저 실행하세요.');
       setLoadingRole(null);
     }
   };
 
-  const handleTeacherLoginAttempt = (e: React.MouseEvent) => {
+  const handleTeacherLoginAttempt = async (e: React.MouseEvent) => {
     e.preventDefault();
-    // 여기서의 비밀번호 확인은 대화상자를 닫기 위한 것일 뿐이고,
-    // 실제 인증은 handleMockLogin의 Firebase Auth 로그인이 담당합니다.
-    // Firebase Auth 최소 길이 제약으로 기존 4자리 '2918' 에서 바뀌었습니다.
-    if (teacherPassword === '29182918') {
-      setPasswordError('');
+    // 비밀번호를 코드에 두고 문자열로 비교하면 클라이언트 번들에서 그대로 읽힙니다.
+    // 입력값을 그대로 Firebase Auth 에 넘겨 서버가 검증하도록 합니다.
+    setPasswordError('');
+    setLoadingRole('teacher');
+    try {
+      const userData = await login(SEED_TEACHER_NAME, teacherPassword);
       document.getElementById('teacher-login-dialog-close')?.click();
-      void handleMockLogin('teacher');
-    } else {
+      router.push(userData.role === 'teacher' ? '/teacher/dashboard' : '/student/dashboard');
+    } catch (error) {
       setPasswordError('비밀번호가 올바르지 않습니다.');
+      setLoadingRole(null);
     }
   };
 
@@ -119,7 +116,7 @@ export default function Home() {
                  <DialogHeader>
                     <DialogTitle>교사 로그인</DialogTitle>
                     <DialogDescription>
-                        교사 목업 계정에 접근하려면 비밀번호를 입력하세요. (비밀번호: 29182918)
+                        교사 계정 비밀번호를 입력하세요.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
