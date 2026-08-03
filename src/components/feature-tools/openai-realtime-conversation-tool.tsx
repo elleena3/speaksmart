@@ -12,6 +12,7 @@ import { REALTIME_INSTRUCTIONS } from "@/lib/realtime-config";
 import { OPENAI_EVALUATION_MODELS, DEFAULT_OPENAI_EVALUATION_MODEL, shortModelName } from "@/lib/evaluation-models";
 import { type EvaluationModel } from "@/lib/types";
 import { RecordingPlayback } from "./recording-playback";
+import { printConversationReport } from "@/lib/conversation-report";
 import { analyzeLiveConversation, type AnalyzeLiveConversationOutput } from "@/ai/flows/analyze-live-conversation-flow";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -324,36 +325,23 @@ export function OpenAiRealtimeConversationTool() {
 
     const handleSavePDF = () => {
         if (!result) return;
-        const printWindow = window.open('', '_blank');
-        if (printWindow) {
-            printWindow.document.write(`
-                <html>
-                    <head>
-                        <title>원어민 대화 리포트 (OpenAI)</title>
-                        <style>
-                            body { font-family: 'Malgun Gothic', sans-serif; line-height: 1.6; padding: 20px; color: #333; }
-                            h1, h2, h3 { color: #111; }
-                        </style>
-                    </head>
-                    <body>
-                        <h1>대화 피드백 리포트 (Powered by ${shortModelName(evaluationModel)})</h1>
-                        <p><strong>총점:</strong> ${result.overallScore} / 100</p>
-                        <h3>문법 및 어휘 (Grammar)</h3>
-                        <p>${result.grammarFeedback}</p>
-                        <h3>유창성 (Fluency)</h3>
-                        <p>${result.fluencyFeedback}</p>
-                        <h3>총평 (Overall)</h3>
-                        <div class="markdown-body">
-                            ${result.overallFeedback}
-                        </div>
-                        <br/>
-                         <h3>전체 대화 스크립트</h3>
-                        <pre>${turns.map(t => `${t.role === 'user' ? 'Student' : 'AI'}: ${t.text}`).join('\n')}</pre>
-                        <script>window.print(); window.close();</script>
-                    </body>
-                </html>
-            `);
-            printWindow.document.close();
+
+        const opened = printConversationReport({
+            title: '대화 피드백 리포트 (OpenAI)',
+            subtitle: `평가 모델: ${shortModelName(evaluationModel)}`,
+            overallScore: result.overallScore,
+            grammarFeedback: result.grammarFeedback,
+            fluencyFeedback: result.fluencyFeedback,
+            overallFeedback: result.overallFeedback,
+            transcript: turns.map(t => `${t.role === 'user' ? 'Student' : 'AI'}: ${t.text}`).join('\n'),
+        });
+
+        if (!opened) {
+            toast({
+                title: "팝업이 차단되었습니다",
+                description: "브라우저에서 이 사이트의 팝업을 허용한 뒤 다시 시도해주세요.",
+                variant: "destructive",
+            });
         }
     };
 
