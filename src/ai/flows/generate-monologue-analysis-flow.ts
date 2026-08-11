@@ -16,6 +16,9 @@ import {
 } from '@/lib/types/ai-schemas';
 import { evaluationModels, type RubricScores, type StudentResult } from '@/lib/types';
 import { resultRef, uploadDataUrl } from "@/lib/server-store";
+import { gradeWithRubric, describeRubricResult } from "./grade-with-rubric";
+import { renderRubricSummary, pickPronunciationScore } from "@/lib/rubric-summary";
+import { RubricCriterionSchema } from "@/lib/types/ai-schemas";
 import { describeAiError } from "@/lib/ai-error-message";
 
 // Helper function for retrying API calls on overload
@@ -117,6 +120,9 @@ const MonologueProcessingInputSchema = z.object({
   assessmentTitle: z.string(),
   evaluationModel: z.string().optional(),
   useRubric: z.boolean().optional(),
+  // 교사가 만든 루브릭 항목. 없으면 루브릭 채점을 하지 않습니다.
+  rubricCriteria: z.array(RubricCriterionSchema).optional(),
+  rubricName: z.string().optional(),
   resultId: z.string(),
   teacherUid: z.string(),
 });
@@ -155,32 +161,31 @@ export const generateMonologueAnalysisFlow = ai.defineFlow(
       
       let finalResult: any;
 
-      if (input.useRubric) {
-          const rubricResult = await withRetry(() => monologueRubricAnalysisPrompt({ studentTranscript }, { model }));
-          let rubricText = rubricResult.text;
-          if (rubricText.startsWith("```html")) rubricText = rubricText.substring(7, rubricText.length - 3).trim();
-          
-          const rubricScores: RubricScores = {
-            fluency: parseScore(rubricText, '유창성'),
-            pronunciation: parseScore(rubricText, '발음 및 억양'),
-            grammar: parseScore(rubricText, '문법'),
-            vocabulary: parseScore(rubricText, '어휘'),
-            interaction: 1, 
-          };
-          
-          const contentScore = Math.round(((rubricScores.fluency + rubricScores.grammar + rubricScores.vocabulary) / 3) * 20);
-          const pronunciationScore = rubricScores.pronunciation * 20;
-          const guidanceResult = await withRetry(() => monologueTeacherGuidanceFromRubricPrompt({ studentFeedbackHtml: rubricText }, { model }));
+      // 루브릭 항목이 전달된 경우에만 루브릭 채점을 합니다.
+      // useRubric 만 켜져 있고 항목이 없으면 아래 일반 채점으로 넘어갑니다.
+      if (input.useRubric && input.rubricCriteria?.length) {
+          const graded = await withRetry(() => gradeWithRubric({
+              transcript: studentTranscript,
+              activityPrompt: input.activityPrompt,
+              rubricName: input.rubricName,
+              criteria: input.rubricCriteria!,
+          }));
+
+          const guidanceResult = await withRetry(() => monologueTeacherGuidanceFromRubricPrompt({
+              studentFeedbackHtml: renderRubricSummary(graded),
+          }, { model }));
 
           finalResult = {
               studentTranscript,
-              contentScore,
-              pronunciationScore,
-              aiFeedback: rubricText,
+              contentScore: graded.percentageScore,
+              // 루브릭에 발음 항목이 있으면 그 항목을 발음 점수로 씁니다. 없으면 총점으로 대체합니다.
+              pronunciationScore: pickPronunciationScore(graded) ?? graded.percentageScore,
+              aiFeedback: renderRubricSummary(graded),
               teacherGuidance: guidanceResult.text,
-              curricularRemarks: `'${input.assessmentTitle}' 루브릭 평가 종합 ${contentScore}점, 발음 ${pronunciationScore}점 성취함.`,
-              pronunciationFeedback: `상세 분석 리포트 참고.`,
-              rubricScores,
+              curricularRemarks: await describeRubricResult(input.assessmentTitle, graded),
+              pronunciationFeedback: graded.evaluation.summary,
+              rubricEvaluation: graded.evaluation,
+              rubricName: input.rubricName ?? null,
           };
       } else {
           const [contentRes, pronRes] = await Promise.all([

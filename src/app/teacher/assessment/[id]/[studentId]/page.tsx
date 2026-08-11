@@ -3,6 +3,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { RubricResultCard } from "@/components/rubric-result-card";
 import { useParams, useRouter, notFound } from "next/navigation";
 import { type TeacherAssessment, type StudentResult, type ResultSummary, type RubricScores, type UserData } from "@/lib/types";
 import { useAuth, mockStudents } from "@/context/auth-context";
@@ -35,9 +36,14 @@ function AttemptDetailView({ result, assessment, attemptNumber }: { result: Stud
     teacherGuidance,
     curricularRemarks,
     rubricScores,
+    rubricEvaluation,
+    rubricName,
   } = result;
 
-  const isRubricUsed = !!rubricScores;
+  // 새 채점은 rubricEvaluation, 예전 채점은 rubricScores 를 갖고 있습니다.
+  const isRubricUsed = !!rubricEvaluation || !!rubricScores;
+  // 레이더 차트는 5점 만점 고정이라 예전 결과에만 씁니다.
+  const showLegacyRadar = !rubricEvaluation && !!rubricScores;
   const isHtmlFeedback = aiFeedback?.trim().startsWith('<!DOCTYPE html>');
   
   const radarChartData = useMemo(() => {
@@ -101,6 +107,14 @@ function AttemptDetailView({ result, assessment, attemptNumber }: { result: Stud
       )}
       
         {isRubricUsed && (
+            <RubricResultCard
+                evaluation={rubricEvaluation}
+                legacyScores={rubricScores}
+                rubricName={rubricName}
+            />
+        )}
+
+        {showLegacyRadar && (
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2"><DraftingCompass />루브릭 영역별 분석</CardTitle>

@@ -14,6 +14,8 @@ import {
 } from '@/lib/types/ai-schemas';
 import { type RubricScores, type StudentResult } from '@/lib/types';
 import { resultRef } from '@/lib/server-store';
+import { gradeWithRubric, describeRubricResult } from './grade-with-rubric';
+import { renderRubricSummary, pickPronunciationScore } from '@/lib/rubric-summary';
 import { describeAiError } from '@/lib/ai-error-message';
 
 async function withRetry<T>(fn: () => Promise<T>, retries = 2, delay = 1500): Promise<T> {
@@ -98,32 +100,29 @@ export async function generateDialogueAnalysis(input: any): Promise<void> {
   try {
       let finalResult: any;
 
-      if (input.useRubric) {
-          const rubricResult = await withRetry(() => dialogueRubricAnalysisPrompt({ fullConversationTranscript: input.fullConversationTranscript }, { model }));
-          let rubricText = rubricResult.text;
-          if (rubricText.startsWith("```html")) rubricText = rubricText.substring(7, rubricText.length - 3).trim();
-          
-          const rubricScores: RubricScores = {
-              fluency: parseScore(rubricText, '유창성'),
-              pronunciation: parseScore(rubricText, '발음 및 억양'),
-              grammar: parseScore(rubricText, '문법'),
-              vocabulary: parseScore(rubricText, '어휘'),
-              interaction: parseScore(rubricText, '내용 이해 및 상호작용'),
-          };
+      // 루브릭 항목이 전달된 경우에만 루브릭 채점을 합니다.
+      if (input.useRubric && input.rubricCriteria?.length) {
+          const graded = await withRetry(() => gradeWithRubric({
+              transcript: input.fullConversationTranscript,
+              activityPrompt: input.activityPrompt,
+              rubricName: input.rubricName,
+              criteria: input.rubricCriteria,
+          }));
 
-          const contentScore = Math.round(((rubricScores.fluency + rubricScores.grammar + rubricScores.vocabulary + (rubricScores.interaction || 0)) / 4) * 20);
-          const pronunciationScore = rubricScores.pronunciation * 20;
-          const guidanceRes = await withRetry(() => dialogueTeacherGuidanceFromRubricPrompt({ studentFeedbackHtml: rubricText }, { model }));
+          const guidanceRes = await withRetry(() => dialogueTeacherGuidanceFromRubricPrompt({
+              studentFeedbackHtml: renderRubricSummary(graded),
+          }, { model }));
 
           finalResult = {
               studentTranscript: input.fullConversationTranscript,
-              contentScore,
-              pronunciationScore,
-              aiFeedback: rubricText,
+              contentScore: graded.percentageScore,
+              pronunciationScore: pickPronunciationScore(graded) ?? graded.percentageScore,
+              aiFeedback: renderRubricSummary(graded),
               teacherGuidance: guidanceRes.text,
-              curricularRemarks: `대화 평가 결과 종합 ${contentScore}점 성취함.`,
-              pronunciationFeedback: `리포트 참고.`,
-              rubricScores,
+              curricularRemarks: await describeRubricResult(input.assessmentTitle ?? '대화 평가', graded),
+              pronunciationFeedback: graded.evaluation.summary,
+              rubricEvaluation: graded.evaluation,
+              rubricName: input.rubricName ?? null,
           };
       } else {
           const [contentRes, pronRes] = await Promise.all([

@@ -101,6 +101,7 @@ export default function EditAssessmentPage() {
     aiVoice: z.enum(allVoices).optional().default('algenib'),
     evaluationModel: z.enum(evaluationModels).optional().default('googleai/gemini-3.1-pro-preview'),
     useRubric: z.boolean().default(false),
+    loadedRubricId: z.string().optional(),
   }).superRefine((data, ctx) => {
     const isFreeTalkDialogue = data.assessmentType === 'dialogue' && data.scenario === 'free-talk';
 
@@ -144,6 +145,7 @@ export default function EditAssessmentPage() {
       aiVoice: 'algenib',
       evaluationModel: 'googleai/gemini-3.1-pro-preview',
       useRubric: false,
+      loadedRubricId: undefined,
     },
   });
 
@@ -152,6 +154,8 @@ export default function EditAssessmentPage() {
   const scenario = form.watch("scenario");
   const isFreeTalkDialogue = assessmentType === 'dialogue' && scenario === 'free-talk';
   const useRubric = form.watch("useRubric");
+  // 수정 화면에서도 루브릭을 바꿀 수 있어야 합니다. 예전에는 생성 시에만 고를 수 있었습니다.
+  const [savedRubrics, setSavedRubrics] = useState<{ id: string; name: string; criteria?: unknown[] }[]>([]);
 
   const fetchAssessmentAndStudents = useCallback(async () => {
     if (!user || !assessmentId) return;
@@ -177,11 +181,20 @@ export default function EditAssessmentPage() {
               aiVoice: data.aiVoice || 'algenib',
               evaluationModel: data.evaluationModel || 'googleai/gemini-3.1-pro-preview',
               useRubric: data.useRubric || false,
+              loadedRubricId: data.loadedRubricId,
             });
         } else {
             toast({ title: "오류", description: "평가를 찾을 수 없거나 수정할 권한이 없습니다.", variant: "destructive" });
             router.push("/teacher/assessments");
             return;
+        }
+
+        // 교사가 만든 루브릭 목록
+        try {
+          const rubricSnap = await getDocs(query(collection(db, "rubrics"), where("uid", "==", user.uid)));
+          setSavedRubrics(rubricSnap.docs.map(d => ({ id: d.id, ...(d.data() as { name: string }) })));
+        } catch (e) {
+          console.error("루브릭 목록을 불러오지 못했습니다.", e);
         }
 
         // Fetch students
@@ -740,6 +753,35 @@ export default function EditAssessmentPage() {
                 </FormItem>
               )}
             />
+
+            {useRubric && (
+              <FormField
+                control={form.control}
+                name="loadedRubricId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>적용할 루브릭</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value ?? undefined}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="저장된 루브릭을 선택하세요" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {savedRubrics.map(r => (
+                          <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>
+                      선택한 루브릭의 항목과 배점이 채점에 그대로 사용됩니다.
+                      고르지 않으면 루브릭 없이 일반 방식으로 채점됩니다.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             {assessmentType === 'monologue' && (
               <FormField

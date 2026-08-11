@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
+import { RubricResultCard } from "@/components/rubric-result-card"
 import { Send, ThumbsUp, ThumbsDown, MessageSquareQuote, Loader2, FileText, Target, Repeat, DraftingCompass } from "lucide-react"
 import { type StudentResult, type TeacherAssessment, type RubricScores } from "@/lib/types"
 import { Progress } from "@/components/ui/progress"
@@ -37,10 +38,15 @@ export function FeedbackView({ result, assessment, isLatestAttempt }: FeedbackVi
     pronunciationScore,
     contentScore,
     studentRawFeedback,
-    rubricScores
+    rubricScores,
+    rubricEvaluation,
+    rubricName,
   } = localResult;
-  
-  const isRubricUsed = !!rubricScores;
+
+  // 새 채점은 rubricEvaluation, 예전 채점은 rubricScores 를 갖고 있습니다.
+  const isRubricUsed = !!rubricEvaluation || !!rubricScores;
+  // 레이더 차트는 5점 만점 고정이라 예전 결과에만 씁니다.
+  const showLegacyRadar = !rubricEvaluation && !!rubricScores;
   const isHtmlFeedback = aiFeedback?.trim().startsWith('<!DOCTYPE html>');
   const rubricSubjects = ['유창성', '발음', '문법', '어휘'];
 
@@ -160,6 +166,14 @@ export function FeedbackView({ result, assessment, isLatestAttempt }: FeedbackVi
         )}
 
         {isRubricUsed && (
+            <RubricResultCard
+                evaluation={rubricEvaluation}
+                legacyScores={rubricScores}
+                rubricName={rubricName}
+            />
+        )}
+
+        {showLegacyRadar && (
             <Card>
                 <CardHeader>
                     <div className="flex justify-between items-center">

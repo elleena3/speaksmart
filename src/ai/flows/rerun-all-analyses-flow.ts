@@ -13,6 +13,7 @@ import { z } from 'zod';
 import { resultRef, assessmentRef, resultsByAssessment, downloadBytes } from '@/lib/server-store';
 import { generateMonologueAnalysisFlow } from './generate-monologue-analysis-flow';
 import { generateDialogueAnalysis } from './generate-dialogue-analysis-flow';
+import { loadRubricById } from './load-rubric-flow';
 import { type TeacherAssessment, type StudentResult } from '@/lib/types';
 import { RetryAnalysisInputSchema } from '@/lib/types/ai-schemas';
 
@@ -40,6 +41,11 @@ const rerunAllAnalysesFlow = ai.defineFlow(
             throw new Error(`Assessment document with ID ${assessmentId} not found.`);
         }
         const assessmentData = { id: assessmentSnap.id, ...assessmentSnap.data()} as TeacherAssessment;
+
+        // 루브릭은 제출물마다 다시 읽을 필요가 없어 한 번만 불러옵니다.
+        const rubric = assessmentData.useRubric && assessmentData.loadedRubricId
+            ? await loadRubricById(assessmentData.loadedRubricId)
+            : null;
 
         const resultsSnapshot = await resultsByAssessment(assessmentId);
 
@@ -72,6 +78,8 @@ const rerunAllAnalysesFlow = ai.defineFlow(
                         assessmentTitle: assessmentData.title,
                         evaluationModel: assessmentData.evaluationModel,
                         useRubric: assessmentData.useRubric || false,
+                        rubricCriteria: rubric?.criteria,
+                        rubricName: rubric?.name,
                     });
                 } else { // Handle Monologue
                     const audioBuffer = await downloadBytes(resultData.studentRecordingUrl!);
@@ -87,6 +95,8 @@ const rerunAllAnalysesFlow = ai.defineFlow(
                         assessmentTitle: assessmentData.title,
                         evaluationModel: assessmentData.evaluationModel,
                         useRubric: assessmentData.useRubric || false,
+                        rubricCriteria: rubric?.criteria,
+                        rubricName: rubric?.name,
                         teacherUid: resultData.teacherUid,
                     });
                 }

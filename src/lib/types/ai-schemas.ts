@@ -178,11 +178,39 @@ const CriterionDetailSchema = z.object({
   description: z.string().describe("The detailed description for this performance level."),
 });
 
-const RubricCriterionSchema = z.object({
+export const RubricCriterionSchema = z.object({
   name: z.string().describe("The name of the evaluation criterion (e.g., '유창성 (Fluency)')."),
   maxScore: z.number().int().describe("The maximum possible score for this criterion."),
   details: z.array(CriterionDetailSchema).describe("An array of detailed descriptions for each score level."),
 });
+export type RubricCriterion = z.infer<typeof RubricCriterionSchema>;
+
+// ##############################################################
+// ##            SCHEMA FOR GRADING AGAINST A RUBRIC           ##
+// ##############################################################
+
+/**
+ * 항목 하나에 대한 채점 결과.
+ *
+ * 예전에는 HTML 리포트를 만든 뒤 정규식으로 점수를 긁어냈는데,
+ * 프롬프트가 영어로 지시하는 바람에 한글 항목명을 찾지 못해 항상 0점이 나왔습니다.
+ * 모델이 구조화된 값으로 직접 돌려주도록 바꿔 그 문제를 없앱니다.
+ */
+export const RubricCriterionScoreSchema = z.object({
+  name: z.string().describe("The exact criterion name as given in the rubric. Copy it verbatim."),
+  score: z.number().describe("The score awarded for this criterion."),
+  maxScore: z.number().describe("The maximum score for this criterion, copied from the rubric."),
+  feedback: z.string().describe("Short feedback in Korean explaining why this score was given."),
+});
+export type RubricCriterionScore = z.infer<typeof RubricCriterionScoreSchema>;
+
+export const RubricEvaluationSchema = z.object({
+  criteria: z.array(RubricCriterionScoreSchema).describe("One entry per criterion in the rubric, in the same order."),
+  totalScore: z.number().describe("Sum of the awarded scores."),
+  totalMaxScore: z.number().describe("Sum of the maximum scores."),
+  summary: z.string().describe("Overall comment in Korean about the performance against this rubric."),
+});
+export type RubricEvaluation = z.infer<typeof RubricEvaluationSchema>;
 
 export const AnalyzeRubricFileOutputSchema = z.object({
   criteria: z.array(RubricCriterionSchema).describe("An array of all extracted evaluation criteria from the file."),

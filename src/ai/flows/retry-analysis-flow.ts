@@ -12,6 +12,7 @@ import { z } from 'zod';
 import { resultRef, assessmentRef, downloadBytes } from '@/lib/server-store';
 import { generateMonologueAnalysisFlow } from './generate-monologue-analysis-flow';
 import { generateDialogueAnalysis } from './generate-dialogue-analysis-flow';
+import { loadRubricById } from './load-rubric-flow';
 import { type TeacherAssessment, type StudentResult } from '@/lib/types';
 import { RetryAnalysisInputSchema, type RetryAnalysisInput } from '@/lib/types/ai-schemas';
 
@@ -51,6 +52,11 @@ const retryAnalysisFlow = ai.defineFlow(
         }
         const assessmentData = assessmentSnap.data() as TeacherAssessment;
 
+        // 재채점도 최초 채점과 같은 루브릭을 써야 점수가 일관됩니다.
+        const rubric = assessmentData.useRubric && assessmentData.loadedRubricId
+            ? await loadRubricById(assessmentData.loadedRubricId)
+            : null;
+
         // Reset status to show it's processing again
         await resultDocRef.update({ status: "분석 중" });
         
@@ -74,6 +80,8 @@ const retryAnalysisFlow = ai.defineFlow(
                 assessmentTitle: assessmentData.title,
                 evaluationModel: assessmentData.evaluationModel,
                 useRubric: assessmentData.useRubric || false,
+                rubricCriteria: rubric?.criteria,
+                rubricName: rubric?.name,
              });
 
         } else { // Handle Monologue
@@ -94,6 +102,8 @@ const retryAnalysisFlow = ai.defineFlow(
                 assessmentTitle: assessmentData.title,
                 evaluationModel: assessmentData.evaluationModel,
                 useRubric: assessmentData.useRubric || false,
+                rubricCriteria: rubric?.criteria,
+                rubricName: rubric?.name,
                 teacherUid: resultData.teacherUid,
             });
         }

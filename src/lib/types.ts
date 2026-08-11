@@ -1,4 +1,4 @@
-import { type ConversationTurn, type ResultSummarySchema } from "@/lib/types/ai-schemas";
+import { type ConversationTurn, type ResultSummarySchema, type RubricCriterion, type RubricCriterionScore, type RubricEvaluation } from "@/lib/types/ai-schemas";
 import { z } from 'zod';
 
 export const scenarios = ["free-talk", "ordering-food", "airport-check-in", "shopping"] as const;
@@ -146,6 +146,11 @@ export type ResultStatus =
   | "분석 중: report";
 
 
+/**
+ * @deprecated 항목이 5개로 고정되어 교사가 만든 루브릭을 담지 못합니다.
+ * 새 채점은 rubricEvaluation 을 사용합니다. 이 타입은 예전에 채점된
+ * 결과를 화면에 계속 표시하기 위해서만 남겨 둡니다.
+ */
 export type RubricScores = {
   fluency: number;
   pronunciation: number;
@@ -153,6 +158,8 @@ export type RubricScores = {
   vocabulary: number;
   interaction?: number; // Optional for monologue
 };
+
+export type { RubricCriterion, RubricCriterionScore, RubricEvaluation };
 
 export type StudentResult = {
   id: string; // Firestore document ID
@@ -176,7 +183,11 @@ export type StudentResult = {
   createdAt: number;
   contentScore: number;
   curricularRemarks: string;
+  /** @deprecated 예전 고정 5항목 채점 결과. 새 채점은 rubricEvaluation 을 씁니다. */
   rubricScores?: RubricScores;
+  /** 교사가 만든 루브릭으로 채점한 결과. 항목 수와 배점이 루브릭을 그대로 따릅니다. */
+  rubricEvaluation?: RubricEvaluation;
+  rubricName?: string;
   historicalScores?: HistoricalScore[];
   growthFeedback?: string;
   growthTeacherGuidance?: string;

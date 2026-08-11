@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { db } from "@/lib/firebase";
 import { collection, query, where, onSnapshot, doc, updateDoc, getDocs, addDoc, runTransaction } from "firebase/firestore";
 import { generateMonologueAnalysisFlow } from "@/ai/flows/generate-monologue-analysis-flow";
+import { loadRubricById } from '@/ai/flows/load-rubric-flow';
 import { useToast } from '@/hooks/use-toast';
 
 const SESSION_STORAGE_KEY = 'monologueSessionData';
@@ -202,6 +203,12 @@ export default function ProcessingPage() {
                 }
             });
 
+            // 교사가 이 평가에 붙여 둔 루브릭을 불러옵니다.
+            // 이걸 넘기지 않으면 채점이 고정 항목으로 진행되어 루브릭이 무의미해집니다.
+            const rubric = assessmentDetails.useRubric && assessmentDetails.loadedRubricId
+                ? await loadRubricById(assessmentDetails.loadedRubricId)
+                : null;
+
             // 주 분석 흐름 호출
             await generateMonologueAnalysisFlow({
                 resultId: newResultDocRef.id,
@@ -212,6 +219,8 @@ export default function ProcessingPage() {
                 assessmentTitle: assessmentDetails.title,
                 evaluationModel: assessmentDetails.evaluationModel,
                 useRubric: assessmentDetails.useRubric || false,
+                rubricCriteria: rubric?.criteria,
+                rubricName: rubric?.name,
                 teacherUid: assessmentDetails.uid,
             });
 

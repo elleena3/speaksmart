@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { db, storage } from "@/lib/firebase";
 import { collection, query, where, onSnapshot, doc, updateDoc, getDocs, addDoc, runTransaction } from "firebase/firestore";
 import { generateDialogueAnalysis } from "@/ai/flows/generate-dialogue-analysis-flow";
+import { loadRubricById } from '@/ai/flows/load-rubric-flow';
 import { ref, uploadString, getDownloadURL } from "firebase/storage";
 import { useToast } from '@/hooks/use-toast';
 
@@ -219,6 +220,11 @@ export default function DialogueProcessingPage() {
                 .join(' ');
             
             // Step 3: Call the main analysis flow
+            // 교사가 이 평가에 붙여 둔 루브릭을 불러옵니다.
+            const rubric = assessment.useRubric && assessment.loadedRubricId
+                ? await loadRubricById(assessment.loadedRubricId)
+                : null;
+
             await generateDialogueAnalysis({
                 resultId: newResultDocRef.id,
                 teacherUid: assessment.uid,
@@ -231,6 +237,8 @@ export default function DialogueProcessingPage() {
                 assessmentTitle: assessment.title,
                 evaluationModel: assessment.evaluationModel,
                 useRubric: assessment.useRubric || false,
+                rubricCriteria: rubric?.criteria,
+                rubricName: rubric?.name,
             });
 
             console.log("[Dialogue Processing] AI flow invocation completed.");
