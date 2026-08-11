@@ -43,6 +43,19 @@ export const VIDEO_EVALUATION_MODELS: EvaluationOption[] = [
   { value: 'googleai/gemini-3.1-pro-preview', label: 'gemini-3.1-pro-preview (고성능/정밀)' },
 ];
 
+/**
+ * 음성을 직접 듣고 처리할 수 있는 모델. 받아쓰기·발음 분석 도구가 비교용으로 씁니다.
+ *
+ * 확인 결과 Gemini 만 오디오 파트를 받습니다.
+ * OpenAI 는 파일 파트에 application/pdf 만 허용하고, Claude 는 이미지로 취급해 거부합니다.
+ * 비교가 의미 있으려면 서로 다른 등급이어야 합니다.
+ */
+export const AUDIO_COMPARISON_MODELS = [
+  'googleai/gemini-3.6-flash',
+  'googleai/gemini-3.1-pro-preview',
+  'googleai/gemini-3.1-flash-lite',
+] as const;
+
 /** 'openai/gpt-5.6-terra' → 'gpt-5.6-terra' (배지 표시용) */
 export function shortModelName(model: string): string {
   return model.includes('/') ? model.split('/')[1] : model;

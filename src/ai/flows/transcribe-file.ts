@@ -6,6 +6,7 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
+import { AUDIO_COMPARISON_MODELS } from '@/lib/evaluation-models';
 
 const TranscribeFileInputSchema = z.object({
   audioDataUri: z.string()
@@ -17,11 +18,8 @@ const TranscriptionResultSchema = z.object({
 });
 
 export async function transcribeFile(audioDataUri: string): Promise<any[]> {
-  const modelsToCompare = [
-    'googleai/gemini-3.6-flash',
-    'googleai/gemini-3.6-flash',
-    'googleai/gemini-3.1-pro-preview'
-  ];
+  // 예전에는 gemini-3.6-flash 가 두 번 들어가 있어 같은 모델 결과가 두 줄 나왔습니다.
+  const modelsToCompare = AUDIO_COMPARISON_MODELS;
 
   const results = await Promise.all(modelsToCompare.map(async (model) => {
     try {
