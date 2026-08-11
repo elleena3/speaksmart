@@ -29,6 +29,7 @@ import { db, storage } from "@/lib/firebase";
 import { ref, uploadString, getDownloadURL } from "firebase/storage";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { generateImage } from "@/ai/flows/generate-image-flow";
+import { RubricPreviewDialog } from "@/components/rubric-preview-dialog";
 import Image from 'next/image';
 import { Label } from "@/components/ui/label";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
@@ -306,10 +307,11 @@ export default function NewAssessmentPage() {
 
   const handleApplyRubric = (rubric: any) => {
     const { id, name, criteria } = rubric;
+    // 역슬래시를 두 번 쓰면 줄바꿈이 아니라 '\n' 이라는 글자가 그대로 들어갑니다.
     const criteriaText = criteria.map((c: any) => {
-      const detailsText = c.details.map((d: any) => `- ${d.score}점: ${d.description}`).join('\\n');
-      return `### ${c.name} (만점: ${c.maxScore}점)\\n${detailsText}`;
-    }).join('\\n\\n');
+      const detailsText = c.details.map((d: any) => `- ${d.score}점: ${d.description}`).join('\n');
+      return `### ${c.name} (만점: ${c.maxScore}점)\n${detailsText}`;
+    }).join('\n\n');
 
     form.setValue('expectedFormat', criteriaText);
     form.setValue('useRubric', true);
@@ -937,23 +939,7 @@ export default function NewAssessmentPage() {
                                   {rubric.criteria.length}개 항목 | 생성일: {format(new Date(rubric.createdAt), 'yyyy-MM-dd')}
                                 </p>
                               </div>
-                              <Dialog>
-                                <DialogTrigger asChild>
-                                  <Button variant="ghost" size="sm" onClick={(e) => e.stopPropagation()}>
-                                    <Eye className="mr-2 h-4 w-4" /> 자세히 보기
-                                  </Button>
-                                </DialogTrigger>
-                                <DialogContent className="max-w-4xl h-[600px] flex flex-col">
-                                  <DialogHeader>
-                                    <DialogTitle>{rubric.name}</DialogTitle>
-                                  </DialogHeader>
-                                  <iframe
-                                    srcDoc={`<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{font-family:sans-serif;margin:2em}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:8px;text-align:left}th{background-color:#f2f2f2}</style></head><body><h2>${rubric.name}</h2>${rubric.criteria.map((c: any) => `<h3>${c.name} (만점: ${c.maxScore}점)</h3><table><tr><th>점수</th><th>설명</th></tr>${c.details.map((d: any) => `<tr><td>${d.score}</td><td>${d.description}</td></tr>`).join('')}</table>`).join('')}</body></html>`}
-                                    className="w-full flex-grow border-0"
-                                    title={`${rubric.name} - 루브릭 미리보기`}
-                                  />
-                                </DialogContent>
-                              </Dialog>
+                              <RubricPreviewDialog name={rubric.name} criteria={rubric.criteria} />
                             </div>
                           </Card>
                         </DialogClose>
@@ -978,22 +964,25 @@ export default function NewAssessmentPage() {
                       </FormDescription>
                     </div>
                     <div className="flex items-center space-x-4">
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button type="button" variant="ghost" size="sm"><Info className="mr-2 h-4 w-4" /> 자세히 보기</Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-4xl h-[600px] flex flex-col">
-                          <DialogHeader>
-                            <DialogTitle>{loadedRubricName || "표준 루브릭"}</DialogTitle>
-                          </DialogHeader>
-                          <iframe
-                            srcDoc={loadedRubricContent ? `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{font-family:sans-serif;margin:2em}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:8px;text-align:left}th{background-color:#f2f2f2}</style></head><body><h2>${loadedRubricName}</h2>${loadedRubricContent.map((c: any) => `<h3>${c.name} (만점: ${c.maxScore}점)</h3><table><tr><th>점수</th><th>설명</th></tr>${c.details.map((d: any) => `<tr><td>${d.score}</td><td>${d.description}</td></tr>`).join('')}</table>`).join('')}</body></html>` : undefined}
-                            src={!loadedRubricContent ? "/rubric.html" : undefined}
-                            className="w-full flex-grow border-0"
-                            title="루브릭 미리보기"
-                          />
-                        </DialogContent>
-                      </Dialog>
+                      {loadedRubricContent ? (
+                        <RubricPreviewDialog
+                          name={loadedRubricName || "루브릭"}
+                          criteria={loadedRubricContent as any}
+                          trigger={<Button type="button" variant="ghost" size="sm"><Info className="mr-2 h-4 w-4" /> 자세히 보기</Button>}
+                        />
+                      ) : (
+                        <Dialog>
+                          <DialogTrigger asChild>
+                            <Button type="button" variant="ghost" size="sm"><Info className="mr-2 h-4 w-4" /> 자세히 보기</Button>
+                          </DialogTrigger>
+                          <DialogContent className="max-w-4xl h-[600px] flex flex-col">
+                            <DialogHeader>
+                              <DialogTitle>표준 루브릭</DialogTitle>
+                            </DialogHeader>
+                            <iframe src="/rubric.html" className="w-full flex-grow border-0" title="표준 루브릭 미리보기" />
+                          </DialogContent>
+                        </Dialog>
+                      )}
                       <FormControl>
                         <Checkbox
                           checked={field.value}

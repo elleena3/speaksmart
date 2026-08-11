@@ -23,13 +23,17 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { scenarios, type TeacherAssessment, femaleVoices, maleVoices, allVoices, evaluationModels, voiceDescriptions, type AiVoice, type UserData } from "@/lib/types";
+import { scenarios, type RubricCriterion, type TeacherAssessment, femaleVoices, maleVoices, allVoices, evaluationModels, voiceDescriptions, type AiVoice, type UserData } from "@/lib/types";
 import { useAuth, mockStudents } from "@/context/auth-context";
 import { doc, getDoc, updateDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Label } from "@/components/ui/label";
+import { RubricPreviewDialog } from "@/components/rubric-preview-dialog";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 
+
+// Radix Select 는 value="" 를 허용하지 않아, '선택 안 함' 에 쓸 표식을 따로 둡니다.
+const NO_RUBRIC = "__none__";
 
 function FilterCombobox({ label, options, value, onSelect }: { label: string, options: string[], value: string, onSelect: (value: string) => void }) {
   const [open, setOpen] = useState(false);
@@ -155,7 +159,9 @@ export default function EditAssessmentPage() {
   const isFreeTalkDialogue = assessmentType === 'dialogue' && scenario === 'free-talk';
   const useRubric = form.watch("useRubric");
   // 수정 화면에서도 루브릭을 바꿀 수 있어야 합니다. 예전에는 생성 시에만 고를 수 있었습니다.
-  const [savedRubrics, setSavedRubrics] = useState<{ id: string; name: string; criteria?: unknown[] }[]>([]);
+  const selectedRubricId = form.watch("loadedRubricId");
+  const [savedRubrics, setSavedRubrics] = useState<{ id: string; name: string; criteria: RubricCriterion[] }[]>([]);
+  const selectedRubric = savedRubrics.find(r => r.id === selectedRubricId);
 
   const fetchAssessmentAndStudents = useCallback(async () => {
     if (!user || !assessmentId) return;
@@ -192,7 +198,10 @@ export default function EditAssessmentPage() {
         // 교사가 만든 루브릭 목록
         try {
           const rubricSnap = await getDocs(query(collection(db, "rubrics"), where("uid", "==", user.uid)));
-          setSavedRubrics(rubricSnap.docs.map(d => ({ id: d.id, ...(d.data() as { name: string }) })));
+          setSavedRubrics(rubricSnap.docs.map(d => {
+            const data = d.data() as { name?: string; criteria?: RubricCriterion[] };
+            return { id: d.id, name: data.name ?? '(이름 없음)', criteria: data.criteria ?? [] };
+          }));
         } catch (e) {
           console.error("루브릭 목록을 불러오지 못했습니다.", e);
         }
@@ -761,18 +770,28 @@ export default function EditAssessmentPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>적용할 루브릭</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value ?? undefined}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="저장된 루브릭을 선택하세요" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {savedRubrics.map(r => (
-                          <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <div className="flex items-center gap-2">
+                      <Select
+                        onValueChange={(v) => field.onChange(v === NO_RUBRIC ? undefined : v)}
+                        value={field.value ?? NO_RUBRIC}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="저장된 루브릭을 선택하세요" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {/* 고른 루브릭을 다시 해제할 수 있어야 합니다. */}
+                          <SelectItem value={NO_RUBRIC}>선택 안 함 (일반 채점)</SelectItem>
+                          {savedRubrics.map(r => (
+                            <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {selectedRubric && (
+                        <RubricPreviewDialog name={selectedRubric.name} criteria={selectedRubric.criteria} />
+                      )}
+                    </div>
                     <FormDescription>
                       선택한 루브릭의 항목과 배점이 채점에 그대로 사용됩니다.
                       고르지 않으면 루브릭 없이 일반 방식으로 채점됩니다.
