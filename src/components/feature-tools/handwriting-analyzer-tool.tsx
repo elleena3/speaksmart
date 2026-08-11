@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from 'react';
+import { useState, useId } from 'react';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,6 +20,9 @@ import { Label } from '../ui/label';
 type AnalysisState = 'idle' | 'analyzing' | 'analyzed' | 'error';
 
 export function HandwritingAnalyzerTool() {
+    // 여러 도구가 한 페이지에 함께 렌더링되므로 id 가 겹치지 않도록 생성합니다.
+    const modelSelectId = useId();
+
     const [analysisState, setAnalysisState] = useState<AnalysisState>('idle');
     const [imagePreview, setImagePreview] = useState<string | null>(null);
     const [imageDataUri, setImageDataUri] = useState<string | null>(null);
@@ -89,9 +92,9 @@ export function HandwritingAnalyzerTool() {
                         <Input id="image-upload" type="file" accept="image/*" onChange={handleFileChange} />
                     </div>
                     <div>
-                        <Label htmlFor="model-select" className="text-sm font-medium">AI 평가 모델 선택</Label>
+                        <Label htmlFor={modelSelectId} className="text-sm font-medium">AI 평가 모델 선택</Label>
                         <Select onValueChange={(value) => setSelectedModel(value as EvaluationModel)} value={selectedModel}>
-                            <SelectTrigger id="model-select">
+                            <SelectTrigger id={modelSelectId}>
                                 <SelectValue placeholder="모델을 선택하세요..." />
                             </SelectTrigger>
                             <SelectContent>

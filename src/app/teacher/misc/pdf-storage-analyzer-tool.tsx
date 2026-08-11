@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useId } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -29,6 +29,9 @@ import { Progress } from "@/components/ui/progress";
 type AnalysisState = "idle" | "uploading" | "analyzing" | "analyzed" | "error";
 
 export function PdfStorageAnalyzerTool() {
+    // 여러 도구가 한 페이지에 함께 렌더링되므로 id 가 겹치지 않도록 생성합니다.
+    const pdfPromptId = useId();
+
   const [analysisState, setAnalysisState] = useState<AnalysisState>("idle");
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [prompt, setPrompt] = useState("");
@@ -158,9 +161,9 @@ export function PdfStorageAnalyzerTool() {
             <Input id="pdf-analyzer-upload" type="file" accept="application/pdf" onChange={handleFileChange} />
         </div>
         <div className="space-y-2">
-            <Label htmlFor="pdf-prompt">분석 요구사항</Label>
+            <Label htmlFor={pdfPromptId}>분석 요구사항</Label>
             <Textarea
-                id="pdf-prompt"
+                id={pdfPromptId}
                 placeholder="예: 이 논문의 핵심 주장을 3줄로 요약해줘. / 이 계약서에서 잠재적인 위험 요소가 될 수 있는 조항을 모두 찾아줘."
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}

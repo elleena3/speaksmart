@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useId } from "react";
 import { Button } from "@/components/ui/button";
 import { Loader2, FileText, Mic, Sparkles } from "lucide-react";
 import { CardContent } from "@/components/ui/card";
@@ -25,6 +25,8 @@ function AudioProcessor({
   analyzeButtonText: string;
   analyzeButtonIcon?: React.ElementType;
 }) {
+  // 여러 도구가 한 페이지에 함께 렌더링되므로 id 가 겹치지 않도록 생성합니다.
+  const fileUploadId = useId();
   const [file, setFile] = useState<File | null>(null);
   const [recordingState, setRecordingState] = useState<RecordingState>('idle');
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
@@ -109,9 +111,9 @@ function AudioProcessor({
   return (
     <CardContent className="space-y-4 pt-6">
       <div className="grid gap-2">
-        <label htmlFor="file-upload" className="text-sm font-medium">{t.teacherMisc.audioProcessor.label}</label>
+        <label htmlFor={fileUploadId} className="text-sm font-medium">{t.teacherMisc.audioProcessor.label}</label>
         <div className="flex gap-2">
-            <Input id="file-upload" type="file" accept="audio/webm" onChange={handleFileChange} className="flex-grow" />
+            <Input id={fileUploadId} type="file" accept="audio/webm" onChange={handleFileChange} className="flex-grow" />
             {recordingState === 'idle' ? (
                 <Button onClick={handleStartRecording} variant="outline" className="shrink-0">
                     <Mic className="mr-2 h-4 w-4" /> {t.teacherMisc.audioProcessor.recordButton}
@@ -142,6 +144,7 @@ function AudioProcessor({
 }
 
 export function TranscriberTool() {
+
   const [transcripts, setTranscripts] = useState<TranscriptionResult[]>([]);
   const { toast } = useToast();
   const { t } = useLanguage();

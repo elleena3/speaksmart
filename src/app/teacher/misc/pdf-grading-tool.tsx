@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useId } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -37,6 +37,9 @@ type FileWithStatus = {
 };
 
 export function PdfGradingTool() {
+    // 여러 도구가 한 페이지에 함께 렌더링되므로 id 가 겹치지 않도록 생성합니다.
+    const criteriaUploadId = useId();
+
   const [studentFiles, setStudentFiles] = useState<FileWithStatus[]>([]);
   const [criteriaFile, setCriteriaFile] = useState<File | null>(null);
   const [isGrading, setIsGrading] = useState(false);
@@ -77,7 +80,7 @@ export function PdfGradingTool() {
   
   const handleRemoveCriteriaFile = () => {
     setCriteriaFile(null);
-    const fileInput = document.getElementById("criteria-upload") as HTMLInputElement;
+    const fileInput = document.getElementById(criteriaUploadId) as HTMLInputElement;
     if(fileInput) fileInput.value = "";
   }
 
@@ -130,7 +133,7 @@ export function PdfGradingTool() {
     setCriteriaFile(null);
     const studentInput = document.getElementById("student-files-upload") as HTMLInputElement;
     if (studentInput) studentInput.value = "";
-    const criteriaInput = document.getElementById("criteria-upload") as HTMLInputElement;
+    const criteriaInput = document.getElementById(criteriaUploadId) as HTMLInputElement;
     if(criteriaInput) criteriaInput.value = "";
   };
   
@@ -148,8 +151,8 @@ export function PdfGradingTool() {
                 <Input id="student-files-upload" type="file" accept="application/pdf" onChange={(e) => handleFileChange(e, 'student')} multiple disabled={isGrading}/>
             </div>
             <div className="space-y-2">
-                <Label htmlFor="criteria-upload" className="flex items-center gap-2"><BookCheck/> 채점 기준 파일 (PDF, 1개)</Label>
-                <Input id="criteria-upload" type="file" accept="application/pdf" onChange={(e) => handleFileChange(e, 'criteria')} disabled={isGrading} />
+                <Label htmlFor={criteriaUploadId} className="flex items-center gap-2"><BookCheck/> 채점 기준 파일 (PDF, 1개)</Label>
+                <Input id={criteriaUploadId} type="file" accept="application/pdf" onChange={(e) => handleFileChange(e, 'criteria')} disabled={isGrading} />
             </div>
         </div>
         

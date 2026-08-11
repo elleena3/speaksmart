@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useId } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -28,6 +28,9 @@ import remarkGfm from "remark-gfm";
 type AnalysisState = "idle" | "analyzing" | "analyzed" | "error";
 
 export function PdfMultiAnalyzerTool() {
+    // 여러 도구가 한 페이지에 함께 렌더링되므로 id 가 겹치지 않도록 생성합니다.
+    const pdfPromptId = useId();
+
   const [analysisState, setAnalysisState] = useState<AnalysisState>("idle");
   const [files, setFiles] = useState<File[]>([]);
   const [prompt, setPrompt] = useState("");
@@ -144,9 +147,9 @@ export function PdfMultiAnalyzerTool() {
         )}
 
         <div className="space-y-2">
-            <Label htmlFor="pdf-prompt">분석 요구사항</Label>
+            <Label htmlFor={pdfPromptId}>분석 요구사항</Label>
             <Textarea
-                id="pdf-prompt"
+                id={pdfPromptId}
                 placeholder="예: 각 논문의 핵심 주장과 사용된 연구 방법을 요약해줘."
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}

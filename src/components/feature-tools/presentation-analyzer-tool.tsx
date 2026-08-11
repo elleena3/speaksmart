@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useId } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -47,6 +47,10 @@ const FeedbackCard = ({ title, score, feedback }: { title: string; score: number
 );
 
 export function PresentationAnalyzerTool() {
+    // 여러 도구가 한 페이지에 함께 렌더링되므로 id 가 겹치지 않도록 생성합니다.
+    const modelSelectId = useId();
+    const customCriteriaId = useId();
+
     const [analysisState, setAnalysisState] = useState<AnalysisState>('idle');
     const [videoFile, setVideoFile] = useState<File | null>(null);
     const [presentationFile, setPresentationFile] = useState<File | null>(null);
@@ -160,9 +164,9 @@ export function PresentationAnalyzerTool() {
                         </div>
                     </div>
                     <div className="space-y-2">
-                        <Label htmlFor="custom-criteria">추가 평가 요소 (선택)</Label>
+                        <Label htmlFor={customCriteriaId}>추가 평가 요소 (선택)</Label>
                         <Textarea
-                            id="custom-criteria"
+                            id={customCriteriaId}
                             placeholder="예: 특정 어휘('moreover', 'consequently')를 2회 이상 사용했는지 평가해주세요."
                             value={customCriteria}
                             onChange={(e) => setCustomCriteria(e.target.value)}
@@ -171,9 +175,9 @@ export function PresentationAnalyzerTool() {
                         <p className="text-xs text-muted-foreground">AI가 평가 시 추가적으로 참고할 내용을 입력합니다.</p>
                     </div>
                     <div>
-                        <Label htmlFor="model-select" className="text-sm font-medium">AI 평가 모델 선택</Label>
+                        <Label htmlFor={modelSelectId} className="text-sm font-medium">AI 평가 모델 선택</Label>
                         <Select onValueChange={(value) => setSelectedModel(value as EvaluationModel)} value={selectedModel}>
-                            <SelectTrigger id="model-select">
+                            <SelectTrigger id={modelSelectId}>
                                 <SelectValue placeholder="모델을 선택하세요..." />
                             </SelectTrigger>
                             <SelectContent>

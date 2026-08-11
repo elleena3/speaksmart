@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useId } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
@@ -20,6 +20,9 @@ type AnalysisAction = 'translate' | 'define' | 'explain';
 
 // Main component
 export function InteractiveTextAnalyzer() {
+    // 여러 도구가 한 페이지에 함께 렌더링되므로 id 가 겹치지 않도록 생성합니다.
+    const fileUploadId = useId();
+
     const [selectedText, setSelectedText] = useState<string>(sampleTexts.beginner.text);
     const [popoverOpen, setPopoverOpen] = useState(false);
     const [selectionRect, setSelectionRect] = useState<DOMRect | null>(null);
@@ -157,7 +160,7 @@ export function InteractiveTextAnalyzer() {
                             <ToggleGroupItem value="advanced" aria-label="Advanced">고급</ToggleGroupItem>
                         </ToggleGroup>
                          <Input
-                            id="file-upload"
+                            id={fileUploadId}
                             type="file"
                             className="hidden"
                             ref={fileInputRef}

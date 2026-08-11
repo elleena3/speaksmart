@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useId } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -36,6 +36,11 @@ export type IndividualResult = {
 const validFileTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
 
 export function HandwritingSubmissionAnalyzerTool() {
+    // 여러 도구가 한 페이지에 함께 렌더링되므로 id 가 겹치지 않도록 생성합니다.
+    const modelSelectId = useId();
+    const customCriteriaId = useId();
+    const criteriaUploadId = useId();
+
     const [analysisState, setAnalysisState] = useState<AnalysisState>('idle');
     const [batchMode, setBatchMode] = useState<BatchMode>('single');
     const [studentFiles, setStudentFiles] = useState<File[]>([]);
@@ -517,14 +522,14 @@ export function HandwritingSubmissionAnalyzerTool() {
                             )}
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="criteria-upload">채점 기준 자료 (이미지/PDF)</Label>
-                            <Input id="criteria-upload" type="file" accept={validFileTypes.join(',')} onChange={(e) => handleFileChange(e, 'criteria')} />
+                            <Label htmlFor={criteriaUploadId}>채점 기준 자료 (이미지/PDF)</Label>
+                            <Input id={criteriaUploadId} type="file" accept={validFileTypes.join(',')} onChange={(e) => handleFileChange(e, 'criteria')} />
                         </div>
                     </div>
                     <div className="space-y-2">
-                        <Label htmlFor="custom-criteria">채점 기준 (텍스트)</Label>
+                        <Label htmlFor={customCriteriaId}>채점 기준 (텍스트)</Label>
                         <Textarea
-                            id="custom-criteria"
+                            id={customCriteriaId}
                             placeholder="파일 대신 텍스트로 채점 기준을 입력할 수 있습니다. 예: 1. 단어의 철자가 정확한가? 2. 문법적으로 올바른 문장을 사용했는가?"
                             value={criteriaText}
                             onChange={(e) => setCriteriaText(e.target.value)}
@@ -549,9 +554,9 @@ export function HandwritingSubmissionAnalyzerTool() {
                     </div>
 
                     <div>
-                        <Label htmlFor="model-select" className="text-sm font-medium">AI 평가 모델 선택</Label>
+                        <Label htmlFor={modelSelectId} className="text-sm font-medium">AI 평가 모델 선택</Label>
                         <Select onValueChange={(value) => setSelectedModel(value as EvaluationModel)} value={selectedModel}>
-                            <SelectTrigger id="model-select">
+                            <SelectTrigger id={modelSelectId}>
                                 <SelectValue placeholder="모델을 선택하세요..." />
                             </SelectTrigger>
                             <SelectContent>
