@@ -152,6 +152,15 @@ export default function NewRubricPage() {
       reader.onloadend = async () => {
         const fileDataUri = reader.result as string;
         const result = await analyzeRubricFile({ fileDataUri, model: analysisModel });
+
+        // 키가 없어 쓸 수 없는 모델이면 원인을 그대로 보여줍니다.
+        if (result.unavailableReason) {
+          setError(result.unavailableReason);
+          setAnalysisState('error');
+          toast({ title: '이 모델을 쓸 수 없습니다', description: result.unavailableReason, variant: 'destructive' });
+          return;
+        }
+
         setVerifiedCriteria(result.criteria.map(c => ({...c, id: crypto.randomUUID() })));
         setAnalysisState('analyzed');
         toast({ title: '분석 완료', description: 'AI가 루브릭 기준을 추출했습니다. 내용을 확인하고 수정하세요.' });
