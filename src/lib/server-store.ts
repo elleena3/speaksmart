@@ -32,14 +32,23 @@ export async function resultsByAssessment(assessmentId: string) {
  * 클라이언트 SDK의 uploadString(..., 'data_url') + getDownloadURL 조합을 대체합니다.
  */
 export async function uploadDataUrl(objectPath: string, dataUrl: string): Promise<string> {
-  // target이 ES2017이라 정규식 s 플래그를 쓸 수 없어 [\s\S] 로 대신합니다.
-  const match = /^data:([^;,]+)(;base64)?,([\s\S]*)$/.exec(dataUrl);
-  if (!match) {
+  // MIME 타입에는 파라미터가 붙을 수 있습니다. 브라우저의 MediaRecorder 는
+  // 'audio/webm;codecs=opus' 로 녹음하므로 실제 값은
+  //   data:audio/webm;codecs=opus;base64,....
+  // 입니다. 파라미터를 고려하지 않고 자르면 학생 녹음이 통째로 거부됩니다.
+  const comma = dataUrl.indexOf(',');
+  if (!dataUrl.startsWith('data:') || comma === -1) {
     throw new Error('올바른 data URL 형식이 아닙니다.');
   }
 
-  const [, contentType, base64Flag, payload] = match;
-  const buffer = base64Flag
+  // 'audio/webm;codecs=opus;base64' 처럼 base64 표시는 항상 맨 뒤에 옵니다.
+  const segments = dataUrl.slice('data:'.length, comma).split(';');
+  const isBase64 = segments[segments.length - 1].trim().toLowerCase() === 'base64';
+  if (isBase64) segments.pop();
+
+  const contentType = segments.join(';').trim() || 'text/plain;charset=US-ASCII';
+  const payload = dataUrl.slice(comma + 1);
+  const buffer = isBase64
     ? Buffer.from(payload, 'base64')
     : Buffer.from(decodeURIComponent(payload), 'utf8');
 

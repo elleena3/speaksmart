@@ -145,7 +145,12 @@ export const generateMonologueAnalysisFlow = ai.defineFlow(
     try {
       await resultDocRef.update({ status: "분석 중: upload", assessmentType: "monologue" });
       const uploadPath = `recordings/${input.studentName}_${Date.now()}.webm`;
+      // 업로드는 전사와 나란히 돌리려고 여기서 await 하지 않습니다.
+      // 다만 그동안 실패하면 처리자 없는 rejection 이 되어 아래 catch 가 아니라
+      // 프로세스 전체가 죽습니다. 실제 결과는 뒤의 await 에서 받으므로
+      // 여기서는 표시만 해 둡니다.
       const uploadTask = uploadDataUrl(uploadPath, input.studentRecordingDataUri);
+      uploadTask.catch(() => {});
 
       await resultDocRef.update({ status: "분석 중: transcribe" });
       const transcriptionResult = await withRetry(() => monologueTranscriptionPrompt({ studentRecordingUrl: input.studentRecordingDataUri }, { model }));
