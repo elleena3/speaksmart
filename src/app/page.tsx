@@ -18,13 +18,17 @@ import { Label } from "@/components/ui/label";
 
 export default function Home() {
   const { language, setLanguage, t } = useLanguage();
-  const { loginAs, login, loading } = useAuth();
+  const { loginAs, login, loading, user } = useAuth();
   const router = useRouter();
   const [loadingRole, setLoadingRole] = useState<string | null>(null);
   const [teacherPassword, setTeacherPassword] = useState('');
   const [passwordError, setPasswordError] = useState('');
   // 목업 계정 메뉴는 비밀번호를 확인한 뒤에만 열립니다.
-  const [unlocked, setUnlocked] = useState(false);
+  // 별도 플래그를 저장하는 대신 로그인 상태를 기준으로 삼습니다.
+  // 잠금 해제는 곧 교사 로그인이므로, 세션이 살아 있는 동안 새로고침해도 유지되고
+  // 로그아웃하면 자연스럽게 다시 잠깁니다. (조작 가능한 플래그를 남기지 않는 이점도 있습니다.)
+  const [unlockedByPassword, setUnlockedByPassword] = useState(false);
+  const unlocked = unlockedByPassword || !!user;
   const [gateOpen, setGateOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [isUnlocking, setIsUnlocking] = useState(false);
@@ -54,7 +58,7 @@ export default function Home() {
     setIsUnlocking(true);
     try {
       await login(SEED_TEACHER_NAME, teacherPassword);
-      setUnlocked(true);
+      setUnlockedByPassword(true);
       setGateOpen(false);
       setTeacherPassword('');
       setMenuOpen(true);

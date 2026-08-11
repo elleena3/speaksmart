@@ -13,6 +13,7 @@ import { analyzePresentationVideo, type AnalyzePresentationVideoOutput } from '@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Label } from '@/components/ui/label';
+import { VIDEO_EVALUATION_MODELS } from '@/lib/evaluation-models';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { type EvaluationModel } from '@/lib/types';
 
@@ -176,14 +177,14 @@ export function PresentationAnalyzerTool() {
                                 <SelectValue placeholder="모델을 선택하세요..." />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="googleai/gemini-3.6-flash">gemini-3.6-flash (기본/빠름)</SelectItem>
-                                <SelectItem value="googleai/gemini-3.1-pro-preview">gemini-3.1-pro-preview (고성능/정밀)</SelectItem>
-                                <SelectItem value="anthropic/claude-fable-5">claude-fable-5 (장시간 실행)</SelectItem>
-                                <SelectItem value="anthropic/claude-opus-4-8">claude-opus-4-8 (엔터프라이즈)</SelectItem>
-                                <SelectItem value="anthropic/claude-sonnet-5">claude-sonnet-5 (속도/지능 최상)</SelectItem>
-                                <SelectItem value="anthropic/claude-haiku-4-5">claude-haiku-4-5 (가장 빠름)</SelectItem>
+                                {VIDEO_EVALUATION_MODELS.map(m => (
+                                    <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                                ))}
                             </SelectContent>
                         </Select>
+                        <p className="text-xs text-muted-foreground mt-1">
+                            영상을 직접 보고 평가할 수 있는 모델만 표시됩니다. OpenAI·Claude 모델은 동영상 입력을 지원하지 않습니다.
+                        </p>
                     </div>
                     <div className="flex gap-2 pt-2">
                         <Button onClick={handleAnalyze} disabled={isAnalyzeButtonDisabled} className="w-full">

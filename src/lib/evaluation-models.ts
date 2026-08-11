@@ -30,6 +30,19 @@ export const GOOGLE_EVALUATION_MODELS: EvaluationOption[] = [
   { value: 'googleai/gemini-3.1-pro-preview', label: 'gemini-3.1-pro-preview (고성능)' },
 ];
 
+/**
+ * 동영상을 직접 입력받아 평가할 수 있는 모델.
+ *
+ * 확인 결과 Gemini 만 video 미디어 파트를 받습니다.
+ * Claude 는 동영상을 이미지 파트로 취급해 media_type 오류를 내고,
+ * OpenAI 는 파일 파트에 application/pdf 만 허용합니다.
+ * 그래서 여기에는 Gemini 만 둡니다.
+ */
+export const VIDEO_EVALUATION_MODELS: EvaluationOption[] = [
+  { value: 'googleai/gemini-3.6-flash', label: 'gemini-3.6-flash (기본/빠름)' },
+  { value: 'googleai/gemini-3.1-pro-preview', label: 'gemini-3.1-pro-preview (고성능/정밀)' },
+];
+
 /** 'openai/gpt-5.6-terra' → 'gpt-5.6-terra' (배지 표시용) */
 export function shortModelName(model: string): string {
   return model.includes('/') ? model.split('/')[1] : model;
