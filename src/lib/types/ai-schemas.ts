@@ -222,5 +222,8 @@ export const AnalyzeRubricFileInputSchema = z.object({
   fileDataUri: z.string().describe(
     "A file (image or PDF) containing the rubric, as a data URI."
   ),
+  // 교사가 고른 분석 모델. 없으면 flow 안의 기본값을 씁니다.
+  // 채점(gradeWithRubric)은 여기 영향을 받지 않습니다 — 기준안 추출에만 쓰입니다.
+  model: z.string().optional(),
 });
 export type AnalyzeRubricFileInput = z.infer<typeof AnalyzeRubricFileInputSchema>;

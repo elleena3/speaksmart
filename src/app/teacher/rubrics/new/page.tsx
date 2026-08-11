@@ -35,6 +35,8 @@ import { useAuth } from '@/context/auth-context';
 import { addDoc, collection } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { rubricAnalysisModels, defaultRubricAnalysisModel, type RubricAnalysisModel } from '@/lib/types';
 
 type AnalysisState = 'idle' | 'analyzing' | 'analyzed' | 'error';
 type RubricCriterion = AnalyzeRubricFileOutput['criteria'][0] & { id: string };
@@ -102,6 +104,9 @@ export default function NewRubricPage() {
   const { user } = useAuth();
   const router = useRouter();
   const fileInputId = useId();
+  const modelSelectId = useId();
+  // 기준안 추출에만 쓰는 모델입니다. 채점은 이 선택과 무관합니다.
+  const [analysisModel, setAnalysisModel] = useState<RubricAnalysisModel>(defaultRubricAnalysisModel);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -125,17 +130,28 @@ export default function NewRubricPage() {
       toast({ title: '파일 없음', description: '분석할 루브릭 파일을 먼저 업로드해주세요.', variant: 'destructive' });
       return;
     }
+    // Claude 는 PDF 를 받지 못합니다(Anthropic API 가 400 으로 거부). 부르기 전에 막습니다.
+    const chosen = rubricAnalysisModels.find((m) => m.value === analysisModel);
+    if (rubricFile.type === 'application/pdf' && chosen && !chosen.pdf) {
+      toast({
+        title: '이 모델은 PDF를 읽지 못합니다',
+        description: '클로드(Claude) 모델은 PDF를 처리하지 못합니다. 캡처 이미지(JPG/PNG)로 올리시거나 제미나이·GPT 모델을 골라주세요.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setAnalysisState('analyzing');
     setError(null);
     setVerifiedCriteria([]);
-    toast({ title: 'AI 분석 시작', description: '루브릭 파일을 분석하여 기준을 추출합니다.' });
+    toast({ title: 'AI 분석 시작', description: `[${analysisModel}] 모델로 루브릭 파일에서 기준을 추출합니다.` });
 
     try {
       const reader = new FileReader();
       reader.readAsDataURL(rubricFile);
       reader.onloadend = async () => {
         const fileDataUri = reader.result as string;
-        const result = await analyzeRubricFile({ fileDataUri });
+        const result = await analyzeRubricFile({ fileDataUri, model: analysisModel });
         setVerifiedCriteria(result.criteria.map(c => ({...c, id: crypto.randomUUID() })));
         setAnalysisState('analyzed');
         toast({ title: '분석 완료', description: 'AI가 루브릭 기준을 추출했습니다. 내용을 확인하고 수정하세요.' });
@@ -275,6 +291,26 @@ export default function NewRubricPage() {
                     표준 템플릿으로 직접 만들기
                 </Button>
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor={modelSelectId}>추출에 쓸 AI 모델</Label>
+              <Select value={analysisModel} onValueChange={(v) => setAnalysisModel(v as RubricAnalysisModel)}>
+                <SelectTrigger id={modelSelectId}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {rubricAnalysisModels.map((m) => (
+                    <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                같은 루브릭 표를 넣어 비교한 결과를 설명에 적어 두었습니다.
+                이 선택은 <b>기준안을 뽑는 데만</b> 쓰이며, 학생 채점 방식은 달라지지 않습니다.
+              </p>
+              <p className="text-xs text-amber-600/80 dark:text-amber-400/80">
+                ※ 클로드(Claude) 모델은 PDF를 읽지 못합니다. PDF는 제미나이 또는 GPT를 골라주세요.
+              </p>
             </div>
             <div className="flex justify-center gap-2">
               <Button onClick={handleAnalyze} disabled={!rubricFile || analysisState === 'analyzing'}>

@@ -20,6 +20,7 @@ export async function analyzeRubricFile(input: AnalyzeRubricFileInput): Promise<
 
 const rubricAnalysisPrompt = ai.definePrompt({
     name: 'rubricAnalysisPrompt',
+    // 교사가 고르지 않았을 때의 기본값. 호출 시 input.model 로 덮어씁니다.
     model: 'googleai/gemini-3.1-pro-preview',
     input: { schema: AnalyzeRubricFileInputSchema },
     output: { schema: AnalyzeRubricFileOutputSchema },
@@ -31,7 +32,7 @@ Here is the rubric file for analysis:
 Please perform the following steps:
 1.  **Identify All Criteria:** Scan the document and identify every distinct evaluation criterion. Each criterion will have a name (e.g., '유창성', '문법').
 2.  **Extract Details for Each Criterion:** For each criterion you identified, you must extract the following information:
-    -   **name:** The full name of the criterion.
+    -   **name:** The full name of the criterion, in the document's own language. Do NOT translate it, and do NOT append the score to it — write '내용의 적절성', never '내용의 적절성 (30점)'. The score belongs in maxScore.
     -   **maxScore:** The highest possible score for that criterion.
     -   **details:** An array containing every single performance level description. For each level, you MUST extract:
         -   **score:** The integer score for that level.
@@ -48,7 +49,11 @@ const analyzeRubricFileFlow = ai.defineFlow(
     outputSchema: AnalyzeRubricFileOutputSchema,
   },
   async (input) => {
-    const { output } = await rubricAnalysisPrompt(input);
+    // 교사가 고른 모델이 있으면 그것으로 부릅니다. 없으면 definePrompt 의 기본값.
+    const { output } = await rubricAnalysisPrompt(
+      input,
+      input.model ? { model: input.model } : undefined
+    );
     if (!output) {
       throw new Error("The AI model did not return a valid rubric analysis.");
     }
