@@ -110,11 +110,14 @@ export function HandwritingSubmissionAnalyzerTool() {
             return;
         }
 
-        const hasPdf = studentFiles.some(f => f.type === 'application/pdf');
-        if (hasPdf && !selectedModel.includes('gemini')) {
+        // 채점 기준 파일도 모델에 그대로 전달되므로 함께 검사해야 합니다.
+        // 확인 결과 PDF 를 읽지 못하는 것은 Claude 뿐이고, GPT 는 정상 처리합니다.
+        const hasPdf = studentFiles.some(f => f.type === 'application/pdf')
+            || criteriaFile?.type === 'application/pdf';
+        if (hasPdf && selectedModel.includes('claude')) {
             toast({
                 title: "오류: 지원하지 않는 파일 형식",
-                description: "현재 선택하신 오픈AI(GPT) 또는 클로드(Claude) 모델은 PDF 파일 내부 분석을 지원하지 않습니다. 캡처 이미지(JPG/PNG)로 업로드하시거나, 최고급 모델인 제미나이(Google AI)를 선택해주세요.",
+                description: "클로드(Claude) 모델은 PDF 파일을 읽지 못합니다. 캡처 이미지(JPG/PNG)로 업로드하시거나, 제미나이(Google AI) 또는 GPT 모델을 선택해주세요.",
                 variant: "destructive"
             });
             return;
@@ -572,7 +575,7 @@ export function HandwritingSubmissionAnalyzerTool() {
                             </SelectContent>
                         </Select>
                         <p className="text-xs text-amber-600/80 dark:text-amber-400/80 mt-2">
-                            ※ PDF 형식은 기본적으로 제미나이(Google AI) 모델에서 최적으로 구동됩니다. GPT/Claude 모델 선택 시, PDF 대신 캡처된 이미지(JPG/PNG/WebP)로 업로드하셔야 정상 분석됩니다.
+                            ※ PDF는 제미나이(Google AI)와 GPT 모델에서 분석됩니다. 클로드(Claude) 선택 시에는 PDF 대신 캡처된 이미지(JPG/PNG/WebP)로 업로드해 주세요.
                         </p>
                     </div>
                     <div className="flex gap-2 pt-2">

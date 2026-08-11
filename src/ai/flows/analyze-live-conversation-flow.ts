@@ -88,7 +88,7 @@ export async function analyzeLiveConversation(input: AnalyzeLiveConversationInpu
 
 const liveConversationAnalysisPrompt = ai.definePrompt({
     name: 'liveConversationAnalysisPrompt',
-    model: 'gemini-3.6-flash',
+    model: 'googleai/gemini-3.6-flash',
     input: { schema: AnalyzeLiveConversationInputSchema },
     output: { schema: AnalyzeLiveConversationOutputSchema },
     prompt: `You are an expert native English AI tutor evaluating a recent real-time conversation you had with a student.
