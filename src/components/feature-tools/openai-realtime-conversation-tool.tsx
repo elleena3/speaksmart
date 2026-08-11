@@ -17,6 +17,7 @@ import { uploadConversationRecording, type UploadState } from "@/lib/upload-reco
 import { analyzeLiveConversation, analyzeLivePronunciation, type AnalyzeLiveConversationOutput, type PronunciationAnalysis } from "@/ai/flows/analyze-live-conversation-flow";
 import { startStudentMicRecorder, type StudentMicRecorder } from "@/lib/student-mic-recorder";
 import { PronunciationCard } from "./pronunciation-card";
+import { CONVERSATION_MIC_CONSTRAINTS } from "@/lib/mic-constraints";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Progress } from "@/components/ui/progress";
@@ -231,7 +232,8 @@ export function OpenAiRealtimeConversationTool() {
             };
 
             // 4. Capture Local Mic
-            const ms = await navigator.mediaDevices.getUserMedia({ audio: true });
+            // 에코 제거를 명시해야 스피커로 나온 AI 목소리가 학생 발화로 전사되지 않습니다.
+            const ms = await navigator.mediaDevices.getUserMedia({ audio: CONVERSATION_MIC_CONSTRAINTS });
             keepaliveStreamRef.current = ms;
             pc.addTrack(ms.getTracks()[0]);
 

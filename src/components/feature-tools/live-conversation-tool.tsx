@@ -12,6 +12,7 @@ import { generateTtsByModelFlow } from "@/ai/flows/generate-tts-by-model-flow";
 import { analyzeLiveConversation, analyzeLivePronunciation, type AnalyzeLiveConversationOutput, type PronunciationAnalysis } from "@/ai/flows/analyze-live-conversation-flow";
 import { startStudentMicRecorder, type StudentMicRecorder } from "@/lib/student-mic-recorder";
 import { PronunciationCard } from "./pronunciation-card";
+import { CONVERSATION_MIC_CONSTRAINTS } from "@/lib/mic-constraints";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Progress } from "@/components/ui/progress";
@@ -67,6 +68,10 @@ export function LiveConversationTool() {
     const studentMicRef = useRef<StudentMicRecorder | null>(null);
 
     const nextPlayTimeRef = useRef<number>(0);
+    // AI 음성이 스피커로 나가는 구간. 이 동안 마이크로 들어온 소리는 학생 발화로 보지 않습니다.
+    const aiSpeakingUntilRef = useRef<number>(0);
+    // 서버 전사가 한 번이라도 오면 Web Speech 폴백을 끕니다.
+    const serverTranscriptSeenRef = useRef<boolean>(false);
 
     const endConversation = useCallback(async () => {
         if (appStateRef.current === 'finished' || appStateRef.current === 'analyzing') return;
@@ -203,6 +208,10 @@ export function LiveConversationTool() {
                         systemInstruction: {
                             parts: [{ text: "You are a friendly native English tutor. Speak naturally and converse interactively with the user." }]
                         },
+                        // 서버가 보낸 오디오와 받은 오디오를 각각 전사해 줍니다.
+                        // 이게 있어야 '학생이 말한 것'과 'AI 가 말한 것'이 출처 단위로 갈립니다.
+                        inputAudioTranscription: {},
+                        outputAudioTranscription: {},
                         generationConfig: {
                             responseModalities: ["AUDIO"],
                             speechConfig: {
@@ -217,10 +226,13 @@ export function LiveConversationTool() {
                 };
                 ws.send(JSON.stringify(setupMessage));
 
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, sampleRate: 16000 } });
+                // 에코 제거를 명시해야 스피커로 나온 AI 목소리가 학생 발화로 전사되지 않습니다.
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, sampleRate: 16000, ...CONVERSATION_MIC_CONSTRAINTS } });
                 micStreamRef.current = stream;
 
                 nextPlayTimeRef.current = 0;
+                aiSpeakingUntilRef.current = 0;
+                serverTranscriptSeenRef.current = false;
 
                 const source = audioCtx.createMediaStreamSource(stream);
                 const processor = audioCtx.createScriptProcessor(4096, 1, 1);
@@ -272,6 +284,15 @@ export function LiveConversationTool() {
                     recognition.interimResults = true;
                     recognition.lang = 'en-US';
                     recognition.onresult = (event: any) => {
+                        // Web Speech 는 마이크를 직접 듣기만 할 뿐 누가 말하는지 모릅니다.
+                        // 스피커로 나온 AI 목소리가 들어오면 그대로 학생 발화로 기록되므로,
+                        // 서버 전사가 한 번이라도 오면 그때부터는 이쪽을 쓰지 않습니다.
+                        if (serverTranscriptSeenRef.current) return;
+
+                        // 서버 전사가 없는 환경에서도 AI 가 말하는 동안은 받아쓰지 않습니다.
+                        const ctx = audioContextRef.current;
+                        if (ctx && ctx.currentTime < aiSpeakingUntilRef.current) return;
+
                         const res = event.results[event.results.length - 1];
                         const transcript = res[0].transcript;
 
@@ -362,6 +383,8 @@ export function LiveConversationTool() {
                                         const scheduledTime = Math.max(currentTime, nextPlayTimeRef.current);
                                         source.start(scheduledTime);
                                         nextPlayTimeRef.current = scheduledTime + audioBuffer.duration;
+                                        // 스피커 잔향이 마이크에 늦게 잡히는 것까지 감안해 0.4초 여유를 둡니다.
+                                        aiSpeakingUntilRef.current = nextPlayTimeRef.current + 0.4;
                                     }
                                 } catch (e) {
                                     console.error("Audio playback error", e);
@@ -405,6 +428,8 @@ export function LiveConversationTool() {
 
                     const { inputTranscription, outputTranscription } = response.serverContent || {};
                     if (inputTranscription?.text) {
+                        // 서버 전사가 도착했으므로 Web Speech 폴백은 더 이상 쓰지 않습니다.
+                        serverTranscriptSeenRef.current = true;
                         setTurns(prev => {
                             const newTurns = [...prev];
                             const last = newTurns[newTurns.length - 1];
