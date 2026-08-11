@@ -16,6 +16,7 @@ import {
 } from '@/lib/types/ai-schemas';
 import { evaluationModels, type RubricScores, type StudentResult } from '@/lib/types';
 import { resultRef, uploadDataUrl } from "@/lib/server-store";
+import { isRetriableAiError, withAudioFallback } from "@/lib/ai-retry";
 import { gradeWithRubric, describeRubricResult } from "./grade-with-rubric";
 import { renderRubricSummary, pickPronunciationScore } from "@/lib/rubric-summary";
 import { RubricCriterionSchema } from "@/lib/types/ai-schemas";
@@ -29,8 +30,8 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 2, delay = 1500): Pr
       return await fn();
     } catch (error: any) {
       lastError = error;
-      if (error.message && (error.message.includes('overloaded') || error.message.includes('503'))) {
-        console.warn(`[withRetry] Attempt ${i + 1} failed due to model overload. Retrying in ${delay}ms...`);
+      if (isRetriableAiError(error)) {
+        console.warn(`[withRetry] Attempt ${i + 1} failed with a transient error. Retrying in ${delay}ms...`);
         if (i < retries) {
           await new Promise(resolve => setTimeout(resolve, delay));
         }
@@ -153,7 +154,13 @@ export const generateMonologueAnalysisFlow = ai.defineFlow(
       uploadTask.catch(() => {});
 
       await resultDocRef.update({ status: "분석 중: transcribe" });
-      const transcriptionResult = await withRetry(() => monologueTranscriptionPrompt({ studentRecordingUrl: input.studentRecordingDataUri }, { model }));
+      // 전사가 실패하면 채점을 아예 못 하고 학생이 다시 응시해야 합니다.
+      // 고른 모델이 흔들리면 오디오를 확실히 받는 모델로 넘어갑니다.
+      const transcriptionResult = await withAudioFallback(
+        model,
+        (m) => withRetry(() => monologueTranscriptionPrompt({ studentRecordingUrl: input.studentRecordingDataUri }, { model: m })),
+        '전사'
+      );
       const studentTranscript = transcriptionResult.text;
 
       if (!studentTranscript || studentTranscript.trim() === "") {
@@ -201,10 +208,11 @@ export const generateMonologueAnalysisFlow = ai.defineFlow(
                   studentName: input.studentName,
                   assessmentTitle: input.assessmentTitle,
               }, { model })),
-              withRetry(() => monologuePronunciationAnalysisPrompt({
+              // 발음 분석도 오디오를 넘기므로 같은 대체 규칙을 씁니다.
+              withAudioFallback(model, (m) => withRetry(() => monologuePronunciationAnalysisPrompt({
                   studentRecordingUrl: input.studentRecordingDataUri,
                   studentTranscript,
-              }, { model }))
+              }, { model: m })), '발음 분석')
           ]);
           
           const contentOutput = contentRes.output;

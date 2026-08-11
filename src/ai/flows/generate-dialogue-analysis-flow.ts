@@ -15,6 +15,7 @@ import {
 import { type RubricScores, type StudentResult } from '@/lib/types';
 import { resultRef } from '@/lib/server-store';
 import { gradeWithRubric, describeRubricResult } from './grade-with-rubric';
+import { isRetriableAiError, withAudioFallback } from '@/lib/ai-retry';
 import { renderRubricSummary, pickPronunciationScore } from '@/lib/rubric-summary';
 import { describeAiError } from '@/lib/ai-error-message';
 
@@ -25,7 +26,7 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 2, delay = 1500): Pr
       return await fn();
     } catch (error: any) {
       lastError = error;
-      if (error.message && (error.message.includes('overloaded') || error.message.includes('503'))) {
+      if (isRetriableAiError(error)) {
         console.warn(`[withRetry] Attempt ${i + 1} failed. Retrying...`);
         if (i < retries) await new Promise(resolve => setTimeout(resolve, delay));
       } else {
@@ -133,10 +134,11 @@ export async function generateDialogueAnalysis(input: any): Promise<void> {
               studentName: input.studentName,
               assessmentTitle: input.assessmentTitle,
             }, { model })),
-            withRetry(() => dialoguePronunciationAnalysisPrompt({
+            // 발음 분석은 녹음을 그대로 넘기므로 오디오 대체 규칙을 씁니다.
+            withAudioFallback(model, (m) => withRetry(() => dialoguePronunciationAnalysisPrompt({
               studentRecordingUrl: input.studentRecordingUrl,
               studentTranscript: input.studentTranscript,
-            }, { model }))
+            }, { model: m })), '발음 분석')
           ]);
 
           if (!contentRes.output || !pronRes.output) throw new Error("분석 실패.");
