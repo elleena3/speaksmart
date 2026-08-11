@@ -52,17 +52,33 @@ export type EvaluationModel = (typeof evaluationModels)[number];
 /**
  * 평가(응시)에서 교사가 고를 수 있는 모델.
  *
- * Claude 는 오디오를 받지 못합니다. monologue·dialogue 평가는 전사 단계에서
- * 학생 녹음을 교사가 고른 모델로 그대로 보내므로, Claude 를 고르면 채점이
- * 반드시 실패합니다. (Anthropic API 가 400 으로 거부하는 것을 실제 호출로 확인)
+ * 13종을 모두 실제로 응시시켜 본 결과를 반영했습니다.
+ * 학생 녹음을 스스로 받는 것은 Gemini 뿐이고, OpenAI·Claude 는 400 으로 거부합니다.
+ * 지금은 오디오 대체(src/lib/ai-retry.ts)가 있어 어느 모델을 골라도 채점은
+ * 끝까지 완료되지만, 그 경우 전사와 발음 점수는 Gemini 가 매깁니다.
+ * 무엇을 스스로 하는지 목록에 적어 두어 교사가 알고 고르게 합니다.
+ *
+ * Claude 는 뺐습니다. 내용 채점만 놓고 보면 OpenAI 와 사정이 같지만
+ * 선택지를 늘려 혼란을 주기보다 최신 GPT 3종으로 비교 폭을 제한했습니다.
+ * 구형 gpt-4o·gpt-4o-mini·o3-mini·o1 도 같은 이유로 제외했습니다.
  *
  * 오디오를 다루지 않는 교사 도구(손글씨·유튜브·발표 분석 등)는 계속
  * evaluationModels 전체를 씁니다. Claude 가 정상 동작하기 때문입니다.
  */
-export type AssessmentEvaluationModel = Exclude<EvaluationModel, `anthropic/${string}`>;
-export const assessmentEvaluationModels = evaluationModels.filter(
-  (m): m is AssessmentEvaluationModel => !m.startsWith('anthropic/')
-);
+export const assessmentEvaluationModels = [
+  // 학생 녹음을 스스로 듣고 처리합니다.
+  { value: 'googleai/gemini-3.6-flash', label: 'gemini-3.6-flash — 전 과정을 스스로 처리 (빠름, 기본값)' },
+  { value: 'googleai/gemini-3.1-pro-preview', label: 'gemini-3.1-pro-preview — 전 과정을 스스로 처리 (정밀)' },
+  // 오디오를 못 받아 전사·발음은 Gemini 가 대신합니다. 내용 채점만 이 모델이 합니다.
+  { value: 'openai/gpt-5.6-terra', label: 'gpt-5.6-terra — 내용 채점만 (전사·발음은 Gemini가 처리)' },
+  { value: 'openai/gpt-5.6-luna', label: 'gpt-5.6-luna — 내용 채점만 (전사·발음은 Gemini가 처리)' },
+  { value: 'openai/gpt-5.6-sol', label: 'gpt-5.6-sol — 내용 채점만 (전사·발음은 Gemini가 처리)' },
+] as const satisfies readonly { value: EvaluationModel; label: string }[];
+
+export type AssessmentEvaluationModel = (typeof assessmentEvaluationModels)[number]['value'];
+
+/** z.enum 과 저장값 검사에 쓰는 값 목록 */
+export const assessmentEvaluationModelValues = assessmentEvaluationModels.map((m) => m.value) as AssessmentEvaluationModel[];
 
 /**
  * 루브릭 파일에서 평가기준안을 뽑을 때 고를 수 있는 모델.

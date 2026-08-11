@@ -22,7 +22,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogClose } from "@/components/ui/dialog";
-import { scenarios, type TeacherAssessment, femaleVoices, maleVoices, allVoices, evaluationModels, assessmentEvaluationModels, type AssessmentEvaluationModel, voiceDescriptions, type AiVoice, type MonologueType, type UserData, imageGenerationModels, type Scenario, type EvaluationModel, type ImageGenerationModel, monologueTypes } from "@/lib/types";
+import { scenarios, type TeacherAssessment, femaleVoices, maleVoices, allVoices, evaluationModels, assessmentEvaluationModels, assessmentEvaluationModelValues, type AssessmentEvaluationModel, voiceDescriptions, type AiVoice, type MonologueType, type UserData, imageGenerationModels, type Scenario, type EvaluationModel, type ImageGenerationModel, monologueTypes } from "@/lib/types";
 import { useAuth, mockStudents } from "@/context/auth-context";
 import { addDoc, collection, getDocs, query, where, orderBy } from "firebase/firestore";
 import { db, storage } from "@/lib/firebase";
@@ -130,7 +130,7 @@ export default function NewAssessmentPage() {
     scenario: z.enum(scenarios as [Scenario, ...Scenario[]]).optional(),
     recordingTimeLimit: z.coerce.number().int().min(0).optional(),
     aiVoice: z.enum(allVoices as unknown as [AiVoice, ...AiVoice[]]).optional().default('algenib'),
-    evaluationModel: z.enum(assessmentEvaluationModels as unknown as [AssessmentEvaluationModel, ...AssessmentEvaluationModel[]]).optional().default('googleai/gemini-3.6-flash'),
+    evaluationModel: z.enum(assessmentEvaluationModelValues as unknown as [AssessmentEvaluationModel, ...AssessmentEvaluationModel[]]).optional().default('googleai/gemini-3.6-flash'),
     useRubric: z.boolean().default(false),
     loadedRubricId: z.string().optional(),
     imageGenerationModel: z.enum(imageGenerationModels as unknown as [ImageGenerationModel, ...ImageGenerationModel[]]).optional().default('googleai/gemini-3.1-flash-image'),
@@ -802,8 +802,8 @@ export default function NewAssessmentPage() {
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {assessmentEvaluationModels.map(model => (
-                        <SelectItem key={model} value={model}>{model}</SelectItem>
+                      {assessmentEvaluationModels.map(m => (
+                        <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
