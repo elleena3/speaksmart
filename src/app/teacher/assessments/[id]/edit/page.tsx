@@ -23,7 +23,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { scenarios, type RubricCriterion, type TeacherAssessment, femaleVoices, maleVoices, allVoices, evaluationModels, voiceDescriptions, type AiVoice, type UserData } from "@/lib/types";
+import { scenarios, type RubricCriterion, type TeacherAssessment, femaleVoices, maleVoices, allVoices, assessmentEvaluationModels, type AssessmentEvaluationModel, voiceDescriptions, type AiVoice, type UserData } from "@/lib/types";
 import { useAuth, mockStudents } from "@/context/auth-context";
 import { doc, getDoc, updateDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -103,7 +103,7 @@ export default function EditAssessmentPage() {
     scenario: z.enum(scenarios).optional(),
     recordingTimeLimit: z.coerce.number().int().min(0).optional(),
     aiVoice: z.enum(allVoices).optional().default('algenib'),
-    evaluationModel: z.enum(evaluationModels).optional().default('googleai/gemini-3.1-pro-preview'),
+    evaluationModel: z.enum(assessmentEvaluationModels as unknown as [AssessmentEvaluationModel, ...AssessmentEvaluationModel[]]).optional().default('googleai/gemini-3.1-pro-preview'),
     useRubric: z.boolean().default(false),
     loadedRubricId: z.string().optional(),
   }).superRefine((data, ctx) => {
@@ -178,6 +178,15 @@ export default function EditAssessmentPage() {
 
         if (docSnap.exists() && docSnap.data().uid === user.uid) {
             const data = docSnap.data() as TeacherAssessment;
+
+            // 예전에 저장된 모델 값이 지금 목록에 없을 수 있습니다.
+            // (옛 이름 'gemini-2.5-flash' 나, 오디오를 못 받아 목록에서 뺀 Claude)
+            // 그대로 두면 선택 상자가 빈 채로 뜨고 저장이 막히므로 기본값으로 되돌립니다.
+            const savedModel = data.evaluationModel as string | undefined;
+            const evaluationModel = assessmentEvaluationModels.includes(savedModel as AssessmentEvaluationModel)
+              ? (savedModel as AssessmentEvaluationModel)
+              : 'googleai/gemini-3.1-pro-preview';
+
             form.reset({
               ...data,
               startDate: data.startDate ? new Date(data.startDate) : undefined,
@@ -185,7 +194,7 @@ export default function EditAssessmentPage() {
               targetType: Array.isArray(data.targetStudentIds) ? 'specific' : 'all',
               targetStudentIds: data.targetStudentIds,
               aiVoice: data.aiVoice || 'algenib',
-              evaluationModel: data.evaluationModel || 'googleai/gemini-3.1-pro-preview',
+              evaluationModel,
               useRubric: data.useRubric || false,
               loadedRubricId: data.loadedRubricId,
             });
@@ -616,7 +625,7 @@ export default function EditAssessmentPage() {
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {evaluationModels.map(model => (
+                      {assessmentEvaluationModels.map(model => (
                         <SelectItem key={model} value={model}>{model}</SelectItem>
                       ))}
                     </SelectContent>

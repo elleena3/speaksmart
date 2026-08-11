@@ -50,6 +50,21 @@ export const evaluationModels = [
 export type EvaluationModel = (typeof evaluationModels)[number];
 
 /**
+ * 평가(응시)에서 교사가 고를 수 있는 모델.
+ *
+ * Claude 는 오디오를 받지 못합니다. monologue·dialogue 평가는 전사 단계에서
+ * 학생 녹음을 교사가 고른 모델로 그대로 보내므로, Claude 를 고르면 채점이
+ * 반드시 실패합니다. (Anthropic API 가 400 으로 거부하는 것을 실제 호출로 확인)
+ *
+ * 오디오를 다루지 않는 교사 도구(손글씨·유튜브·발표 분석 등)는 계속
+ * evaluationModels 전체를 씁니다. Claude 가 정상 동작하기 때문입니다.
+ */
+export type AssessmentEvaluationModel = Exclude<EvaluationModel, `anthropic/${string}`>;
+export const assessmentEvaluationModels = evaluationModels.filter(
+  (m): m is AssessmentEvaluationModel => !m.startsWith('anthropic/')
+);
+
+/**
  * 루브릭 파일에서 평가기준안을 뽑을 때 고를 수 있는 모델.
  *
  * 같은 루브릭 표(4항목·12수준)를 PNG·PDF 로 넣어 실제로 비교한 결과를 반영했습니다.
