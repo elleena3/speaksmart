@@ -1,4 +1,5 @@
 'use server';
+import { requireResultAccess } from '@/lib/auth-guard';
 
 /**
  * @fileOverview A comprehensive flow that analyzes a student's MONOLOGUE English performance.
@@ -128,7 +129,7 @@ const MonologueProcessingInputSchema = z.object({
   teacherUid: z.string(),
 });
 
-export const generateMonologueAnalysisFlow = ai.defineFlow(
+const monologueAnalysisFlow = ai.defineFlow(
   {
     name: 'generateMonologueAnalysisFlow',
     inputSchema: MonologueProcessingInputSchema,
@@ -251,3 +252,16 @@ export const generateMonologueAnalysisFlow = ai.defineFlow(
     }
   }
 );
+
+/**
+ * 학생 응시 분석 진입점.
+ *
+ * 결과 문서를 덮어쓰므로 본인 결과이거나 담당 교사일 때만 허용합니다.
+ * 예전에는 flow 를 그대로 export 해 결과 ID 만 알면 누구나 점수를 바꿀 수 있었습니다.
+ */
+export async function generateMonologueAnalysisFlow(
+  input: z.infer<typeof MonologueProcessingInputSchema>
+): Promise<void> {
+  await requireResultAccess(input.resultId);
+  await monologueAnalysisFlow(input);
+}

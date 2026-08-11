@@ -90,6 +90,29 @@ async function loadUserDoc(firebaseUser: FirebaseUser): Promise<UserData | null>
   return { ...snap.data(), uid: firebaseUser.uid, docId: firebaseUser.uid } as UserData;
 }
 
+/**
+ * 서버 액션이 호출자를 확인할 수 있도록 httpOnly 세션 쿠키를 심습니다.
+ * 서버 액션은 인증 없이도 POST 되는 엔드포인트라 이 쿠키가 유일한 신원 근거입니다.
+ * (검증은 src/lib/auth-guard.ts)
+ */
+async function syncServerSession(firebaseUser: FirebaseUser | null): Promise<void> {
+  try {
+    if (!firebaseUser) {
+      await fetch('/api/session', { method: 'DELETE' });
+      return;
+    }
+    const idToken = await firebaseUser.getIdToken();
+    await fetch('/api/session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idToken }),
+    });
+  } catch (error) {
+    // 쿠키를 못 심어도 화면은 떠야 합니다. 다만 서버 액션은 거부됩니다.
+    console.error('세션 쿠키 동기화 실패:', error);
+  }
+}
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -97,10 +120,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (!firebaseUser) {
+        await syncServerSession(null);
         setUser(null);
         setLoading(false);
         return;
       }
+
+      // 새로고침·토큰 갱신 때도 쿠키를 다시 심어 만료된 채로 남지 않게 합니다.
+      await syncServerSession(firebaseUser);
 
       try {
         const userData = await loadUserDoc(firebaseUser);
@@ -131,6 +158,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await signOut(auth);
       throw new Error('사용자 프로필 문서를 찾을 수 없습니다.');
     }
+    await syncServerSession(credential.user);
     setUser(userData);
     return userData;
   }, []);
@@ -151,6 +179,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const logout = useCallback(async () => {
     await signOut(auth);
+    await syncServerSession(null);
     setUser(null);
   }, []);
 

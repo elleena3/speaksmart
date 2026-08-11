@@ -1,6 +1,7 @@
 
 
 'use server';
+import { requireAssessmentOwner } from '@/lib/auth-guard';
 /**
  * @fileOverview A flow to re-run analysis for all submissions of a given assessment.
  * This is useful when evaluation criteria have been updated.
@@ -23,6 +24,8 @@ const RerunAllInputSchema = z.object({
 type RerunAllInput = z.infer<typeof RerunAllInputSchema>;
 
 export async function rerunAllAnalyses(input: RerunAllInput): Promise<{ success: boolean; message: string }> {
+  // 평가에 딸린 모든 학생 점수를 다시 씁니다. 평가를 만든 교사만 허용합니다.
+  await requireAssessmentOwner(input.assessmentId);
   return rerunAllAnalysesFlow(input);
 }
 

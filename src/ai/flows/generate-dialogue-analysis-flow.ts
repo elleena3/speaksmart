@@ -1,4 +1,5 @@
 'use server';
+import { requireResultAccess } from '@/lib/auth-guard';
 
 /**
  * @fileOverview A comprehensive flow that analyzes a student's DIALOGUE English performance.
@@ -90,6 +91,8 @@ const dialogueTeacherGuidanceFromRubricPrompt = ai.definePrompt({
 // --- Main Function ---
 
 export async function generateDialogueAnalysis(input: any): Promise<void> {
+  // 결과 문서를 덮어쓰므로 본인 결과이거나 담당 교사일 때만 허용합니다.
+  await requireResultAccess(input.resultId);
   const resultDocRef = resultRef(input.resultId);
   let model = input.evaluationModel || 'googleai/gemini-3.6-flash';
   if (model.includes('1.5') || model.includes('2.5')) {

@@ -1,6 +1,7 @@
 
 
 'use server';
+import { requireResultAccess } from '@/lib/auth-guard';
 /**
  * @fileOverview A flow to retry a failed analysis using a saved recording URL.
  * 
@@ -17,6 +18,8 @@ import { type TeacherAssessment, type StudentResult } from '@/lib/types';
 import { RetryAnalysisInputSchema, type RetryAnalysisInput } from '@/lib/types/ai-schemas';
 
 export async function retryAnalysis(input: RetryAnalysisInput): Promise<{ success: boolean; message: string }> {
+  // 결과 문서를 덮어쓰므로 본인 결과이거나 담당 교사일 때만 허용합니다.
+  await requireResultAccess(input.resultId);
   return retryAnalysisFlow(input);
 }
 

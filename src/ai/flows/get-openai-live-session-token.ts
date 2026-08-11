@@ -1,4 +1,5 @@
 'use server';
+import { requireUser } from '@/lib/auth-guard';
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
@@ -23,6 +24,8 @@ const GetOpenAiLiveSessionTokenOutputSchema = z.object({
 export type GetOpenAiLiveSessionTokenOutput = z.infer<typeof GetOpenAiLiveSessionTokenOutputSchema>;
 
 export async function getOpenAiLiveSessionToken(input?: GetOpenAiLiveSessionTokenInput): Promise<GetOpenAiLiveSessionTokenOutput> {
+    // 쓸 수 있는 세션 토큰을 발급하므로 로그인한 사용자로 제한합니다.
+    await requireUser();
     return getOpenAiLiveSessionTokenFlow((input || {}) as GetOpenAiLiveSessionTokenInput);
 }
 

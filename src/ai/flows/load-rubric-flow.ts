@@ -1,4 +1,5 @@
 'use server';
+import { requireUser } from '@/lib/auth-guard';
 
 /**
  * @fileOverview 평가에 연결된 루브릭을 불러옵니다.
@@ -19,6 +20,7 @@ export type LoadedRubric = {
 
 /** 루브릭 문서를 읽어 항목을 돌려줍니다. 없거나 비어 있으면 null. */
 export async function loadRubricById(rubricId: string): Promise<LoadedRubric | null> {
+  await requireUser();
   if (!rubricId) return null;
 
   try {
@@ -47,6 +49,7 @@ export async function loadRubricById(rubricId: string): Promise<LoadedRubric | n
  * 재채점 경로는 평가 ID만 알고 있으므로 이 형태가 필요합니다.
  */
 export async function loadRubricForAssessment(assessmentId: string): Promise<LoadedRubric | null> {
+  await requireUser();
   try {
     const snap = await assessmentRef(assessmentId).get();
     if (!snap.exists) return null;

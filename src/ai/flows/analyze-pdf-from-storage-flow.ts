@@ -1,4 +1,5 @@
 'use server';
+import { requireTeacher } from '@/lib/auth-guard';
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
@@ -19,6 +20,8 @@ export type AnalyzePdfFromStorageOutput = z.infer<typeof AnalyzePdfFromStorageOu
 export async function analyzePdfFromStorage(
   input: AnalyzePdfFromStorageInput,
 ): Promise<AnalyzePdfFromStorageOutput> {
+  // Storage 파일을 읽으므로 교사만 허용합니다.
+  await requireTeacher();
   return analyzePdfFromStorageFlow(input);
 }
 
