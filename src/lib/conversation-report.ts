@@ -14,6 +14,8 @@ export type ConversationReport = {
   grammarFeedback: string;
   fluencyFeedback: string;
   overallFeedback: string;
+  /** 발음·억양 평가. 음성을 들어야 하므로 자막 평가와 별개로 들어옵니다. */
+  pronunciation?: { score: number; feedback: string; model: string } | null;
   transcript: string;
   /** Storage 에 보관된 녹음 주소. PDF 에서 눌러 들을 수 있도록 넣습니다. */
   recordingUrl?: string | null;
@@ -82,6 +84,13 @@ export function buildConversationReportHtml(report: ConversationReport): string 
 
     <h3>유창성 (Fluency)</h3>
     <div class="body-text">${escapeHtml(report.fluencyFeedback)}</div>
+
+    ${report.pronunciation ? `
+    <h3>발음 및 억양 (Pronunciation) — ${report.pronunciation.score} / 100</h3>
+    <p style="font-size:12px;color:#666;margin:0 0 6px">
+      실제 음성을 듣고 평가했습니다. 음성 분석은 ${escapeHtml(report.pronunciation.model)} 가 수행했습니다.
+    </p>
+    <div class="body-text">${escapeHtml(report.pronunciation.feedback)}</div>` : ''}
 
     <h3>총평 (Overall)</h3>
     <div class="body-text">${renderMarkdown(report.overallFeedback)}</div>

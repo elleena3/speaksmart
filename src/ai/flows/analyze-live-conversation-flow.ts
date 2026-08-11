@@ -4,6 +4,7 @@ import { ai } from '@/ai/genkit';
 import { googleAI } from '@genkit-ai/google-genai';
 import { z } from 'zod';
 import { describeAiError } from '@/lib/ai-error-message';
+import { PRONUNCIATION_ANALYSIS_MODEL } from '@/lib/evaluation-models';
 
 const AnalyzeLiveConversationInputSchema = z.object({
     transcript: z.string().describe("The full transcript of the real-time conversation between User and AI."),
@@ -18,6 +19,51 @@ const AnalyzeLiveConversationOutputSchema = z.object({
     overallFeedback: z.string().describe("Holistic summary in markdown (2 strengths, 2 weaknesses, 3 actionable tips).")
 });
 export type AnalyzeLiveConversationOutput = z.infer<typeof AnalyzeLiveConversationOutputSchema>;
+
+// 발음 평가 모델 상수는 'use server' 파일에서 export 할 수 없어 lib 쪽에 둡니다.
+// (이 파일은 async 함수만 export 할 수 있습니다.)
+
+const PronunciationSchema = z.object({
+    pronunciationScore: z.number().int().min(0).max(100).describe("Pronunciation and intonation score 0-100"),
+    pronunciationFeedback: z.string().describe("Feedback in Korean on pronunciation, intonation, stress and rhythm."),
+});
+
+export type PronunciationAnalysis = z.infer<typeof PronunciationSchema> & { model: string };
+
+const pronunciationFromAudioPrompt = ai.definePrompt({
+    name: 'livePronunciationFromAudioPrompt',
+    model: PRONUNCIATION_ANALYSIS_MODEL,
+    input: { schema: z.object({ studentAudioDataUri: z.string() }) },
+    output: { schema: PronunciationSchema },
+    prompt: `You are an English pronunciation coach. The audio contains ONLY the student's speech from an English conversation practice session.
+
+{{media url=studentAudioDataUri}}
+
+Judge ONLY what can be heard. Do not comment on grammar, vocabulary or the content of what was said - those are evaluated separately.
+
+Assess:
+1. Pronunciation accuracy of individual sounds, and which specific sounds the student struggles with.
+2. Intonation, word stress and sentence rhythm.
+3. Speaking pace, clarity and hesitation.
+
+Give a score from 0 to 100 and concrete, encouraging feedback in Korean. Quote the English words the student mispronounced so they know exactly what to practise.`,
+});
+
+/**
+ * 학생 마이크 녹음만 받아 발음을 평가합니다.
+ * 실패해도 나머지 평가는 살아야 하므로 예외 대신 null 을 돌려줍니다.
+ */
+export async function analyzeLivePronunciation(studentAudioDataUri: string): Promise<PronunciationAnalysis | null> {
+    try {
+        const { output } = await pronunciationFromAudioPrompt({ studentAudioDataUri });
+        if (!output) return null;
+        return { ...output, model: PRONUNCIATION_ANALYSIS_MODEL };
+    } catch (e) {
+        const info = describeAiError(e, PRONUNCIATION_ANALYSIS_MODEL, '발음 분석');
+        console.error('analyzeLivePronunciation 실패:', info.kind, info.detail);
+        return null;
+    }
+}
 
 /**
  * 서버 액션에서 예외를 던지면 Next.js가 프로덕션에서 메시지를 지우고 digest만 남깁니다.

@@ -14,7 +14,9 @@ import { type EvaluationModel } from "@/lib/types";
 import { RecordingPlayback } from "./recording-playback";
 import { printConversationReport } from "@/lib/conversation-report";
 import { uploadConversationRecording, type UploadState } from "@/lib/upload-recording";
-import { analyzeLiveConversation, type AnalyzeLiveConversationOutput } from "@/ai/flows/analyze-live-conversation-flow";
+import { analyzeLiveConversation, analyzeLivePronunciation, type AnalyzeLiveConversationOutput, type PronunciationAnalysis } from "@/ai/flows/analyze-live-conversation-flow";
+import { startStudentMicRecorder, type StudentMicRecorder } from "@/lib/student-mic-recorder";
+import { PronunciationCard } from "./pronunciation-card";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Progress } from "@/components/ui/progress";
@@ -27,6 +29,7 @@ export function OpenAiRealtimeConversationTool() {
     const [appState, setAppState] = useState<AppState>('idle');
     const [turns, setTurns] = useState<Turn[]>([]);
     const [result, setResult] = useState<AnalyzeLiveConversationOutput | null>(null);
+    const [pronunciation, setPronunciation] = useState<PronunciationAnalysis | null>(null);
 
     const [selectedModel, setSelectedModel] = useState<string>("gpt-realtime-2.1-mini");
     const [selectedVoice, setSelectedVoice] = useState<string>("alloy");
@@ -62,12 +65,19 @@ export function OpenAiRealtimeConversationTool() {
     // WebAudio 쪽으로 오디오를 흘려보내지 않습니다. 실제 재생은 이 엘리먼트가 담당합니다.
     const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
 
+    // 발음 평가용 학생 마이크 전용 녹음 (합본 녹음과 별개)
+    const studentMicRef = useRef<StudentMicRecorder | null>(null);
+
     const endConversation = useCallback(async () => {
         if (appStateRef.current === 'finished' || appStateRef.current === 'analyzing') return;
 
         if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
             mediaRecorderRef.current.stop();
         }
+
+        // AudioContext 를 닫으면 마이크 스트림도 끊기므로, 정지 요청을 먼저 걸어둡니다.
+        const studentAudioPromise = studentMicRef.current?.stopAndGetDataUri() ?? Promise.resolve(null);
+        studentMicRef.current = null;
 
         if (peerConnectionRef.current) {
             peerConnectionRef.current.close();
@@ -93,15 +103,22 @@ export function OpenAiRealtimeConversationTool() {
 
         setAppState('analyzing');
 
+        // 발음 평가는 학생 목소리만 들어야 하므로 합본이 아닌 마이크 전용 녹음을 씁니다.
+        const studentAudio = await studentAudioPromise;
+
         try {
             const currentTurns = turnsRef.current;
             const fullTranscript = currentTurns.map(t => `${t.role === 'user' ? 'Student' : 'AI'}: ${t.text}`).join('\n');
             if (fullTranscript.trim().length > 10) {
-                const res = await analyzeLiveConversation({
-                    transcript: fullTranscript,
-                    // 이 콜백은 연결 시점에 캡처되므로 ref 로 최신 선택값을 읽습니다.
-                    evaluationModel: evaluationModelRef.current
-                });
+                // 자막 기반 평가와 음성 기반 발음 평가를 동시에 돌립니다.
+                const [res, pron] = await Promise.all([
+                    analyzeLiveConversation({
+                        transcript: fullTranscript,
+                        // 이 콜백은 연결 시점에 캡처되므로 ref 로 최신 선택값을 읽습니다.
+                        evaluationModel: evaluationModelRef.current
+                    }),
+                    studentAudio ? analyzeLivePronunciation(studentAudio) : Promise.resolve(null),
+                ]);
 
                 if (!res.ok) {
                     toast({ title: "분석 실패", description: res.error, variant: "destructive" });
@@ -109,6 +126,7 @@ export function OpenAiRealtimeConversationTool() {
                     return;
                 }
 
+                setPronunciation(pron);
                 setResult(res.data);
                 setAppState('finished');
             } else {
@@ -128,6 +146,7 @@ export function OpenAiRealtimeConversationTool() {
         setAppState('connecting');
         setTurns([]);
         setResult(null);
+        setPronunciation(null);
         setRecordingUrl(null);
         audioChunksRef.current = [];
 
@@ -219,6 +238,9 @@ export function OpenAiRealtimeConversationTool() {
             // Mic audio goes to recorder ONLY (avoid local echo)
             const micNode = audioCtx.createMediaStreamSource(ms);
             micNode.connect(mixDest);
+
+            // 발음 평가용으로 학생 목소리만 따로 담습니다.
+            studentMicRef.current = startStudentMicRecorder(audioCtx, micNode);
 
             // 5. Setup Data Channel to receive transcriptions
             const dc = pc.createDataChannel("oai-events");
@@ -353,6 +375,9 @@ export function OpenAiRealtimeConversationTool() {
             grammarFeedback: result.grammarFeedback,
             fluencyFeedback: result.fluencyFeedback,
             overallFeedback: result.overallFeedback,
+            pronunciation: pronunciation
+                ? { score: pronunciation.pronunciationScore, feedback: pronunciation.pronunciationFeedback, model: shortModelName(pronunciation.model) }
+                : null,
             transcript: turns.map(t => `${t.role === 'user' ? 'Student' : 'AI'}: ${t.text}`).join('\n'),
             recordingUrl: storedRecordingUrl,
         });
@@ -497,6 +522,8 @@ export function OpenAiRealtimeConversationTool() {
                             </CardContent>
                         </Card>
                     </div>
+
+                    {pronunciation && <PronunciationCard analysis={pronunciation} />}
 
                     <Card>
                         <CardHeader className="pb-2">

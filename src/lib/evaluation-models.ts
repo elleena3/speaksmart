@@ -51,6 +51,12 @@ export const VIDEO_EVALUATION_MODELS: EvaluationOption[] = [
  *
  * 값이 evaluationModels 에 없는 것도 있어(flash-lite) 타입을 string 으로 둡니다.
  */
+/**
+ * 실시간 대화의 발음 평가에 쓰는 모델.
+ * 대화를 OpenAI 로 했더라도 소리를 들을 수 있는 것은 Gemini 뿐이라 이 부분만 Gemini 가 맡습니다.
+ */
+export const PRONUNCIATION_ANALYSIS_MODEL = 'googleai/gemini-3.6-flash';
+
 export type AudioModelOption = { value: string; label: string };
 
 export const DEFAULT_AUDIO_MODEL = 'googleai/gemini-3.6-flash';

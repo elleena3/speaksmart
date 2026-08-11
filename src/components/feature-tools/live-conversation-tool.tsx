@@ -9,7 +9,9 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getLiveSessionToken } from "@/ai/flows/get-live-session-token";
 import { generateTtsByModelFlow } from "@/ai/flows/generate-tts-by-model-flow";
-import { analyzeLiveConversation, type AnalyzeLiveConversationOutput } from "@/ai/flows/analyze-live-conversation-flow";
+import { analyzeLiveConversation, analyzeLivePronunciation, type AnalyzeLiveConversationOutput, type PronunciationAnalysis } from "@/ai/flows/analyze-live-conversation-flow";
+import { startStudentMicRecorder, type StudentMicRecorder } from "@/lib/student-mic-recorder";
+import { PronunciationCard } from "./pronunciation-card";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Progress } from "@/components/ui/progress";
@@ -27,6 +29,7 @@ export function LiveConversationTool() {
     const [appState, setAppState] = useState<AppState>('idle');
     const [turns, setTurns] = useState<Turn[]>([]);
     const [result, setResult] = useState<AnalyzeLiveConversationOutput | null>(null);
+    const [pronunciation, setPronunciation] = useState<PronunciationAnalysis | null>(null);
     const [audioChunkCount, setAudioChunkCount] = useState<number>(0);
     const [selectedVoice, setSelectedVoice] = useState<string>("Aoede");
     const [recordingUrl, setRecordingUrl] = useState<string | null>(null);
@@ -60,6 +63,8 @@ export function LiveConversationTool() {
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const audioChunksRef = useRef<Blob[]>([]);
     const mixDestinationRef = useRef<MediaStreamAudioDestinationNode | null>(null);
+    // 발음 평가용 학생 마이크 전용 녹음 (합본 녹음과 별개)
+    const studentMicRef = useRef<StudentMicRecorder | null>(null);
 
     const nextPlayTimeRef = useRef<number>(0);
 
@@ -70,6 +75,10 @@ export function LiveConversationTool() {
         if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
             mediaRecorderRef.current.stop();
         }
+
+        // AudioContext 를 닫으면 마이크 스트림도 끊기므로, 정지 요청을 먼저 걸어둡니다.
+        const studentAudioPromise = studentMicRef.current?.stopAndGetDataUri() ?? Promise.resolve(null);
+        studentMicRef.current = null;
 
         if (wsRef.current) {
             wsRef.current.close();
@@ -94,16 +103,22 @@ export function LiveConversationTool() {
 
         setAppState('analyzing');
 
+        // 발음 평가는 학생 목소리만 들어야 하므로 합본이 아닌 마이크 전용 녹음을 씁니다.
+        const studentAudio = await studentAudioPromise;
+
         try {
             const currentTurns = turnsRef.current;
             const fullTranscript = currentTurns.map(t => `${t.role === 'user' ? 'Student' : 'AI'}: ${t.text}`).join('\n');
             if (fullTranscript.trim().length > 10) {
-                // Gemini app uses Gemini 3.1 Pro for high fidelity evaluation
-                const res = await analyzeLiveConversation({
-                    transcript: fullTranscript,
-                    // 이 콜백은 연결 시점에 캡처되므로 ref 로 최신 선택값을 읽습니다.
-                    evaluationModel: evaluationModelRef.current
-                });
+                // 자막 기반 평가와 음성 기반 발음 평가를 동시에 돌립니다.
+                const [res, pron] = await Promise.all([
+                    analyzeLiveConversation({
+                        transcript: fullTranscript,
+                        // 이 콜백은 연결 시점에 캡처되므로 ref 로 최신 선택값을 읽습니다.
+                        evaluationModel: evaluationModelRef.current
+                    }),
+                    studentAudio ? analyzeLivePronunciation(studentAudio) : Promise.resolve(null),
+                ]);
 
                 if (!res.ok) {
                     toast({ title: "분석 실패", description: res.error, variant: "destructive" });
@@ -111,6 +126,7 @@ export function LiveConversationTool() {
                     return;
                 }
 
+                setPronunciation(pron);
                 setResult(res.data);
                 setAppState('finished');
             } else {
@@ -130,6 +146,7 @@ export function LiveConversationTool() {
         setAppState('connecting');
         setTurns([]);
         setResult(null);
+        setPronunciation(null);
         setAudioChunkCount(0);
         setRecordingUrl(null);
         audioChunksRef.current = [];
@@ -211,6 +228,9 @@ export function LiveConversationTool() {
 
                 // Send user mic to mixDest for recording
                 source.connect(mixDest);
+
+                // 발음 평가용으로 학생 목소리만 따로 담습니다.
+                studentMicRef.current = startStudentMicRecorder(audioCtx, source);
 
                 processor.onaudioprocess = (e) => {
                     if (!wsRef.current || !setupCompleteRef.current) return;
@@ -439,6 +459,9 @@ export function LiveConversationTool() {
             grammarFeedback: result.grammarFeedback,
             fluencyFeedback: result.fluencyFeedback,
             overallFeedback: result.overallFeedback,
+            pronunciation: pronunciation
+                ? { score: pronunciation.pronunciationScore, feedback: pronunciation.pronunciationFeedback, model: shortModelName(pronunciation.model) }
+                : null,
             transcript: turns.map(t => `${t.role === 'user' ? 'Student' : 'AI'}: ${t.text}`).join('\n'),
             recordingUrl: storedRecordingUrl,
         });
@@ -571,6 +594,8 @@ export function LiveConversationTool() {
                             </CardContent>
                         </Card>
                     </div>
+
+                    {pronunciation && <PronunciationCard analysis={pronunciation} />}
 
                     <Card>
                         <CardHeader className="pb-2">
