@@ -44,17 +44,22 @@ export const VIDEO_EVALUATION_MODELS: EvaluationOption[] = [
 ];
 
 /**
- * 음성을 직접 듣고 처리할 수 있는 모델. 받아쓰기·발음 분석 도구가 비교용으로 씁니다.
+ * 음성을 직접 듣고 처리할 수 있는 모델. 받아쓰기·발음 분석 도구가 씁니다.
  *
  * 확인 결과 Gemini 만 오디오 파트를 받습니다.
  * OpenAI 는 파일 파트에 application/pdf 만 허용하고, Claude 는 이미지로 취급해 거부합니다.
- * 비교가 의미 있으려면 서로 다른 등급이어야 합니다.
+ *
+ * 값이 evaluationModels 에 없는 것도 있어(flash-lite) 타입을 string 으로 둡니다.
  */
-export const AUDIO_COMPARISON_MODELS = [
-  'googleai/gemini-3.6-flash',
-  'googleai/gemini-3.1-pro-preview',
-  'googleai/gemini-3.1-flash-lite',
-] as const;
+export type AudioModelOption = { value: string; label: string };
+
+export const DEFAULT_AUDIO_MODEL = 'googleai/gemini-3.6-flash';
+
+export const AUDIO_MODELS: AudioModelOption[] = [
+  { value: 'googleai/gemini-3.6-flash', label: 'gemini-3.6-flash (기본/빠름)' },
+  { value: 'googleai/gemini-3.1-pro-preview', label: 'gemini-3.1-pro-preview (고성능/정밀)' },
+  { value: 'googleai/gemini-3.1-flash-lite', label: 'gemini-3.1-flash-lite (가장 가벼움)' },
+];
 
 /** 'openai/gpt-5.6-terra' → 'gpt-5.6-terra' (배지 표시용) */
 export function shortModelName(model: string): string {

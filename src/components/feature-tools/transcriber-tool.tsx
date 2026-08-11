@@ -10,6 +10,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { transcribeFile, type TranscriptionResult } from "@/ai/flows/transcribe-file";
 import { useLanguage } from "@/context/language-context";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AUDIO_MODELS, DEFAULT_AUDIO_MODEL } from "@/lib/evaluation-models";
 
 const mimeType = 'audio/webm;codecs=opus';
 type RecordingState = 'idle' | 'recording';
@@ -144,8 +147,10 @@ function AudioProcessor({
 }
 
 export function TranscriberTool() {
+  const modelSelectId = useId();
 
   const [transcripts, setTranscripts] = useState<TranscriptionResult[]>([]);
+  const [model, setModel] = useState<string>(DEFAULT_AUDIO_MODEL);
   const { toast } = useToast();
   const { t } = useLanguage();
 
@@ -153,7 +158,7 @@ export function TranscriberTool() {
     setTranscripts([]);
     toast({ title: t.teacherMisc.transcriberTool.toastStartTitle, description: t.teacherMisc.transcriberTool.toastStartDescription });
     try {
-      const results = await transcribeFile(dataUri);
+      const results = await transcribeFile(dataUri, model);
       setTranscripts(results);
       toast({ title: t.teacherMisc.transcriberTool.toastCompleteTitle, description: t.teacherMisc.transcriberTool.toastCompleteDescription });
     } catch (error: any) {
@@ -164,6 +169,23 @@ export function TranscriberTool() {
 
   return (
     <AudioProcessor onAnalyze={handleAnalyze} analyzeButtonText={t.teacherMisc.transcriberTool.buttonText} analyzeButtonIcon={FileText}>
+        <div className="grid gap-2">
+          <Label htmlFor={modelSelectId} className="text-sm font-medium">AI 모델 선택</Label>
+          <Select value={model} onValueChange={setModel}>
+            <SelectTrigger id={modelSelectId}>
+              <SelectValue placeholder="모델을 선택하세요..." />
+            </SelectTrigger>
+            <SelectContent>
+              {AUDIO_MODELS.map(m => (
+                <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            음성을 직접 처리할 수 있는 모델만 표시됩니다. OpenAI·Claude 모델은 음성 입력을 지원하지 않습니다.
+          </p>
+        </div>
+
         {transcripts.length > 0 && (
             <div className="grid grid-cols-1 gap-4">
               <h3 className="text-lg font-semibold border-b pb-2">{t.teacherMisc.transcriberTool.resultsTitle}</h3>
