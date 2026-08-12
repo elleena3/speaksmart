@@ -46,6 +46,57 @@ Firebase Auth는 이메일을 요구하므로 이름을 결정적으로 변환�
 - 학생 비밀번호 초기화·계정 삭제는 교사만 가능하며, 서버에서 ID 토큰과 역할을 검증합니다
   (`src/app/teacher/students/actions.ts`).
 
+### 서버 액션 인증 (중요)
+
+Next.js의 서버 액션은 **인증 없이 누구나 POST 할 수 있는 HTTP 엔드포인트**입니다.
+액션 ID는 공개된 JS 번들에 그대로 들어 있어 감춰지지도 않습니다.
+따라서 Firestore·Storage를 건드리거나 유료 API를 쓰는 액션은 반드시 호출자를 확인해야 합니다.
+
+로그인하면 `/api/session`이 httpOnly 세션 쿠키를 심고, 서버 액션은 `src/lib/auth-guard.ts`의
+가드로 그 쿠키를 확인합니다. 브라우저가 쿠키를 자동으로 실어 보내므로 화면 코드는
+아무것도 넘길 필요가 없습니다.
+
+```ts
+'use server';
+import { requireTeacher } from '@/lib/auth-guard';
+
+export async function myAction(input: MyInput) {
+  await requireTeacher();   // ← 맨 앞에
+  ...
+}
+```
+
+**새 서버 액션을 만들면 첫 줄에 가드를 넣으십시오.** 빠뜨리면 그 기능이 인터넷에 열립니다.
+
+| 가드 | 쓰는 곳 |
+|---|---|
+| `requireUser()` | 학생도 쓰는 기능 |
+| `requireTeacher()` | 교사 전용 도구 |
+| `requireResultAccess(resultId)` | 특정 결과 문서를 읽거나 덮어쓸 때 |
+| `requireAssessmentOwner(assessmentId)` | 평가 전체에 영향을 주는 작업 |
+
+가드는 **서버 액션의 본문에서** 부르십시오. Genkit 플로우 안이 아니라 바깥입니다.
+`next/headers`의 `cookies()`는 요청 문맥에서만 동작합니다.
+
+운영자용 스크립트(`scripts/`)에서 플로우를 직접 부를 때는 `SPEAKSMART_TRUSTED_SCRIPT=1`을
+붙입니다. Vercel에서는 `VERCEL` 환경 변수 때문에 켜지지 않으므로 대시보드에 넣어도 무시됩니다.
+
+```bash
+SPEAKSMART_TRUSTED_SCRIPT=1 npx tsx scripts/experiments/some-check.ts
+```
+
+### API 키 취급
+
+`src/ai/flows/get-live-session-token.ts`는 실시간 대화(Gemini) 도구를 위해
+**API 키 원본을 브라우저로 내려보냅니다.** 지금은 로그인한 사용자로 제한해 두었지만,
+그 사용자들의 브라우저에는 키가 남습니다(WebSocket URL의 `?key=`).
+
+임시 토큰(`v1alpha/auth_tokens`)으로 바꾸려 했으나 **발급은 되는데 접속이 거부됩니다.**
+`access_token`(v1alpha·v1beta), `Authorization: Token`, 미인코딩 4가지를 시도했고
+전부 `unregistered callers`로 닫혔습니다. 같은 조건에서 원본 키는 정상 접속됩니다.
+
+이 도구를 쓰신다면 **Live 전용으로 별도의 키를 발급해 피해 범위를 격리**하는 편이 안전합니다.
+
 ## 4. 데이터베이스 초기화 (중요)
 
 새로운 Firebase 환경으로 옮기면 데이터베이스(Firestore)가 비어 있습니다.
@@ -194,8 +245,47 @@ PNG와 PDF로 만들어 9개 모델에 넣고 항목명·배점·수준 점수·
 - `src/lib/rubric-summary.ts`: 채점 결과를 표·요약으로 변환
 - `src/components/rubric-result-card.tsx`: 결과 화면 표시 (구형식 호환)
 
+## 7-2. 평가에 쓸 모델 고르기
+
+모델 목록이 용도에 따라 셋으로 나뉘어 있습니다 (`src/lib/types.ts`).
+13종을 전부 실제로 응시시켜 확인한 결과를 반영한 것입니다.
+
+| 목록 | 개수 | 어디에 쓰이나 |
+|---|---|---|
+| `assessmentEvaluationModels` | 5 | 평가 만들기·수정의 `AI 평가 모델` |
+| `rubricAnalysisModels` | 8 | 루브릭 파일에서 기준안 뽑기 |
+| `evaluationModels` | 13 | 교사 도구 (손글씨·PDF·유튜브·발표 등) |
+
+**학생 녹음을 스스로 듣는 것은 Gemini 뿐입니다.** OpenAI와 Claude는 오디오를 400으로 거부합니다.
+그래서 평가 목록에는 Gemini 2종과 gpt-5.6 3종만 두었고, 각 항목에 무엇을 스스로 하는지
+적어 두었습니다.
+
+- `gemini-3.6-flash`, `gemini-3.1-pro-preview` — 전 과정을 스스로 처리
+- `gpt-5.6-terra`, `gpt-5.6-luna`, `gpt-5.6-sol` — **내용 채점만.** 전사와 발음 점수는 Gemini가 매깁니다
+
+즉 GPT를 고르셔도 발음 점수는 Gemini가 준 값입니다. 발음 채점 모델을 비교하는 용도로는
+쓸 수 없습니다.
+
+### 오디오 실패 시 자동 대체
+
+오디오를 넘기는 호출(전사·발음 분석)이 실패하면 `googleai/gemini-3.1-pro-preview`로
+한 번 더 시도합니다 (`src/lib/ai-retry.ts`). 전사가 실패하면 채점을 아예 못 하고
+학생이 다시 응시해야 하기 때문입니다.
+
+실제로 2026-08에 `gemini-3.6-flash`가 오디오 입력에만 500을 돌려주는 일이 있었고
+(텍스트·이미지는 정상), 이 대체 덕분에 응시가 끝까지 완료됐습니다.
+대체가 걸리면 서버 로그에 다음과 같이 남습니다.
+
+```
+[전사] googleai/gemini-3.6-flash 실패 → googleai/gemini-3.1-pro-preview 로 대체합니다: ...
+```
+
+대체가 걸리는 동안에는 응시 처리가 20~40초로 조금 느려집니다.
+
 ## 8. 장애 조치 (Troubleshooting)
 
+- **도구가 "로그인이 필요합니다"로 막힐 때**: 세션 쿠키가 없거나 만료된 상태입니다.
+  로그아웃 후 다시 로그인하면 `/api/session`이 쿠키를 새로 심습니다.
 - **AI 응답 속도가 느릴 때**: `src/ai/flows/text-to-speech.ts`에서 모델을 `gemini-1.5-flash-latest`로 변경하면 속도가 향상됩니다.
 - **로그인이 되지 않을 때**: `npm run seed`로 계정을 생성했는지, 기존 환경이라면 `npm run migrate:auth -- --apply`를 실행했는지 확인하십시오.
 - **Firebase 권한 오류**: `firestore.rules` / `storage.rules`를 배포했는지 확인하십시오 (`firebase deploy --only firestore:rules,storage`).
