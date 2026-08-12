@@ -275,10 +275,10 @@ Admin SDK로 옮기면서 들어온 문제입니다 (`uploadString`은 이 형�
   따라갔고(`sheet`·`skeleton`은 `sidebar`만 쓰므로 남겼습니다), 삭제 후 33개 전부
   도달 가능·미사용 0개를 재확인했습니다.
   `sidebar.tsx` 의 `collapsible` prop 은 동명이인이라 참조가 아닙니다.
-  **다만 이 넷만 쓰던 npm 패키지 4개가 남아 있습니다** — `embla-carousel-react`,
-  `@radix-ui/react-collapsible`, `@radix-ui/react-menubar`, `@radix-ui/react-slider`.
-  지금은 아무도 import 하지 않으니 지워도 되지만, `vercel.json` 이 `npm ci` 를 쓰므로
-  package-lock.json 이 함께 갱신되어야 합니다.
+  이 넷만 쓰던 npm 패키지 4개도 함께 제거했습니다(dependencies 57 → 53).
+  `@radix-ui/react-collapsible` 은 `@radix-ui/react-accordion` 의 전이 의존이라
+  package.json 에서 빠져도 계속 설치됩니다. `npm ci` 로 깨끗하게 설치되는 것까지
+  확인했습니다.
 
 ### 알아두어야 할 제약
 
