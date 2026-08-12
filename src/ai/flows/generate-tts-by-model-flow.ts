@@ -1,5 +1,6 @@
 
 'use server';
+import { requireTeacher } from '@/lib/auth-guard';
 
 /**
  * @fileOverview A flow to generate speech from text using a specific TTS model.
@@ -109,7 +110,7 @@ async function textToSpeech(text: string, modelName: (typeof ttsModels)[number])
 }
 
 
-export const generateTtsByModelFlow = ai.defineFlow(
+const generateTtsByModelFlowInner = ai.defineFlow(
   {
     name: 'generateTtsByModelFlow',
     inputSchema: GenerateTtsByModelInputSchema,
@@ -123,3 +124,9 @@ export const generateTtsByModelFlow = ai.defineFlow(
     return { audioDataUri };
   }
 );
+
+/** 서버 액션 진입점. 인증 없이 호출될 수 있어 호출자를 먼저 확인합니다. */
+export async function generateTtsByModelFlow(input: Parameters<typeof generateTtsByModelFlowInner>[0]) {
+  await requireTeacher();
+  return generateTtsByModelFlowInner(input);
+}

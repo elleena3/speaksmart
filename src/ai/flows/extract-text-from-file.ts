@@ -1,5 +1,6 @@
 
 'use server';
+import { requireTeacher } from '@/lib/auth-guard';
 
 /**
  * @fileOverview A flow to extract text from an uploaded file (PDF, image, or TXT).
@@ -24,6 +25,9 @@ const ExtractTextFromFileOutputSchema = z.object({
 export type ExtractTextFromFileOutput = z.infer<typeof ExtractTextFromFileOutputSchema>;
 
 export async function extractTextFromFile(input: ExtractTextFromFileInput): Promise<ExtractTextFromFileOutput> {
+  // 서버 액션은 인증 없이 호출될 수 있어 호출자를 먼저 확인합니다.
+  await requireTeacher();
+
   // Handle plain text files on the server to avoid client-side complexity
   if (input.fileDataUri.startsWith('data:text/plain')) {
       const base64Content = input.fileDataUri.substring(input.fileDataUri.indexOf(',') + 1);

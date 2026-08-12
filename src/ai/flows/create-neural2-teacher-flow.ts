@@ -1,5 +1,6 @@
 
 'use server';
+import { requireTeacher } from '@/lib/auth-guard';
 
 /**
  * @fileOverview Converts audio to speech and handles conversational AI responses.
@@ -56,6 +57,9 @@ type ConverseWithOpenAiTtsTeacherOutput = z.infer<typeof ConverseWithOpenAiTtsTe
 export async function converseWithOpenAiTtsTeacher(
   input: ConverseWithOpenAiTtsTeacherInput
 ): Promise<ConverseWithOpenAiTtsTeacherOutput> {
+  // 서버 액션은 인증 없이 호출될 수 있어 호출자를 먼저 확인합니다.
+  await requireTeacher();
+
   return converseWithOpenAiTtsTeacherFlow(input);
 }
 

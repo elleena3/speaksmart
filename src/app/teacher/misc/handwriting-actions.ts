@@ -1,4 +1,5 @@
 'use server';
+import { requireTeacher } from '@/lib/auth-guard';
 
 import { getAdminDb } from '@/lib/firebase-admin';
 import type { AnalyzeHandwritingSubmissionOutput } from '@/ai/flows/analyze-handwriting-submission-flow';
@@ -10,6 +11,9 @@ function generateDocId(fileName: string) {
 }
 
 export async function checkGradingHistoryBatch(fileNames: string[]): Promise<string[]> {
+  // 서버 액션은 인증 없이 호출될 수 있어 호출자를 먼저 확인합니다.
+  await requireTeacher();
+
     try {
         const db = getAdminDb();
         const foundFiles: string[] = [];
@@ -25,6 +29,9 @@ export async function checkGradingHistoryBatch(fileNames: string[]): Promise<str
 }
 
 export async function getPreviousGradingResult(fileName: string): Promise<string | null> {
+  // 서버 액션은 인증 없이 호출될 수 있어 호출자를 먼저 확인합니다.
+  await requireTeacher();
+
     try {
         const db = getAdminDb();
         const docId = generateDocId(fileName);
@@ -46,6 +53,9 @@ export async function getPreviousGradingResult(fileName: string): Promise<string
 }
 
 export async function saveGradingResult(fileName: string, result: AnalyzeHandwritingSubmissionOutput) {
+  // 서버 액션은 인증 없이 호출될 수 있어 호출자를 먼저 확인합니다.
+  await requireTeacher();
+
     try {
         const db = getAdminDb();
         const docId = generateDocId(fileName);

@@ -1,4 +1,5 @@
 'use server';
+import { requireTeacher } from '@/lib/auth-guard';
 
 /**
  * @fileOverview Summarizes student feedback on assessment activities for teachers.
@@ -35,6 +36,9 @@ export type SummarizeStudentFeedbackOutput = z.infer<
 export async function summarizeStudentFeedback(
   input: SummarizeStudentFeedbackInput
 ): Promise<SummarizeStudentFeedbackOutput> {
+  // 서버 액션은 인증 없이 호출될 수 있어 호출자를 먼저 확인합니다.
+  await requireTeacher();
+
   return summarizeStudentFeedbackFlow(input);
 }
 

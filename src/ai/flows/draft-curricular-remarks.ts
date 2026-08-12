@@ -1,5 +1,6 @@
 // src/ai/flows/draft-curricular-remarks.ts
 'use server';
+import { requireTeacher } from '@/lib/auth-guard';
 
 /**
  * @fileOverview This file defines a Genkit flow for drafting curricular remarks based on a student's performance in a speaking assessment.
@@ -41,6 +42,9 @@ export type DraftCurricularRemarksOutput =
 export async function draftCurricularRemarks(
   input: DraftCurricularRemarksInput
 ): Promise<DraftCurricularRemarksOutput> {
+  // 서버 액션은 인증 없이 호출될 수 있어 호출자를 먼저 확인합니다.
+  await requireTeacher();
+
   return draftCurricularRemarksFlow(input);
 }
 

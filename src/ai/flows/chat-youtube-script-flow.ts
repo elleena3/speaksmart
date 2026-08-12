@@ -1,4 +1,5 @@
 'use server';
+import { requireTeacher } from '@/lib/auth-guard';
 /**
  * @fileOverview A flow to chat with a YouTube transcript context.
  */
@@ -27,6 +28,9 @@ const ChatYoutubeScriptOutputSchema = z.object({
 export type ChatYoutubeScriptOutput = z.infer<typeof ChatYoutubeScriptOutputSchema>;
 
 export async function chatYoutubeScript(input: ChatYoutubeScriptInput): Promise<ChatYoutubeScriptOutput> {
+  // 서버 액션은 인증 없이 호출될 수 있어 호출자를 먼저 확인합니다.
+  await requireTeacher();
+
     return chatYoutubeScriptFlow(input);
 }
 

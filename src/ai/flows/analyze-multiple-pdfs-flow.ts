@@ -1,5 +1,6 @@
 
 'use server';
+import { requireTeacher } from '@/lib/auth-guard';
 
 /**
  * @fileOverview A flow to analyze multiple PDF files individually.
@@ -36,6 +37,9 @@ export type SingleFileAnalysisResult = z.infer<typeof SingleFileAnalysisResultSc
  * This is the new core function for the sequential analyzer tool.
  */
 export async function analyzeSinglePdf(input: SingleFileInput): Promise<SingleFileAnalysisResult> {
+  // 서버 액션은 인증 없이 호출될 수 있어 호출자를 먼저 확인합니다.
+  await requireTeacher();
+
     try {
         const { text } = await ai.generate({
             model: 'googleai/gemini-3.1-pro-preview',
@@ -88,6 +92,9 @@ const AnalyzeMultiplePdfsOutputSchema = z.object({
 export type AnalyzeMultiplePdfsOutput = z.infer<typeof AnalyzeMultiplePdfsOutputSchema>;
 
 export async function analyzeMultiplePdfs(input: AnalyzeMultiplePdfsInput): Promise<AnalyzeMultiplePdfsOutput> {
+  // 서버 액션은 인증 없이 호출될 수 있어 호출자를 먼저 확인합니다.
+  await requireTeacher();
+
   return analyzeMultiplePdfsFlow(input);
 }
 

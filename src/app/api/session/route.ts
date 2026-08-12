@@ -19,7 +19,10 @@ export const runtime = 'nodejs';
 const SESSION_DAYS = 5;
 const EXPIRES_IN_MS = SESSION_DAYS * 24 * 60 * 60 * 1000;
 
-export const SESSION_COOKIE_NAME = 'speaksmart_session';
+// 라우트 핸들러 파일은 GET/POST 같은 정해진 것만 export 할 수 있습니다.
+// 상수를 함께 내보내면 타입 검사가 실패하므로 여기서는 지역 상수로 둡니다.
+// 같은 이름을 src/lib/auth-guard.ts 가 따로 갖고 있습니다.
+const SESSION_COOKIE_NAME = 'speaksmart_session';
 
 /** ID 토큰을 세션 쿠키로 바꿔 심습니다. */
 export async function POST(request: Request) {

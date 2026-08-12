@@ -1,4 +1,5 @@
 'use server';
+import { requireTeacher } from '@/lib/auth-guard';
 
 import { ai } from '@/ai/genkit';
 import { googleAI } from '@genkit-ai/google-genai';
@@ -32,6 +33,9 @@ const GradePdfSubmissionOutputSchema = z.object({
 export type GradePdfSubmissionOutput = z.infer<typeof GradePdfSubmissionOutputSchema>;
 
 export async function gradePdfSubmission(input: GradePdfSubmissionInput): Promise<GradePdfSubmissionOutput> {
+  // 서버 액션은 인증 없이 호출될 수 있어 호출자를 먼저 확인합니다.
+  await requireTeacher();
+
   try {
     const { text } = await ai.generate({
       model: 'googleai/gemini-3.1-pro-preview',

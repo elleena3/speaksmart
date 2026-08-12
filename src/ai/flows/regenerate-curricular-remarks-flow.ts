@@ -1,4 +1,5 @@
 'use server';
+import { requireTeacher } from '@/lib/auth-guard';
 /**
  * @fileOverview A dedicated flow to regenerate only the comprehensive curricular remarks.
  *
@@ -24,6 +25,9 @@ export type RegenerateRemarksOutput = z.infer<typeof RegenerateRemarksOutputSche
 export async function regenerateCurricularRemarks(
   input: z.infer<typeof RegenerateRemarksInputSchema>
 ): Promise<RegenerateRemarksOutput> {
+  // 서버 액션은 인증 없이 호출될 수 있어 호출자를 먼저 확인합니다.
+  await requireTeacher();
+
   return regenerateCurricularRemarksFlow(input);
 }
 

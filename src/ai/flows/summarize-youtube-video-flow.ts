@@ -1,5 +1,6 @@
 
 'use server';
+import { requireTeacher } from '@/lib/auth-guard';
 /**
  * @fileOverview A flow to summarize a YouTube video.
  * It fetches the transcript of a YouTube video and uses Gemini to summarize it.
@@ -24,6 +25,9 @@ const SummarizeYoutubeVideoOutputSchema = z.object({
 export type SummarizeYoutubeVideoOutput = z.infer<typeof SummarizeYoutubeVideoOutputSchema>;
 
 export async function summarizeYoutubeVideo(input: SummarizeYoutubeVideoInput): Promise<SummarizeYoutubeVideoOutput> {
+  // 서버 액션은 인증 없이 호출될 수 있어 호출자를 먼저 확인합니다.
+  await requireTeacher();
+
   return summarizeYoutubeVideoFlow(input);
 }
 

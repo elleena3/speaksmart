@@ -1,4 +1,5 @@
 'use server';
+import { requireTeacher } from '@/lib/auth-guard';
 
 /**
  * @fileOverview A flow to analyze a user's handwriting from an image.
@@ -38,6 +39,9 @@ export type AnalyzeHandwritingOutput = z.infer<typeof AnalyzeHandwritingOutputSc
 
 
 export async function analyzeHandwriting(input: AnalyzeHandwritingInput): Promise<AnalyzeHandwritingOutput> {
+  // 서버 액션은 인증 없이 호출될 수 있어 호출자를 먼저 확인합니다.
+  await requireTeacher();
+
   const result = await analyzeHandwritingFlow(input);
   return result;
 }

@@ -1,4 +1,5 @@
 'use server';
+import { requireTeacher } from '@/lib/auth-guard';
 
 import { ai } from '@/ai/genkit';
 import { googleAI } from '@genkit-ai/google-genai';
@@ -54,6 +55,9 @@ Give a score from 0 to 100 and concrete, encouraging feedback in Korean. Quote t
  * 실패해도 나머지 평가는 살아야 하므로 예외 대신 null 을 돌려줍니다.
  */
 export async function analyzeLivePronunciation(studentAudioDataUri: string): Promise<PronunciationAnalysis | null> {
+  // 서버 액션은 인증 없이 호출될 수 있어 호출자를 먼저 확인합니다.
+  await requireTeacher();
+
     try {
         const { output } = await pronunciationFromAudioPrompt({ studentAudioDataUri });
         if (!output) return null;
@@ -76,6 +80,9 @@ export type AnalyzeLiveConversationResult =
     | { ok: false; error: string };
 
 export async function analyzeLiveConversation(input: AnalyzeLiveConversationInput): Promise<AnalyzeLiveConversationResult> {
+  // 서버 액션은 인증 없이 호출될 수 있어 호출자를 먼저 확인합니다.
+  await requireTeacher();
+
     try {
         const data = await analyzeLiveConversationFlow(input);
         return { ok: true, data };

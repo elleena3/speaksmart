@@ -1,5 +1,6 @@
 
 'use server';
+import { requireTeacher } from '@/lib/auth-guard';
 
 /**
  * @fileOverview A flow to analyze a user-selected text snippet from a larger passage.
@@ -14,6 +15,9 @@ import { z } from 'zod';
 import { EnhanceSelectedTextInputSchema, EnhanceSelectedTextOutputSchema, EnhanceSelectedTextInput, EnhanceSelectedTextOutput } from '@/lib/types/ai-schemas';
 
 export async function enhanceSelectedText(input: EnhanceSelectedTextInput): Promise<EnhanceSelectedTextOutput> {
+  // 서버 액션은 인증 없이 호출될 수 있어 호출자를 먼저 확인합니다.
+  await requireTeacher();
+
   const result = await enhanceSelectedTextFlow(input);
   return result;
 }

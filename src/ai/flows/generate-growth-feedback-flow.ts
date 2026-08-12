@@ -1,5 +1,6 @@
 
 'use server';
+import { requireUser } from '@/lib/auth-guard';
 /**
  * @fileOverview A flow to generate comparative feedback on a student's growth between two assessment attempts.
  *
@@ -14,6 +15,9 @@ import { GenerateGrowthFeedbackInputSchema, GenerateGrowthFeedbackOutputSchema, 
 export async function generateGrowthFeedback(
   input: GenerateGrowthFeedbackInput
 ): Promise<GenerateGrowthFeedbackOutput> {
+  // 서버 액션은 인증 없이 호출될 수 있어 호출자를 먼저 확인합니다.
+  await requireUser();
+
   return generateGrowthFeedbackFlow(input);
 }
 

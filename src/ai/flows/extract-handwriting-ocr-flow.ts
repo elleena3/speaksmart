@@ -1,4 +1,5 @@
 'use server';
+import { requireTeacher } from '@/lib/auth-guard';
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
@@ -20,6 +21,9 @@ const ExtractHandwritingOcrOutputSchema = z.object({
 export type ExtractHandwritingOcrOutput = z.infer<typeof ExtractHandwritingOcrOutputSchema>;
 
 export async function extractHandwritingOcr(input: ExtractHandwritingOcrInput): Promise<string> {
+  // 서버 액션은 인증 없이 호출될 수 있어 호출자를 먼저 확인합니다.
+  await requireTeacher();
+
     const result = await extractHandwritingOcrFlow(input);
     return result;
 }

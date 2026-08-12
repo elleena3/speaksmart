@@ -1,4 +1,5 @@
 'use server';
+import { requireUser } from '@/lib/auth-guard';
 
 /**
  * @fileOverview 교사가 만든 루브릭으로 채점합니다.
@@ -67,6 +68,9 @@ export type GradeWithRubricResult = {
 };
 
 export async function gradeWithRubric(input: GradeWithRubricInput): Promise<GradeWithRubricResult> {
+  // 서버 액션은 인증 없이 호출될 수 있어 호출자를 먼저 확인합니다.
+  await requireUser();
+
   const { output } = await rubricGradingPrompt(input);
   if (!output) throw new Error('루브릭 채점 결과를 받지 못했습니다.');
 
@@ -86,6 +90,9 @@ export async function describeRubricResult(
   assessmentTitle: string,
   result: GradeWithRubricResult
 ): Promise<string> {
+  // 서버 액션은 인증 없이 호출될 수 있어 호출자를 먼저 확인합니다.
+  await requireUser();
+
   const parts = result.evaluation.criteria
     .map((c) => `${c.name} ${c.score}/${c.maxScore}`)
     .join(', ');

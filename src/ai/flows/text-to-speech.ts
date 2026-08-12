@@ -1,4 +1,5 @@
 'use server';
+import { requireUser } from '@/lib/auth-guard';
 
 /**
  * @fileOverview Converts text to speech and handles conversational AI responses.
@@ -102,6 +103,9 @@ You:{{/if}}`,
 // --- Exported Functions ---
 
 export async function converseWithStudent(input: any): Promise<any> {
+  // 서버 액션은 인증 없이 호출될 수 있어 호출자를 먼저 확인합니다.
+  await requireUser();
+
   const { studentRecordingDataUri, conversationHistory, scenario, scenarioPrompt, aiVoice, evaluationModel } = input;
 
   // Resolve potentially outdated or unprefixed model strings from Firestore
@@ -152,6 +156,9 @@ export async function converseWithStudent(input: any): Promise<any> {
 }
 
 export async function readAloudText(input: any): Promise<any> {
+  // 서버 액션은 인증 없이 호출될 수 있어 호출자를 먼저 확인합니다.
+  await requireUser();
+
   const audioDataUri = await textToSpeech(input.text, 'puck');
   return { audioDataUri };
 }

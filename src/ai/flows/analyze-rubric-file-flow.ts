@@ -1,4 +1,5 @@
 'use server';
+import { requireTeacher } from '@/lib/auth-guard';
 
 /**
  * @fileOverview A flow to analyze a rubric file (image or PDF) and extract evaluation criteria.
@@ -26,6 +27,9 @@ function missingKeyFor(model: string): string | null {
 export async function analyzeRubricFile(
   input: AnalyzeRubricFileInput
 ): Promise<AnalyzeRubricFileOutput & { unavailableReason?: string }> {
+  // 서버 액션은 인증 없이 호출될 수 있어 호출자를 먼저 확인합니다.
+  await requireTeacher();
+
   // 키가 없으면 Genkit 은 "Model ... not found" 를 던지는데,
   // 프로덕션은 서버 액션이 던진 메시지를 감춰서 화면에는 원인이 안 뜹니다.
   // 그래서 던지지 않고 결과에 담아 돌려줍니다.

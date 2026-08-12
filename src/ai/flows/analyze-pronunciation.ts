@@ -1,4 +1,5 @@
 'use server';
+import { requireTeacher } from '@/lib/auth-guard';
 
 /**
  * @fileOverview Analyzes pronunciation using multiple models for comparison.
@@ -17,6 +18,9 @@ export async function analyzePronunciation(
   audioDataUri: string,
   model: string = DEFAULT_AUDIO_MODEL
 ): Promise<any[]> {
+  // 서버 액션은 인증 없이 호출될 수 있어 호출자를 먼저 확인합니다.
+  await requireTeacher();
+
   try {
     const response = await ai.generate({
       model,

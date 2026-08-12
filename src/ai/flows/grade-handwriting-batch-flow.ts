@@ -1,4 +1,5 @@
 'use server';
+import { requireTeacher } from '@/lib/auth-guard';
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
@@ -41,6 +42,9 @@ const GradeHandwritingBatchOutputSchema = z.object({
 export type GradeHandwritingBatchOutput = z.infer<typeof GradeHandwritingBatchOutputSchema>;
 
 export async function gradeHandwritingBatch(input: GradeHandwritingBatchInput): Promise<GradeHandwritingBatchOutput> {
+  // 서버 액션은 인증 없이 호출될 수 있어 호출자를 먼저 확인합니다.
+  await requireTeacher();
+
     const result = await gradeHandwritingBatchFlow(input);
     return result;
 }

@@ -1,5 +1,6 @@
 
 'use server';
+import { requireTeacher } from '@/lib/auth-guard';
 
 /**
  * @fileOverview A Genkit flow to generate an image from a text prompt.
@@ -33,6 +34,9 @@ export type GenerateImageResult =
   | { ok: false; error: string };
 
 export async function generateImage(input: GenerateImageInput): Promise<GenerateImageResult> {
+  // 서버 액션은 인증 없이 호출될 수 있어 호출자를 먼저 확인합니다.
+  await requireTeacher();
+
   try {
     const data = await generateImageFlow(input);
     return { ok: true, data };

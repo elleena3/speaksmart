@@ -1,5 +1,6 @@
 
 'use server';
+import { requireTeacher } from '@/lib/auth-guard';
 
 /**
  * @fileOverview A flow to analyze a user's reading of a given text.
@@ -41,6 +42,9 @@ const AnalyzeReadAloudOutputSchema = z.object({
 export type AnalyzeReadAloudOutput = z.infer<typeof AnalyzeReadAloudOutputSchema>;
 
 export async function analyzeReadAloud(input: AnalyzeReadAloudInput): Promise<AnalyzeReadAloudOutput> {
+  // 서버 액션은 인증 없이 호출될 수 있어 호출자를 먼저 확인합니다.
+  await requireTeacher();
+
   const result = await analyzeReadAloudFlow(input);
   return result;
 }

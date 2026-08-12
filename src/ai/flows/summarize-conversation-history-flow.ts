@@ -1,5 +1,6 @@
 
 'use server';
+import { requireUser } from '@/lib/auth-guard';
 /**
  * @fileOverview A flow to summarize a conversation history.
  */
@@ -32,7 +33,7 @@ Conversation History:
 Please provide a brief summary of this conversation.`,
 });
 
-export const summarizeConversationHistoryFlow = ai.defineFlow(
+const summarizeConversationHistoryFlowInner = ai.defineFlow(
     {
         name: 'summarizeConversationHistoryFlow',
         inputSchema: SummarizeConversationHistoryInputSchema,
@@ -50,3 +51,9 @@ export const summarizeConversationHistoryFlow = ai.defineFlow(
         return output;
     }
 );
+
+/** 서버 액션 진입점. 인증 없이 호출될 수 있어 호출자를 먼저 확인합니다. */
+export async function summarizeConversationHistoryFlow(input: Parameters<typeof summarizeConversationHistoryFlowInner>[0]) {
+  await requireUser();
+  return summarizeConversationHistoryFlowInner(input);
+}

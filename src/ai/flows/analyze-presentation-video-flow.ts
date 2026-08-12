@@ -1,5 +1,6 @@
 
 'use server';
+import { requireTeacher } from '@/lib/auth-guard';
 /**
  * @fileOverview A flow to analyze a student's presentation video.
  * It evaluates content, language competence, and delivery based on the video and optional supplementary materials.
@@ -44,6 +45,9 @@ export type AnalyzePresentationVideoOutput = z.infer<typeof AnalyzePresentationV
 
 
 export async function analyzePresentationVideo(input: AnalyzePresentationVideoInput): Promise<AnalyzePresentationVideoOutput> {
+  // 서버 액션은 인증 없이 호출될 수 있어 호출자를 먼저 확인합니다.
+  await requireTeacher();
+
   const result = await analyzePresentationVideoFlow(input);
   return result;
 }
