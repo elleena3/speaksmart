@@ -52,7 +52,19 @@ export async function POST(request: Request) {
     return response;
   } catch (error) {
     console.error('세션 쿠키 발급 실패:', error);
-    return NextResponse.json({ error: '세션을 만들지 못했습니다.' }, { status: 401 });
+
+    // 프로덕션은 서버 로그를 바로 볼 수 없어, 원인을 가릴 수 있는 만큼만 함께 돌려줍니다.
+    // Firebase 오류 코드(auth/...)는 비밀이 아니며, 이것이 없으면 배포 환경에서
+    // '키가 없는 것'과 '권한이 없는 것'을 구분할 방법이 없습니다.
+    const code = (error as { code?: string })?.code;
+    const message = (error as { message?: string })?.message ?? '';
+    const reason = code
+      ? `code=${code}`
+      : message.includes('FIREBASE_SERVICE_ACCOUNT_KEY')
+        ? 'service-account-key-missing'
+        : message.slice(0, 120);
+
+    return NextResponse.json({ error: '세션을 만들지 못했습니다.', reason }, { status: 401 });
   }
 }
 
