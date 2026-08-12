@@ -71,3 +71,44 @@ export const AUDIO_MODELS: AudioModelOption[] = [
 export function shortModelName(model: string): string {
   return model.includes('/') ? model.split('/')[1] : model;
 }
+
+/**
+ * 평가 문서에 저장된 모델 이름을 지금 부를 수 있는 이름으로 옮깁니다.
+ *
+ * 평가는 만들 때 고른 모델을 그대로 씁니다. 채점 도중에 모델이 바뀌면
+ * 같은 평가인데 학생마다 다른 기준으로 채점되기 때문입니다.
+ * 다만 모델이 없어지거나 세대가 바뀌면 저장된 이름으로는 부를 수 없으므로,
+ * 그때만 **같은 공급자의 대응 모델**로 옮깁니다. 공급자를 넘어가지 않습니다.
+ *
+ * 모델이 업그레이드되면 아래 표에 한 줄만 추가하십시오.
+ * 예전에는 이 규칙이 플로우 세 곳에 복사되어 있어 서로 어긋날 수 있었습니다.
+ */
+const MODEL_UPGRADES: Record<string, string> = {
+  // Gemini 1.5 / 2.5 세대는 더 이상 제공되지 않습니다. 같은 급의 현행 모델로 옮깁니다.
+  'googleai/gemini-1.5-flash': 'googleai/gemini-3.6-flash',
+  'googleai/gemini-1.5-flash-latest': 'googleai/gemini-3.6-flash',
+  'googleai/gemini-1.5-pro': 'googleai/gemini-3.1-pro-preview',
+  'googleai/gemini-2.5-flash': 'googleai/gemini-3.6-flash',
+  'googleai/gemini-2.5-flash-lite-preview-06-17': 'googleai/gemini-3.6-flash',
+  'googleai/gemini-2.5-pro': 'googleai/gemini-3.1-pro-preview',
+};
+
+export function resolveEvaluationModel(stored: string | undefined | null): string {
+  // 저장값이 없으면 기본값.
+  if (!stored) return DEFAULT_GOOGLE_EVALUATION_MODEL;
+
+  // 예전 값에는 공급자 접두사가 없습니다. 당시에는 Gemini 뿐이었습니다.
+  const withPrefix = stored.includes('/') ? stored : `googleai/${stored}`;
+
+  const upgraded = MODEL_UPGRADES[withPrefix];
+  if (upgraded) return upgraded;
+
+  // 표에 없는 옛 Gemini 세대도 안전하게 받아 줍니다.
+  if (withPrefix.startsWith('googleai/') && /gemini-(1\.5|2\.0|2\.5)/.test(withPrefix)) {
+    return withPrefix.includes('pro')
+      ? 'googleai/gemini-3.1-pro-preview'
+      : DEFAULT_GOOGLE_EVALUATION_MODEL;
+  }
+
+  return withPrefix;
+}

@@ -17,6 +17,7 @@ import { type RubricScores, type StudentResult } from '@/lib/types';
 import { resultRef } from '@/lib/server-store';
 import { gradeWithRubric, describeRubricResult } from './grade-with-rubric';
 import { isRetriableAiError, withAudioFallback } from '@/lib/ai-retry';
+import { resolveEvaluationModel } from '@/lib/evaluation-models';
 import { renderRubricSummary, pickPronunciationScore } from '@/lib/rubric-summary';
 import { describeAiError } from '@/lib/ai-error-message';
 
@@ -94,12 +95,8 @@ export async function generateDialogueAnalysis(input: any): Promise<void> {
   // 결과 문서를 덮어쓰므로 본인 결과이거나 담당 교사일 때만 허용합니다.
   await requireResultAccess(input.resultId);
   const resultDocRef = resultRef(input.resultId);
-  let model = input.evaluationModel || 'googleai/gemini-3.6-flash';
-  if (model.includes('1.5') || model.includes('2.5')) {
-      model = model.includes('pro') ? 'googleai/gemini-3.1-pro-preview' : 'googleai/gemini-3.6-flash';
-  } else if (!model.includes('/')) {
-      model = 'googleai/' + model;
-  }
+  // 평가에 저장된 모델을 그대로 씁니다. 없어진 세대만 같은 공급자의 대응 모델로 옮깁니다.
+  const model = resolveEvaluationModel(input.evaluationModel);
 
   try {
       let finalResult: any;
@@ -111,6 +108,7 @@ export async function generateDialogueAnalysis(input: any): Promise<void> {
               activityPrompt: input.activityPrompt,
               rubricName: input.rubricName,
               criteria: input.rubricCriteria,
+              model,
           }));
 
           const guidanceRes = await withRetry(() => dialogueTeacherGuidanceFromRubricPrompt({
@@ -159,6 +157,8 @@ export async function generateDialogueAnalysis(input: any): Promise<void> {
       
       await resultDocRef.update({
           ...finalResult,
+          // 어떤 모델이 이 점수를 줬는지 남깁니다. 모델마다 채점 성향이 크게 다릅니다.
+          evaluationModelUsed: model,
           status: "채점 완료",
           teacherUid: input.teacherUid,
           studentRecordingUrl: input.studentRecordingUrl,

@@ -47,7 +47,20 @@ service cloud.firestore {
       allow read: if isSignedIn();
 
       allow create: if isTeacher() && request.resource.data.uid == request.auth.uid;
-      allow update, delete: if isTeacher() && resource.data.uid == request.auth.uid;
+
+      // 응시가 시작된 뒤에는 채점 모델을 바꿀 수 없습니다.
+      // 모델마다 채점 성향이 크게 달라(같은 답변이 80점 / 28점) 중간에 바뀌면
+      // 같은 평가 안에서 학생마다 다른 기준으로 채점됩니다.
+      // 화면에서도 막지만, 저장은 클라이언트 SDK가 직접 하므로 여기서 강제합니다.
+      allow update: if isTeacher()
+                    && resource.data.uid == request.auth.uid
+                    && (
+                         resource.data.get('submissionCount', 0) == 0
+                         || !request.resource.data.diff(resource.data)
+                                .affectedKeys().hasAny(['evaluationModel'])
+                       );
+
+      allow delete: if isTeacher() && resource.data.uid == request.auth.uid;
     }
 
     match /results/{resultId} {

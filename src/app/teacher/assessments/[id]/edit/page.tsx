@@ -161,6 +161,10 @@ export default function EditAssessmentPage() {
   // 수정 화면에서도 루브릭을 바꿀 수 있어야 합니다. 예전에는 생성 시에만 고를 수 있었습니다.
   const selectedRubricId = form.watch("loadedRubricId");
   const [savedRubrics, setSavedRubrics] = useState<{ id: string; name: string; criteria: RubricCriterion[] }[]>([]);
+  // 응시가 시작되면 채점 모델을 바꿀 수 없습니다. 모델마다 채점 성향이 크게 달라
+  // 중간에 바뀌면 같은 평가 안에서 학생마다 다른 기준으로 채점됩니다.
+  const [submissionCount, setSubmissionCount] = useState(0);
+  const modelLocked = submissionCount > 0;
   const selectedRubric = savedRubrics.find(r => r.id === selectedRubricId);
 
   const fetchAssessmentAndStudents = useCallback(async () => {
@@ -183,6 +187,8 @@ export default function EditAssessmentPage() {
             // (옛 이름 'gemini-2.5-flash' 나, 오디오를 못 받아 목록에서 뺀 Claude)
             // 그대로 두면 선택 상자가 빈 채로 뜨고 저장이 막히므로 기본값으로 되돌립니다.
             const savedModel = data.evaluationModel as string | undefined;
+            setSubmissionCount(Number(data.submissionCount ?? 0));
+
             const evaluationModel = assessmentEvaluationModelValues.includes(savedModel as AssessmentEvaluationModel)
               ? (savedModel as AssessmentEvaluationModel)
               : 'googleai/gemini-3.1-pro-preview';
@@ -618,7 +624,7 @@ export default function EditAssessmentPage() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>AI 평가 모델 선택</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value} disabled={modelLocked}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="평가에 사용할 AI 모델을 선택하세요..." />
@@ -630,7 +636,19 @@ export default function EditAssessmentPage() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <FormDescription>평가 분석에 사용할 AI 모델을 선택합니다. 특정 모델의 성능을 테스트하거나 목적에 맞는 모델을 사용할 수 있습니다.</FormDescription>
+                  {modelLocked ? (
+                    <FormDescription className="text-amber-600 dark:text-amber-400">
+                      이미 {submissionCount}명이 응시해 채점 모델을 바꿀 수 없습니다.
+                      모델마다 채점이 후하거나 엄격한 정도가 크게 달라, 중간에 바꾸면
+                      같은 평가인데 학생마다 다른 기준으로 채점됩니다.
+                      다른 모델로 채점하시려면 평가를 새로 만드십시오.
+                    </FormDescription>
+                  ) : (
+                    <FormDescription>
+                      평가 분석에 사용할 AI 모델을 선택합니다.
+                      <b> 학생이 한 명이라도 응시하면 이후에는 바꿀 수 없습니다.</b>
+                    </FormDescription>
+                  )}
                   <FormMessage />
                 </FormItem>
               )}

@@ -26,11 +26,14 @@ const GradeWithRubricInputSchema = z.object({
   activityPrompt: z.string().optional().describe("The task the student was asked to perform."),
   rubricName: z.string().optional(),
   criteria: z.array(RubricCriterionSchema).min(1),
+  // 평가에 설정된 채점 모델. 예전에는 이 값을 받지 못해 항상 기본값으로만 채점됐습니다.
+  model: z.string().optional(),
 });
 export type GradeWithRubricInput = z.infer<typeof GradeWithRubricInputSchema>;
 
 const rubricGradingPrompt = ai.definePrompt({
   name: 'rubricGradingPrompt',
+  // 교사가 고르지 않았을 때의 기본값. 호출 시 input.model 로 덮어씁니다.
   model: 'googleai/gemini-3.6-flash',
   input: { schema: GradeWithRubricInputSchema },
   output: { schema: RubricEvaluationSchema },
@@ -71,7 +74,10 @@ export async function gradeWithRubric(input: GradeWithRubricInput): Promise<Grad
   // 서버 액션은 인증 없이 호출될 수 있어 호출자를 먼저 확인합니다.
   await requireUser();
 
-  const { output } = await rubricGradingPrompt(input);
+  const { output } = await rubricGradingPrompt(
+    input,
+    input.model ? { model: input.model } : undefined
+  );
   if (!output) throw new Error('루브릭 채점 결과를 받지 못했습니다.');
 
   // 모델이 합계를 틀리게 낼 수 있어 항목 점수로 다시 계산합니다.

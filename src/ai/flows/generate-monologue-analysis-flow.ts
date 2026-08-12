@@ -18,6 +18,7 @@ import {
 import { evaluationModels, type RubricScores, type StudentResult } from '@/lib/types';
 import { resultRef, uploadDataUrl } from "@/lib/server-store";
 import { isRetriableAiError, withAudioFallback } from "@/lib/ai-retry";
+import { resolveEvaluationModel } from "@/lib/evaluation-models";
 import { gradeWithRubric, describeRubricResult } from "./grade-with-rubric";
 import { renderRubricSummary, pickPronunciationScore } from "@/lib/rubric-summary";
 import { RubricCriterionSchema } from "@/lib/types/ai-schemas";
@@ -135,12 +136,8 @@ const monologueAnalysisFlow = ai.defineFlow(
     inputSchema: MonologueProcessingInputSchema,
   },
   async (input) => {
-    let model = input.evaluationModel || 'googleai/gemini-3.6-flash';
-  if (model.includes('1.5') || model.includes('2.5')) {
-      model = model.includes('pro') ? 'googleai/gemini-3.1-pro-preview' : 'googleai/gemini-3.6-flash';
-  } else if (!model.includes('/')) {
-      model = 'googleai/' + model;
-  }
+    // 평가에 저장된 모델을 그대로 씁니다. 없어진 세대만 같은 공급자의 대응 모델로 옮깁니다.
+    const model = resolveEvaluationModel(input.evaluationModel);
     const resultDocRef = resultRef(input.resultId);
     let downloadURL = "";
 
@@ -182,6 +179,7 @@ const monologueAnalysisFlow = ai.defineFlow(
               activityPrompt: input.activityPrompt,
               rubricName: input.rubricName,
               criteria: input.rubricCriteria!,
+              model,
           }));
 
           const guidanceResult = await withRetry(() => monologueTeacherGuidanceFromRubricPrompt({
@@ -234,6 +232,8 @@ const monologueAnalysisFlow = ai.defineFlow(
       
       await resultDocRef.update({
           ...finalResult,
+          // 어떤 모델이 이 점수를 줬는지 남깁니다. 모델마다 채점 성향이 크게 다릅니다.
+          evaluationModelUsed: model,
           studentRecordingUrl: downloadURL,
           status: "채점 완료",
           teacherUid: input.teacherUid,

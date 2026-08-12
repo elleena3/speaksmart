@@ -70,9 +70,9 @@ export const assessmentEvaluationModels = [
   { value: 'googleai/gemini-3.6-flash', label: 'gemini-3.6-flash — 전 과정을 스스로 처리 (빠름, 기본값)' },
   { value: 'googleai/gemini-3.1-pro-preview', label: 'gemini-3.1-pro-preview — 전 과정을 스스로 처리 (정밀)' },
   // 오디오를 못 받아 전사·발음은 Gemini 가 대신합니다. 내용 채점만 이 모델이 합니다.
-  { value: 'openai/gpt-5.6-terra', label: 'gpt-5.6-terra — 내용 채점만 (전사·발음은 Gemini가 처리)' },
-  { value: 'openai/gpt-5.6-luna', label: 'gpt-5.6-luna — 내용 채점만 (전사·발음은 Gemini가 처리)' },
-  { value: 'openai/gpt-5.6-sol', label: 'gpt-5.6-sol — 내용 채점만 (전사·발음은 Gemini가 처리)' },
+  { value: 'openai/gpt-5.6-terra', label: 'gpt-5.6-terra — 내용 채점만 (전사·발음은 Gemini) · 루브릭은 엄격하게 채점' },
+  { value: 'openai/gpt-5.6-luna', label: 'gpt-5.6-luna — 내용 채점만 (전사·발음은 Gemini) · 루브릭은 엄격하게 채점' },
+  { value: 'openai/gpt-5.6-sol', label: 'gpt-5.6-sol — 내용 채점만 (전사·발음은 Gemini) · 루브릭은 엄격하게 채점' },
 ] as const satisfies readonly { value: EvaluationModel; label: string }[];
 
 export type AssessmentEvaluationModel = (typeof assessmentEvaluationModels)[number]['value'];
