@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Download, Loader2, Link2, Check, AlertTriangle } from "lucide-react";
 import { type UploadState } from "@/lib/upload-recording";
+import { RecordedAudio } from "./recorded-audio";
 
 /**
  * 대화 녹음을 그 자리에서 들어보고, 내려받고, 보관 링크를 복사하는 패널.
@@ -43,8 +44,9 @@ export function RecordingPlayback({
   return (
     <div className="mt-4 rounded-lg border bg-muted/40 p-3 space-y-2">
       <p className="text-sm font-medium">내 대화 녹음</p>
-      {/* controls 를 주면 재생·일시정지·탐색·볼륨을 브라우저가 제공합니다. */}
-      <audio controls src={url} className="w-full" preload="metadata" />
+      {/* MediaRecorder webm 은 길이 정보가 없어 그냥 물리면 재생이 안 되는 것처럼 보입니다.
+          RecordedAudio 가 길이를 보정합니다. */}
+      <RecordedAudio src={url} />
 
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="text-xs text-muted-foreground flex items-center gap-1">

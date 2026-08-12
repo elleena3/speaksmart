@@ -24,6 +24,7 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { sampleTexts } from '@/lib/book';
 import { analyzeShadowing, type AnalyzeShadowingOutput } from '@/ai/flows/analyze-shadowing-flow';
+import { RecordedAudio } from './recorded-audio';
 import {
   Mic, Headphones, Volume2, Hand, Play, Square, RotateCcw, Sparkles, Loader2,
   ChevronLeft, ChevronRight, Trash2, Pencil,
@@ -177,7 +178,8 @@ export function ShadowingCoachTool() {
       blobRef.current = blob;
       setAudioUrl(URL.createObjectURL(blob));
     };
-    recorder.start();
+    // 1초마다 조각을 받아 둡니다. 중간에 비정상 종료돼도 그때까지 녹음이 남습니다.
+    recorder.start(1000);
     recorderRef.current = recorder;
   }, []);
 
@@ -391,7 +393,7 @@ export function ShadowingCoachTool() {
 
             {audioUrl && (
               <div className="flex items-center gap-2">
-                <audio src={audioUrl} controls className="h-9 w-full" />
+                <RecordedAudio src={audioUrl} className="flex-1" />
                 <Button onClick={analyze} disabled={!canAnalyze} className="shrink-0">
                   {analyzing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
                   AI 평가

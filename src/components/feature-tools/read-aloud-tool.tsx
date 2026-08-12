@@ -12,6 +12,7 @@ import { analyzeReadAloud, type AnalyzeReadAloudOutput } from '@/ai/flows/analyz
 import { sampleTexts } from '@/lib/book';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { RecordedAudio } from './recorded-audio';
 
 type RecordingState = 'idle' | 'recording' | 'recorded' | 'analyzing';
 type Difficulty = 'beginner' | 'intermediate' | 'advanced';
@@ -140,7 +141,7 @@ export function ReadAloudTool() {
                          {recordingState === 'analyzing' && <Button disabled className="flex-1"><Loader2 className="mr-2 animate-spin"/>분석 중...</Button>}
                          <Button onClick={() => handleReset()} variant="outline"><RefreshCw/></Button>
                     </div>
-                     {audioBlob && <audio src={URL.createObjectURL(audioBlob)} controls className="w-full h-10" />}
+                     {audioBlob && <RecordedAudio src={URL.createObjectURL(audioBlob)} />}
                 </CardContent>
             </Card>
         </div>

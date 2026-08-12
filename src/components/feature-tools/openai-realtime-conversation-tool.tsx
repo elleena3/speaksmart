@@ -275,7 +275,9 @@ export function OpenAiRealtimeConversationTool() {
                         instructions: REALTIME_INSTRUCTIONS,
                         audio: {
                             input: {
-                                transcription: { model: "gpt-4o-mini-transcribe" },
+                                // 언어를 지정하지 않으면 자동 감지라, 짧은 영어 발화를 중국어 등으로
+                                // 잘못 알아듣는 일이 잦습니다. API 가 받는 값임을 확인했습니다.
+                                transcription: { model: "gpt-4o-mini-transcribe", language: "en" },
                                 turn_detection: {
                                     type: "server_vad",
                                     threshold: 0.5,
