@@ -32,11 +32,18 @@ import {
 
 const MIME_TYPE = 'audio/webm;codecs=opus';
 
+/**
+ * 원어민 음성이 끝난 뒤에도 잠시 더 녹음합니다.
+ * 쉐도잉은 학습자가 3~4초 뒤에서 따라오므로, 원어민이 끝나는 순간 녹음을 멈추면
+ * 학습자가 말하던 마지막 부분이 통째로 잘립니다.
+ */
+const SHADOW_TAIL_MS = 6000;
+
 type Mode = 'voice' | 'shadowing' | 'listen' | 'manual';
 
 const MODES: { id: Mode; label: string; hint: string; icon: typeof Mic }[] = [
   { id: 'voice', label: '음성 인식 따라읽기', hint: '학생이 읽으면 마이크가 알아듣고 위치를 옮깁니다', icon: Mic },
-  { id: 'shadowing', label: '쉐도잉 (원어민 + 동시 따라읽기)', hint: '원어민 음성을 들으며 동시에 말하고 녹음합니다', icon: Headphones },
+  { id: 'shadowing', label: '쉐도잉 (원어민 뒤따라 말하기)', hint: '원어민이 시작하면 3~4초 뒤에서 같은 속도로 따라 말합니다', icon: Headphones },
   { id: 'listen', label: '원어민 듣기', hint: '재생에 맞춰 단어가 순서대로 표시됩니다', icon: Volume2 },
   { id: 'manual', label: '수동 / 포인터', hint: '마우스 올리기, 버튼, 방향키로 직접 옮깁니다', icon: Hand },
 ];
@@ -55,6 +62,10 @@ export function ShadowingCoachTool() {
   const [mode, setMode] = useState<Mode>('shadowing');
   const [running, setRunning] = useState(false);
   const [wordIndex, setWordIndex] = useState(-1);
+  // 쉐도잉에서는 원어민과 학습자의 위치가 다릅니다.
+  // wordIndex 는 원어민이 읽는 자리, learnerIndex 는 학습자가 따라온 자리입니다.
+  const [learnerIndex, setLearnerIndex] = useState(-1);
+  const [finishing, setFinishing] = useState(false);
   const [rate, setRate] = useState(1);
 
   const [lines, setLines] = useState<string[]>([]);
@@ -71,6 +82,8 @@ export function ShadowingCoachTool() {
   const runningRef = useRef(false);
   const modeRef = useRef<Mode>(mode);
   const wordIndexRef = useRef(-1);
+  const learnerIndexRef = useRef(-1);
+  const tailTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeWordRef = useRef<HTMLSpanElement | null>(null);
 
   const words = useMemo(() => passage.trim().split(/\s+/).filter(Boolean), [passage]);
@@ -98,15 +111,17 @@ export function ShadowingCoachTool() {
    * 현재 위치부터 앞으로만, 좁은 구간에서만 찾습니다.
    * 지문 전체에서 찾으면 흔한 단어(the, a) 때문에 엉뚱한 곳으로 튑니다.
    */
-  const followSpokenWords = useCallback((spoken: string) => {
+  const followSpokenWords = useCallback((spoken: string, target: 'native' | 'learner') => {
     const tokens = spoken.split(/\s+/).map(normalise).filter(Boolean);
     if (!tokens.length) return;
 
-    const from = Math.max(0, wordIndexRef.current);
+    const cursor = target === 'learner' ? learnerIndexRef.current : wordIndexRef.current;
+    const from = Math.max(0, cursor);
     const to = Math.min(normalisedWords.length, from + 20);
     for (let i = to - 1; i >= from; i--) {
       if (normalisedWords[i] && tokens.includes(normalisedWords[i])) {
-        moveTo(i);
+        if (target === 'learner') { setLearnerIndex(i); learnerIndexRef.current = i; }
+        else moveTo(i);
         return;
       }
     }
@@ -124,6 +139,8 @@ export function ShadowingCoachTool() {
       recorderRef.current.stream.getTracks().forEach((t) => t.stop());
     }
     if (pacerRef.current) { clearInterval(pacerRef.current); pacerRef.current = null; }
+    if (tailTimerRef.current) { clearTimeout(tailTimerRef.current); tailTimerRef.current = null; }
+    setFinishing(false);
   }, []);
 
   useEffect(() => stopAll, [stopAll]);
@@ -148,10 +165,14 @@ export function ShadowingCoachTool() {
       if (finalText.trim()) {
         setLines((prev) => [...prev, finalText.trim()]);
         setInterim('');
-        if (modeRef.current !== 'listen') followSpokenWords(finalText);
+        // 쉐도잉에서는 노란 표시가 원어민을 따라가야 합니다.
+        // 여기서 학습자 위치로 되돌리면 표시가 앞뒤로 튑니다.
+        if (modeRef.current === 'shadowing') followSpokenWords(finalText, 'learner');
+        else if (modeRef.current !== 'listen') followSpokenWords(finalText, 'native');
       } else if (pending.trim()) {
         setInterim(pending.trim());
-        if (modeRef.current === 'voice') followSpokenWords(pending);
+        if (modeRef.current === 'voice') followSpokenWords(pending, 'native');
+        else if (modeRef.current === 'shadowing') followSpokenWords(pending, 'learner');
       }
     };
     // 브라우저가 조용하면 스스로 끊습니다. 진행 중이면 다시 붙입니다.
@@ -201,7 +222,13 @@ export function ShadowingCoachTool() {
     utterance.onboundary = (event) => {
       if (event.name === 'word') moveTo(Math.min(cursor++, words.length - 1));
     };
-    utterance.onend = () => { if (runningRef.current) stopAll(); };
+    utterance.onend = () => {
+      if (!runningRef.current) return;
+      if (modeRef.current !== 'shadowing') { stopAll(); return; }
+      // 학습자가 뒤따라오는 중이므로 잠시 더 녹음합니다.
+      setFinishing(true);
+      tailTimerRef.current = setTimeout(() => stopAll(), SHADOW_TAIL_MS);
+    };
 
     synth.speak(utterance);
   }, [words, rate, moveTo, stopAll, toast]);
@@ -280,6 +307,8 @@ export function ShadowingCoachTool() {
   const reset = useCallback(() => {
     stopAll();
     moveTo(-1);
+    setLearnerIndex(-1);
+    learnerIndexRef.current = -1;
     setLines([]);
     setInterim('');
     setAudioUrl(null);
@@ -381,9 +410,17 @@ export function ShadowingCoachTool() {
               </Button>
             </div>
 
+            {mode === 'shadowing' && (
+              <p className="text-xs text-muted-foreground">
+                🎧 <b>이어폰을 쓰십시오.</b> 스피커로 들으면 원어민 목소리가 마이크에 섞여 내 발음 대신 그 소리가 채점됩니다.
+                원어민이 먼저 시작하면 <b>3~4초 기다렸다가</b> 같은 속도로 뒤따라 말합니다.
+                {finishing && <span className="text-amber-600 dark:text-amber-400"> · 원어민은 끝났습니다. 마무리까지 녹음 중…</span>}
+              </p>
+            )}
+
             <div className="space-y-1">
               <div className="flex justify-between text-xs text-muted-foreground">
-                <span>진행률</span>
+                <span>{mode === 'shadowing' ? '원어민 진행' : '진행률'}</span>
                 <span className="font-medium tabular-nums">
                   {Math.max(wordIndex + 1, 0)} / {words.length} 단어 ({progress}%)
                 </span>
@@ -440,7 +477,11 @@ export function ShadowingCoachTool() {
         <Card className="flex flex-col">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm">지문</CardTitle>
-            <CardDescription className="text-xs">단어를 누르면 그 위치부터 시작합니다.</CardDescription>
+            <CardDescription className="text-xs">
+              {mode === 'shadowing'
+                ? '진한 표시는 원어민이 읽는 자리, 테두리 표시는 내가 따라온 자리입니다. 3~4단어쯤 뒤처지는 게 정상입니다.'
+                : '단어를 누르면 그 위치부터 시작합니다.'}
+            </CardDescription>
           </CardHeader>
           <CardContent className="flex-1 overflow-y-auto max-h-[22rem] text-lg font-serif leading-relaxed">
             {words.map((word, i) => (
@@ -455,7 +496,10 @@ export function ShadowingCoachTool() {
                   'inline-block rounded px-1 py-0.5 mr-1 cursor-pointer transition-colors',
                   i === wordIndex && 'bg-primary text-primary-foreground font-semibold',
                   i < wordIndex && 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-200',
-                  i > wordIndex && 'hover:bg-muted'
+                  i > wordIndex && 'hover:bg-muted',
+                  // 쉐도잉에서 내가 따라온 자리. 원어민(노란 표시)과의 간격이 곧 지연입니다.
+                  mode === 'shadowing' && i === learnerIndex && i !== wordIndex &&
+                    'ring-2 ring-amber-500 ring-offset-1'
                 )}
               >
                 {word}

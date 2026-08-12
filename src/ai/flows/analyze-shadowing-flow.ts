@@ -40,7 +40,7 @@ const AnalyzeShadowingOutputSchema = z.object({
   overallScore: z.number().int().min(0).max(100).describe('Overall shadowing performance.'),
   pronunciationScore: z.number().int().min(0).max(100).describe('Clarity and correctness of individual sounds.'),
   intonationScore: z.number().int().min(0).max(100).describe('Stress, rhythm and sentence melody.'),
-  syncScore: z.number().int().min(0).max(100).describe('How well the learner kept pace with the model voice. For reading mode, judge steadiness of pace instead.'),
+  syncScore: z.number().int().min(0).max(100).describe('Shadowing: how steadily the learner held a few-seconds gap behind the model while matching its speed. A constant lag scores high. Reading mode: steadiness of pace instead.'),
   completionRate: z.number().int().min(0).max(100).describe('Percentage of the passage the learner actually attempted.'),
   userTranscript: z.string().describe('What the learner actually said, transcribed from the audio.'),
   strengths: z.string().describe('What the learner did well, in Korean. Two or three sentences.'),
@@ -76,8 +76,13 @@ It is often wrong. Treat it only as a hint, and trust the audio when they disagr
 
 ### Practice mode
 {{#if isShadowing}}
-Shadowing — the learner spoke at the same time as a model voice{{#if playbackRate}} played at {{playbackRate}}x speed{{/if}}.
-Judge how closely they kept pace and copied the model's rhythm. Speaking slightly behind the model is normal and should not be penalised heavily.
+Shadowing — a model voice read the passage{{#if playbackRate}} at {{playbackRate}}x speed{{/if}} and the learner repeated it a few seconds behind.
+
+Shadowing is NOT simultaneous speech. The learner is meant to start about 3 to 4 seconds after the model and then hold that gap while matching the model's speed. So:
+- A steady delay of a few seconds is correct technique. Never treat it as hesitation or a mistake.
+- syncScore should reward a CONSTANT gap and a matching speaking rate. Lower it only when the learner drifts further and further behind, rushes ahead, or stops to catch up.
+- The recording starts when the model starts, so the opening seconds are usually silence while the learner waits. That is expected — do not count it against completionRate or fluency.
+- The learner may still be speaking after the model finishes. That tail is normal.
 {{else}}
 Reading aloud — the learner read on their own, with no model voice. Judge steadiness of pace for syncScore.
 {{/if}}
