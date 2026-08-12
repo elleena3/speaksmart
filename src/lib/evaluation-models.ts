@@ -57,6 +57,14 @@ export const VIDEO_EVALUATION_MODELS: EvaluationOption[] = [
  */
 export const PRONUNCIATION_ANALYSIS_MODEL = 'googleai/gemini-3.6-flash';
 
+/**
+ * 쉐도잉 연습 평가에 쓰는 모델.
+ *
+ * 학생 녹음을 들어야 하므로 후보는 Gemini 뿐입니다(OpenAI·Claude 는 오디오를 거부).
+ * 두 모델을 같은 녹음으로 비교해 정합니다. 아래 값은 그 결과입니다.
+ */
+export const SHADOWING_ANALYSIS_MODEL = 'googleai/gemini-3.6-flash';
+
 export type AudioModelOption = { value: string; label: string };
 
 export const DEFAULT_AUDIO_MODEL = 'googleai/gemini-3.6-flash';

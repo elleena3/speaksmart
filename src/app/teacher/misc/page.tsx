@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { TranscriberTool } from "@/components/feature-tools/transcriber-tool";
 import { PronunciationAnalyzerTool } from "@/components/feature-tools/pronunciation-analyzer-tool";
 import { ReadAloudTool } from "@/components/feature-tools/read-aloud-tool";
+import { ShadowingCoachTool } from "@/components/feature-tools/shadowing-coach-tool";
 import { HandwritingAnalyzerTool } from "@/components/feature-tools/handwriting-analyzer-tool";
 import { PresentationAnalyzerTool } from "@/components/feature-tools/presentation-analyzer-tool";
 import { InteractiveTextAnalyzer } from "@/components/feature-tools/interactive-text-analyzer";
@@ -72,6 +73,15 @@ export default function MiscPage() {
                         <CardDescription>{t.teacherMisc.pronunciationAnalyzerTool.description}</CardDescription>
                     </CardHeader>
                     <PronunciationAnalyzerTool />
+                </Card>
+                <Card>
+                    <CardHeader>
+                        <CardTitle>{t.teacherMisc.shadowingCoachTool.title}</CardTitle>
+                        <CardDescription>{t.teacherMisc.shadowingCoachTool.description}</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <ShadowingCoachTool />
+                    </CardContent>
                 </Card>
                 <Card>
                     <CardHeader>

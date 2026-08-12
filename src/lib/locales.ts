@@ -263,6 +263,10 @@ export const translations = {
         toastCompleteTitle: "분석 완료",
         toastCompleteDescription: "모든 모델의 분석이 완료되었습니다.",
       },
+      shadowingCoachTool: {
+        title: "쉐도잉 코치",
+        description: "원어민 음성을 들으며 동시에 따라 읽고, 발음·억양·속도 맞추기까지 AI 평가를 받습니다. 읽는 위치가 지문 위에 표시되고 말한 내용이 자막으로 쌓입니다.",
+      },
       readAloudTool: {
         title: "Read Aloud 연습 도구",
         description: "제공된 지문을 따라 읽고 AI에게 발음, 정확도, 유창성 피드백을 받아보세요. 직접 텍스트를 입력하여 테스트할 수도 있습니다.",
@@ -562,6 +566,10 @@ export const translations = {
         toastStartDescription: "Beginning parallel pronunciation analysis by model.",
         toastCompleteTitle: "Analysis Complete",
         toastCompleteDescription: "Analysis from all models is complete.",
+      },
+      shadowingCoachTool: {
+        title: "Shadowing Coach",
+        description: "Speak along with a native voice and get AI feedback on pronunciation, intonation and how well you kept pace. Your position is tracked on the passage and what you say is captured as subtitles.",
       },
       readAloudTool: {
         title: "Read Aloud Practice Tool",
