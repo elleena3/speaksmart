@@ -106,7 +106,7 @@ OpenAI는 `/v1/audio/transcriptions`로 **받아쓰기는 가능**하나 아직 
 서버 액션은 누구나 POST 할 수 있는 엔드포인트이고 액션 ID는 공개 JS 번들에 그대로 들어 있습니다.
 
 **특히 `getLiveSessionToken()`이 `GOOGLE_GENAI_API_KEY` 원본을 그대로 반환하고 있었습니다.**
-배포된 번들에 액션 ID가 있는 것을 확인했습니다. **이 키는 교체해야 합니다.**
+배포된 번들에 액션 ID가 있는 것을 확인했습니다. 노출된 키는 그 뒤 교체했습니다(아래 제약 참조).
 
 **현재**: 로그인 시 httpOnly 세션 쿠키를 발급하고([src/app/api/session/route.ts](src/app/api/session/route.ts)),
 서버 액션은 [src/lib/auth-guard.ts](src/lib/auth-guard.ts)의 가드로 확인합니다.
@@ -162,7 +162,7 @@ OpenAI·Claude는 400으로 거부합니다. 오디오 대체가 있어 채점�
 | 항목 | 상태 |
 |---|---|
 | 빌드 | 통과 |
-| 타입 에러 | 42건 (그중 6건은 `workspace/` 사본) |
+| 타입 에러 | 36건 (`workspace/` 삭제로 6건 감소) |
 | 작업 트리 | 깨끗함, 모두 푸시됨 |
 | 최신 커밋 | `5c054ec` |
 | 배포 | 반영 확인 (프로덕션에서 인증·Admin SDK·AI 호출 모두 정상) |
@@ -261,8 +261,10 @@ Admin SDK로 옮기면서 들어온 문제입니다 (`uploadString`은 이 형�
 
 ### 정리 대상
 
-- **`workspace/` 폴더** — `src/` 파일 3개의 오래된 사본. 타입 에러 6건의 원인.
-  삭제 또는 `tsconfig.json`의 `exclude` 추가. 자세한 내용은 OPERATION_GUIDE 6장.
+- ~~**`workspace/` 폴더**~~ — 2026-08-12 삭제 완료. 사본 3개를 원본과 대조해 남길 내용이
+  없음을 확인했습니다(자세한 내용은 OPERATION_GUIDE 6장). 타입 에러 42 → 36건.
+  `.env.local`은 루트의 `.env.workspace-old.local`로 옮겨 두었습니다. 그 안의
+  **OpenAI 키가 루트 `.env`와 다릅니다.** 계정에서 살아 있다면 폐기하고 백업도 지우십시오.
 - **`ALL_CODE.md`, `all_code*.md`** — 코드 스냅샷 4개(약 350KB). 의도적 기록인지 확인 후 판단.
 - **미사용 shadcn 프리미티브 4개** (`carousel`, `collapsible`, `menubar`, `slider`)
 

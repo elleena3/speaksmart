@@ -186,35 +186,23 @@ npm run genkit:dev
 - `src/lib/types.ts`: 시스템 전체에서 사용하는 데이터 타입 정의
 - `scripts/seed.ts`, `scripts/migrate-auth.ts`: 운영자용 일회성 스크립트
 
-### `workspace/` 폴더 — 정리 필요
+### `workspace/` 폴더 — 삭제됨 (2026-08-12)
 
-`workspace/`에는 `src/`에 있는 파일 3개의 **오래된 사본**이 들어 있습니다.
-빌드에는 포함되지 않지만 `tsconfig.json`의 검사 범위(`**/*.ts`)에 걸려
-타입 검사 오류 6건을 만들고 있습니다.
+`src/` 파일 3개의 오래된 사본이 들어 있어 타입 검사 오류 6건을 만들고 있었습니다.
+지우기 전에 사본마다 원본과 대조했고, 남길 내용이 없음을 확인한 뒤 삭제했습니다.
 
-| 사본 | 원본과의 차이 |
-|---|---|
-| `workspace/src/ai/flows/create-neural2-teacher-flow.ts` | 54줄 |
-| `workspace/src/app/teacher/conversation-tools/page.tsx` | 76줄 |
-| `workspace/src/lib/firebase.ts` | 2줄 |
+- `firebase.ts` — 끝 개행 한 자 말고는 원본과 내용이 같았습니다.
+- `create-neural2-teacher-flow.ts` — 사본에만 있는 내용이 없었고,
+  오히려 원본에 있는 인증 가드와 wav 헬퍼가 빠진 옛 버전이었습니다.
+- `conversation-tools/page.tsx` — 사본에만 60줄이 있었지만 전부 지난 세션에
+  삭제된 실험용 대화 도구 6개를 참조하는 코드였습니다. 그 컴포넌트들이 없어
+  타입 오류가 났던 것이고, 되살릴 수 없으므로 보존 가치가 없었습니다.
 
-**원본은 항상 `src/` 쪽입니다.** `workspace/` 사본은 참조하지 마십시오.
-차이가 큰 것은 그만큼 오래되었다는 뜻이며, 여기서 코드를 가져다 쓰면
-이미 고친 문제가 되살아납니다.
-
-정리 방법은 두 가지입니다.
-
-1. **폴더째 삭제** (권장) — 사본에 남기고 싶은 내용이 없다면 가장 깨끗합니다.
-   ```bash
-   git rm -r workspace
-   ```
-2. **검사 범위에서 제외** — 기록으로 남겨두고 싶다면 `tsconfig.json`의
-   `exclude`에 `"workspace"`를 추가합니다. 타입 오류는 사라지지만
-   사본이 계속 남아 혼동의 소지는 유지됩니다.
-
-`workspace/.env.local`에는 실제 키가 들어 있으나 `.gitignore`의 `.env*` 규칙으로
-저장소에는 올라가지 않습니다. 폴더를 지울 때 이 파일도 함께 사라지므로,
-아직 쓰는 값이 있다면 먼저 확인하십시오.
+`workspace/.env.local`은 git 추적 대상이 아니어서 폴더와 함께 사라지므로
+루트의 `.env.workspace-old.local`로 옮겨 두었습니다(`.gitignore`의 `.env*`에 걸립니다).
+내용은 옛 Firebase 프로젝트(`speaksmart-evaluator`) 설정과, 쓰이지 않는
+`GOOGLE_CLOUD_*`, 잘린 `GOOGLE_API_KEY`, 그리고 **루트 `.env`와 다른 OpenAI 키**입니다.
+그 OpenAI 키가 계정에서 아직 살아 있다면 폐기하고 이 백업 파일도 지우십시오.
 
 ## 7. 루브릭 채점
 
