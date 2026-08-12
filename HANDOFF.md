@@ -269,7 +269,16 @@ Admin SDK로 옮기면서 들어온 문제입니다 (`uploadString`은 이 형�
   전체 코드 덤프였고 손으로 쓴 기록은 없었습니다. 담긴 파일 128개가 전부 git 이력에
   있음을 전수 확인했고(예외는 내용이 빈 `.env` 뿐), 비밀정보 검사도 0건이었습니다.
   git 추적 대상이었으므로 `git show <커밋>:ALL_CODE.md` 로 되살릴 수 있습니다.
-- **미사용 shadcn 프리미티브 4개** (`carousel`, `collapsible`, `menubar`, `slider`)
+- ~~**미사용 shadcn 프리미티브 4개**~~ — 2026-08-12 삭제 완료
+  (`carousel`, `collapsible`, `menubar`, `slider`).
+  `src/components/ui/` 37개 전체의 참조 그래프를 만들어 판정했습니다. ui 끼리의 의존도
+  따라갔고(`sheet`·`skeleton`은 `sidebar`만 쓰므로 남겼습니다), 삭제 후 33개 전부
+  도달 가능·미사용 0개를 재확인했습니다.
+  `sidebar.tsx` 의 `collapsible` prop 은 동명이인이라 참조가 아닙니다.
+  **다만 이 넷만 쓰던 npm 패키지 4개가 남아 있습니다** — `embla-carousel-react`,
+  `@radix-ui/react-collapsible`, `@radix-ui/react-menubar`, `@radix-ui/react-slider`.
+  지금은 아무도 import 하지 않으니 지워도 되지만, `vercel.json` 이 `npm ci` 를 쓰므로
+  package-lock.json 이 함께 갱신되어야 합니다.
 
 ### 알아두어야 할 제약
 
