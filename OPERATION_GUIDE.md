@@ -34,6 +34,42 @@ OPENAI_API_KEY="YOUR_OPENAI_API_KEY"
 FIREBASE_SERVICE_ACCOUNT_KEY='{"type":"service_account","project_id":"...","private_key":"..."}'
 ```
 
+### 배포 환경(Vercel)에 옮길 때 주의 — 실제로 겪은 함정
+
+**`.env`의 바깥 작은따옴표는 셸 문법입니다. 대시보드에 함께 넣으면 JSON이 아니게 됩니다.**
+
+이 실수로 2026-08까지 배포 환경에서 Admin SDK가 아예 초기화되지 않았고,
+학생 응시 채점·루브릭 불러오기·학생 계정 관리가 계속 실패하고 있었습니다.
+로컬은 같은 코드로 정상이라 한동안 드러나지 않았습니다.
+
+값을 옮길 때는 화면에 찍지 말고 클립보드로 보내십시오.
+
+```bash
+node -e "require('dotenv').config();process.stdout.write(process.env.FIREBASE_SERVICE_ACCOUNT_KEY)" | clip
+```
+
+- `{` 로 시작해 `}` 로 끝나는 한 줄이어야 합니다.
+- `private_key` 안의 `\n` 은 **글자 그대로** 있어야 합니다. 실제 줄바꿈으로 바꾸면 깨집니다.
+- 앞뒤 공백이 붙지 않았는지 확인하십시오.
+- Environment 는 **Production** 을 체크해야 실서비스에 적용됩니다.
+
+로컬 `.env` 에 넣을 때는 손으로 붙여넣지 말고 도우미 스크립트를 쓰십시오.
+
+```bash
+npx tsx scripts/set-service-account.ts "<다운로드한 서비스계정 JSON 경로>"
+```
+
+**환경 변수를 바꿨는데 반영되지 않을 때**: Redeploy 가 빌드 캐시를 재사용하면 새 값이
+들어가지 않는 경우가 있었습니다. "Use existing Build Cache" 를 해제하거나 아무 커밋이나
+하나 푸시하십시오.
+
+**설정이 잘못됐는지 확인하는 법**: 배포된 주소에 아래를 호출해 봅니다.
+정상이면 `{"ok":true}`, 잘못됐으면 `reason` 에 원인이 담겨 옵니다.
+
+```bash
+curl -s -X POST "https://<배포주소>/api/session" -H "Content-Type: application/json" -d '{"idToken":"x"}'
+```
+
 ## 3. 인증 구조
 
 로그인은 **Firebase Authentication**을 사용합니다. 학생은 이름(아이디)과 비밀번호로 로그인하지만,
