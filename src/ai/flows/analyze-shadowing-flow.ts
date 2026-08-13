@@ -26,6 +26,13 @@ const AnalyzeShadowingInputSchema = z.object({
   mode: z.enum(['shadowing', 'reading']).default('shadowing'),
   /** 원어민 음성 재생 속도. 느리게 들었다면 감안해서 평가해야 합니다. */
   playbackRate: z.number().optional(),
+  /**
+   * 브라우저가 실제로 잰 지연(중앙값, ms).
+   * 모델은 학습자 음성만 받으므로 원어민과의 간격을 알 수 없습니다.
+   * 이 값이 있으면 추정하지 말고 그대로 쓰게 합니다.
+   */
+  measuredLagMs: z.number().optional(),
+  measuredWordCount: z.number().optional(),
   model: z.string().optional(),
 });
 export type AnalyzeShadowingInput = z.infer<typeof AnalyzeShadowingInputSchema>;
@@ -40,7 +47,7 @@ const AnalyzeShadowingOutputSchema = z.object({
   overallScore: z.number().int().min(0).max(100).describe('Overall shadowing performance.'),
   pronunciationScore: z.number().int().min(0).max(100).describe('Clarity and correctness of individual sounds.'),
   intonationScore: z.number().int().min(0).max(100).describe('Stress, rhythm and sentence melody.'),
-  syncScore: z.number().int().min(0).max(100).describe('Shadowing: how steadily the learner held a few-seconds gap behind the model while matching its speed. A constant lag scores high. Reading mode: steadiness of pace instead.'),
+  syncScore: z.number().int().min(0).max(100).describe('Shadowing: how tightly the learner tracked the model. A short (about 0.1-0.5s) and constant lag scores high; falling seconds behind or waiting for each phrase to end scores low. Reading mode: steadiness of pace instead.'),
   completionRate: z.number().int().min(0).max(100).describe('Percentage of the passage the learner actually attempted.'),
   userTranscript: z.string().describe('What the learner actually said, transcribed from the audio.'),
   strengths: z.string().describe('What the learner did well, in Korean. Two or three sentences.'),
@@ -78,11 +85,24 @@ It is often wrong. Treat it only as a hint, and trust the audio when they disagr
 {{#if isShadowing}}
 Shadowing — a model voice read the passage{{#if playbackRate}} at {{playbackRate}}x speed{{/if}} and the learner repeated it a few seconds behind.
 
-Shadowing is NOT simultaneous speech. The learner is meant to start about 3 to 4 seconds after the model and then hold that gap while matching the model's speed. So:
-- A steady delay of a few seconds is correct technique. Never treat it as hesitation or a mistake.
-- syncScore should reward a CONSTANT gap and a matching speaking rate. Lower it only when the learner drifts further and further behind, rushes ahead, or stops to catch up.
-- The recording starts when the model starts, so the opening seconds are usually silence while the learner waits. That is expected — do not count it against completionRate or fluency.
-- The learner may still be speaking after the model finishes. That tail is normal.
+Shadowing comes from interpreter training. The learner echoes the model almost immediately — like a shadow, roughly 0.1 to 0.5 seconds behind — rather than waiting for the sentence to end. So:
+- A very short, steady lag is correct technique. Do not treat it as an echo, a delay, or a mistake.
+- syncScore is about how tightly the learner tracked the model: a short and CONSTANT lag scores high. Lower it when the learner falls seconds behind, waits for each phrase to finish before starting, rushes ahead, or stops to catch up.
+- The learner may still be finishing the last words after the model stops. That short tail is normal.
+- Because they overlap the model, the learner cannot pause to think. Judge fluency on whether they kept moving, not on perfect wording.
+
+{{#if measuredLagMs}}
+The app measured the real gap in the browser by comparing when the model said each word with when the learner reached it.
+Median gap: {{measuredLagMs}} ms{{#if measuredWordCount}}, from {{measuredWordCount}} words{{/if}}.
+Base syncScore on this number instead of guessing from the audio:
+- under 700 ms — tight shadowing, 90 or above
+- 700 to 1500 ms — following but a little loose, roughly 70 to 89
+- 1500 to 3000 ms — waiting too long before echoing, roughly 45 to 69
+- over 3000 ms — repeating after the model rather than shadowing, below 45
+Say the measured gap in seconds in your feedback so the learner knows where they stand.
+{{else}}
+No gap measurement is available, so syncScore is your best estimate from the audio alone. Say in practiceTips that the timing score is approximate.
+{{/if}}
 {{else}}
 Reading aloud — the learner read on their own, with no model voice. Judge steadiness of pace for syncScore.
 {{/if}}

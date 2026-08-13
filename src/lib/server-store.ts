@@ -94,3 +94,18 @@ export async function downloadBytes(urlOrPath: string): Promise<Buffer> {
   const [buffer] = await getAdminStorage().bucket().file(objectPathFromUrl(urlOrPath)).download();
   return buffer;
 }
+
+/**
+ * Storage 의 파일을 모델에 넘길 수 있는 data URL 로 읽어옵니다.
+ *
+ * 동영상·오디오를 브라우저에서 data URL 로 만들어 서버 액션 인자로 보내면
+ * 배포 환경의 요청 본문 한도(실측 4.5MB)에 걸려 413 으로 거부됩니다.
+ * 그래서 파일은 브라우저에서 Storage 로 올리고, 서버가 여기서 다시 읽습니다.
+ */
+export async function downloadAsDataUrl(urlOrPath: string): Promise<string> {
+  const file = getAdminStorage().bucket().file(objectPathFromUrl(urlOrPath));
+  const [buffer] = await file.download();
+  const [metadata] = await file.getMetadata();
+  const contentType = metadata.contentType || 'application/octet-stream';
+  return `data:${contentType};base64,${buffer.toString('base64')}`;
+}

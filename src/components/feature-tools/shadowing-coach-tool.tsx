@@ -34,16 +34,16 @@ const MIME_TYPE = 'audio/webm;codecs=opus';
 
 /**
  * 원어민 음성이 끝난 뒤에도 잠시 더 녹음합니다.
- * 쉐도잉은 학습자가 3~4초 뒤에서 따라오므로, 원어민이 끝나는 순간 녹음을 멈추면
- * 학습자가 말하던 마지막 부분이 통째로 잘립니다.
+ * 쉐도잉은 그림자처럼 0.1~0.5초 뒤를 따라가지만, 마지막 단어는 원어민이 끝난 뒤에
+ * 마무리됩니다. 여기서 바로 멈추면 그 부분이 잘립니다.
  */
-const SHADOW_TAIL_MS = 6000;
+const SHADOW_TAIL_MS = 3000;
 
 type Mode = 'voice' | 'shadowing' | 'listen' | 'manual';
 
 const MODES: { id: Mode; label: string; hint: string; icon: typeof Mic }[] = [
   { id: 'voice', label: '음성 인식 따라읽기', hint: '학생이 읽으면 마이크가 알아듣고 위치를 옮깁니다', icon: Mic },
-  { id: 'shadowing', label: '쉐도잉 (원어민 뒤따라 말하기)', hint: '원어민이 시작하면 3~4초 뒤에서 같은 속도로 따라 말합니다', icon: Headphones },
+  { id: 'shadowing', label: '쉐도잉 (그림자처럼 바로 뒤따라 말하기)', hint: '원어민 소리를 들으며 거의 동시에, 반 박자 뒤에서 겹쳐 말합니다', icon: Headphones },
   { id: 'listen', label: '원어민 듣기', hint: '재생에 맞춰 단어가 순서대로 표시됩니다', icon: Volume2 },
   { id: 'manual', label: '수동 / 포인터', hint: '마우스 올리기, 버튼, 방향키로 직접 옮깁니다', icon: Hand },
 ];
@@ -83,6 +83,12 @@ export function ShadowingCoachTool() {
   const modeRef = useRef<Mode>(mode);
   const wordIndexRef = useRef(-1);
   const learnerIndexRef = useRef(-1);
+  // 원어민이 각 단어를 읽은 시각과, 학습자가 그 단어에 도달한 시각.
+  // 둘을 맞대면 실제 지연을 잴 수 있습니다. AI 는 학습자 음성만 받으므로
+  // 이 값을 넘겨 주지 않으면 간격을 추정할 수밖에 없습니다.
+  const nativeAtRef = useRef<Map<number, number>>(new Map());
+  const learnerAtRef = useRef<Map<number, number>>(new Map());
+  const [measuredLagMs, setMeasuredLagMs] = useState<number | null>(null);
   const tailTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeWordRef = useRef<HTMLSpanElement | null>(null);
 
@@ -120,7 +126,15 @@ export function ShadowingCoachTool() {
     const to = Math.min(normalisedWords.length, from + 20);
     for (let i = to - 1; i >= from; i--) {
       if (normalisedWords[i] && tokens.includes(normalisedWords[i])) {
-        if (target === 'learner') { setLearnerIndex(i); learnerIndexRef.current = i; }
+        if (target === 'learner') {
+          setLearnerIndex(i);
+          learnerIndexRef.current = i;
+          if (!learnerAtRef.current.has(i)) {
+            learnerAtRef.current.set(i, Date.now());
+            const spokenAt = nativeAtRef.current.get(i);
+            if (spokenAt) setMeasuredLagMs(Date.now() - spokenAt);
+          }
+        }
         else moveTo(i);
         return;
       }
@@ -220,7 +234,10 @@ export function ShadowingCoachTool() {
 
     let cursor = from;
     utterance.onboundary = (event) => {
-      if (event.name === 'word') moveTo(Math.min(cursor++, words.length - 1));
+      if (event.name !== 'word') return;
+      const at = Math.min(cursor++, words.length - 1);
+      if (!nativeAtRef.current.has(at)) nativeAtRef.current.set(at, Date.now());
+      moveTo(at);
     };
     utterance.onend = () => {
       if (!runningRef.current) return;
@@ -242,6 +259,9 @@ export function ShadowingCoachTool() {
     runningRef.current = true;
     setRunning(true);
     setResult(null);
+    nativeAtRef.current.clear();
+    learnerAtRef.current.clear();
+    setMeasuredLagMs(null);
 
     try {
       if (mode === 'voice' || mode === 'shadowing') {
@@ -285,12 +305,23 @@ export function ShadowingCoachTool() {
         reader.readAsDataURL(blobRef.current!);
       });
 
+      // 단어마다 잰 지연의 중앙값. 한두 번 크게 튄 값에 휘둘리지 않습니다.
+      const lags: number[] = [];
+      learnerAtRef.current.forEach((at, index) => {
+        const spokenAt = nativeAtRef.current.get(index);
+        if (spokenAt) lags.push(at - spokenAt);
+      });
+      lags.sort((a, b) => a - b);
+      const medianLagMs = lags.length ? lags[Math.floor(lags.length / 2)] : undefined;
+
       const output = await analyzeShadowing({
         audioDataUri: dataUri,
         passage,
         liveTranscript: lines.join(' ') || undefined,
         mode: mode === 'shadowing' ? 'shadowing' : 'reading',
         playbackRate: rate,
+        measuredLagMs: medianLagMs,
+        measuredWordCount: lags.length || undefined,
       });
       setResult(output);
     } catch (e) {
@@ -309,6 +340,9 @@ export function ShadowingCoachTool() {
     moveTo(-1);
     setLearnerIndex(-1);
     learnerIndexRef.current = -1;
+    nativeAtRef.current.clear();
+    learnerAtRef.current.clear();
+    setMeasuredLagMs(null);
     setLines([]);
     setInterim('');
     setAudioUrl(null);
@@ -413,7 +447,15 @@ export function ShadowingCoachTool() {
             {mode === 'shadowing' && (
               <p className="text-xs text-muted-foreground">
                 🎧 <b>이어폰을 쓰십시오.</b> 스피커로 들으면 원어민 목소리가 마이크에 섞여 내 발음 대신 그 소리가 채점됩니다.
-                원어민이 먼저 시작하면 <b>3~4초 기다렸다가</b> 같은 속도로 뒤따라 말합니다.
+                원어민 소리를 들으면서 <b>거의 동시에</b>, 반 박자(0.1~0.5초) 뒤에서 그림자처럼 겹쳐 말합니다.
+                문장이 끝나기를 기다렸다가 따라 하는 것이 아닙니다.
+                {measuredLagMs !== null && (
+                  <span className={cn('ml-1 font-semibold',
+                    measuredLagMs <= 900 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400')}>
+                    · 현재 간격 {(measuredLagMs / 1000).toFixed(1)}초
+                    {measuredLagMs > 900 && ' (조금 더 빨리 붙어 보세요)'}
+                  </span>
+                )}
                 {finishing && <span className="text-amber-600 dark:text-amber-400"> · 원어민은 끝났습니다. 마무리까지 녹음 중…</span>}
               </p>
             )}
@@ -479,7 +521,7 @@ export function ShadowingCoachTool() {
             <CardTitle className="text-sm">지문</CardTitle>
             <CardDescription className="text-xs">
               {mode === 'shadowing'
-                ? '진한 표시는 원어민이 읽는 자리, 테두리 표시는 내가 따라온 자리입니다. 3~4단어쯤 뒤처지는 게 정상입니다.'
+                ? '진한 표시는 원어민이 읽는 자리, 테두리 표시는 내가 따라온 자리입니다. 두 표시가 거의 붙어 있어야 잘 따라가는 것입니다.'
                 : '단어를 누르면 그 위치부터 시작합니다.'}
             </CardDescription>
           </CardHeader>

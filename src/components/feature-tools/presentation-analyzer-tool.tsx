@@ -14,6 +14,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Label } from '@/components/ui/label';
 import { VIDEO_EVALUATION_MODELS } from '@/lib/evaluation-models';
+import { uploadToolFile, MAX_TOOL_FILE_BYTES, describeFileSize } from '@/lib/upload-tool-file';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { type EvaluationModel } from '@/lib/types';
 
@@ -97,18 +98,33 @@ export function PresentationAnalyzerTool() {
             toast({ title: "동영상 파일 없음", description: "분석할 동영상 파일을 먼저 업로드해주세요.", variant: "destructive" });
             return;
         }
+        // 서버 액션 인자로는 4.5MB 를 넘길 수 없어(플랫폼 한도) 파일은 Storage 로 먼저 올립니다.
+        const tooBig = [videoFile, presentationFile].find((f) => f && f.size > MAX_TOOL_FILE_BYTES);
+        if (tooBig) {
+            const message = `파일이 너무 큽니다(${describeFileSize(tooBig.size)}). ${describeFileSize(MAX_TOOL_FILE_BYTES)} 이하만 분석할 수 있습니다.`;
+            setError(message);
+            toast({ title: "파일 크기 초과", description: message, variant: "destructive" });
+            return;
+        }
+
         setAnalysisState('analyzing');
         setError(null);
         setAnalysisResult(null);
-        toast({ title: "AI 분석 시작", description: "발표 내용을 분석하고 있습니다. 동영상 길이에 따라 몇 분 정도 소요될 수 있습니다." });
+        toast({ title: "업로드 중", description: "동영상을 올리는 중입니다. 잠시만 기다려주세요." });
 
         try {
-            const videoDataUri = await fileToDataUri(videoFile);
-            const presentationFileUri = presentationFile ? await fileToDataUri(presentationFile) : undefined;
+            const [videoUrl, presentationFileUrl] = await Promise.all([
+                uploadToolFile(videoFile, 'presentation-video', videoFile.name),
+                presentationFile
+                    ? uploadToolFile(presentationFile, 'presentation-doc', presentationFile.name)
+                    : Promise.resolve(undefined),
+            ]);
+
+            toast({ title: "AI 분석 시작", description: "발표 내용을 분석하고 있습니다. 동영상 길이에 따라 몇 분 정도 소요될 수 있습니다." });
 
             const result = await analyzePresentationVideo({
-                videoDataUri,
-                presentationFileUri,
+                videoUrl,
+                presentationFileUrl,
                 customCriteria: customCriteria || undefined,
                 evaluationModel: selectedModel,
             });

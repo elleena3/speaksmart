@@ -14,18 +14,23 @@ import { ai } from '@/ai/genkit';
 import { googleAI } from '@genkit-ai/google-genai';
 import { z } from 'zod';
 import { evaluationModels } from '@/lib/types';
+import { downloadAsDataUrl } from '@/lib/server-store';
 
 const FeedbackSchema = z.object({
   score: z.number().int().min(0).max(100).describe("The score for this category, from 0 to 100."),
   feedback: z.string().describe("Specific, constructive feedback for this category in Korean, including examples from the presentation."),
 });
 
+/**
+ * 화면에서 넘어오는 입력.
+ *
+ * 영상은 Storage 에 먼저 올리고 URL 만 받습니다. data URL 로 넘기면
+ * 배포 환경의 요청 본문 한도(실측 4.5MB)에 걸려 413 으로 거부됩니다.
+ */
 const AnalyzePresentationVideoInputSchema = z.object({
-  videoDataUri: z.string().describe(
-    "A video file of the student's presentation, as a data URI."
-  ),
-  presentationFileUri: z.string().optional().describe(
-    "An optional presentation file (e.g., PDF, PPTX) as a data URI."
+  videoUrl: z.string().describe("Storage URL of the student's presentation video."),
+  presentationFileUrl: z.string().optional().describe(
+    'Optional Storage URL of a supporting PDF.'
   ),
   customCriteria: z.string().optional().describe(
     "Optional custom evaluation criteria provided by the teacher."
@@ -52,9 +57,16 @@ export async function analyzePresentationVideo(input: AnalyzePresentationVideoIn
   return result;
 }
 
+/** 프롬프트에는 Storage 에서 읽어 만든 data URL 을 넣습니다. */
+const PromptInputSchema = z.object({
+  videoDataUri: z.string(),
+  presentationFileUri: z.string().optional(),
+  customCriteria: z.string().optional(),
+});
+
 const presentationAnalysisPrompt = ai.definePrompt({
   name: 'presentationAnalysisPrompt',
-  input: { schema: AnalyzePresentationVideoInputSchema },
+  input: { schema: PromptInputSchema },
   output: { schema: AnalyzePresentationVideoOutputSchema },
   prompt: `You are an expert AI teacher evaluating a student's English presentation or conversation performance. Your task is to provide a comprehensive, multi-faceted evaluation based on a video, optional presentation materials, and specific criteria. All feedback must be in Korean.
 
@@ -132,7 +144,16 @@ const analyzePresentationVideoFlow = ai.defineFlow(
     }
     const analysisModel = modelName as any;
 
-    const { output } = await presentationAnalysisPrompt(input, { model: analysisModel });
+    // Storage 에서 읽어 모델이 받는 형태로 만듭니다.
+    const [videoDataUri, presentationFileUri] = await Promise.all([
+      downloadAsDataUrl(input.videoUrl),
+      input.presentationFileUrl ? downloadAsDataUrl(input.presentationFileUrl) : Promise.resolve(undefined),
+    ]);
+
+    const { output } = await presentationAnalysisPrompt(
+      { videoDataUri, presentationFileUri, customCriteria: input.customCriteria },
+      { model: analysisModel }
+    );
     if (!output) {
       throw new Error("The AI model did not return a valid presentation analysis.");
     }
