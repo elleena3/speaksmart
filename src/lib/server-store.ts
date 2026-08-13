@@ -102,6 +102,16 @@ export async function downloadBytes(urlOrPath: string): Promise<Buffer> {
  * 배포 환경의 요청 본문 한도(실측 4.5MB)에 걸려 413 으로 거부됩니다.
  * 그래서 파일은 브라우저에서 Storage 로 올리고, 서버가 여기서 다시 읽습니다.
  */
+/**
+ * 화면에서 넘어온 미디어 입력을 모델이 받는 data URL 로 맞춥니다.
+ *
+ * 작은 파일은 그대로 data URL 로 넘어오고, 큰 파일은 Storage 에 올린 뒤
+ * URL 만 넘어옵니다(요청 본문 한도 때문). 플로우는 둘을 구분할 필요가 없습니다.
+ */
+export async function resolveToDataUrl(input: string): Promise<string> {
+  return input.startsWith('data:') ? input : downloadAsDataUrl(input);
+}
+
 export async function downloadAsDataUrl(urlOrPath: string): Promise<string> {
   const file = getAdminStorage().bucket().file(objectPathFromUrl(urlOrPath));
   const [buffer] = await file.download();

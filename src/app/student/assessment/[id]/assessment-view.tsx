@@ -2,6 +2,7 @@
 "use client"
 
 import { useState, useRef, useEffect, useCallback } from "react"
+import { prepareMediaInput } from '@/lib/upload-tool-file';
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Mic, StopCircle, Loader2, Timer, Send, RefreshCw, Image as ImageIcon, Film } from "lucide-react"
@@ -172,26 +173,17 @@ export function AssessmentView({ assessmentDetails }: { assessmentDetails: Teach
     try {
         toast({ title: "답변 처리 중...", description: "AI 분석 페이지로 이동합니다." });
         
-        const reader = new FileReader();
-        reader.readAsDataURL(audioBlob);
-        reader.onloadend = () => {
-            const dataUri = reader.result as string;
-            sessionStorage.removeItem(SESSION_STORAGE_KEY);
-            
-            sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({
-                assessmentId: assessmentDetails.id,
-                studentRecordingDataUri: dataUri,
-                assessmentDetails: assessmentDetails, 
-            }));
-    
-            router.push(`/student/assessment/${assessmentDetails.id}/processing`);
-        };
-        reader.onerror = (error) => {
-             console.error("Error converting blob to data URI:", error);
-             toast({ title: "파일 처리 오류", description: "녹음 파일을 처리하는 중 오류가 발생했습니다.", variant: "destructive" });
-             setRecordingState("recorded");
-        };
+        // 긴 답변은 data URL 로 만들면 sessionStorage(약 5MB)와 서버 액션 요청
+        // 본문 한도(4.5MB)에 모두 걸립니다. 큰 녹음은 Storage 로 올리고 URL 만 넘깁니다.
+        const recordingInput = await prepareMediaInput(audioBlob, 'assessment', 'answer.webm');
+        sessionStorage.removeItem(SESSION_STORAGE_KEY);
+        sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({
+            assessmentId: assessmentDetails.id,
+            studentRecordingDataUri: recordingInput,
+            assessmentDetails: assessmentDetails,
+        }));
 
+        router.push(`/student/assessment/${assessmentDetails.id}/processing`);
     } catch (error) {
         console.error("Error submitting audio:", error);
         toast({ title: "제출 오류", description: "답변을 제출하는 중 오류가 발생했습니다.", variant: "destructive" });

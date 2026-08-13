@@ -1,4 +1,5 @@
 'use server';
+import { resolveToDataUrl } from "@/lib/server-store";
 import { requireResultAccess } from '@/lib/auth-guard';
 
 /**
@@ -138,6 +139,8 @@ const monologueAnalysisFlow = ai.defineFlow(
   async (input) => {
     // 평가에 저장된 모델을 그대로 씁니다. 없어진 세대만 같은 공급자의 대응 모델로 옮깁니다.
     const model = resolveEvaluationModel(input.evaluationModel);
+    // 긴 답변은 Storage 를 거쳐 URL 로 넘어옵니다(요청 본문 한도).
+    const studentRecordingDataUri = await resolveToDataUrl(input.studentRecordingDataUri);
     const resultDocRef = resultRef(input.resultId);
     let downloadURL = "";
 
@@ -148,7 +151,7 @@ const monologueAnalysisFlow = ai.defineFlow(
       // 다만 그동안 실패하면 처리자 없는 rejection 이 되어 아래 catch 가 아니라
       // 프로세스 전체가 죽습니다. 실제 결과는 뒤의 await 에서 받으므로
       // 여기서는 표시만 해 둡니다.
-      const uploadTask = uploadDataUrl(uploadPath, input.studentRecordingDataUri);
+      const uploadTask = uploadDataUrl(uploadPath, studentRecordingDataUri);
       uploadTask.catch(() => {});
 
       await resultDocRef.update({ status: "분석 중: transcribe" });
@@ -156,7 +159,7 @@ const monologueAnalysisFlow = ai.defineFlow(
       // 고른 모델이 흔들리면 오디오를 확실히 받는 모델로 넘어갑니다.
       const transcriptionResult = await withAudioFallback(
         model,
-        (m) => withRetry(() => monologueTranscriptionPrompt({ studentRecordingUrl: input.studentRecordingDataUri }, { model: m })),
+        (m) => withRetry(() => monologueTranscriptionPrompt({ studentRecordingUrl: studentRecordingDataUri }, { model: m })),
         '전사'
       );
       const studentTranscript = transcriptionResult.text;
@@ -209,7 +212,7 @@ const monologueAnalysisFlow = ai.defineFlow(
               }, { model })),
               // 발음 분석도 오디오를 넘기므로 같은 대체 규칙을 씁니다.
               withAudioFallback(model, (m) => withRetry(() => monologuePronunciationAnalysisPrompt({
-                  studentRecordingUrl: input.studentRecordingDataUri,
+                  studentRecordingUrl: studentRecordingDataUri,
                   studentTranscript,
               }, { model: m })), '발음 분석')
           ]);

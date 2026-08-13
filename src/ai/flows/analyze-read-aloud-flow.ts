@@ -1,5 +1,6 @@
 
 'use server';
+import { resolveToDataUrl } from '@/lib/server-store';
 import { requireTeacher } from '@/lib/auth-guard';
 
 /**
@@ -45,7 +46,11 @@ export async function analyzeReadAloud(input: AnalyzeReadAloudInput): Promise<An
   // 서버 액션은 인증 없이 호출될 수 있어 호출자를 먼저 확인합니다.
   await requireTeacher();
 
-  const result = await analyzeReadAloudFlow(input);
+  // 큰 녹음은 Storage 를 거쳐 URL 로 넘어옵니다.
+  const result = await analyzeReadAloudFlow({
+    ...input,
+    audioDataUri: await resolveToDataUrl(input.audioDataUri),
+  });
   return result;
 }
 

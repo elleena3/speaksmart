@@ -23,6 +23,41 @@ export function describeFileSize(bytes: number): string {
 }
 
 /**
+ * 이보다 크면 Storage 를 거칩니다.
+ *
+ * 배포 환경의 요청 본문 한도가 4.5MB 인데 base64 는 원본보다 33% 커지므로
+ * 3.3MB 부터는 그냥 넘길 수 없습니다. 여유를 두고 2.5MB 로 잡았습니다.
+ * 작은 파일까지 Storage 를 거치면 왕복이 늘고 쓰레기 파일만 쌓입니다.
+ */
+const INLINE_LIMIT_BYTES = 2.5 * 1024 * 1024;
+
+/**
+ * 서버 액션에 넘길 미디어 값을 만듭니다.
+ *
+ * 작으면 data URL 을 그대로, 크면 Storage 에 올린 뒤 그 URL 을 돌려줍니다.
+ * 서버는 server-store 의 resolveToDataUrl 로 둘 다 받습니다.
+ */
+export async function prepareMediaInput(file: Blob, prefix: string, fileName?: string): Promise<string> {
+  if (file.size > MAX_TOOL_FILE_BYTES) {
+    throw new Error(
+      `파일이 너무 큽니다(${describeFileSize(file.size)}). ` +
+      `${describeFileSize(MAX_TOOL_FILE_BYTES)} 이하만 분석할 수 있습니다.`
+    );
+  }
+
+  if (file.size > INLINE_LIMIT_BYTES) {
+    return uploadToolFile(file, prefix, fileName);
+  }
+
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error('파일을 읽지 못했습니다.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+/**
  * 파일을 uploads/{uid}/ 아래에 올리고 다운로드 URL 을 돌려줍니다.
  * 서버 액션에는 이 URL 만 넘기면 됩니다.
  */

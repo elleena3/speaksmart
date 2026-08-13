@@ -1,4 +1,5 @@
 'use server';
+import { resolveToDataUrl } from '@/lib/server-store';
 import { requireTeacher } from '@/lib/auth-guard';
 
 /**
@@ -137,12 +138,15 @@ export async function analyzeShadowing(input: AnalyzeShadowingInput): Promise<An
   const chosen = input.model || SHADOWING_ANALYSIS_MODEL;
 
   // 오디오를 넘기므로 모델이 흔들리면 오디오를 확실히 받는 모델로 넘어갑니다.
+  // 큰 녹음은 Storage 를 거쳐 URL 로 넘어옵니다.
+  const audioDataUri = await resolveToDataUrl(input.audioDataUri);
+
   const { output } = await withAudioFallback(
     chosen,
     (m) =>
       withRetry(() =>
         shadowingPrompt(
-          { ...input, mode: input.mode ?? 'shadowing', isShadowing: input.mode !== 'reading' },
+          { ...input, audioDataUri, mode: input.mode ?? 'shadowing', isShadowing: input.mode !== 'reading' },
           { model: m }
         )
       ),

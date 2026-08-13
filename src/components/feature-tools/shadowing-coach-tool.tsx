@@ -25,6 +25,7 @@ import { cn } from '@/lib/utils';
 import { sampleTexts } from '@/lib/book';
 import { analyzeShadowing, type AnalyzeShadowingOutput } from '@/ai/flows/analyze-shadowing-flow';
 import { RecordedAudio } from './recorded-audio';
+import { prepareMediaInput } from '@/lib/upload-tool-file';
 import {
   Mic, Headphones, Volume2, Hand, Play, Square, RotateCcw, Sparkles, Loader2,
   ChevronLeft, ChevronRight, Trash2, Pencil,
@@ -298,12 +299,8 @@ export function ShadowingCoachTool() {
     }
     setAnalyzing(true);
     try {
-      const dataUri = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(blobRef.current!);
-      });
+      // 긴 녹음은 요청 본문 한도를 넘으므로 Storage 를 거칩니다.
+      const dataUri = await prepareMediaInput(blobRef.current, 'shadowing', 'shadowing.webm');
 
       // 단어마다 잰 지연의 중앙값. 한두 번 크게 튄 값에 휘둘리지 않습니다.
       const lags: number[] = [];

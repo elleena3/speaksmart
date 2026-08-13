@@ -13,6 +13,7 @@ import { sampleTexts } from '@/lib/book';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { RecordedAudio } from './recorded-audio';
+import { prepareMediaInput } from '@/lib/upload-tool-file';
 
 type RecordingState = 'idle' | 'recording' | 'recorded' | 'analyzing';
 type Difficulty = 'beginner' | 'intermediate' | 'advanced';
@@ -84,14 +85,12 @@ export function ReadAloudTool() {
         toast({ title: "AI 분석 시작", description: "낭독 내용을 분석하고 있습니다." });
         
         try {
-            const reader = new FileReader();
-            reader.readAsDataURL(audioBlob);
-            reader.onloadend = async () => {
-                const result = await analyzeReadAloud({ audioDataUri: reader.result as string, originalText: editableText });
-                setAnalysisResult(result);
-                toast({ title: "분석 완료", description: "AI 낭독 분석이 완료되었습니다." });
-                setRecordingState('recorded');
-            };
+            // 긴 녹음은 요청 본문 한도를 넘으므로 Storage 를 거칩니다.
+            const audioDataUri = await prepareMediaInput(audioBlob, 'read-aloud', 'read-aloud.webm');
+            const result = await analyzeReadAloud({ audioDataUri, originalText: editableText });
+            setAnalysisResult(result);
+            toast({ title: "분석 완료", description: "AI 낭독 분석이 완료되었습니다." });
+            setRecordingState('recorded');
         } catch (e) {
             toast({ title: "분석 실패", variant: "destructive" });
             setRecordingState('recorded');
