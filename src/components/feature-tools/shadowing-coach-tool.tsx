@@ -26,6 +26,8 @@ import { sampleTexts } from '@/lib/book';
 import { analyzeShadowing, type AnalyzeShadowingOutput } from '@/ai/flows/analyze-shadowing-flow';
 import { RecordedAudio } from './recorded-audio';
 import { prepareMediaInput } from '@/lib/upload-tool-file';
+import { saveShadowingRecord, loadSentenceHistory, type ShadowingRecord } from '@/lib/shadowing-records';
+import { splitSentences } from '@/lib/split-sentences';
 import {
   Mic, Headphones, Volume2, Hand, Play, Square, RotateCcw, Sparkles, Loader2,
   ChevronLeft, ChevronRight, Trash2, Pencil,
@@ -51,6 +53,8 @@ const MODES: { id: Mode; label: string; hint: string; icon: typeof Mic }[] = [
 
 /** 비교용으로 문장부호와 대소문자를 지웁니다. */
 const normalise = (w: string) => w.toLowerCase().replace(/[^a-z0-9']/g, '');
+
+
 
 export function ShadowingCoachTool() {
   const { toast } = useToast();
@@ -90,10 +94,19 @@ export function ShadowingCoachTool() {
   const nativeAtRef = useRef<Map<number, number>>(new Map());
   const learnerAtRef = useRef<Map<number, number>>(new Map());
   const [measuredLagMs, setMeasuredLagMs] = useState<number | null>(null);
+  /** 'sentence' 면 고른 문장만, 'whole' 이면 지문 전체를 연습합니다. */
+  const [scope, setScope] = useState<'sentence' | 'whole'>('sentence');
+  const [sentenceIndex, setSentenceIndex] = useState(0);
+  const [history, setHistory] = useState<ShadowingRecord[]>([]);
   const tailTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeWordRef = useRef<HTMLSpanElement | null>(null);
 
-  const words = useMemo(() => passage.trim().split(/\s+/).filter(Boolean), [passage]);
+  const sentences = useMemo(() => splitSentences(passage), [passage]);
+  const currentSentence = sentences[Math.min(sentenceIndex, sentences.length - 1)] ?? passage;
+  /** 실제로 읽고 채점할 대상. 문장 모드면 그 문장만입니다. */
+  const target = scope === 'sentence' ? currentSentence : passage;
+
+  const words = useMemo(() => target.trim().split(/\s+/).filter(Boolean), [target]);
   const normalisedWords = useMemo(() => words.map(normalise), [words]);
 
   useEffect(() => { modeRef.current = mode; }, [mode]);
@@ -313,7 +326,7 @@ export function ShadowingCoachTool() {
 
       const output = await analyzeShadowing({
         audioDataUri: dataUri,
-        passage,
+        passage: target,
         liveTranscript: lines.join(' ') || undefined,
         mode: mode === 'shadowing' ? 'shadowing' : 'reading',
         playbackRate: rate,
@@ -321,6 +334,22 @@ export function ShadowingCoachTool() {
         measuredWordCount: lags.length || undefined,
       });
       setResult(output);
+
+      // 같은 문장을 반복하며 점수가 오르는 것을 보려면 시도를 남겨야 합니다.
+      try {
+        await saveShadowingRecord({
+          sentence: target,
+          overallScore: output.overallScore,
+          pronunciationScore: output.pronunciationScore,
+          intonationScore: output.intonationScore,
+          syncScore: output.syncScore,
+          completionRate: output.completionRate,
+          measuredLagMs: medianLagMs ?? null,
+        });
+        setHistory(await loadSentenceHistory(target));
+      } catch {
+        // 기록을 못 남겨도 연습과 평가는 그대로 쓸 수 있어야 합니다.
+      }
     } catch (e) {
       toast({
         title: '분석 실패',
@@ -330,7 +359,7 @@ export function ShadowingCoachTool() {
     } finally {
       setAnalyzing(false);
     }
-  }, [passage, lines, mode, rate, toast]);
+  }, [target, lines, mode, rate, toast]);
 
   const reset = useCallback(() => {
     stopAll();
@@ -359,6 +388,27 @@ export function ShadowingCoachTool() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [mode, words.length, moveTo]);
+
+  /** 문장을 옮기면 이전 문장의 표시와 결과가 남지 않도록 정리합니다. */
+  const goToSentence = useCallback((index: number) => {
+    if (index < 0 || index >= sentences.length) return;
+    stopAll();
+    setSentenceIndex(index);
+    moveTo(-1);
+    setLearnerIndex(-1);
+    learnerIndexRef.current = -1;
+    setMeasuredLagMs(null);
+    setResult(null);
+    setLines([]);
+    setInterim('');
+  }, [sentences.length, stopAll, moveTo]);
+
+  // 고른 문장의 지난 기록을 불러옵니다.
+  useEffect(() => {
+    let alive = true;
+    loadSentenceHistory(target).then((rows) => { if (alive) setHistory(rows); }).catch(() => {});
+    return () => { alive = false; };
+  }, [target]);
 
   const progress = words.length ? Math.round(((wordIndex + 1) / words.length) * 100) : 0;
   const canAnalyze = !!audioUrl && !analyzing;
@@ -414,6 +464,43 @@ export function ShadowingCoachTool() {
             </label>
           </CardHeader>
           <CardContent className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <div className="inline-flex rounded-md border overflow-hidden">
+                <button type="button" onClick={() => { stopAll(); setScope('sentence'); }}
+                  className={cn('px-2.5 py-1', scope === 'sentence' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted')}>
+                  문장별
+                </button>
+                <button type="button" onClick={() => { stopAll(); setScope('whole'); }}
+                  className={cn('px-2.5 py-1 border-l', scope === 'whole' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted')}>
+                  지문 전체
+                </button>
+              </div>
+
+              {scope === 'sentence' && (
+                <div className="flex items-center gap-1">
+                  <Button variant="outline" size="icon" className="h-7 w-7"
+                    onClick={() => goToSentence(sentenceIndex - 1)} disabled={sentenceIndex === 0} aria-label="이전 문장">
+                    <ChevronLeft className="h-3.5 w-3.5" />
+                  </Button>
+                  <span className="tabular-nums text-muted-foreground">
+                    {Math.min(sentenceIndex + 1, sentences.length)} / {sentences.length} 문장
+                  </span>
+                  <Button variant="outline" size="icon" className="h-7 w-7"
+                    onClick={() => goToSentence(sentenceIndex + 1)} disabled={sentenceIndex >= sentences.length - 1} aria-label="다음 문장">
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              )}
+
+              {history.length > 0 && (
+                <span className="text-muted-foreground">
+                  이 {scope === 'sentence' ? '문장' : '지문'} {history.length}번 연습 ·
+                  최고 <b className="text-foreground">{Math.max(...history.map((h) => h.overallScore))}점</b>
+                  {history[0] && ` · 직전 ${history[0].overallScore}점`}
+                </span>
+              )}
+            </div>
+
             <div className="flex flex-wrap gap-2">
               {running ? (
                 <Button onClick={stopAll} variant="destructive" className="flex-1 min-w-[140px]">
