@@ -28,6 +28,7 @@ import { RecordedAudio } from './recorded-audio';
 import { prepareMediaInput } from '@/lib/upload-tool-file';
 import { saveActivityRecord, loadActivityRecords, type ActivityRecord } from '@/lib/activity-records';
 import { splitSentences } from '@/lib/split-sentences';
+import { ShadowingStats } from './shadowing-stats';
 import {
   Mic, Headphones, Volume2, Hand, Play, Square, RotateCcw, Sparkles, Loader2,
   ChevronLeft, ChevronRight, Trash2, Pencil,
@@ -414,6 +415,22 @@ export function ShadowingCoachTool() {
     return () => { alive = false; };
   }, [target]);
 
+  /** 통계에서 고른 문장으로 이동합니다. 지문에 없으면 그 문장만 지문으로 삼습니다. */
+  const practiseSentence = useCallback((sentence: string) => {
+    const found = sentences.findIndex((x) => x === sentence);
+    if (found >= 0) {
+      setScope('sentence');
+      goToSentence(found);
+    } else {
+      stopAll();
+      setPassage(sentence);
+      setDraft(sentence);
+      setScope('whole');
+      moveTo(-1);
+      setResult(null);
+    }
+  }, [sentences, goToSentence, stopAll, moveTo]);
+
   const progress = words.length ? Math.round(((wordIndex + 1) / words.length) * 100) : 0;
   const canAnalyze = !!audioUrl && !analyzing;
 
@@ -661,7 +678,30 @@ export function ShadowingCoachTool() {
         </Card>
       </div>
 
-      {result && <ShadowingReport result={result} />}
+      {result && (
+        <ShadowingReport
+          result={result}
+          onRetry={() => { setResult(null); start(); }}
+          onDrillWords={result.wordIssues.length
+            ? () => {
+                // 틀린 단어만 이어 붙여 짧은 지문으로 만듭니다.
+                // 문장을 통째로 다시 읽는 것보다 걸리는 소리에 집중할 수 있습니다.
+                const drill = result.wordIssues.map((w) => w.word).join(' ');
+                stopAll();
+                setPassage(drill);
+                setDraft(drill);
+                setScope('whole');
+                moveTo(-1);
+                setLearnerIndex(-1);
+                learnerIndexRef.current = -1;
+                setResult(null);
+                toast({ title: '틀린 단어만 모았습니다', description: `${result.wordIssues.length}개 단어로 연습합니다. 원어민 듣기로 소리부터 확인해 보세요.` });
+              }
+            : undefined}
+        />
+      )}
+
+      <ShadowingStats onPractise={practiseSentence} />
     </div>
   );
 }
@@ -678,7 +718,11 @@ function ScoreBar({ label, value }: { label: string; value: number }) {
   );
 }
 
-function ShadowingReport({ result }: { result: AnalyzeShadowingOutput }) {
+function ShadowingReport({ result, onRetry, onDrillWords }: {
+  result: AnalyzeShadowingOutput;
+  onRetry?: () => void;
+  onDrillWords?: () => void;
+}) {
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -686,6 +730,12 @@ function ShadowingReport({ result }: { result: AnalyzeShadowingOutput }) {
           <Sparkles className="h-4 w-4 text-primary" />
           AI 쉐도잉 평가
           <Badge variant="secondary" className="ml-1">종합 {result.overallScore}점</Badge>
+          <span className="ml-auto flex gap-2">
+            {onDrillWords && (
+              <Button variant="outline" size="sm" onClick={onDrillWords}>틀린 단어만 연습</Button>
+            )}
+            {onRetry && <Button size="sm" onClick={onRetry}>다시 시도</Button>}
+          </span>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-5">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback } from "react";
+import { prepareMediaInput } from '@/lib/upload-tool-file';
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -67,14 +68,10 @@ export function PdfSequentialAnalyzerTool() {
     setFilesWithStatus(prev => prev.filter((fw) => fw.id !== idToRemove));
   };
 
-  const fileToDataUri = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = (error) => reject(error);
-    });
-  };
+  // 큰 PDF 는 요청 본문 한도(배포 환경 4.5MB)를 넘으므로 Storage 를 거칩니다.
+  // 서버는 두 형태를 모두 받고, 임시 업로드는 분석 후 지웁니다.
+  const fileToDataUri = (file: File): Promise<string> =>
+    prepareMediaInput(file, 'pdf-sequential', file.name);
 
   const handleAnalyze = async () => {
     if (filesWithStatus.length === 0 || !prompt.trim()) {

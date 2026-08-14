@@ -1,5 +1,6 @@
 
 'use server';
+import { resolveToDataUrl, deleteStoredFile } from '@/lib/server-store';
 import { requireTeacher } from '@/lib/auth-guard';
 
 /**
@@ -40,32 +41,35 @@ export async function analyzeSinglePdf(input: SingleFileInput): Promise<SingleFi
   // 서버 액션은 인증 없이 호출될 수 있어 호출자를 먼저 확인합니다.
   await requireTeacher();
 
-    try {
-        const { text } = await ai.generate({
-            model: 'googleai/gemini-3.1-pro-preview',
-            prompt: [
-                { text: input.prompt },
-                { media: { url: input.dataUri } }
-            ]
-        });
+  // 큰 PDF 는 요청 본문 한도를 넘으므로 Storage 를 거쳐 URL 로 넘어옵니다.
+  const original = input.dataUri;
+  const dataUri = await resolveToDataUrl(original);
 
-        if (!text) {
-            throw new Error("AI model did not return a valid text analysis.");
-        }
+  try {
+    const { text } = await ai.generate({
+      model: 'googleai/gemini-3.1-pro-preview',
+      prompt: [
+        { text: input.prompt },
+        { media: { url: dataUri } },
+      ],
+    });
 
-        return {
-            fileName: input.fileName,
-            analysis: text,
-        };
-    } catch (error: any) {
-        console.error(`Error analyzing file ${input.fileName}:`, error);
-        return {
-            fileName: input.fileName,
-            error: `[${input.fileName}] 분석 실패: ${error.message || '알 수 없는 오류'}`,
-        };
+    if (!text) {
+      throw new Error('AI model did not return a valid text analysis.');
     }
-}
 
+    return { fileName: input.fileName, analysis: text };
+  } catch (error: any) {
+    console.error(`Error analyzing file ${input.fileName}:`, error);
+    return {
+      fileName: input.fileName,
+      error: `[${input.fileName}] 분석 실패: ${error.message || '알 수 없는 오류'}`,
+    };
+  } finally {
+    // Storage 는 통로일 뿐이므로 성공하든 실패하든 임시 업로드를 지웁니다.
+    await deleteStoredFile(original);
+  }
+}
 
 // --- The original flow remains for 'PDF Analyzer 2' ---
 
