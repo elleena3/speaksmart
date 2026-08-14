@@ -96,12 +96,23 @@ export async function downloadBytes(urlOrPath: string): Promise<Buffer> {
 }
 
 /**
- * Storage 의 파일을 모델에 넘길 수 있는 data URL 로 읽어옵니다.
+ * 분석용으로 잠시 올려 둔 파일을 지웁니다.
  *
- * 동영상·오디오를 브라우저에서 data URL 로 만들어 서버 액션 인자로 보내면
- * 배포 환경의 요청 본문 한도(실측 4.5MB)에 걸려 413 으로 거부됩니다.
- * 그래서 파일은 브라우저에서 Storage 로 올리고, 서버가 여기서 다시 읽습니다.
+ * Storage 는 요청 본문 한도를 넘기기 위한 통로로만 씁니다.
+ * 원본 영상·녹음을 계속 쌓아 두면 비용도 늘고, 학생 음성을 필요 이상으로
+ * 보관하게 됩니다. 남겨야 하는 것은 산출물(점수·피드백)입니다.
+ *
+ * 지우기에 실패해도 분석 결과는 그대로 돌려줘야 하므로 조용히 넘어갑니다.
  */
+export async function deleteStoredFile(urlOrPath: string): Promise<void> {
+  if (!urlOrPath || urlOrPath.startsWith('data:')) return;
+  try {
+    await getAdminStorage().bucket().file(objectPathFromUrl(urlOrPath)).delete();
+  } catch (error) {
+    console.warn('임시 업로드 파일을 지우지 못했습니다:', (error as Error)?.message);
+  }
+}
+
 /**
  * 화면에서 넘어온 미디어 입력을 모델이 받는 data URL 로 맞춥니다.
  *
@@ -112,6 +123,13 @@ export async function resolveToDataUrl(input: string): Promise<string> {
   return input.startsWith('data:') ? input : downloadAsDataUrl(input);
 }
 
+/**
+ * Storage 의 파일을 모델에 넘길 수 있는 data URL 로 읽어옵니다.
+ *
+ * 동영상·오디오를 브라우저에서 data URL 로 만들어 서버 액션 인자로 보내면
+ * 배포 환경의 요청 본문 한도(실측 4.5MB)에 걸려 413 으로 거부됩니다.
+ * 그래서 파일은 브라우저에서 Storage 로 올리고, 서버가 여기서 다시 읽습니다.
+ */
 export async function downloadAsDataUrl(urlOrPath: string): Promise<string> {
   const file = getAdminStorage().bucket().file(objectPathFromUrl(urlOrPath));
   const [buffer] = await file.download();

@@ -1,5 +1,5 @@
 'use server';
-import { resolveToDataUrl } from '@/lib/server-store';
+import { resolveToDataUrl, deleteStoredFile } from '@/lib/server-store';
 import { requireTeacher } from '@/lib/auth-guard';
 
 /**
@@ -152,6 +152,9 @@ export async function analyzeShadowing(input: AnalyzeShadowingInput): Promise<An
       ),
     '쉐도잉 분석'
   );
+
+  // Storage 는 통로일 뿐입니다. 남길 것은 점수와 피드백이지 원본 녹음이 아닙니다.
+  await deleteStoredFile(input.audioDataUri);
 
   if (!output) throw new Error('쉐도잉 분석 결과를 받지 못했습니다.');
   return output;

@@ -14,7 +14,7 @@ import { ai } from '@/ai/genkit';
 import { googleAI } from '@genkit-ai/google-genai';
 import { z } from 'zod';
 import { evaluationModels } from '@/lib/types';
-import { downloadAsDataUrl } from '@/lib/server-store';
+import { downloadAsDataUrl, deleteStoredFile } from '@/lib/server-store';
 
 const FeedbackSchema = z.object({
   score: z.number().int().min(0).max(100).describe("The score for this category, from 0 to 100."),
@@ -150,13 +150,23 @@ const analyzePresentationVideoFlow = ai.defineFlow(
       input.presentationFileUrl ? downloadAsDataUrl(input.presentationFileUrl) : Promise.resolve(undefined),
     ]);
 
-    const { output } = await presentationAnalysisPrompt(
-      { videoDataUri, presentationFileUri, customCriteria: input.customCriteria },
-      { model: analysisModel }
-    );
-    if (!output) {
-      throw new Error("The AI model did not return a valid presentation analysis.");
+    try {
+      const { output } = await presentationAnalysisPrompt(
+        { videoDataUri, presentationFileUri, customCriteria: input.customCriteria },
+        { model: analysisModel }
+      );
+      if (!output) {
+        throw new Error("The AI model did not return a valid presentation analysis.");
+      }
+      return output;
+    } finally {
+      // Storage 는 요청 본문 한도를 넘기기 위한 통로일 뿐입니다.
+      // 원본 영상까지 쌓아 둘 이유가 없으므로 분석이 끝나면 지웁니다.
+      // 남길 가치가 있는 것은 산출물(점수와 피드백)이지 원본이 아닙니다.
+      await Promise.all([
+        deleteStoredFile(input.videoUrl),
+        input.presentationFileUrl ? deleteStoredFile(input.presentationFileUrl) : Promise.resolve(),
+      ]);
     }
-    return output;
   }
 );

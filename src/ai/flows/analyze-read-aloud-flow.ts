@@ -1,6 +1,6 @@
 
 'use server';
-import { resolveToDataUrl } from '@/lib/server-store';
+import { resolveToDataUrl, deleteStoredFile } from '@/lib/server-store';
 import { requireTeacher } from '@/lib/auth-guard';
 
 /**
@@ -51,6 +51,8 @@ export async function analyzeReadAloud(input: AnalyzeReadAloudInput): Promise<An
     ...input,
     audioDataUri: await resolveToDataUrl(input.audioDataUri),
   });
+  // 분석이 끝나면 임시 업로드는 남기지 않습니다.
+  await deleteStoredFile(input.audioDataUri);
   return result;
 }
 
