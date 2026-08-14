@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useId } from 'react';
+import { prepareMediaInput } from '@/lib/upload-tool-file';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -40,16 +41,16 @@ export function HandwritingAnalyzerTool() {
             return;
         }
 
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = () => {
-            const dataUri = reader.result as string;
-            setImagePreview(URL.createObjectURL(file));
-            setImageDataUri(dataUri);
-            setAnalysisState('idle');
-            setAnalysisResult(null);
-            setError(null);
-        };
+        // 큰 이미지는 요청 본문 한도를 넘으므로 Storage 를 거칩니다.
+        prepareMediaInput(file, 'handwriting', file.name)
+            .then((input) => {
+                setImagePreview(URL.createObjectURL(file));
+                setImageDataUri(input);
+                setAnalysisState('idle');
+                setAnalysisResult(null);
+                setError(null);
+            })
+            .catch((e) => setError(e instanceof Error ? e.message : '파일을 읽지 못했습니다.'));
     };
 
     const handleAnalyze = async () => {

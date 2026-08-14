@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useRef, useId } from "react";
+import { prepareMediaInput } from '@/lib/upload-tool-file';
 import { Button } from "@/components/ui/button";
 import { Loader2, FileText, Mic, Sparkles } from "lucide-react";
 import { CardContent } from "@/components/ui/card";
@@ -55,15 +56,13 @@ function AudioProcessor({
     }
   };
 
-  const processAudioBlob = (blob: Blob) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(blob);
-    reader.onloadend = async () => {
-      const base64Audio = reader.result as string;
-      await onAnalyze(base64Audio);
+  const processAudioBlob = async (blob: Blob) => {
+    try {
+      // 긴 녹음·큰 파일은 요청 본문 한도를 넘으므로 Storage 를 거칩니다.
+      await onAnalyze(await prepareMediaInput(blob, 'transcribe', 'audio.webm'));
       setIsProcessing(false);
-    };
-    reader.onerror = (error) => {
+      return;
+    } catch (error) {
       console.error("File reading error:", error);
       toast({ title: t.teacherMisc.errors.fileReadErrorTitle, description: t.teacherMisc.errors.fileReadErrorDescription, variant: "destructive" });
       setIsProcessing(false);

@@ -15,6 +15,7 @@ import remarkGfm from 'remark-gfm';
 import { Label } from '@/components/ui/label';
 import { VIDEO_EVALUATION_MODELS } from '@/lib/evaluation-models';
 import { uploadToolFile, MAX_TOOL_FILE_BYTES, describeFileSize } from '@/lib/upload-tool-file';
+import { saveActivityRecord } from '@/lib/activity-records';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { type EvaluationModel } from '@/lib/types';
 
@@ -132,6 +133,24 @@ export function PresentationAnalyzerTool() {
             setAnalysisResult(result);
             setAnalysisState('analyzed');
             toast({ title: "분석 완료", description: "AI 발표 분석이 완료되었습니다." });
+
+            // 원본 영상은 분석 후 지워지므로, 결과를 남겨 두어야 나중에 다시 볼 수 있습니다.
+            try {
+                await saveActivityRecord({
+                    type: 'presentation',
+                    title: videoFile.name,
+                    score: result.overallScore,
+                    detail: {
+                        content: result.content.score,
+                        language: result.languageCompetence.score,
+                        delivery: result.delivery.score,
+                        model: selectedModel,
+                        overallFeedback: result.overallFeedback.slice(0, 1500),
+                    },
+                });
+            } catch {
+                // 기록을 못 남겨도 화면의 분석 결과는 그대로 씁니다.
+            }
         } catch (e: any) {
             console.error("Presentation analysis failed:", e);
             setError(e.message || "알 수 없는 오류가 발생했습니다.");

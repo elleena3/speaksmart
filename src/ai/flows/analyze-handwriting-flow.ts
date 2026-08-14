@@ -1,4 +1,5 @@
 'use server';
+import { resolveToDataUrl, deleteStoredFile } from '@/lib/server-store';
 import { requireTeacher } from '@/lib/auth-guard';
 
 /**
@@ -42,7 +43,12 @@ export async function analyzeHandwriting(input: AnalyzeHandwritingInput): Promis
   // 서버 액션은 인증 없이 호출될 수 있어 호출자를 먼저 확인합니다.
   await requireTeacher();
 
-  const result = await analyzeHandwritingFlow(input);
+  // 큰 이미지는 Storage 를 거쳐 URL 로 넘어옵니다.
+  const result = await analyzeHandwritingFlow({
+    ...input,
+    imageDataUri: await resolveToDataUrl(input.imageDataUri),
+  });
+  await deleteStoredFile(input.imageDataUri);
   return result;
 }
 

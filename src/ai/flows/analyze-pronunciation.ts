@@ -1,4 +1,5 @@
 'use server';
+import { resolveToDataUrl, deleteStoredFile } from '@/lib/server-store';
 import { requireTeacher } from '@/lib/auth-guard';
 
 /**
@@ -21,12 +22,15 @@ export async function analyzePronunciation(
   // 서버 액션은 인증 없이 호출될 수 있어 호출자를 먼저 확인합니다.
   await requireTeacher();
 
+  // 큰 파일은 Storage 를 거쳐 URL 로 넘어옵니다(요청 본문 한도).
+  const resolvedAudio = await resolveToDataUrl(audioDataUri);
+
   try {
     const response = await ai.generate({
       model,
       prompt: [
         { text: "Evaluate the pronunciation accuracy, intonation, and fluency of this audio. Provide score (0-100) and feedback in Korean." },
-        { media: { url: audioDataUri } }
+        { media: { url: resolvedAudio } }
       ],
       output: {
         schema: z.object({

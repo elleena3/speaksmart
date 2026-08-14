@@ -1,5 +1,6 @@
 
 'use server';
+import { resolveToDataUrl, deleteStoredFile } from '@/lib/server-store';
 import { requireTeacher } from '@/lib/auth-guard';
 
 /**
@@ -63,7 +64,12 @@ export async function analyzeHandwritingSubmission(input: AnalyzeHandwritingSubm
   // 서버 액션은 인증 없이 호출될 수 있어 호출자를 먼저 확인합니다.
   await requireTeacher();
 
-  const result = await analyzeHandwritingSubmissionFlow(input);
+  // 큰 파일은 Storage 를 거쳐 URL 로 넘어옵니다.
+  const result = await analyzeHandwritingSubmissionFlow({
+    ...input,
+    criteriaFileUri: input.criteriaFileUri ? await resolveToDataUrl(input.criteriaFileUri) : undefined,
+  });
+  if (input.criteriaFileUri) await deleteStoredFile(input.criteriaFileUri);
   return result;
 }
 

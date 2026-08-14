@@ -26,7 +26,7 @@ import { sampleTexts } from '@/lib/book';
 import { analyzeShadowing, type AnalyzeShadowingOutput } from '@/ai/flows/analyze-shadowing-flow';
 import { RecordedAudio } from './recorded-audio';
 import { prepareMediaInput } from '@/lib/upload-tool-file';
-import { saveShadowingRecord, loadSentenceHistory, type ShadowingRecord } from '@/lib/shadowing-records';
+import { saveActivityRecord, loadActivityRecords, type ActivityRecord } from '@/lib/activity-records';
 import { splitSentences } from '@/lib/split-sentences';
 import {
   Mic, Headphones, Volume2, Hand, Play, Square, RotateCcw, Sparkles, Loader2,
@@ -97,7 +97,7 @@ export function ShadowingCoachTool() {
   /** 'sentence' 면 고른 문장만, 'whole' 이면 지문 전체를 연습합니다. */
   const [scope, setScope] = useState<'sentence' | 'whole'>('sentence');
   const [sentenceIndex, setSentenceIndex] = useState(0);
-  const [history, setHistory] = useState<ShadowingRecord[]>([]);
+  const [history, setHistory] = useState<ActivityRecord[]>([]);
   const tailTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeWordRef = useRef<HTMLSpanElement | null>(null);
 
@@ -337,16 +337,19 @@ export function ShadowingCoachTool() {
 
       // 같은 문장을 반복하며 점수가 오르는 것을 보려면 시도를 남겨야 합니다.
       try {
-        await saveShadowingRecord({
-          sentence: target,
-          overallScore: output.overallScore,
-          pronunciationScore: output.pronunciationScore,
-          intonationScore: output.intonationScore,
-          syncScore: output.syncScore,
-          completionRate: output.completionRate,
-          measuredLagMs: medianLagMs ?? null,
+        await saveActivityRecord({
+          type: 'shadowing',
+          title: target,
+          score: output.overallScore,
+          detail: {
+            pronunciation: output.pronunciationScore,
+            intonation: output.intonationScore,
+            sync: output.syncScore,
+            completion: output.completionRate,
+            lagMs: medianLagMs ?? null,
+          },
         });
-        setHistory(await loadSentenceHistory(target));
+        setHistory(await loadActivityRecords({ type: 'shadowing', subject: target }));
       } catch {
         // 기록을 못 남겨도 연습과 평가는 그대로 쓸 수 있어야 합니다.
       }
@@ -406,7 +409,8 @@ export function ShadowingCoachTool() {
   // 고른 문장의 지난 기록을 불러옵니다.
   useEffect(() => {
     let alive = true;
-    loadSentenceHistory(target).then((rows) => { if (alive) setHistory(rows); }).catch(() => {});
+    loadActivityRecords({ type: 'shadowing', subject: target })
+      .then((rows) => { if (alive) setHistory(rows); }).catch(() => {});
     return () => { alive = false; };
   }, [target]);
 
@@ -495,8 +499,8 @@ export function ShadowingCoachTool() {
               {history.length > 0 && (
                 <span className="text-muted-foreground">
                   이 {scope === 'sentence' ? '문장' : '지문'} {history.length}번 연습 ·
-                  최고 <b className="text-foreground">{Math.max(...history.map((h) => h.overallScore))}점</b>
-                  {history[0] && ` · 직전 ${history[0].overallScore}점`}
+                  최고 <b className="text-foreground">{Math.max(...history.map((h) => h.score))}점</b>
+                  {history[0] && ` · 직전 ${history[0].score}점`}
                 </span>
               )}
             </div>
