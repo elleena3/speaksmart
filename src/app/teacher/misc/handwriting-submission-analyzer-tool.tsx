@@ -54,7 +54,7 @@ export function HandwritingSubmissionAnalyzerTool() {
     // Batch results (for individual mode)
     const [batchResults, setBatchResults] = useState<IndividualResult[]>([]);
     const [error, setError] = useState<string | null>(null);
-    const [selectedModel, setSelectedModel] = useState<EvaluationModel>('googleai/gemini-3.6-flash');
+    const [selectedModel, setSelectedModel] = useState<EvaluationModel>('googleai/gemini-3.8-flash');
 
     // History Pre-scan Dialog State
     const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
@@ -566,7 +566,9 @@ export function HandwritingSubmissionAnalyzerTool() {
                                 {OPENAI_EVALUATION_MODELS.map(m => (
                                     <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
                                 ))}
-                                <SelectItem value="googleai/gemini-3.6-flash">gemini-3.6-flash (빠름* / PDF 특화)</SelectItem>
+                                <SelectItem value="googleai/gemini-3.8-flash">gemini-3.8-flash (빠름* / PDF 특화)</SelectItem>
+                                <SelectItem value="googleai/gemini-3.7-flash">gemini-3.7-flash (빠름* / PDF 특화)</SelectItem>
+                                <SelectItem value="googleai/gemini-3.6-flash">gemini-3.6-flash (이전 세대 / PDF 특화)</SelectItem>
                                 <SelectItem value="googleai/gemini-3.1-pro-preview">gemini-3.1-pro-preview (고성능* / PDF 특화)</SelectItem>
                                 <SelectItem value="anthropic/claude-fable-5">claude-fable-5 (장시간 실행)</SelectItem>
                                 <SelectItem value="anthropic/claude-opus-4-8">claude-opus-4-8 (엔터프라이즈)</SelectItem>

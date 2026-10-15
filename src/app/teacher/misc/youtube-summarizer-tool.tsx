@@ -173,7 +173,9 @@ export function YoutubeSummarizerTool() {
                                 <SelectValue placeholder="분석에 사용할 AI 모델을 선택하세요" />
                             </SelectTrigger>
                             <SelectContent className="min-w-[400px]">
-                                <SelectItem value="googleai/gemini-3.6-flash">Gemini 3.6 Flash (무료/초고속)</SelectItem>
+                                <SelectItem value="googleai/gemini-3.8-flash">Gemini 3.8 Flash (초고속)</SelectItem>
+                                <SelectItem value="googleai/gemini-3.7-flash">Gemini 3.7 Flash (초고속)</SelectItem>
+                                <SelectItem value="googleai/gemini-3.6-flash">Gemini 3.6 Flash (이전 세대)</SelectItem>
                                 <SelectItem value="googleai/gemini-3.1-pro-preview">Gemini 3.1 Pro Preview (가성비/고품질)</SelectItem>
                                 <SelectItem value="openai/gpt-5.6-luna">GPT-5.6 Luna ($1/입력, $6/출력)</SelectItem>
                                 <SelectItem value="openai/gpt-5.6-terra">GPT-5.6 Terra ($2.5/입력, $15/출력)</SelectItem>

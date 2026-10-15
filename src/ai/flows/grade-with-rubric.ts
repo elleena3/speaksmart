@@ -34,7 +34,7 @@ export type GradeWithRubricInput = z.infer<typeof GradeWithRubricInputSchema>;
 const rubricGradingPrompt = ai.definePrompt({
   name: 'rubricGradingPrompt',
   // 교사가 고르지 않았을 때의 기본값. 호출 시 input.model 로 덮어씁니다.
-  model: 'googleai/gemini-3.6-flash',
+  model: 'googleai/gemini-3.8-flash',
   input: { schema: GradeWithRubricInputSchema },
   output: { schema: RubricEvaluationSchema },
   prompt: `You are an English speaking assessment expert. Grade the student strictly against the rubric below.

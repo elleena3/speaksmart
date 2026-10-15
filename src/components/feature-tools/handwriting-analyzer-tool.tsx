@@ -29,7 +29,7 @@ export function HandwritingAnalyzerTool() {
     const [imageDataUri, setImageDataUri] = useState<string | null>(null);
     const [analysisResult, setAnalysisResult] = useState<AnalyzeHandwritingOutput | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const [selectedModel, setSelectedModel] = useState<EvaluationModel>('googleai/gemini-3.6-flash');
+    const [selectedModel, setSelectedModel] = useState<EvaluationModel>('googleai/gemini-3.8-flash');
     const { toast } = useToast();
 
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -102,7 +102,9 @@ export function HandwritingAnalyzerTool() {
                                 {OPENAI_EVALUATION_MODELS.map(m => (
                                     <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
                                 ))}
-                                <SelectItem value="googleai/gemini-3.6-flash">gemini-3.6-flash (빠름)</SelectItem>
+                                <SelectItem value="googleai/gemini-3.8-flash">gemini-3.8-flash (빠름)</SelectItem>
+                                <SelectItem value="googleai/gemini-3.7-flash">gemini-3.7-flash (빠름)</SelectItem>
+                                <SelectItem value="googleai/gemini-3.6-flash">gemini-3.6-flash (이전 세대)</SelectItem>
                                 <SelectItem value="googleai/gemini-3.1-pro-preview">gemini-3.1-pro-preview (고성능)</SelectItem>
                                 <SelectItem value="anthropic/claude-fable-5">claude-fable-5 (장시간 실행)</SelectItem>
                                 <SelectItem value="anthropic/claude-opus-4-8">claude-opus-4-8 (엔터프라이즈)</SelectItem>

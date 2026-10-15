@@ -65,7 +65,7 @@ export async function converseWithOpenAiTtsTeacher(
 
 const conversationalPrompt = ai.definePrompt({
   name: 'openAiTtsTeacherConversationalPrompt',
-  model: 'googleai/gemini-3.6-flash',
+  model: 'googleai/gemini-3.8-flash',
   input: {
     schema: z.object({
       studentTranscript: z.string().optional(),
@@ -139,7 +139,7 @@ const converseWithOpenAiTtsTeacherFlow = ai.defineFlow(
     // Step 1: Transcribe student's audio if it exists.
     if (studentRecordingDataUri) {
       const sttResponse = await ai.generate({
-        model: 'googleai/gemini-3.6-flash',
+        model: 'googleai/gemini-3.8-flash',
         prompt: [
           { text: 'Transcribe this English audio.' },
           { media: { url: studentRecordingDataUri } },

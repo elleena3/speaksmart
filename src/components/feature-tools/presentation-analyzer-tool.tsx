@@ -57,7 +57,7 @@ export function PresentationAnalyzerTool() {
     const [videoFile, setVideoFile] = useState<File | null>(null);
     const [presentationFile, setPresentationFile] = useState<File | null>(null);
     const [customCriteria, setCustomCriteria] = useState('');
-    const [selectedModel, setSelectedModel] = useState<EvaluationModel>('googleai/gemini-3.6-flash');
+    const [selectedModel, setSelectedModel] = useState<EvaluationModel>('googleai/gemini-3.8-flash');
     const [analysisResult, setAnalysisResult] = useState<AnalyzePresentationVideoOutput | null>(null);
     const [error, setError] = useState<string | null>(null);
     const { toast } = useToast();

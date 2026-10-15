@@ -15,7 +15,7 @@ const GradeHandwritingBatchInputSchema = z.object({
     })).min(1).describe("Chunk of student OCR texts to grade. Max size should be 5-10 for token limits."),
     criteriaText: z.string().optional(),
     criteriaFileUri: z.string().optional(),
-    model: z.enum(evaluationModels).optional().default('googleai/gemini-3.6-flash'),
+    model: z.enum(evaluationModels).optional().default('googleai/gemini-3.8-flash'),
 });
 
 export type GradeHandwritingBatchInput = z.infer<typeof GradeHandwritingBatchInputSchema>;

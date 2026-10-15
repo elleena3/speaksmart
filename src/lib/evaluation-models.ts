@@ -22,11 +22,16 @@ export const OPENAI_EVALUATION_MODELS: EvaluationOption[] = [
   { value: 'openai/gpt-5.6-sol', label: 'gpt-5.6-sol (최고 성능, 가장 비쌈)' },
 ];
 
-export const DEFAULT_GOOGLE_EVALUATION_MODEL: EvaluationModel = 'googleai/gemini-3.6-flash';
+export const DEFAULT_GOOGLE_EVALUATION_MODEL: EvaluationModel = 'googleai/gemini-3.8-flash';
 
 // Gemini 평가 모델. flash 가 훨씬 저렴하고 빨라 기본값으로 둡니다.
+//
+// 3.6 은 그대로 남깁니다. 응시가 시작된 평가는 만들 때 고른 모델로 계속 채점해야
+// 하므로(모델마다 채점 성향이 달라), 저장된 값을 부를 수 있어야 합니다.
 export const GOOGLE_EVALUATION_MODELS: EvaluationOption[] = [
-  { value: 'googleai/gemini-3.6-flash', label: 'gemini-3.6-flash (빠름, 기본값)' },
+  { value: 'googleai/gemini-3.8-flash', label: 'gemini-3.8-flash (빠름, 기본값)' },
+  { value: 'googleai/gemini-3.7-flash', label: 'gemini-3.7-flash (빠름)' },
+  { value: 'googleai/gemini-3.6-flash', label: 'gemini-3.6-flash (이전 세대)' },
   { value: 'googleai/gemini-3.1-pro-preview', label: 'gemini-3.1-pro-preview (고성능)' },
 ];
 
@@ -39,7 +44,9 @@ export const GOOGLE_EVALUATION_MODELS: EvaluationOption[] = [
  * 그래서 여기에는 Gemini 만 둡니다.
  */
 export const VIDEO_EVALUATION_MODELS: EvaluationOption[] = [
-  { value: 'googleai/gemini-3.6-flash', label: 'gemini-3.6-flash (기본/빠름)' },
+  { value: 'googleai/gemini-3.8-flash', label: 'gemini-3.8-flash (기본/빠름)' },
+  { value: 'googleai/gemini-3.7-flash', label: 'gemini-3.7-flash (빠름)' },
+  { value: 'googleai/gemini-3.6-flash', label: 'gemini-3.6-flash (이전 세대)' },
   { value: 'googleai/gemini-3.1-pro-preview', label: 'gemini-3.1-pro-preview (고성능/정밀)' },
 ];
 
@@ -55,22 +62,26 @@ export const VIDEO_EVALUATION_MODELS: EvaluationOption[] = [
  * 실시간 대화의 발음 평가에 쓰는 모델.
  * 대화를 OpenAI 로 했더라도 소리를 들을 수 있는 것은 Gemini 뿐이라 이 부분만 Gemini 가 맡습니다.
  */
-export const PRONUNCIATION_ANALYSIS_MODEL = 'googleai/gemini-3.6-flash';
+export const PRONUNCIATION_ANALYSIS_MODEL = 'googleai/gemini-3.8-flash';
 
 /**
  * 쉐도잉 연습 평가에 쓰는 모델.
  *
  * 학생 녹음을 들어야 하므로 후보는 Gemini 뿐입니다(OpenAI·Claude 는 오디오를 거부).
- * 두 모델을 같은 녹음으로 비교해 정합니다. 아래 값은 그 결과입니다.
+ * 같은 녹음으로 비교해 정합니다. 아래 값은 그 결과입니다.
+ * 3.6 과 3.8 을 같은 녹음으로 비교해 점수·전사·지연 규칙 준수가 같았고,
+ * 3.8 이 조금 더 빠르고 피드백이 길어 3.8 로 둡니다.
  */
-export const SHADOWING_ANALYSIS_MODEL = 'googleai/gemini-3.6-flash';
+export const SHADOWING_ANALYSIS_MODEL = 'googleai/gemini-3.8-flash';
 
 export type AudioModelOption = { value: string; label: string };
 
-export const DEFAULT_AUDIO_MODEL = 'googleai/gemini-3.6-flash';
+export const DEFAULT_AUDIO_MODEL = 'googleai/gemini-3.8-flash';
 
 export const AUDIO_MODELS: AudioModelOption[] = [
-  { value: 'googleai/gemini-3.6-flash', label: 'gemini-3.6-flash (기본/빠름)' },
+  { value: 'googleai/gemini-3.8-flash', label: 'gemini-3.8-flash (기본/빠름)' },
+  { value: 'googleai/gemini-3.7-flash', label: 'gemini-3.7-flash (빠름)' },
+  { value: 'googleai/gemini-3.6-flash', label: 'gemini-3.6-flash (이전 세대)' },
   { value: 'googleai/gemini-3.1-pro-preview', label: 'gemini-3.1-pro-preview (고성능/정밀)' },
   { value: 'googleai/gemini-3.1-flash-lite', label: 'gemini-3.1-flash-lite (가장 가벼움)' },
 ];
@@ -93,11 +104,11 @@ export function shortModelName(model: string): string {
  */
 const MODEL_UPGRADES: Record<string, string> = {
   // Gemini 1.5 / 2.5 세대는 더 이상 제공되지 않습니다. 같은 급의 현행 모델로 옮깁니다.
-  'googleai/gemini-1.5-flash': 'googleai/gemini-3.6-flash',
-  'googleai/gemini-1.5-flash-latest': 'googleai/gemini-3.6-flash',
+  'googleai/gemini-1.5-flash': 'googleai/gemini-3.8-flash',
+  'googleai/gemini-1.5-flash-latest': 'googleai/gemini-3.8-flash',
   'googleai/gemini-1.5-pro': 'googleai/gemini-3.1-pro-preview',
-  'googleai/gemini-2.5-flash': 'googleai/gemini-3.6-flash',
-  'googleai/gemini-2.5-flash-lite-preview-06-17': 'googleai/gemini-3.6-flash',
+  'googleai/gemini-2.5-flash': 'googleai/gemini-3.8-flash',
+  'googleai/gemini-2.5-flash-lite-preview-06-17': 'googleai/gemini-3.8-flash',
   'googleai/gemini-2.5-pro': 'googleai/gemini-3.1-pro-preview',
 };
 

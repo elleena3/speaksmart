@@ -95,7 +95,7 @@ export async function analyzeLiveConversation(input: AnalyzeLiveConversationInpu
 
 const liveConversationAnalysisPrompt = ai.definePrompt({
     name: 'liveConversationAnalysisPrompt',
-    model: 'googleai/gemini-3.6-flash',
+    model: 'googleai/gemini-3.8-flash',
     input: { schema: AnalyzeLiveConversationInputSchema },
     output: { schema: AnalyzeLiveConversationOutputSchema },
     prompt: `You are an expert native English AI tutor evaluating a recent real-time conversation you had with a student.
@@ -120,7 +120,7 @@ const analyzeLiveConversationFlow = ai.defineFlow(
         outputSchema: AnalyzeLiveConversationOutputSchema,
     },
     async (input) => {
-        const modelToUse = input.evaluationModel || 'googleai/gemini-3.6-flash';
+        const modelToUse = input.evaluationModel || 'googleai/gemini-3.8-flash';
         console.log(`Analyzing conversational feedback using model: ${modelToUse}`);
         const { output } = await liveConversationAnalysisPrompt(input, { model: modelToUse });
         if (!output) throw new Error("AI failed to evaluate live conversation.");

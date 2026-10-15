@@ -83,6 +83,9 @@ export const voiceDescriptions: Record<AiVoice, string> = {
 
 export const evaluationModels = [
   // Google AI Models
+  // 3.6 은 그대로 둡니다. 그 모델로 응시가 시작된 평가를 계속 부를 수 있어야 합니다.
+  "googleai/gemini-3.8-flash",
+  "googleai/gemini-3.7-flash",
   "googleai/gemini-3.6-flash",
   "googleai/gemini-3.1-pro-preview",
   // OpenAI Models
@@ -120,7 +123,9 @@ export type EvaluationModel = (typeof evaluationModels)[number];
  */
 export const assessmentEvaluationModels = [
   // 학생 녹음을 스스로 듣고 처리합니다.
-  { value: 'googleai/gemini-3.6-flash', label: 'gemini-3.6-flash — 전 과정을 스스로 처리 (빠름, 기본값)' },
+  { value: 'googleai/gemini-3.8-flash', label: 'gemini-3.8-flash — 전 과정을 스스로 처리 (빠름, 기본값)' },
+  { value: 'googleai/gemini-3.7-flash', label: 'gemini-3.7-flash — 전 과정을 스스로 처리 (빠름)' },
+  { value: 'googleai/gemini-3.6-flash', label: 'gemini-3.6-flash — 전 과정을 스스로 처리 (이전 세대)' },
   { value: 'googleai/gemini-3.1-pro-preview', label: 'gemini-3.1-pro-preview — 전 과정을 스스로 처리 (정밀)' },
   // 오디오를 못 받아 전사·발음은 Gemini 가 대신합니다. 내용 채점만 이 모델이 합니다.
   { value: 'openai/gpt-5.6-terra', label: 'gpt-5.6-terra — 내용 채점만 (전사·발음은 Gemini) · 루브릭은 엄격하게 채점' },
@@ -144,7 +149,9 @@ export const assessmentEvaluationModelValues = assessmentEvaluationModels.map((m
  */
 export const rubricAnalysisModels = [
   { value: 'googleai/gemini-3.1-pro-preview', label: 'gemini-3.1-pro-preview — 이미지·PDF 모두 정확 (느림)', pdf: true },
-  { value: 'googleai/gemini-3.6-flash',       label: 'gemini-3.6-flash — 정확하고 빠름', pdf: true },
+  { value: 'googleai/gemini-3.8-flash',       label: 'gemini-3.8-flash — 정확하고 빠름', pdf: true },
+  { value: 'googleai/gemini-3.7-flash',       label: 'gemini-3.7-flash — 정확하고 빠름', pdf: true },
+  { value: 'googleai/gemini-3.6-flash',       label: 'gemini-3.6-flash — 이전 세대', pdf: true },
   { value: 'openai/gpt-5.6-terra',            label: 'gpt-5.6-terra — 가장 빠르고 정확', pdf: true },
   { value: 'openai/gpt-5.6-luna',             label: 'gpt-5.6-luna — 정확', pdf: true },
   { value: 'anthropic/claude-fable-5',        label: 'claude-fable-5 — 이미지 전용, 정확', pdf: false },

@@ -9,7 +9,7 @@ const ExtractHandwritingOcrInputSchema = z.object({
     studentSubmissionUri: z.string().describe(
         "The student's handwritten work as a data URI (image or PDF)."
     ),
-    model: z.enum(evaluationModels).optional().default('googleai/gemini-3.6-flash'),
+    model: z.enum(evaluationModels).optional().default('googleai/gemini-3.8-flash'),
 });
 
 export type ExtractHandwritingOcrInput = z.infer<typeof ExtractHandwritingOcrInputSchema>;
@@ -47,7 +47,7 @@ const extractHandwritingOcrFlow = ai.defineFlow(
     },
     async ({ model, ...input }) => {
         // Force a multimodal-capable model if needed, but flash is default
-        const analysisModel = model || 'googleai/gemini-3.6-flash';
+        const analysisModel = model || 'googleai/gemini-3.8-flash';
 
         const { text } = await extractHandwritingOcrPrompt(input, { model: analysisModel });
 

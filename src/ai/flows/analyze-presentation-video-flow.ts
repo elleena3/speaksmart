@@ -35,7 +35,7 @@ const AnalyzePresentationVideoInputSchema = z.object({
   customCriteria: z.string().optional().describe(
     "Optional custom evaluation criteria provided by the teacher."
   ),
-  evaluationModel: z.enum(evaluationModels).optional().default('googleai/gemini-3.6-flash').describe("The evaluation model to use for analysis."),
+  evaluationModel: z.enum(evaluationModels).optional().default('googleai/gemini-3.8-flash').describe("The evaluation model to use for analysis."),
 });
 export type AnalyzePresentationVideoInput = z.infer<typeof AnalyzePresentationVideoInputSchema>;
 
@@ -137,10 +137,10 @@ const analyzePresentationVideoFlow = ai.defineFlow(
     outputSchema: AnalyzePresentationVideoOutputSchema,
   },
   async (input) => {
-    let modelName = input.evaluationModel || 'googleai/gemini-3.6-flash';
+    let modelName = input.evaluationModel || 'googleai/gemini-3.8-flash';
     // Normalize if user provided un-prefixed name
     if (!modelName.startsWith('googleai/') && !modelName.startsWith('openai/')) {
-      modelName = modelName.includes('pro') ? 'googleai/gemini-3.1-pro-preview' : 'googleai/gemini-3.6-flash';
+      modelName = modelName.includes('pro') ? 'googleai/gemini-3.1-pro-preview' : 'googleai/gemini-3.8-flash';
     }
     const analysisModel = modelName as any;
 
