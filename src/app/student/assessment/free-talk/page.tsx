@@ -4,6 +4,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { FreeTalkView } from "./free-talk-view"
 import { RealtimeAssessmentView } from "./realtime-view"
+import { GeminiLiveAssessmentView } from "./gemini-live-view"
 import { useSearchParams, useRouter, notFound } from "next/navigation"
 import { type TeacherAssessment } from "@/lib/types"
 import { useEffect, useState } from "react"
@@ -80,7 +81,9 @@ export default function FreeTalkPage() {
               예전에 만든 평가에는 conversationMode 가 없으므로 턴 방식이 기본입니다. */}
           {assessment.conversationMode === 'realtime'
             ? <RealtimeAssessmentView assessment={assessment} />
-            : <FreeTalkView assessment={assessment} />}
+            : assessment.conversationMode === 'gemini-live'
+              ? <GeminiLiveAssessmentView assessment={assessment} />
+              : <FreeTalkView assessment={assessment} />}
         </CardContent>
       </Card>
     </div>

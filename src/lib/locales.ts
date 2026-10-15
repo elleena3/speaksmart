@@ -105,7 +105,8 @@ export const translations = {
       assessmentTypes: {
         monologue: "혼자 말하기",
         dialogue: "AI와 대화하기",
-        realtime: "실시간 대화"
+        realtime: "실시간 대화",
+        geminiLive: "실시간 대화(Gemini)"
       },
       targetAudience: {
         all: "전체",
@@ -154,6 +155,7 @@ export const translations = {
       typeMonologue: "혼자 말하기 (Monologue)",
       typeDialogue: "AI와 대화하기 (Dialogue)",
       typeRealtime: "실시간 대화 (OpenAI Realtime)",
+      typeGeminiLive: "실시간 대화 (Gemini Live)",
       targetLabel: "평가 대상",
       targetAll: "전체 학생",
       targetSpecific: "학생 선택",
@@ -411,7 +413,8 @@ export const translations = {
       assessmentTypes: {
         monologue: "Monologue",
         dialogue: "Dialogue with AI",
-        realtime: "Realtime"
+        realtime: "Realtime",
+        geminiLive: "Realtime (Gemini)"
       },
       targetAudience: {
         all: "All",
@@ -460,6 +463,7 @@ export const translations = {
       typeMonologue: "Monologue",
       typeDialogue: "Dialogue with AI",
       typeRealtime: "Realtime conversation (OpenAI)",
+      typeGeminiLive: "Realtime conversation (Gemini Live)",
       targetLabel: "Assessment Target",
       targetAll: "All Students",
       targetSpecific: "Select Students",

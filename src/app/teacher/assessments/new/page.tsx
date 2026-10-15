@@ -22,7 +22,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogClose } from "@/components/ui/dialog";
-import { scenarios, type TeacherAssessment, femaleVoices, maleVoices, allVoices, evaluationModels, assessmentEvaluationModels, assessmentEvaluationModelValues, type AssessmentEvaluationModel, voiceDescriptions, type AiVoice, type MonologueType, type UserData, imageGenerationModels, type Scenario, type EvaluationModel, type ImageGenerationModel, monologueTypes, realtimeModels, realtimeVoices, type RealtimeModel, type RealtimeVoice, defaultRealtimeModel, defaultRealtimeVoice, DEFAULT_REALTIME_TIME_LIMIT_MIN } from "@/lib/types";
+import { scenarios, type TeacherAssessment, femaleVoices, maleVoices, allVoices, evaluationModels, assessmentEvaluationModels, assessmentEvaluationModelValues, type AssessmentEvaluationModel, voiceDescriptions, type AiVoice, type MonologueType, type UserData, imageGenerationModels, type Scenario, type EvaluationModel, type ImageGenerationModel, monologueTypes, realtimeModels, realtimeVoices, type RealtimeModel, type RealtimeVoice, defaultRealtimeModel, defaultRealtimeVoice, DEFAULT_REALTIME_TIME_LIMIT_MIN, geminiLiveModels, geminiLiveVoices, type GeminiLiveModel, type GeminiLiveVoice, defaultGeminiLiveModel, defaultGeminiLiveVoice } from "@/lib/types";
 import { useAuth, mockStudents } from "@/context/auth-context";
 import { addDoc, collection, getDocs, query, where, orderBy } from "firebase/firestore";
 import { db, storage } from "@/lib/firebase";
@@ -126,9 +126,11 @@ export default function NewAssessmentPage() {
     // 'realtime' 은 화면에서만 쓰는 값입니다. 저장할 때
     // assessmentType: 'dialogue' + conversationMode: 'realtime' 로 나눠 담습니다.
     // 채점·결과·루브릭은 통화 방식과 무관하게 같은 경로를 쓰기 때문입니다.
-    assessmentType: z.enum(["monologue", "dialogue", "realtime"]),
+    assessmentType: z.enum(["monologue", "dialogue", "realtime", "gemini-live"]),
     realtimeModel: z.enum(realtimeModels.map(m => m.value) as [RealtimeModel, ...RealtimeModel[]]).optional().default(defaultRealtimeModel),
     realtimeVoice: z.enum(realtimeVoices.map(v => v.value) as [RealtimeVoice, ...RealtimeVoice[]]).optional().default(defaultRealtimeVoice),
+    geminiLiveModel: z.enum(geminiLiveModels.map(m => m.value) as [GeminiLiveModel, ...GeminiLiveModel[]]).optional().default(defaultGeminiLiveModel),
+    geminiLiveVoice: z.enum(geminiLiveVoices.map(v => v.value) as [GeminiLiveVoice, ...GeminiLiveVoice[]]).optional().default(defaultGeminiLiveVoice),
     monologueType: z.enum(monologueTypes as [MonologueType, ...MonologueType[]]).optional(),
     targetType: z.enum(["all", "specific"]).default("all"),
     targetStudentIds: z.union([z.literal('all'), z.array(z.string()).min(1, "한 명 이상의 학생을 선택해야 합니다.")]),
@@ -206,14 +208,17 @@ export default function NewAssessmentPage() {
   /** 턴 방식이든 실시간이든 '대화형'인지. 주제·지문·시나리오 칸은 둘이 같습니다. */
   const isDialogueLike = assessmentType !== 'monologue';
 
+  /** 끊김 없는 실시간 통화인지(OpenAI 든 Gemini 든). 제한 시간·과금 성격이 같습니다. */
+  const isLiveCall = assessmentType === 'realtime' || assessmentType === 'gemini-live';
+
   // 실시간 대화를 고르면 제한 시간을 기본값으로 채웁니다.
   // 비워 두면 학생이 창을 닫지 않는 한 통화가 계속되어 과금이 이어집니다.
   // 교사가 값을 넣어 둔 경우에는 건드리지 않습니다.
   useEffect(() => {
-    if (assessmentType !== 'realtime') return;
+    if (!isLiveCall) return;
     const current = form.getValues('recordingTimeLimit');
     if (!current) form.setValue('recordingTimeLimit', DEFAULT_REALTIME_TIME_LIMIT_MIN);
-  }, [assessmentType, form]);
+  }, [isLiveCall, form]);
   const monologueType = form.watch("monologueType");
   const targetType = form.watch("targetType");
   const scenario = form.watch("scenario");
@@ -359,9 +364,10 @@ export default function NewAssessmentPage() {
       // assessmentType 은 'dialogue' 로 두어야 채점·결과·루브릭·성장 추이가
       // 기존 경로를 그대로 타고, 통화 방식만 conversationMode 로 구분됩니다.
       const isRealtime = values.assessmentType === 'realtime';
+      const isGeminiLive = values.assessmentType === 'gemini-live';
       submissionValues.assessmentType = values.assessmentType === 'monologue' ? 'monologue' : 'dialogue';
       if (values.assessmentType !== 'monologue') {
-        submissionValues.conversationMode = isRealtime ? 'realtime' : 'turn';
+        submissionValues.conversationMode = isRealtime ? 'realtime' : isGeminiLive ? 'gemini-live' : 'turn';
       }
 
       if (isFreeTalkDialogue) {
@@ -398,15 +404,25 @@ export default function NewAssessmentPage() {
         delete (docData as any).scenario;
         delete (docData as any).realtimeModel;
         delete (docData as any).realtimeVoice;
+        delete (docData as any).geminiLiveModel;
+        delete (docData as any).geminiLiveVoice;
       } else {
         delete (docData as any).monologueType;
-        // 통화 방식에 따라 쓰지 않는 쪽은 저장하지 않습니다.
-        // aiVoice 는 Gemini TTS 목소리, realtimeVoice 는 OpenAI 목소리로 목록이 다릅니다.
+        // 통화 방식마다 목소리 목록이 달라, 쓰지 않는 쪽은 저장하지 않습니다.
+        // aiVoice=Gemini TTS, realtimeVoice=OpenAI, geminiLiveVoice=Vertex Live 로 모두 다릅니다.
         if (isRealtime) {
           delete (docData as any).aiVoice;
+          delete (docData as any).geminiLiveModel;
+          delete (docData as any).geminiLiveVoice;
+        } else if (isGeminiLive) {
+          delete (docData as any).aiVoice;
+          delete (docData as any).realtimeModel;
+          delete (docData as any).realtimeVoice;
         } else {
           delete (docData as any).realtimeModel;
           delete (docData as any).realtimeVoice;
+          delete (docData as any).geminiLiveModel;
+          delete (docData as any).geminiLiveVoice;
         }
       }
 
@@ -621,10 +637,16 @@ export default function NewAssessmentPage() {
                         <FormControl><RadioGroupItem value="realtime" /></FormControl>
                         <FormLabel className="font-normal">{t.teacherAssessmentForm.typeRealtime}</FormLabel>
                       </FormItem>
+                      <FormItem className="flex items-center space-x-2 space-y-0">
+                        <FormControl><RadioGroupItem value="gemini-live" /></FormControl>
+                        <FormLabel className="font-normal">{t.teacherAssessmentForm.typeGeminiLive}</FormLabel>
+                      </FormItem>
                     </RadioGroup>
                   </FormControl>
                   <FormDescription>
-                    {assessmentType === 'realtime'
+                    {assessmentType === 'gemini-live'
+                      ? 'OpenAI 실시간 대화와 쓰는 방식은 같고 목소리와 모델만 Gemini 입니다. 학생 브라우저에는 1시간 만료 토큰만 내려갑니다.'
+                      : assessmentType === 'realtime'
                       ? '학생이 버튼을 누르지 않고 말합니다. 말을 멈추면(0.5초) AI가 바로 대답하고 끼어들기도 됩니다. 채점 방식은 AI와 대화하기와 같습니다.'
                       : assessmentType === 'dialogue'
                         ? '학생이 [응답하기]와 [말하기 중지]를 눌러 한 번씩 주고받습니다. 멈춘 뒤 AI 답변까지 약 10초 걸립니다.'
@@ -675,6 +697,49 @@ export default function NewAssessmentPage() {
                         </SelectContent>
                       </Select>
                       <FormDescription>OpenAI 실시간 전용 목소리입니다.</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            )}
+
+            {assessmentType === 'gemini-live' && (
+              <div className="grid grid-cols-1 gap-4 rounded-md border p-4 sm:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="geminiLiveModel"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>실시간 통화 모델 (Gemini)</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                        <SelectContent>
+                          {geminiLiveModels.map((m) => (
+                            <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>통화에만 쓰는 모델입니다. 채점 모델과 별개입니다.</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="geminiLiveVoice"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>AI 목소리</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                        <SelectContent>
+                          {geminiLiveVoices.map((v) => (
+                            <SelectItem key={v.value} value={v.value}>{v.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>Gemini Live 전용 목소리입니다.</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -1094,7 +1159,7 @@ export default function NewAssessmentPage() {
 
             {/* 실시간 대화는 접속한 시간만큼 과금되므로 제한 시간이 필요합니다.
                 턴 방식은 이 값을 읽는 코드가 없어 숨겨 둡니다. */}
-            {(assessmentType === 'monologue' || assessmentType === 'realtime') && (
+            {(assessmentType === 'monologue' || isLiveCall) && (
               <FormField
                 control={form.control}
                 name="recordingTimeLimit"
@@ -1110,7 +1175,7 @@ export default function NewAssessmentPage() {
                       />
                     </FormControl>
                     <FormDescription>
-                      {assessmentType === 'realtime'
+                      {isLiveCall
                         ? '이 시간이 지나면 통화가 자동으로 끊기고 지금까지의 대화로 채점합니다. 실시간 통화는 접속한 시간만큼 과금되므로 비워 두지 마십시오.'
                         : t.teacherAssessmentForm.timeLimitDescription}
                     </FormDescription>

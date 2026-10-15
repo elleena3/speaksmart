@@ -7,16 +7,18 @@ export type Scenario = (typeof scenarios)[number];
 /**
  * 대화형 평가의 '통화 엔진'.
  *
- * turn     — 버튼을 눌러 주고받습니다. 한 턴에 전사·답변·음성합성을 차례로 불러
- *            학생이 멈춘 뒤 약 10초를 기다립니다.
- * realtime — OpenAI Realtime 과 WebRTC 로 음성을 직접 주고받습니다.
- *            말이 끝나면(무음 0.5초) 자동으로 턴이 넘어가고 끼어들기도 됩니다.
+ * turn        — 버튼을 눌러 주고받습니다. 한 턴에 전사·답변·음성합성을 차례로 불러
+ *               학생이 멈춘 뒤 약 10초를 기다립니다.
+ * realtime    — OpenAI Realtime 과 WebRTC 로 음성을 직접 주고받습니다.
+ *               말이 끝나면(무음 0.5초) 자동으로 턴이 넘어가고 끼어들기도 됩니다.
+ * gemini-live — Vertex AI Live 와 WebSocket 으로 주고받습니다. 역시 끊김이 없습니다.
+ *               브라우저에는 1시간 만료 토큰만 내려갑니다(API 키 원본이 아닙니다).
  *
  * 채점 방식은 두 엔진이 같습니다(대화 분석 플로우). 엔진은 '어떻게 대화했는가'일
  * 뿐이라 assessmentType 은 그대로 'dialogue' 를 씁니다. 그래서 결과·루브릭·성장
  * 추이·다시 채점 경로가 모두 손대지 않고 그대로 동작합니다.
  */
-export const conversationModes = ["turn", "realtime"] as const;
+export const conversationModes = ["turn", "realtime", "gemini-live"] as const;
 export type ConversationMode = (typeof conversationModes)[number];
 
 /** OpenAI Realtime 통화에 쓰는 모델. 교사가 평가를 만들 때 고릅니다. */
@@ -47,6 +49,35 @@ export const realtimeVoices = [
 ] as const;
 export type RealtimeVoice = (typeof realtimeVoices)[number]["value"];
 export const defaultRealtimeVoice: RealtimeVoice = "marin";
+
+/**
+ * Vertex AI Live 통화 모델. 이 프로젝트에서 실제로 접속되는 것만 적었습니다.
+ * (publisher 모델 목록을 받아 live 후보를 추린 뒤 하나씩 setup 을 보내 확인했습니다.)
+ */
+export const geminiLiveModels = [
+  { value: "gemini-3.8-live", label: "gemini-3.8-live (기본, 최신)" },
+  { value: "gemini-live-2.5-flash-native-audio", label: "gemini-live-2.5-flash-native-audio (이전 세대)" },
+] as const;
+export type GeminiLiveModel = (typeof geminiLiveModels)[number]["value"];
+export const defaultGeminiLiveModel: GeminiLiveModel = "gemini-3.8-live";
+
+/**
+ * Vertex AI Live 목소리. 8종 모두 실제로 받아들여지는 것을 확인했습니다
+ * (엉터리 값은 'No matching speaker voice found' 로 거부되므로 의미 있는 확인입니다).
+ * OpenAI·Gemini TTS 목소리와는 또 다른 목록입니다.
+ */
+export const geminiLiveVoices = [
+  { value: "Aoede", label: "Aoede (여성·부드러움, 기본값)" },
+  { value: "Kore", label: "Kore (여성·또렷함)" },
+  { value: "Leda", label: "Leda (여성·밝음)" },
+  { value: "Zephyr", label: "Zephyr (여성·차분함)" },
+  { value: "Puck", label: "Puck (남성·활기참)" },
+  { value: "Charon", label: "Charon (남성·낮고 안정적)" },
+  { value: "Fenrir", label: "Fenrir (남성·힘있음)" },
+  { value: "Orus", label: "Orus (남성·중립적)" },
+] as const;
+export type GeminiLiveVoice = (typeof geminiLiveVoices)[number]["value"];
+export const defaultGeminiLiveVoice: GeminiLiveVoice = "Aoede";
 
 /**
  * 실시간 대화의 기본 제한 시간(분).
@@ -224,6 +255,9 @@ export type TeacherAssessment = {
   /** conversationMode 가 'realtime' 일 때만 씁니다. */
   realtimeModel?: RealtimeModel;
   realtimeVoice?: RealtimeVoice;
+  /** conversationMode 가 'gemini-live' 일 때만 씁니다. */
+  geminiLiveModel?: GeminiLiveModel;
+  geminiLiveVoice?: GeminiLiveVoice;
   monologueType?: MonologueType;
   scenario?: Scenario;
   aiVoice?: AiVoice;

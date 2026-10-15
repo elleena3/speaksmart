@@ -23,7 +23,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { scenarios, type RubricCriterion, type TeacherAssessment, femaleVoices, maleVoices, allVoices, assessmentEvaluationModels, assessmentEvaluationModelValues, type AssessmentEvaluationModel, voiceDescriptions, type AiVoice, type UserData, realtimeModels, realtimeVoices, type RealtimeModel, type RealtimeVoice, defaultRealtimeModel, defaultRealtimeVoice, DEFAULT_REALTIME_TIME_LIMIT_MIN } from "@/lib/types";
+import { scenarios, type RubricCriterion, type TeacherAssessment, femaleVoices, maleVoices, allVoices, assessmentEvaluationModels, assessmentEvaluationModelValues, type AssessmentEvaluationModel, voiceDescriptions, type AiVoice, type UserData, realtimeModels, realtimeVoices, type RealtimeModel, type RealtimeVoice, defaultRealtimeModel, defaultRealtimeVoice, DEFAULT_REALTIME_TIME_LIMIT_MIN, geminiLiveModels, geminiLiveVoices, type GeminiLiveModel, type GeminiLiveVoice, defaultGeminiLiveModel, defaultGeminiLiveVoice } from "@/lib/types";
 import { useAuth, mockStudents } from "@/context/auth-context";
 import { doc, getDoc, updateDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -98,9 +98,11 @@ export default function EditAssessmentPage() {
     startDate: z.date().optional(),
     endDate: z.date().optional(),
     // 'realtime' 은 화면에서만 쓰는 값입니다. 저장은 dialogue + conversationMode 로 나눕니다.
-    assessmentType: z.enum(["monologue", "dialogue", "realtime"]),
+    assessmentType: z.enum(["monologue", "dialogue", "realtime", "gemini-live"]),
     realtimeModel: z.enum(realtimeModels.map(m => m.value) as [RealtimeModel, ...RealtimeModel[]]).optional().default(defaultRealtimeModel),
     realtimeVoice: z.enum(realtimeVoices.map(v => v.value) as [RealtimeVoice, ...RealtimeVoice[]]).optional().default(defaultRealtimeVoice),
+    geminiLiveModel: z.enum(geminiLiveModels.map(m => m.value) as [GeminiLiveModel, ...GeminiLiveModel[]]).optional().default(defaultGeminiLiveModel),
+    geminiLiveVoice: z.enum(geminiLiveVoices.map(v => v.value) as [GeminiLiveVoice, ...GeminiLiveVoice[]]).optional().default(defaultGeminiLiveVoice),
     targetType: z.enum(["all", "specific"]).default("all"),
     targetStudentIds: z.union([z.literal('all'), z.array(z.string())]),
     scenario: z.enum(scenarios).optional(),
@@ -162,12 +164,15 @@ export default function EditAssessmentPage() {
   /** 턴 방식이든 실시간이든 '대화형'인지. */
   const isDialogueLike = assessmentType !== 'monologue';
 
+  /** 끊김 없는 실시간 통화인지(OpenAI 든 Gemini 든). */
+  const isLiveCall = assessmentType === 'realtime' || assessmentType === 'gemini-live';
+
   // 실시간으로 바꿨는데 제한 시간이 비어 있으면 기본값을 채웁니다.
   useEffect(() => {
-    if (assessmentType !== 'realtime') return;
+    if (!isLiveCall) return;
     const current = form.getValues('recordingTimeLimit');
     if (!current) form.setValue('recordingTimeLimit', DEFAULT_REALTIME_TIME_LIMIT_MIN);
-  }, [assessmentType, form]);
+  }, [isLiveCall, form]);
   const isFreeTalkDialogue = isDialogueLike && scenario === 'free-talk';
   const useRubric = form.watch("useRubric");
   // 수정 화면에서도 루브릭을 바꿀 수 있어야 합니다. 예전에는 생성 시에만 고를 수 있었습니다.
@@ -210,9 +215,13 @@ export default function EditAssessmentPage() {
               // 저장된 dialogue + conversationMode 를 화면의 세 번째 선택지로 되돌립니다.
               assessmentType: data.assessmentType === 'dialogue' && data.conversationMode === 'realtime'
                 ? 'realtime'
-                : data.assessmentType,
+                : data.assessmentType === 'dialogue' && data.conversationMode === 'gemini-live'
+                  ? 'gemini-live'
+                  : data.assessmentType,
               realtimeModel: data.realtimeModel || defaultRealtimeModel,
               realtimeVoice: data.realtimeVoice || defaultRealtimeVoice,
+              geminiLiveModel: data.geminiLiveModel || defaultGeminiLiveModel,
+              geminiLiveVoice: data.geminiLiveVoice || defaultGeminiLiveVoice,
               startDate: data.startDate ? new Date(data.startDate) : undefined,
               endDate: data.endDate ? new Date(data.endDate) : undefined,
               targetType: Array.isArray(data.targetStudentIds) ? 'specific' : 'all',
@@ -326,9 +335,10 @@ export default function EditAssessmentPage() {
 
         // 화면의 '실시간 대화' 를 저장 형태로 나눠 담습니다.
         const isRealtime = values.assessmentType === 'realtime';
+        const isGeminiLive = values.assessmentType === 'gemini-live';
         submissionValues.assessmentType = values.assessmentType === 'monologue' ? 'monologue' : 'dialogue';
         if (values.assessmentType !== 'monologue') {
-            submissionValues.conversationMode = isRealtime ? 'realtime' : 'turn';
+            submissionValues.conversationMode = isRealtime ? 'realtime' : isGeminiLive ? 'gemini-live' : 'turn';
         }
 
         const docRef = doc(db, "assessments", assessmentId);
@@ -356,12 +366,22 @@ export default function EditAssessmentPage() {
             delete (updateData as any).scenario;
             delete (updateData as any).realtimeModel;
             delete (updateData as any).realtimeVoice;
+            delete (updateData as any).geminiLiveModel;
+            delete (updateData as any).geminiLiveVoice;
         } else if (isRealtime) {
-            // 목소리 목록이 서로 달라 쓰지 않는 쪽은 저장하지 않습니다.
+            // 통화 방식마다 목소리 목록이 달라 쓰지 않는 쪽은 저장하지 않습니다.
             delete (updateData as any).aiVoice;
+            delete (updateData as any).geminiLiveModel;
+            delete (updateData as any).geminiLiveVoice;
+        } else if (isGeminiLive) {
+            delete (updateData as any).aiVoice;
+            delete (updateData as any).realtimeModel;
+            delete (updateData as any).realtimeVoice;
         } else {
             delete (updateData as any).realtimeModel;
             delete (updateData as any).realtimeVoice;
+            delete (updateData as any).geminiLiveModel;
+            delete (updateData as any).geminiLiveVoice;
         }
 
         // Ensure createdAt is not overwritten
@@ -569,6 +589,14 @@ export default function EditAssessmentPage() {
                             {t.teacherAssessmentForm.typeRealtime}
                           </FormLabel>
                         </FormItem>
+                        <FormItem className="flex items-center space-x-3 space-y-0">
+                          <FormControl>
+                            <RadioGroupItem value="gemini-live" />
+                          </FormControl>
+                          <FormLabel className="font-normal">
+                            {t.teacherAssessmentForm.typeGeminiLive}
+                          </FormLabel>
+                        </FormItem>
                       </RadioGroup>
                     </FormControl>
                     <FormMessage />
@@ -616,6 +644,49 @@ export default function EditAssessmentPage() {
                         </SelectContent>
                       </Select>
                       <FormDescription>OpenAI 실시간 전용 목소리입니다.</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            )}
+
+            {assessmentType === 'gemini-live' && (
+              <div className="grid grid-cols-1 gap-4 rounded-md border p-4 sm:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="geminiLiveModel"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>실시간 통화 모델 (Gemini)</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                        <SelectContent>
+                          {geminiLiveModels.map((m) => (
+                            <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>통화에만 쓰는 모델입니다. 채점 모델과 별개입니다.</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="geminiLiveVoice"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>AI 목소리</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                        <SelectContent>
+                          {geminiLiveVoices.map((v) => (
+                            <SelectItem key={v.value} value={v.value}>{v.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>Gemini Live 전용 목소리입니다.</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -920,7 +991,7 @@ export default function EditAssessmentPage() {
 
             {/* 실시간 대화는 접속한 시간만큼 과금되므로 제한 시간이 필요합니다.
                 턴 방식은 이 값을 읽는 코드가 없어 숨겨 둡니다. */}
-            {(assessmentType === 'monologue' || assessmentType === 'realtime') && (
+            {(assessmentType === 'monologue' || isLiveCall) && (
               <FormField
                 control={form.control}
                 name="recordingTimeLimit"
@@ -937,7 +1008,7 @@ export default function EditAssessmentPage() {
                       />
                     </FormControl>
                     <FormDescription>
-                      {assessmentType === 'realtime'
+                      {isLiveCall
                         ? '이 시간이 지나면 통화가 자동으로 끊기고 지금까지의 대화로 채점합니다. 실시간 통화는 접속한 시간만큼 과금되므로 비워 두지 마십시오.'
                         : t.teacherAssessmentForm.timeLimitDescription}
                     </FormDescription>
