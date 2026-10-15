@@ -177,13 +177,19 @@ const monologueAnalysisFlow = ai.defineFlow(
       // 루브릭 항목이 전달된 경우에만 루브릭 채점을 합니다.
       // useRubric 만 켜져 있고 항목이 없으면 아래 일반 채점으로 넘어갑니다.
       if (input.useRubric && input.rubricCriteria?.length) {
-          const graded = await withRetry(() => gradeWithRubric({
-              transcript: studentTranscript,
-              activityPrompt: input.activityPrompt,
-              rubricName: input.rubricName,
-              criteria: input.rubricCriteria!,
-              model,
-          }));
+          // 루브릭 채점은 전사(글)만 봅니다. 녹음을 듣는 호출을 함께 돌려야
+          // 발음 점수가 실제로 들어본 결과가 됩니다. 예전에는 발음 항목이 없으면
+          // 총점이 그대로 발음 점수로 들어갔습니다.
+          const [graded, heardPron] = await Promise.all([
+              withRetry(() => gradeWithRubric({
+                  transcript: studentTranscript,
+                  activityPrompt: input.activityPrompt,
+                  rubricName: input.rubricName,
+                  criteria: input.rubricCriteria!,
+                  model,
+              })),
+              analysePronunciationFromAudio(model, studentRecordingDataUri, studentTranscript),
+          ]);
 
           const guidanceResult = await withRetry(() => monologueTeacherGuidanceFromRubricPrompt({
               studentFeedbackHtml: renderRubricSummary(graded),
@@ -192,12 +198,12 @@ const monologueAnalysisFlow = ai.defineFlow(
           finalResult = {
               studentTranscript,
               contentScore: graded.percentageScore,
-              // 루브릭에 발음 항목이 있으면 그 항목을 발음 점수로 씁니다. 없으면 총점으로 대체합니다.
-              pronunciationScore: pickPronunciationScore(graded) ?? graded.percentageScore,
+              // 녹음을 들은 결과를 우선합니다. 루브릭 총점은 교사가 정한 배점이라 건드리지 않습니다.
+              pronunciationScore: heardPron?.pronunciationScore ?? pickPronunciationScore(graded) ?? graded.percentageScore,
               aiFeedback: renderRubricSummary(graded),
               teacherGuidance: guidanceResult.text,
               curricularRemarks: await describeRubricResult(input.assessmentTitle, graded),
-              pronunciationFeedback: graded.evaluation.summary,
+              pronunciationFeedback: heardPron?.pronunciationFeedback ?? graded.evaluation.summary,
               rubricEvaluation: graded.evaluation,
               rubricName: input.rubricName ?? null,
           };
@@ -262,6 +268,28 @@ const monologueAnalysisFlow = ai.defineFlow(
  * 결과 문서를 덮어쓰므로 본인 결과이거나 담당 교사일 때만 허용합니다.
  * 예전에는 flow 를 그대로 export 해 결과 ID 만 알면 누구나 점수를 바꿀 수 있었습니다.
  */
+/**
+ * 녹음을 듣고 발음만 평가합니다. 루브릭 채점과 나란히 돌리는 용도입니다.
+ * 실패해도 채점 전체를 되돌리지 않습니다.
+ */
+async function analysePronunciationFromAudio(
+  model: string,
+  studentRecordingUrl: string,
+  studentTranscript: string
+): Promise<{ pronunciationScore: number; pronunciationFeedback: string } | null> {
+  try {
+    const res = await withAudioFallback(
+      model,
+      (m) => withRetry(() => monologuePronunciationAnalysisPrompt({ studentRecordingUrl, studentTranscript }, { model: m })),
+      '발음 분석(루브릭 병행)'
+    );
+    return res.output ?? null;
+  } catch (e) {
+    console.warn('[발음 분석(루브릭 병행)] 실패 — 루브릭 점수로 대체합니다:', (e as Error)?.message?.split(String.fromCharCode(10))[0]);
+    return null;
+  }
+}
+
 export async function generateMonologueAnalysisFlow(
   input: z.infer<typeof MonologueProcessingInputSchema>
 ): Promise<void> {

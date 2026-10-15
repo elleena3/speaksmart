@@ -91,6 +91,30 @@ const dialogueTeacherGuidanceFromRubricPrompt = ai.definePrompt({
 
 // --- Main Function ---
 
+/**
+ * 녹음을 듣고 발음만 평가합니다. 루브릭 채점과 나란히 돌리는 용도입니다.
+ *
+ * 여기서 실패해도 채점 전체를 되돌리지 않습니다. 발음 점수 하나 때문에
+ * 학생이 다시 응시해야 하는 상황을 만들지 않으려는 것입니다.
+ */
+async function analysePronunciationFromAudio(
+  model: string,
+  studentRecordingUrl: string,
+  studentTranscript: string
+): Promise<{ pronunciationScore: number; pronunciationFeedback: string } | null> {
+  try {
+    const res = await withAudioFallback(
+      model,
+      (m) => withRetry(() => dialoguePronunciationAnalysisPrompt({ studentRecordingUrl, studentTranscript }, { model: m })),
+      '발음 분석(루브릭 병행)'
+    );
+    return res.output ?? null;
+  } catch (e) {
+    console.warn('[발음 분석(루브릭 병행)] 실패 — 루브릭 점수로 대체합니다:', (e as Error)?.message?.split(String.fromCharCode(10))[0]);
+    return null;
+  }
+}
+
 export async function generateDialogueAnalysis(input: any): Promise<void> {
   // 결과 문서를 덮어쓰므로 본인 결과이거나 담당 교사일 때만 허용합니다.
   await requireResultAccess(input.resultId);
@@ -103,13 +127,19 @@ export async function generateDialogueAnalysis(input: any): Promise<void> {
 
       // 루브릭 항목이 전달된 경우에만 루브릭 채점을 합니다.
       if (input.useRubric && input.rubricCriteria?.length) {
-          const graded = await withRetry(() => gradeWithRubric({
-              transcript: input.fullConversationTranscript,
-              activityPrompt: input.activityPrompt,
-              rubricName: input.rubricName,
-              criteria: input.rubricCriteria,
-              model,
-          }));
+          // 루브릭 채점은 글(전사)만 봅니다. 녹음을 듣는 호출이 없으면 발음 점수가
+          // 사실은 들어본 적 없는 숫자가 됩니다(발음 항목이 없으면 총점이 그대로
+          // 발음 점수로 들어갔습니다). 그래서 발음 분석을 따로 함께 돌립니다.
+          const [graded, heardPron] = await Promise.all([
+              withRetry(() => gradeWithRubric({
+                  transcript: input.fullConversationTranscript,
+                  activityPrompt: input.activityPrompt,
+                  rubricName: input.rubricName,
+                  criteria: input.rubricCriteria,
+                  model,
+              })),
+              analysePronunciationFromAudio(model, input.studentRecordingUrl, input.studentTranscript),
+          ]);
 
           const guidanceRes = await withRetry(() => dialogueTeacherGuidanceFromRubricPrompt({
               studentFeedbackHtml: renderRubricSummary(graded),
@@ -118,11 +148,13 @@ export async function generateDialogueAnalysis(input: any): Promise<void> {
           finalResult = {
               studentTranscript: input.fullConversationTranscript,
               contentScore: graded.percentageScore,
-              pronunciationScore: pickPronunciationScore(graded) ?? graded.percentageScore,
+              // 녹음을 들은 결과가 있으면 그것을 씁니다. 루브릭 총점은 건드리지 않습니다
+              // (교사가 정한 배점이므로). 실패했을 때만 예전 방식으로 돌아갑니다.
+              pronunciationScore: heardPron?.pronunciationScore ?? pickPronunciationScore(graded) ?? graded.percentageScore,
               aiFeedback: renderRubricSummary(graded),
               teacherGuidance: guidanceRes.text,
               curricularRemarks: await describeRubricResult(input.assessmentTitle ?? '대화 평가', graded),
-              pronunciationFeedback: graded.evaluation.summary,
+              pronunciationFeedback: heardPron?.pronunciationFeedback ?? graded.evaluation.summary,
               rubricEvaluation: graded.evaluation,
               rubricName: input.rubricName ?? null,
           };
