@@ -23,7 +23,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { scenarios, type RubricCriterion, type TeacherAssessment, femaleVoices, maleVoices, allVoices, assessmentEvaluationModels, assessmentEvaluationModelValues, type AssessmentEvaluationModel, voiceDescriptions, type AiVoice, type UserData } from "@/lib/types";
+import { scenarios, type RubricCriterion, type TeacherAssessment, femaleVoices, maleVoices, allVoices, assessmentEvaluationModels, assessmentEvaluationModelValues, type AssessmentEvaluationModel, voiceDescriptions, type AiVoice, type UserData, realtimeModels, realtimeVoices, type RealtimeModel, type RealtimeVoice, defaultRealtimeModel, defaultRealtimeVoice } from "@/lib/types";
 import { useAuth, mockStudents } from "@/context/auth-context";
 import { doc, getDoc, updateDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -97,7 +97,10 @@ export default function EditAssessmentPage() {
     expectedFormat: z.string().optional(),
     startDate: z.date().optional(),
     endDate: z.date().optional(),
-    assessmentType: z.enum(["monologue", "dialogue"]),
+    // 'realtime' 은 화면에서만 쓰는 값입니다. 저장은 dialogue + conversationMode 로 나눕니다.
+    assessmentType: z.enum(["monologue", "dialogue", "realtime"]),
+    realtimeModel: z.enum(realtimeModels.map(m => m.value) as [RealtimeModel, ...RealtimeModel[]]).optional().default(defaultRealtimeModel),
+    realtimeVoice: z.enum(realtimeVoices.map(v => v.value) as [RealtimeVoice, ...RealtimeVoice[]]).optional().default(defaultRealtimeVoice),
     targetType: z.enum(["all", "specific"]).default("all"),
     targetStudentIds: z.union([z.literal('all'), z.array(z.string())]),
     scenario: z.enum(scenarios).optional(),
@@ -107,7 +110,7 @@ export default function EditAssessmentPage() {
     useRubric: z.boolean().default(false),
     loadedRubricId: z.string().optional(),
   }).superRefine((data, ctx) => {
-    const isFreeTalkDialogue = data.assessmentType === 'dialogue' && data.scenario === 'free-talk';
+    const isFreeTalkDialogue = data.assessmentType !== 'monologue' && data.scenario === 'free-talk';
 
     if (!isFreeTalkDialogue) {
       if (!data.title) {
@@ -156,7 +159,9 @@ export default function EditAssessmentPage() {
   const assessmentType = form.watch("assessmentType");
   const targetType = form.watch("targetType");
   const scenario = form.watch("scenario");
-  const isFreeTalkDialogue = assessmentType === 'dialogue' && scenario === 'free-talk';
+  /** 턴 방식이든 실시간이든 '대화형'인지. */
+  const isDialogueLike = assessmentType !== 'monologue';
+  const isFreeTalkDialogue = isDialogueLike && scenario === 'free-talk';
   const useRubric = form.watch("useRubric");
   // 수정 화면에서도 루브릭을 바꿀 수 있어야 합니다. 예전에는 생성 시에만 고를 수 있었습니다.
   const selectedRubricId = form.watch("loadedRubricId");
@@ -195,6 +200,12 @@ export default function EditAssessmentPage() {
 
             form.reset({
               ...data,
+              // 저장된 dialogue + conversationMode 를 화면의 세 번째 선택지로 되돌립니다.
+              assessmentType: data.assessmentType === 'dialogue' && data.conversationMode === 'realtime'
+                ? 'realtime'
+                : data.assessmentType,
+              realtimeModel: data.realtimeModel || defaultRealtimeModel,
+              realtimeVoice: data.realtimeVoice || defaultRealtimeVoice,
               startDate: data.startDate ? new Date(data.startDate) : undefined,
               endDate: data.endDate ? new Date(data.endDate) : undefined,
               targetType: Array.isArray(data.targetStudentIds) ? 'specific' : 'all',
@@ -306,6 +317,13 @@ export default function EditAssessmentPage() {
             submissionValues.expectedFormat = "발음, 문법, 단어, 문장 등을 평가 주제에 맞게 종합적으로 판단.";
         }
 
+        // 화면의 '실시간 대화' 를 저장 형태로 나눠 담습니다.
+        const isRealtime = values.assessmentType === 'realtime';
+        submissionValues.assessmentType = values.assessmentType === 'monologue' ? 'monologue' : 'dialogue';
+        if (values.assessmentType !== 'monologue') {
+            submissionValues.conversationMode = isRealtime ? 'realtime' : 'turn';
+        }
+
         const docRef = doc(db, "assessments", assessmentId);
         
         const updateData: Partial<TeacherAssessment> = {
@@ -329,6 +347,14 @@ export default function EditAssessmentPage() {
         if (values.assessmentType === 'monologue') {
             delete (updateData as any).aiVoice;
             delete (updateData as any).scenario;
+            delete (updateData as any).realtimeModel;
+            delete (updateData as any).realtimeVoice;
+        } else if (isRealtime) {
+            // 목소리 목록이 서로 달라 쓰지 않는 쪽은 저장하지 않습니다.
+            delete (updateData as any).aiVoice;
+        } else {
+            delete (updateData as any).realtimeModel;
+            delete (updateData as any).realtimeVoice;
         }
 
         // Ensure createdAt is not overwritten
@@ -528,6 +554,14 @@ export default function EditAssessmentPage() {
                             {t.teacherAssessmentForm.typeDialogue}
                           </FormLabel>
                         </FormItem>
+                        <FormItem className="flex items-center space-x-3 space-y-0">
+                          <FormControl>
+                            <RadioGroupItem value="realtime" />
+                          </FormControl>
+                          <FormLabel className="font-normal">
+                            {t.teacherAssessmentForm.typeRealtime}
+                          </FormLabel>
+                        </FormItem>
                       </RadioGroup>
                     </FormControl>
                     <FormMessage />
@@ -535,6 +569,54 @@ export default function EditAssessmentPage() {
                 )}
               />
 
+            {assessmentType === 'realtime' && (
+              <div className="grid grid-cols-1 gap-4 rounded-md border p-4 sm:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="realtimeModel"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>실시간 통화 모델</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {realtimeModels.map((m) => (
+                            <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>통화에만 쓰는 모델입니다. 채점 모델과 별개입니다.</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="realtimeVoice"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>AI 목소리</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {realtimeVoices.map((v) => (
+                            <SelectItem key={v.value} value={v.value}>{v.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>OpenAI 실시간 전용 목소리입니다.</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            )}
+
+            {/* Gemini TTS 목소리입니다. 실시간 대화는 OpenAI 목소리를 쓰므로 턴 방식에서만 보입니다. */}
             {assessmentType === 'dialogue' && (
               <FormField
                 control={form.control}
@@ -654,7 +736,7 @@ export default function EditAssessmentPage() {
               )}
             />
 
-            {assessmentType === 'dialogue' && (
+            {isDialogueLike && (
                <FormField
                   control={form.control}
                   name="scenario"
@@ -739,10 +821,10 @@ export default function EditAssessmentPage() {
               name="expectedFormat"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>{t.teacherAssessmentForm.expectedFormatLabel} {(assessmentType === 'dialogue' || useRubric) && `(${t.teacherAssessmentForm.optional})`}</FormLabel>
+                  <FormLabel>{t.teacherAssessmentForm.expectedFormatLabel} {(isDialogueLike || useRubric) && `(${t.teacherAssessmentForm.optional})`}</FormLabel>
                   <FormControl>
                     <Textarea
-                      placeholder={assessmentType === 'dialogue' ? '발음, 문법, 단어, 문장 등을 평가 주제에 맞게 종합적으로 판단.' : t.teacherAssessmentForm.expectedFormatPlaceholder}
+                      placeholder={isDialogueLike ? '발음, 문법, 단어, 문장 등을 평가 주제에 맞게 종합적으로 판단.' : t.teacherAssessmentForm.expectedFormatPlaceholder}
                       rows={4}
                       {...field}
                       disabled={useRubric}

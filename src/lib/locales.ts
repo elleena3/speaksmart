@@ -104,7 +104,8 @@ export const translations = {
       tableHeaderActions: "작업",
       assessmentTypes: {
         monologue: "혼자 말하기",
-        dialogue: "AI와 대화하기"
+        dialogue: "AI와 대화하기",
+        realtime: "실시간 대화"
       },
       targetAudience: {
         all: "전체",
@@ -152,6 +153,7 @@ export const translations = {
       typeLabel: "평가 유형",
       typeMonologue: "혼자 말하기 (Monologue)",
       typeDialogue: "AI와 대화하기 (Dialogue)",
+      typeRealtime: "실시간 대화 (OpenAI Realtime)",
       targetLabel: "평가 대상",
       targetAll: "전체 학생",
       targetSpecific: "학생 선택",
@@ -408,7 +410,8 @@ export const translations = {
       tableHeaderActions: "Actions",
       assessmentTypes: {
         monologue: "Monologue",
-        dialogue: "Dialogue with AI"
+        dialogue: "Dialogue with AI",
+        realtime: "Realtime"
       },
       targetAudience: {
         all: "All",
@@ -456,6 +459,7 @@ export const translations = {
       typeLabel: "Assessment Type",
       typeMonologue: "Monologue",
       typeDialogue: "Dialogue with AI",
+      typeRealtime: "Realtime conversation (OpenAI)",
       targetLabel: "Assessment Target",
       targetAll: "All Students",
       targetSpecific: "Select Students",

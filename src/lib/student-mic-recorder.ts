@@ -9,6 +9,14 @@
 export type StudentMicRecorder = {
   /** 녹음을 멈추고 지금까지의 음성을 data URI 로 돌려줍니다. 녹음이 없으면 null. */
   stopAndGetDataUri: () => Promise<string | null>;
+  /**
+   * 녹음을 멈추고 Blob 으로 돌려줍니다. 녹음이 없으면 null.
+   *
+   * 평가 응시는 이 녹음을 Storage 에 올려야 합니다. data URI 로 받으면 base64 로
+   * 3분의 1쯤 커지고, 화면 사이로 넘기려면 sessionStorage(약 5MB)에 담아야 해서
+   * 긴 대화에서 터집니다. Blob 이면 그대로 업로드할 수 있습니다.
+   */
+  stopAndGetBlob: () => Promise<Blob | null>;
 };
 
 /**
@@ -29,28 +37,34 @@ export function startStudentMicRecorder(
   };
   recorder.start();
 
+  /** 녹음을 멈추고 모인 조각을 Blob 으로 만듭니다. 빈 녹음은 null. */
+  const stopAndGetBlob = (): Promise<Blob | null> =>
+    new Promise((resolve) => {
+      if (recorder.state !== 'recording') {
+        resolve(null);
+        return;
+      }
+
+      // 분석은 이 결과를 기다려야 하므로 onstop 을 여기서 연결합니다.
+      recorder.onstop = () => {
+        const blob = new Blob(chunks, { type: 'audio/webm' });
+        resolve(blob.size === 0 ? null : blob);
+      };
+
+      recorder.stop();
+    });
+
   return {
-    stopAndGetDataUri: () =>
-      new Promise((resolve) => {
-        if (recorder.state !== 'recording') {
-          resolve(null);
-          return;
-        }
-
-        // 분석은 이 결과를 기다려야 하므로 onstop 을 여기서 연결합니다.
-        recorder.onstop = () => {
-          const blob = new Blob(chunks, { type: 'audio/webm' });
-          if (blob.size === 0) {
-            resolve(null);
-            return;
-          }
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(typeof reader.result === 'string' ? reader.result : null);
-          reader.onerror = () => resolve(null);
-          reader.readAsDataURL(blob);
-        };
-
-        recorder.stop();
-      }),
+    stopAndGetBlob,
+    stopAndGetDataUri: async () => {
+      const blob = await stopAndGetBlob();
+      if (!blob) return null;
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(typeof reader.result === 'string' ? reader.result : null);
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(blob);
+      });
+    },
   };
 }

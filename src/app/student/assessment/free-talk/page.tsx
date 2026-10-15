@@ -3,6 +3,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { FreeTalkView } from "./free-talk-view"
+import { RealtimeAssessmentView } from "./realtime-view"
 import { useSearchParams, useRouter, notFound } from "next/navigation"
 import { type TeacherAssessment } from "@/lib/types"
 import { useEffect, useState } from "react"
@@ -75,9 +76,11 @@ export default function FreeTalkPage() {
           <CardDescription>{assessment.prompt}</CardDescription>
         </CardHeader>
         <CardContent>
-          <FreeTalkView 
-            assessment={assessment} 
-          />
+          {/* 통화 방식만 갈립니다. 채점·결과 경로는 둘이 같습니다.
+              예전에 만든 평가에는 conversationMode 가 없으므로 턴 방식이 기본입니다. */}
+          {assessment.conversationMode === 'realtime'
+            ? <RealtimeAssessmentView assessment={assessment} />
+            : <FreeTalkView assessment={assessment} />}
         </CardContent>
       </Card>
     </div>

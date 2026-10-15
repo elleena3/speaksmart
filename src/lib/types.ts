@@ -4,6 +4,43 @@ import { z } from 'zod';
 export const scenarios = ["free-talk", "ordering-food", "airport-check-in", "shopping"] as const;
 export type Scenario = (typeof scenarios)[number];
 
+/**
+ * 대화형 평가의 '통화 엔진'.
+ *
+ * turn     — 버튼을 눌러 주고받습니다. 한 턴에 전사·답변·음성합성을 차례로 불러
+ *            학생이 멈춘 뒤 약 10초를 기다립니다.
+ * realtime — OpenAI Realtime 과 WebRTC 로 음성을 직접 주고받습니다.
+ *            말이 끝나면(무음 0.5초) 자동으로 턴이 넘어가고 끼어들기도 됩니다.
+ *
+ * 채점 방식은 두 엔진이 같습니다(대화 분석 플로우). 엔진은 '어떻게 대화했는가'일
+ * 뿐이라 assessmentType 은 그대로 'dialogue' 를 씁니다. 그래서 결과·루브릭·성장
+ * 추이·다시 채점 경로가 모두 손대지 않고 그대로 동작합니다.
+ */
+export const conversationModes = ["turn", "realtime"] as const;
+export type ConversationMode = (typeof conversationModes)[number];
+
+/** OpenAI Realtime 통화에 쓰는 모델. 교사가 평가를 만들 때 고릅니다. */
+export const realtimeModels = [
+  { value: "gpt-realtime-2.1-mini", label: "gpt-realtime-2.1-mini (기본, 저렴)" },
+  { value: "gpt-realtime-2.1", label: "gpt-realtime-2.1 (고성능)" },
+] as const;
+export type RealtimeModel = (typeof realtimeModels)[number]["value"];
+export const defaultRealtimeModel: RealtimeModel = "gpt-realtime-2.1-mini";
+
+/** OpenAI Realtime 목소리. Gemini TTS 목소리(allVoices)와는 별개 목록입니다. */
+export const realtimeVoices = [
+  { value: "alloy", label: "Alloy (여성·중립)" },
+  { value: "echo", label: "Echo (남성·부드러움)" },
+  { value: "shimmer", label: "Shimmer (여성·밝음)" },
+  { value: "ash", label: "Ash (남성·진지함)" },
+  { value: "ballad", label: "Ballad (남성·차분함)" },
+  { value: "coral", label: "Coral (여성·상쾌함)" },
+  { value: "sage", label: "Sage (여성·전문적)" },
+  { value: "verse", label: "Verse (남성·에너제틱)" },
+] as const;
+export type RealtimeVoice = (typeof realtimeVoices)[number]["value"];
+export const defaultRealtimeVoice: RealtimeVoice = "alloy";
+
 // Google Cloud TTS Voice list updated for accuracy
 export const femaleVoices = ["laomedeia", "callirrhoe", "autonoe", "erinome"] as const;
 export const maleVoices = ["achernar", "algenib", "gacrux", "iapetus", "orus", "puck", "schedar", "zubenelgenubi"] as const;
@@ -159,6 +196,11 @@ export type TeacherAssessment = {
   startDate?: string;
   endDate?: string;
   assessmentType: 'monologue' | 'dialogue';
+  /** dialogue 일 때의 통화 방식. 없으면 'turn'(기존 평가들) 입니다. */
+  conversationMode?: ConversationMode;
+  /** conversationMode 가 'realtime' 일 때만 씁니다. */
+  realtimeModel?: RealtimeModel;
+  realtimeVoice?: RealtimeVoice;
   monologueType?: MonologueType;
   scenario?: Scenario;
   aiVoice?: AiVoice;

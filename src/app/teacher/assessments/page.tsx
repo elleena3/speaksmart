@@ -187,7 +187,10 @@ export default function AssessmentsPage() {
 
   const getAssessmentTypeText = (assessment: TeacherAssessment) => {
     if (assessment.assessmentType === 'dialogue') {
-      return t.teacherAssessments.assessmentTypes.dialogue;
+      // 통화 방식이 달라 학생이 보는 화면도 다릅니다. 목록에서 구분되어야 합니다.
+      return assessment.conversationMode === 'realtime'
+        ? t.teacherAssessments.assessmentTypes.realtime
+        : t.teacherAssessments.assessmentTypes.dialogue;
     }
     return t.teacherAssessments.assessmentTypes.monologue;
   }

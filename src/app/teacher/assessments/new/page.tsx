@@ -22,7 +22,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogClose } from "@/components/ui/dialog";
-import { scenarios, type TeacherAssessment, femaleVoices, maleVoices, allVoices, evaluationModels, assessmentEvaluationModels, assessmentEvaluationModelValues, type AssessmentEvaluationModel, voiceDescriptions, type AiVoice, type MonologueType, type UserData, imageGenerationModels, type Scenario, type EvaluationModel, type ImageGenerationModel, monologueTypes } from "@/lib/types";
+import { scenarios, type TeacherAssessment, femaleVoices, maleVoices, allVoices, evaluationModels, assessmentEvaluationModels, assessmentEvaluationModelValues, type AssessmentEvaluationModel, voiceDescriptions, type AiVoice, type MonologueType, type UserData, imageGenerationModels, type Scenario, type EvaluationModel, type ImageGenerationModel, monologueTypes, realtimeModels, realtimeVoices, type RealtimeModel, type RealtimeVoice, defaultRealtimeModel, defaultRealtimeVoice } from "@/lib/types";
 import { useAuth, mockStudents } from "@/context/auth-context";
 import { addDoc, collection, getDocs, query, where, orderBy } from "firebase/firestore";
 import { db, storage } from "@/lib/firebase";
@@ -123,7 +123,12 @@ export default function NewAssessmentPage() {
     expectedFormat: z.string().optional(),
     startDate: z.date().optional(),
     endDate: z.date().optional(),
-    assessmentType: z.enum(["monologue", "dialogue"]),
+    // 'realtime' 은 화면에서만 쓰는 값입니다. 저장할 때
+    // assessmentType: 'dialogue' + conversationMode: 'realtime' 로 나눠 담습니다.
+    // 채점·결과·루브릭은 통화 방식과 무관하게 같은 경로를 쓰기 때문입니다.
+    assessmentType: z.enum(["monologue", "dialogue", "realtime"]),
+    realtimeModel: z.enum(realtimeModels.map(m => m.value) as [RealtimeModel, ...RealtimeModel[]]).optional().default(defaultRealtimeModel),
+    realtimeVoice: z.enum(realtimeVoices.map(v => v.value) as [RealtimeVoice, ...RealtimeVoice[]]).optional().default(defaultRealtimeVoice),
     monologueType: z.enum(monologueTypes as [MonologueType, ...MonologueType[]]).optional(),
     targetType: z.enum(["all", "specific"]).default("all"),
     targetStudentIds: z.union([z.literal('all'), z.array(z.string()).min(1, "한 명 이상의 학생을 선택해야 합니다.")]),
@@ -135,7 +140,8 @@ export default function NewAssessmentPage() {
     loadedRubricId: z.string().optional(),
     imageGenerationModel: z.enum(imageGenerationModels as unknown as [ImageGenerationModel, ...ImageGenerationModel[]]).optional().default('googleai/gemini-3.1-flash-image'),
   }).superRefine((data, ctx) => {
-    const isFreeTalkDialogue = data.assessmentType === 'dialogue' && data.scenario === 'free-talk';
+    // 턴 방식과 실시간 모두 '대화형'입니다. 주제·지문 규칙은 둘이 같습니다.
+    const isFreeTalkDialogue = data.assessmentType !== 'monologue' && data.scenario === 'free-talk';
 
     if (!isFreeTalkDialogue) {
       if (!data.title) {
@@ -197,10 +203,12 @@ export default function NewAssessmentPage() {
   });
 
   const assessmentType = form.watch("assessmentType");
+  /** 턴 방식이든 실시간이든 '대화형'인지. 주제·지문·시나리오 칸은 둘이 같습니다. */
+  const isDialogueLike = assessmentType !== 'monologue';
   const monologueType = form.watch("monologueType");
   const targetType = form.watch("targetType");
   const scenario = form.watch("scenario");
-  const isFreeTalkDialogue = assessmentType === 'dialogue' && scenario === 'free-talk';
+  const isFreeTalkDialogue = isDialogueLike && scenario === 'free-talk';
   const useRubric = form.watch("useRubric");
 
   useEffect(() => {
@@ -338,6 +346,15 @@ export default function NewAssessmentPage() {
 
       let submissionValues: any = { ...values, imageUrl: imageUrl || undefined };
 
+      // 화면의 '실시간 대화' 선택을 저장 형태로 나눠 담습니다.
+      // assessmentType 은 'dialogue' 로 두어야 채점·결과·루브릭·성장 추이가
+      // 기존 경로를 그대로 타고, 통화 방식만 conversationMode 로 구분됩니다.
+      const isRealtime = values.assessmentType === 'realtime';
+      submissionValues.assessmentType = values.assessmentType === 'monologue' ? 'monologue' : 'dialogue';
+      if (values.assessmentType !== 'monologue') {
+        submissionValues.conversationMode = isRealtime ? 'realtime' : 'turn';
+      }
+
       if (isFreeTalkDialogue) {
         submissionValues.title = values.title || t.teacherAssessmentForm.scenarios.freeTalk;
         submissionValues.topic = values.topic || t.teacherAssessmentForm.freeTalkDefaults.topic;
@@ -370,8 +387,18 @@ export default function NewAssessmentPage() {
       if (values.assessmentType === 'monologue') {
         delete (docData as any).aiVoice;
         delete (docData as any).scenario;
+        delete (docData as any).realtimeModel;
+        delete (docData as any).realtimeVoice;
       } else {
         delete (docData as any).monologueType;
+        // 통화 방식에 따라 쓰지 않는 쪽은 저장하지 않습니다.
+        // aiVoice 는 Gemini TTS 목소리, realtimeVoice 는 OpenAI 목소리로 목록이 다릅니다.
+        if (isRealtime) {
+          delete (docData as any).aiVoice;
+        } else {
+          delete (docData as any).realtimeModel;
+          delete (docData as any).realtimeVoice;
+        }
       }
 
       Object.keys(docData).forEach(key => docData[key as keyof typeof docData] === undefined && delete docData[key as keyof typeof docData]);
@@ -403,7 +430,9 @@ export default function NewAssessmentPage() {
 
     const titleToCheck = values.title || (isFreeTalkDialogue ? t.teacherAssessmentForm.scenarios.freeTalk : "");
     if (!titleToCheck) {
-      form.handleSubmit(proceedToSubmit)(values);
+      // handleSubmit 은 이벤트를 받는 함수라 값 객체를 넘기면 타입이 맞지 않습니다.
+      // 여기서는 이미 검증을 통과한 값이므로 그대로 넘깁니다.
+      await proceedToSubmit(values);
       return;
     }
 
@@ -579,12 +608,70 @@ export default function NewAssessmentPage() {
                         <FormControl><RadioGroupItem value="dialogue" /></FormControl>
                         <FormLabel className="font-normal">{t.teacherAssessmentForm.typeDialogue}</FormLabel>
                       </FormItem>
+                      <FormItem className="flex items-center space-x-2 space-y-0">
+                        <FormControl><RadioGroupItem value="realtime" /></FormControl>
+                        <FormLabel className="font-normal">{t.teacherAssessmentForm.typeRealtime}</FormLabel>
+                      </FormItem>
                     </RadioGroup>
                   </FormControl>
+                  <FormDescription>
+                    {assessmentType === 'realtime'
+                      ? '학생이 버튼을 누르지 않고 말합니다. 말을 멈추면(0.5초) AI가 바로 대답하고 끼어들기도 됩니다. 채점 방식은 AI와 대화하기와 같습니다.'
+                      : assessmentType === 'dialogue'
+                        ? '학생이 [응답하기]와 [말하기 중지]를 눌러 한 번씩 주고받습니다. 멈춘 뒤 AI 답변까지 약 10초 걸립니다.'
+                        : undefined}
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
             />
+
+            {assessmentType === 'realtime' && (
+              <div className="grid grid-cols-1 gap-4 rounded-md border p-4 sm:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="realtimeModel"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>실시간 통화 모델</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {realtimeModels.map((m) => (
+                            <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>통화에만 쓰는 모델입니다. 채점 모델은 아래에서 따로 고릅니다.</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="realtimeVoice"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>AI 목소리</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {realtimeVoices.map((v) => (
+                            <SelectItem key={v.value} value={v.value}>{v.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>OpenAI 실시간 전용 목소리입니다.</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            )}
 
             {assessmentType === 'monologue' && (
               <FormField
@@ -706,6 +793,7 @@ export default function NewAssessmentPage() {
             )}
 
 
+            {/* Gemini TTS 목소리입니다. 실시간 대화는 OpenAI 목소리를 쓰므로 턴 방식에서만 보입니다. */}
             {assessmentType === 'dialogue' && (
               <FormField
                 control={form.control}
@@ -813,7 +901,7 @@ export default function NewAssessmentPage() {
               )}
             />
 
-            {assessmentType === 'dialogue' && (
+            {isDialogueLike && (
               <FormField
                 control={form.control}
                 name="scenario"
@@ -898,10 +986,10 @@ export default function NewAssessmentPage() {
               name="expectedFormat"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>{t.teacherAssessmentForm.expectedFormatLabel} {(assessmentType === 'dialogue' || useRubric) && `(${t.teacherAssessmentForm.optional})`}</FormLabel>
+                  <FormLabel>{t.teacherAssessmentForm.expectedFormatLabel} {(isDialogueLike || useRubric) && `(${t.teacherAssessmentForm.optional})`}</FormLabel>
                   <FormControl>
                     <Textarea
-                      placeholder={assessmentType === 'dialogue' ? '발음, 문법, 단어, 문장 등을 평가 주제에 맞게 종합적으로 판단.' : t.teacherAssessmentForm.expectedFormatPlaceholder}
+                      placeholder={isDialogueLike ? '발음, 문법, 단어, 문장 등을 평가 주제에 맞게 종합적으로 판단.' : t.teacherAssessmentForm.expectedFormatPlaceholder}
                       rows={4}
                       {...field}
                       disabled={useRubric}

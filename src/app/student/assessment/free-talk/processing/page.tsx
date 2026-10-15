@@ -202,9 +202,15 @@ export default function DialogueProcessingPage() {
             });
 
             // Step 1: Upload recording
-            const storageRef = ref(storage, `recordings/${user.uid}_dialogue_${newResultDocRef.id}.webm`);
-            const uploadSnapshot = await uploadString(storageRef, studentRecordingDataUri, 'data_url');
-            downloadURL = await getDownloadURL(uploadSnapshot.ref);
+            // 실시간 대화는 응시 화면에서 이미 Storage 에 올리고 URL 만 넘깁니다.
+            // 긴 대화를 data URI 로 바꾸면 sessionStorage 용량을 넘겨 제출이 실패합니다.
+            if (/^https?:\/\//.test(studentRecordingDataUri)) {
+                downloadURL = studentRecordingDataUri;
+            } else {
+                const storageRef = ref(storage, `recordings/${user.uid}_dialogue_${newResultDocRef.id}.webm`);
+                const uploadSnapshot = await uploadString(storageRef, studentRecordingDataUri, 'data_url');
+                downloadURL = await getDownloadURL(uploadSnapshot.ref);
+            }
             
             // Step 2: Update status to 'analyze' after upload
             await updateDoc(newResultDocRef, { studentRecordingUrl: downloadURL, status: "분석 중: analyze" });
