@@ -48,6 +48,15 @@ export const realtimeVoices = [
 export type RealtimeVoice = (typeof realtimeVoices)[number]["value"];
 export const defaultRealtimeVoice: RealtimeVoice = "marin";
 
+/**
+ * 실시간 대화의 기본 제한 시간(분).
+ *
+ * 실시간 통화는 접속해 있는 시간만큼 과금됩니다. 제한을 비워 두면 학생이 창을
+ * 닫지 않는 한 계속 연결되어 인원×시간으로 비용이 불어납니다. 그래서 기본값을
+ * 두고, 교사가 필요하면 늘립니다. 혼자 말하기·턴 방식 기본값(무제한)은 그대로입니다.
+ */
+export const DEFAULT_REALTIME_TIME_LIMIT_MIN = 2;
+
 // Google Cloud TTS Voice list updated for accuracy
 export const femaleVoices = ["laomedeia", "callirrhoe", "autonoe", "erinome"] as const;
 export const maleVoices = ["achernar", "algenib", "gacrux", "iapetus", "orus", "puck", "schedar", "zubenelgenubi"] as const;

@@ -23,7 +23,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { scenarios, type RubricCriterion, type TeacherAssessment, femaleVoices, maleVoices, allVoices, assessmentEvaluationModels, assessmentEvaluationModelValues, type AssessmentEvaluationModel, voiceDescriptions, type AiVoice, type UserData, realtimeModels, realtimeVoices, type RealtimeModel, type RealtimeVoice, defaultRealtimeModel, defaultRealtimeVoice } from "@/lib/types";
+import { scenarios, type RubricCriterion, type TeacherAssessment, femaleVoices, maleVoices, allVoices, assessmentEvaluationModels, assessmentEvaluationModelValues, type AssessmentEvaluationModel, voiceDescriptions, type AiVoice, type UserData, realtimeModels, realtimeVoices, type RealtimeModel, type RealtimeVoice, defaultRealtimeModel, defaultRealtimeVoice, DEFAULT_REALTIME_TIME_LIMIT_MIN } from "@/lib/types";
 import { useAuth, mockStudents } from "@/context/auth-context";
 import { doc, getDoc, updateDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -161,6 +161,13 @@ export default function EditAssessmentPage() {
   const scenario = form.watch("scenario");
   /** 턴 방식이든 실시간이든 '대화형'인지. */
   const isDialogueLike = assessmentType !== 'monologue';
+
+  // 실시간으로 바꿨는데 제한 시간이 비어 있으면 기본값을 채웁니다.
+  useEffect(() => {
+    if (assessmentType !== 'realtime') return;
+    const current = form.getValues('recordingTimeLimit');
+    if (!current) form.setValue('recordingTimeLimit', DEFAULT_REALTIME_TIME_LIMIT_MIN);
+  }, [assessmentType, form]);
   const isFreeTalkDialogue = isDialogueLike && scenario === 'free-talk';
   const useRubric = form.watch("useRubric");
   // 수정 화면에서도 루브릭을 바꿀 수 있어야 합니다. 예전에는 생성 시에만 고를 수 있었습니다.
@@ -911,7 +918,9 @@ export default function EditAssessmentPage() {
               />
             )}
 
-            {assessmentType === 'monologue' && (
+            {/* 실시간 대화는 접속한 시간만큼 과금되므로 제한 시간이 필요합니다.
+                턴 방식은 이 값을 읽는 코드가 없어 숨겨 둡니다. */}
+            {(assessmentType === 'monologue' || assessmentType === 'realtime') && (
               <FormField
                 control={form.control}
                 name="recordingTimeLimit"
@@ -927,7 +936,11 @@ export default function EditAssessmentPage() {
                         onChange={event => field.onChange(parseInt(event.target.value, 10) || 0)}
                       />
                     </FormControl>
-                    <FormDescription>{t.teacherAssessmentForm.timeLimitDescription}</FormDescription>
+                    <FormDescription>
+                      {assessmentType === 'realtime'
+                        ? '이 시간이 지나면 통화가 자동으로 끊기고 지금까지의 대화로 채점합니다. 실시간 통화는 접속한 시간만큼 과금되므로 비워 두지 마십시오.'
+                        : t.teacherAssessmentForm.timeLimitDescription}
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}

@@ -22,7 +22,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogClose } from "@/components/ui/dialog";
-import { scenarios, type TeacherAssessment, femaleVoices, maleVoices, allVoices, evaluationModels, assessmentEvaluationModels, assessmentEvaluationModelValues, type AssessmentEvaluationModel, voiceDescriptions, type AiVoice, type MonologueType, type UserData, imageGenerationModels, type Scenario, type EvaluationModel, type ImageGenerationModel, monologueTypes, realtimeModels, realtimeVoices, type RealtimeModel, type RealtimeVoice, defaultRealtimeModel, defaultRealtimeVoice } from "@/lib/types";
+import { scenarios, type TeacherAssessment, femaleVoices, maleVoices, allVoices, evaluationModels, assessmentEvaluationModels, assessmentEvaluationModelValues, type AssessmentEvaluationModel, voiceDescriptions, type AiVoice, type MonologueType, type UserData, imageGenerationModels, type Scenario, type EvaluationModel, type ImageGenerationModel, monologueTypes, realtimeModels, realtimeVoices, type RealtimeModel, type RealtimeVoice, defaultRealtimeModel, defaultRealtimeVoice, DEFAULT_REALTIME_TIME_LIMIT_MIN } from "@/lib/types";
 import { useAuth, mockStudents } from "@/context/auth-context";
 import { addDoc, collection, getDocs, query, where, orderBy } from "firebase/firestore";
 import { db, storage } from "@/lib/firebase";
@@ -205,6 +205,15 @@ export default function NewAssessmentPage() {
   const assessmentType = form.watch("assessmentType");
   /** 턴 방식이든 실시간이든 '대화형'인지. 주제·지문·시나리오 칸은 둘이 같습니다. */
   const isDialogueLike = assessmentType !== 'monologue';
+
+  // 실시간 대화를 고르면 제한 시간을 기본값으로 채웁니다.
+  // 비워 두면 학생이 창을 닫지 않는 한 통화가 계속되어 과금이 이어집니다.
+  // 교사가 값을 넣어 둔 경우에는 건드리지 않습니다.
+  useEffect(() => {
+    if (assessmentType !== 'realtime') return;
+    const current = form.getValues('recordingTimeLimit');
+    if (!current) form.setValue('recordingTimeLimit', DEFAULT_REALTIME_TIME_LIMIT_MIN);
+  }, [assessmentType, form]);
   const monologueType = form.watch("monologueType");
   const targetType = form.watch("targetType");
   const scenario = form.watch("scenario");
@@ -1083,7 +1092,9 @@ export default function NewAssessmentPage() {
               />
             </div>
 
-            {assessmentType === 'monologue' && (
+            {/* 실시간 대화는 접속한 시간만큼 과금되므로 제한 시간이 필요합니다.
+                턴 방식은 이 값을 읽는 코드가 없어 숨겨 둡니다. */}
+            {(assessmentType === 'monologue' || assessmentType === 'realtime') && (
               <FormField
                 control={form.control}
                 name="recordingTimeLimit"
@@ -1098,7 +1109,11 @@ export default function NewAssessmentPage() {
                         onChange={event => field.onChange(parseInt(event.target.value, 10) || undefined)}
                       />
                     </FormControl>
-                    <FormDescription>{t.teacherAssessmentForm.timeLimitDescription}</FormDescription>
+                    <FormDescription>
+                      {assessmentType === 'realtime'
+                        ? '이 시간이 지나면 통화가 자동으로 끊기고 지금까지의 대화로 채점합니다. 실시간 통화는 접속한 시간만큼 과금되므로 비워 두지 마십시오.'
+                        : t.teacherAssessmentForm.timeLimitDescription}
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
