@@ -27,8 +27,15 @@ export const realtimeModels = [
 export type RealtimeModel = (typeof realtimeModels)[number]["value"];
 export const defaultRealtimeModel: RealtimeModel = "gpt-realtime-2.1-mini";
 
-/** OpenAI Realtime 목소리. Gemini TTS 목소리(allVoices)와는 별개 목록입니다. */
+/**
+ * OpenAI Realtime 목소리. Gemini TTS 목소리(allVoices)와는 별개 목록입니다.
+ *
+ * OpenAI 에 엉터리 값을 넣어 직접 받은 지원 목록 10종입니다.
+ * marin·cedar 는 GA 모델과 함께 추가된 목소리라 기본값으로 둡니다.
+ */
 export const realtimeVoices = [
+  { value: "marin", label: "Marin (여성·자연스러움, 기본값)" },
+  { value: "cedar", label: "Cedar (남성·자연스러움)" },
   { value: "alloy", label: "Alloy (여성·중립)" },
   { value: "echo", label: "Echo (남성·부드러움)" },
   { value: "shimmer", label: "Shimmer (여성·밝음)" },
@@ -39,7 +46,7 @@ export const realtimeVoices = [
   { value: "verse", label: "Verse (남성·에너제틱)" },
 ] as const;
 export type RealtimeVoice = (typeof realtimeVoices)[number]["value"];
-export const defaultRealtimeVoice: RealtimeVoice = "alloy";
+export const defaultRealtimeVoice: RealtimeVoice = "marin";
 
 // Google Cloud TTS Voice list updated for accuracy
 export const femaleVoices = ["laomedeia", "callirrhoe", "autonoe", "erinome"] as const;
